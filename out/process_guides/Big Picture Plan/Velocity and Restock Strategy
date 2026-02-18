@@ -1,0 +1,299 @@
+## Where you are now (zoomed out, fact-based)
+
+* The **API-first E-cycle foundation** (phases 1–7 from `out/process_guides/e-cycle-plan.md`) appears to be implemented and running: pricing/offer snapshots, inventory/inbound snapshots + history, refund/adjustment snapshots + history, plus cadence + lineage checks.
+* Latest health is **OK**, but the **stability gate is not closed** yet: you have **7 consecutive OK runs** and the target is **10**.
+* Two operational gaps called out in the transparency report:
+
+  1. **Rollback snapshot retention** (“keep last 3 publish snapshots”) is not evidenced (folder missing).
+  2. **API collection is being run more often than daily** in practice (multiple runs per hour observed). That’s fine for testing, but it matters once you start allocating the API budget to “micro-managed” SKUs.
+* Your current E-runbook’s intent is correct: **E is compute-only** on top of collected datasets and **should not change prices**.
+
+That means your “larger picture” is: **you already built the data spine**; now you need the **portfolio manager + per-SKU micromanager** layers on top.
+
+---
+
+## The clean architecture you’re building (so the names stop feeling messy)
+
+Think in **layers**, not “cycles”:
+
+### A/B/C = Data + Accounting truth
+
+* **B/C**: Token COGS, fees, Order_Master truth.
+* **A**: Single-owner API collection (offers, inventory, inbound, refunds).
+
+### H = History (not a new cycle)
+
+* “H” is just the **history datasets** (offer_history, inventory_history, inbound_history, refund_history).
+* It runs *inside A* (scheduled), feeding E.
+
+This is explicitly aligned with the API-first plan: snapshots + histories are “market context” inputs; they’re not a separate operational cycle.
+
+### E = Decision facts + recommendations (no execution)
+
+* E turns all that into **metrics, flags, and recommendations** (velocity, stock posture, forward economics placeholders, reason codes, etc).
+
+### F = Execution (manual → semi-auto → auto)
+
+* F is the part that **changes price** (initially you = F0).
+* Later: scripts push changes via SP-API safely.
+
+---
+
+## Master roadmap: from “working E” to “finished micromanagers”
+
+This is the **zoomed-out plan that manages the phased plans** you already have.
+
+### Phase M0 — Stabilise the spine (short, boring, necessary)
+
+**Goal:** Make the data spine trustworthy enough that it doesn’t waste your time.
+
+**Deliverables**
+
+* Close the **10 consecutive OK runs** stability gate.
+* Add the missing **publish snapshot retention** (keep last 3) so any bad publish/run can be rolled back safely.
+* Tighten **API collection cadence** to match the plan:
+
+  * Phase 1–2: **daily** collection
+  * After stability: offers every **4 hours (training set only)**, E every **12 hours**.
+
+**Why this matters:** It prevents “system feels chaotic” when you start letting the micromanager act.
+
+---
+
+### Phase M1 — F0 “manual micromanager program” (you act as F, but systemised)
+
+**Goal:** Turn your real-world pricing instincts into a repeatable, logged process so later automation is “codify what works”.
+
+**Deliverables**
+
+* Keep the scope constrained: **5–10 SKUs** in a training set (you already have this pattern).
+* Daily routine:
+
+  * E runs (facts)
+  * Market snapshot/history refresh (A-run)
+  * You choose a “state” per SKU and execute in PPP/manual
+  * Log the decision + outcome next day
+
+This is the bridge you originally intended: decision logs + outcome logs become the training data for rules.
+
+---
+
+### Phase M2 — Build *forward* unit economics (this fixes your ROI complaint)
+
+You’re right: **historic realised ROI is not sufficient for decisions when token cost changes**. So the micromanager needs **forward economics**.
+
+**Goal:** Per SKU, compute “if we price at X today, what do we expect to earn?”
+
+**Deliverables (E adds these as computed, not blank placeholders)**
+
+* `current_unit_cost_gbp` (latest token cost basis that will be consumed next)
+* `expected_refund_cost_per_unit_gbp` (from refund/adjustment history)
+* `expected_net_profit_per_unit_gbp_at_our_price`
+* `expected_net_profit_per_unit_gbp_at_buy_box`
+* `roi_at_our_price_pct`, `roi_at_buy_box_price_pct` (your placeholders already exist, but must be populated)
+* Optional but powerful: `break_even_price_gbp` and `min_floor_price_gbp` (guardrail for F)
+
+**Key design rule (prevents confusion):**
+
+* **Realised ROI** stays as “accounting truth / audit trail”.
+* **Forward ROI** is what F uses to decide actions.
+
+This matches the separation that keeps the system explainable and prevents the “why did it do that?” chaos.
+
+---
+
+### Phase M3 — Portfolio “lane selection” (this is how you avoid micromanaging everything)
+
+**Goal:** The system decides which SKUs deserve heavy attention, because API + time are limited.
+
+You create 3 lanes:
+
+**Lane 0 — Passive**
+
+* Low value/day or low confidence data
+* Updated daily only
+* Reprice with simple min/max (PPP or basic rules)
+
+**Lane 1 — Managed**
+
+* Medium value/day or moderate competition
+* Offer snapshots every 4–12h
+* “Cooperate/Defensive” most of the time
+
+**Lane 2 — Micro-managed**
+
+* High **profit/day potential**, high volatility, high strategic importance
+* Offer snapshots every 1–4h (within API budget)
+* State machine allowed to switch modes faster
+
+**Scoring (simple, explainable)**
+A daily score per SKU such as:
+
+`priority_score = (expected_profit_per_day) × (buy_box_opportunity) × (volatility_factor) × (stock_feasibility)`
+
+Where:
+
+* expected_profit_per_day = (expected_profit_per_unit_at_buy_box) × (expected_units_per_day)
+* buy_box_opportunity = “we are not winning now” OR “buy box price is above our floor”
+* volatility_factor = buy box price changes/day, offer count changes/day (from history)
+* stock_feasibility = penalise if days-of-cover is low or inbound is far away
+
+This is directly aligned with your “value beats velocity” point and is consistent with the system design direction.
+
+---
+
+### Phase M4 — The per-SKU micromanager state machine (your “manager for one product” idea)
+
+**Goal:** Each SKU gets a **state**, a **target**, and a **timebox**, so it can “play nice first” and escalate only when it’s worth it.
+
+Start with a small set of states (the exact names don’t matter; the guardrails do):
+
+* **COOPERATE**: maximise margin; don’t chase pennies; only small moves.
+* **PROBE**: small controlled undercut/overcut tests to learn the listing’s “delta to win”.
+* **PRESSURE**: time-boxed aggression *only if* forward ROI stays above floor.
+* **DEFENSIVE**: raise price / reduce competitiveness when stock is low or inbound is far.
+* **LIQUIDATE**: sell-through mode (reduce price within floor to clear stock / avoid storage risk).
+* **HIBERNATE**: effectively pause (or set high) when unsavable/unprofitable until conditions change.
+
+The state machine should output:
+
+* `recommended_state`
+* `recommended_target_price`
+* `min_price_floor` and `max_price_ceiling`
+* `why` (reason codes)
+* `expires_at` (so it doesn’t get stuck in “pressure forever”)
+
+This matches the “one product is the whole business” micromanager concept you’ve described and what your older repricer design notes were aiming at (rules + logging + unsavable SKU flagging).
+
+**Important constraint:** keep the system profit-focused and guardrailed. Don’t build “hurt competitor” objectives; build “maximise profit/day within floors and compliance”.
+
+---
+
+### Phase M5 — F1 semi-automation (assistant, not autopilot)
+
+**Goal:** The system generates price changes, but you approve.
+
+**Deliverables**
+
+* A file like `out/f_price_actions_proposed.csv`:
+
+  * sku, asin
+  * current_price, target_price
+  * floor, ceiling
+  * state, reason, confidence
+* A “diff-style” summary so you can approve quickly.
+* Hard guardrails:
+
+  * max price changes per SKU per day
+  * min time between changes (“cooldown”)
+  * never below floor
+  * kill switch env var
+
+This is where you get 80% of the benefit with 20% of the risk.
+
+---
+
+### Phase M6 — F2 full automation (only for Lane 2 SKUs, gradually)
+
+**Goal:** Automated price updates via SP-API, but bounded.
+
+**Deliverables**
+
+* A dedicated price updater that respects:
+
+  * global lock/throttle (you already have the pattern in the API owner layer)
+  * per-SKU cooldown (no flapping)
+  * min/max
+  * failure is fail-soft (log + skip; don’t break A)
+
+This aligns with your earlier research design: scheduler + caching + rate limit tracker + decision logging.
+
+---
+
+### Phase M7 — Scale-out + learning loop
+
+**Goal:** Expand coverage and improve strategies without blowing the business up.
+
+* Expand Lane 2 from 10 → 30 → 100 SKUs based on profit/day and stability.
+* Weekly review:
+
+  * Which states worked?
+  * Which SKUs are “unsavable” and should be hibernated?
+  * Adjust thresholds *in config*, not by rewriting code every time.
+
+---
+
+## How the micromanager handles your specific real-world scenarios
+
+### 1) “Sells 200 one month, 0 next month because we were uncompetitive, then we re-enter”
+
+Fix: Split the concept into:
+
+* **Market demand** (listing-level): from offer history + (optional) rank/BBP signals
+* **Our capture** (seller-level): from our sales and buy box competitiveness
+
+So velocity becomes:
+
+* `market_velocity_est` (demand proxy)
+* `our_velocity_realised` (what we captured)
+* `expected_velocity_if_competitive` (market × expected share)
+
+That prevents “velocity = 0 forever” just because you temporarily chose not to compete.
+
+### 2) “Out of stock for 3 months, comes back, don’t treat as new but don’t assume old”
+
+Fix: A “re-entry ramp” state:
+
+* Week 1: use 30–50% of old expected velocity
+* Week 2–3: increase if sell-through confirms
+* If market signals worsened (buy box price down, offer count up, etc), ramp slower
+
+### 3) “Need to sell off stock”
+
+Use **LIQUIDATE** state with:
+
+* floor = break-even or minimum acceptable loss (owner-defined)
+* target = floor + small buffer
+* disable “chasing buy box” if it causes flapping
+
+### 4) “Aggressive undercutter keeps attacking my price”
+
+Treat as **high volatility / hostile listing**:
+
+* time-box **PROBE** and **PRESSURE**
+* if you can’t win profitably, step into **COOPERATE** or **HIBERNATE**
+* only escalate when:
+
+  * profit/day upside is large
+  * and stock posture supports it
+  * and forward ROI stays above your floor
+
+This lets the system “pick battles” instead of trying to win every listing.
+
+---
+
+## API cooldown reality (how to make it workable)
+
+Your own older design notes already point at the right approach: **rate limiting + caching + prioritised scheduling**.
+
+Practical policy that matches your frozen plan:
+
+* During stability: **daily** API pull + daily E.
+* After stability:
+
+  * Lane 2: every **1–4 hours** (depending on budget)
+  * Lane 1: every **8–24 hours**
+  * Lane 0: daily or less
+* Use batching wherever possible (training set first) and let “lane selection” determine who gets the extra calls.
+
+---
+
+## The “next steps” from where you are now (the minimum you need to stay oriented)
+
+1. **Close stability gate (10 OK runs)** and implement **publish snapshot retention** (last 3).
+2. Implement **forward economics** in E (populate the projected ROI placeholders using current token cost + refund expectations + market price).
+3. Add **lane selection scoring** so only a subset becomes micro-managed (Lane 2). (This is explicitly a “later phase” item beyond the current E working-finish definition.)
+4. Run **F0 manual** on 5–10 SKUs, but log every decision/outcome so you can codify rules later.
+5. Build the **state machine outputs** (recommendations) before building autopilot execution.
+
+If you want, I can convert the above into a **single “Master Roadmap” markdown** that lives alongside the existing phased plans (so you have one zoomed-out page to reference), but the plan above is the complete structure.

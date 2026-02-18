@@ -1,0 +1,15 @@
+check_type,order_id,delta,notes
+sales,026-5779852-3693911,4.990000000000002,Check in Seller Central transaction details
+fees,026-9393020-5089962,-15.01,Check in Seller Central transaction details
+fees,406-1515262-6745944,-12.66,Check in Seller Central transaction details
+fees,026-5779852-3693911,-11.75,Check in Seller Central transaction details
+fees,405-4689348-9081153,-9.69,Check in Seller Central transaction details
+fees,171-4156688-4630732,-9.69,Check in Seller Central transaction details
+fees,206-9306685-0504363,-8.3,Check in Seller Central transaction details
+fees,204-7594989-9607547,-7.69,Check in Seller Central transaction details
+fees,205-0096432-1312317,-7.31,Check in Seller Central transaction details
+fees,206-5452379-4242722,-5.84,Check in Seller Central transaction details
+fees,204-3131865-7775515,-5.84,Check in Seller Central transaction details
+cogs,204-9203725-8492315,0.27,Check in Seller Central transaction details
+cogs,206-4792723-5481947,0.27,Check in Seller Central transaction details
+cogs,202-9354624-2423517,0.1400000000000005,Check in Seller Central transaction details

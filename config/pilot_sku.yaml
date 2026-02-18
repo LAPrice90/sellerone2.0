@@ -1,0 +1,43 @@
+sku: L1-54EX-56YC
+pilot_whitelist_sku: L1-54EX-56YC
+pilot_whitelist_skus: ""
+target_universe_mode: active_merchant
+asin: B0DK2JYVGK
+marketplace_id: A1F83G8C2ARO7P
+seller_id: AB5OM860MS57Z
+pricing_writer_mode: CODEX_H
+enabled_live_writes: true
+live_sku_allowlist: L1-54EX-56YC
+scan_cooldown_minutes: 15
+sku_call_spacing_seconds: 2.1
+use_active_merchant_skus: true
+max_skus_per_run: 0
+allow_h_intraday_intel_refresh: false
+
+boundaries:
+  hard_floor_gbp: 10.90
+  manual_cap_gbp: 17.99
+  policy_buffer_pct: 0.03
+
+guardrails:
+  max_step_down_gbp: 0.20
+  max_step_up_gbp: 0.20
+  max_daily_drop_gbp: 0.60
+  price_apply_tolerance_gbp: 0.01
+
+eligibility:
+  foep_stale_hours: 48
+  foep_sanity_min_mult: 0.50
+  foep_sanity_max_mult: 2.00
+  use_cpt_ceiling: false
+
+learning:
+  delta_tolerance_gbp: 0.02
+  stable_buffer_gbp: 0.02
+  min_clean_tests_for_confidence: 5
+
+daily_intel:
+  foep_status: MISSING
+  foep_price_gbp: ""
+  cpt_gbp: ""
+  last_known_safe_gbp: ""

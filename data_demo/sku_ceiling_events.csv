@@ -1,0 +1,2 @@
+event_ts_utc,sku,our_delivery_penalty_gbp,compliance_ceiling_landed_gbp,eligibility_ceiling_landed_gbp,demand_ceiling_landed_gbp,final_ceiling_landed_gbp,binding_ceiling_type,ceiling_reason_codes_json
+2026-02-13T15:55:59Z,DEMO-SKU,0.00,18.33,18.95,19.00,18.33,COMPLIANCE,"[""BINDING_CEILING_COMPLIANCE""]"

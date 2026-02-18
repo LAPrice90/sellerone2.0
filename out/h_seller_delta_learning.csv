@@ -1,0 +1,3 @@
+asof_date,updated_utc,marketplace,sku,seller_id,seller_mode,learned_delta_gbp,highest_delta_win_gbp,lowest_delta_loss_gbp,delta_gap_gbp,delta_confidence,last_validated_utc,source,notes
+2026-02-13,2026-02-13T15:22:42Z,UK,JB-RGB6-LZOJ,A39VTM0CZSRJZA,learn,,,3.64,,unknown,,run_H_pricing_cycle,observed_win_now=0
+2026-02-16,2026-02-16T16:49:52Z,UK,L1-54EX-56YC,A292BGT65ET8F0,learn,,,0.60,,unknown,,run_H_pricing_cycle,observed_win_now=0

@@ -1,0 +1,29 @@
+transaction_type,breakdown_type,description,breakdown_currency,rows,amount_total
+FBAInventoryReimbursement,Expenses,COMPENSATED_CLAWBACK,GBP,1,-10.47
+FBAInventoryReimbursement,Expenses,REVERSAL_REIMBURSEMENT,EUR,1,0.0
+FBAInventoryReimbursement,Expenses,REVERSAL_REIMBURSEMENT,GBP,16,0.0
+FBAInventoryReimbursement,Expenses,WAREHOUSE_LOST,GBP,2,0.0
+FBAInventoryReimbursement,Sales,COMPENSATED_CLAWBACK,GBP,1,0.0
+FBAInventoryReimbursement,Sales,REVERSAL_REIMBURSEMENT,EUR,1,14.78
+FBAInventoryReimbursement,Sales,REVERSAL_REIMBURSEMENT,GBP,16,50.910000000000004
+FBAInventoryReimbursement,Sales,WAREHOUSE_LOST,GBP,2,8.04
+Refund,Refunded Expenses,Refund,GBP,29,58.53
+Refund,Refunded Sales,Refund,GBP,29,-366.21
+Retrocharge,Expenses,RetroChargeRefund,GBP,1,-1.08
+Retrocharge,Expenses,Retrocharge,GBP,1,0.0
+Retrocharge,Sales,RetroChargeRefund,GBP,1,0.0
+Retrocharge,Sales,Retrocharge,GBP,1,1.08
+ServiceFee,Expenses,FBAPostInboundTransportation,GBP,3,-23.740000000000002
+ServiceFee,Expenses,FBARemoval,GBP,2,-2.76
+ServiceFee,Sales,FBAPostInboundTransportation,GBP,3,0.0
+ServiceFee,Sales,FBARemoval,GBP,2,0.0
+Shipment,Expenses,Order Payment,AED,7,-401.1
+Shipment,Expenses,Order Payment,EUR,3,-11.61
+Shipment,Expenses,Order Payment,GBP,1285,-5991.9
+Shipment,Expenses,Order Payment,SAR,1,-44.74
+Shipment,Sales,Order Payment,AED,7,1060.8600000000001
+Shipment,Sales,Order Payment,EUR,3,15.99
+Shipment,Sales,Order Payment,GBP,1285,15059.78
+Shipment,Sales,Order Payment,SAR,1,166.39
+Transfer,Expenses,Disbursement,GBP,1,0.0
+Transfer,Sales,Disbursement,GBP,1,4139.74

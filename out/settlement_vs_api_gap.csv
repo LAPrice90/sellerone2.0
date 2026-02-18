@@ -1,0 +1,9 @@
+missing_transaction_type
+COMPENSATED_CLAWBACK
+Inbound Transportation Fee
+Order
+Order_Retrocharge
+REVERSAL_REIMBURSEMENT
+Refund_Retrocharge
+RemovalComplete
+WAREHOUSE_LOST

@@ -1,0 +1,5 @@
+timestamp_utc,cycle_start_utc,cycle,mode_requested,mode_effective,legacy_fail_count,legacy_warn_count,legacy_gate_block,split_fail_count,split_warn_count,split_gate_block,decision_match,h_clean,b_match_streak,h_clean_streak,ready_for_cutover,legacy_source,split_source,notes
+2026-02-18T10:30:25Z,20260218T102540Z,H,shadow,shadow,,,,0,2,0,,1,0,1,0,,checklist_H_split.csv,
+2026-02-18T10:50:03Z,20260218T104523Z,H,shadow,shadow,,,,0,2,0,,1,0,2,0,,checklist_H_split.csv,
+2026-02-18T11:09:23Z,20260218T110452Z,H,shadow,shadow,,,,0,2,0,,1,0,3,0,,checklist_H_split.csv,
+2026-02-18T11:29:15Z,20260218T112423Z,H,shadow,shadow,,,,0,2,0,,1,0,4,0,,checklist_H_split.csv,

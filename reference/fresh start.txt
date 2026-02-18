@@ -1,0 +1,278 @@
+Where you are going wrong is not “a little bug” - it is a broken invariant in the pipeline:
+
+* **Level 3 is being allowed to create “orders” (keys) instead of only enriching real Level 1 orders.**
+* Because Level 3 does not carry order quantities, anything downstream that treats Level 3 rows as order lines will invent demand and/or invent dates.
+* Your health check (A015) is missing the one check that would have screamed immediately: **“keys in Order_Master (or L3) that do not exist in Level 1.”**
+
+Below is the detailed breakdown: what was meant to happen, what is actually happening, and why - with evidence from the files you attached.
+
+---
+
+## What was meant to happen (the invariant)
+
+### Canonical truth
+
+1. **Level 1 creates the canonical order line keyset**: `(Order ID, SKU)` and provides:
+
+   * Order purchase date (the “real order date”)
+   * Quantity ordered (the only safe quantity source)
+   * Market/country/currency context (directly or derivable)
+
+2. **Level 2 and Level 3 only enrich those same keys**
+
+   * L2 improves estimates
+   * L3 replaces fees/sales with final finance values
+
+### Order_Master rules that must always hold
+
+* **Order_Master rows must be a subset of Level 1 keys** (or Level 1 + Level 2, if you explicitly allow L2-only, but never L3-only).
+* **Order_Master.Date must come from Level 1** (purchase date), not from an L3 event timestamp.
+* **Token allocation demand must come from Level 1 quantities**, not from L3 rows.
+
+This is the only setup that prevents “finance rows” from being treated as “orders”.
+
+---
+
+## What is actually happening (symptoms + evidence)
+
+### Symptom A: Token shortages are exploding and blocking publish
+
+Your `system_health_checklist.csv` shows:
+
+* `token_shortages_by_sku` = **FAIL (58)**
+* `order_master_blank_cogs_lvl1plus` = **WARN (903)**
+* And your `B_cycle.log` repeatedly shows publish being skipped due to health FAIL.
+
+So you are stuck in a loop: the system is protecting you by **not publishing** while the underlying state is broken.
+
+### Symptom B: Level 3 has no quantities (so it cannot be a driver for token demand)
+
+From your `financial_events_level3_official.csv`:
+
+* **Quantity Ordered is blank on 6300/6300 rows (100%).**
+
+That is normal for a financial-events feed: it is not an order-items feed.
+
+If any part of the pipeline uses Level 3 rows as “things that must be allocated tokens”, it has to either:
+
+* default missing quantity to 1 (phantom demand), or
+* treat missing as 0 (silently missing COGS),
+* or do some other unsafe fallback.
+
+### Symptom C (hard evidence): Your shortages track Level 3 rows almost exactly
+
+This is the biggest smoking gun from your attached outputs:
+
+* For each SKU, I compared:
+
+  * `missing_qty` (from `token_shortages_by_sku.csv`)
+  * vs the number of Level 3 rows for that SKU (from `financial_events_level3_official.csv`)
+
+Result:
+
+* Correlation is **0.996** (almost perfect).
+* For most SKUs, `missing_qty` is the same as (or very close to) the number of Level 3 rows.
+
+Top examples:
+
+| seller_sku   | missing_qty | l3_rows | delta_missing_minus_l3 |
+| ------------ | ----------- | ------- | ---------------------- |
+| 6V-EEC1-2S9Z | 1543        | 1570    | -27                    |
+| WX-L5UA-UB1Q | 630         | 570     | 60                     |
+| A2-T2AC-TW3L | 539         | 538     | 1                      |
+| DC-K5WH-R7F5 | 419         | 317     | 102                    |
+| XH-0LAE-FQO5 | 302         | 276     | 26                     |
+| NN-TSZ1-X2RD | 265         | 207     | 58                     |
+| VF-3T0K-DR5O | 235         | 267     | -32                    |
+| EV-CHU5-XU3G | 184         | 165     | 19                     |
+| Z7-26PV-O9LR | 153         | 133     | 20                     |
+| TU-8I14-25ZR | 113         | 102     | 11                     |
+| L3-ZQ8U-A7LQ | 86          | 29      | 57                     |
+| SU-5LQH-2DVN | 62          | 58      | 4                      |
+
+That pattern is extremely consistent with this failure mode:
+
+* **Either Order_Master is being seeded with Level 3 keys,**
+* **or token allocation is reading Level 3 (directly or indirectly),**
+* **and treating each Level 3 row as a unit of demand.**
+
+That is exactly how “L3-only rows masquerade as orders” shows up downstream.
+
+---
+
+## Why it is happening (mechanism)
+
+### 1) Wrong join direction / wrong keyset construction
+
+Your runbook says “if Level 3 exists use it”. That is fine **only if** Level 3 is treated as **enrichment**.
+
+The likely code pattern in `B004_build_order_master.py` is something like:
+
+* build a union/outer-join of keys across L1 + L2 + L3
+* then pick best available values per column (fallback logic)
+
+That is the critical mistake:
+
+* Outer-joining keys lets Level 3 introduce brand-new `(Order ID, SKU)` lines that **never existed as Level 1 order items**.
+
+### 2) Unsafe fallbacks for Date and Quantity
+
+Once you allow L3-only keys into a merged dataset:
+
+* `Date` falls back to the L3 event timestamp
+* `Quantity Ordered` is missing (because L3 doesn’t have it), so code tends to default it
+
+That makes “finance events” look like “orders”.
+
+### 3) The health check is missing the exact orphan check
+
+A015 currently checks:
+
+* `l1_keys_missing_in_master` (L1 -> Master coverage)
+
+But it does **not** check:
+
+* `master_keys_missing_in_l1` (Master -> L1 legitimacy)
+* or `l3_keys_missing_in_l1` (L3 orphans)
+
+So the system can be internally corrupt while still passing the “coverage” test.
+
+### 4) Knock-on effect: token allocation gets poisoned
+
+Once phantom order lines exist, token allocation will:
+
+* allocate tokens to them (stealing from real orders), or
+* log massive shortages (blocking publish), or both.
+
+This is exactly the mess you are feeling: downstream scripts are reacting correctly to bad upstream state.
+
+---
+
+## The fix that actually ends this (and stops future recurrence)
+
+### Fix 1: Enforce the invariant in B004 (Order_Master build)
+
+In `B004_build_order_master.py`:
+
+* Define canonical keys from **Level 1 order items**: `(Order ID, SKU)`
+* Join Level 2 onto that (left join)
+* Join Level 3 onto that (left join)
+* **Do not outer-join Level 3**
+* Create a separate output:
+
+  * `out/l3_orphans.csv` = rows in L3 whose keys do not exist in L1
+
+Critical: **Order_Master.Date = Level 1 purchase date only**.
+If L1 is missing for a key, that row does not belong in Order_Master.
+
+### Fix 2: Enforce the invariant in B007 (token allocation)
+
+In `B007_allocate_tokens_live.py`:
+
+* The “demand” side must come from Level 1 quantities only
+* Any row with missing quantity/date is **skipped and logged**, never allocated
+* Never use L3-derived keys to drive allocation
+
+### Fix 3: Make A015 catch this immediately
+
+In `A015_build_system_health_check.py`, add:
+
+* `l3_orphans_count` (FAIL if > 0, or WARN if you want a transition period)
+* `order_master_orphans_count` (rows in Order_Master whose `(Order ID, SKU)` not in L1)
+* `order_master_blank_qty` (FAIL if > 0)
+
+This is the self-healing piece: once this exists, you can’t “silently drift” back into this state.
+
+---
+
+## Setting up a clean new Codex chat (so the context is not clogged)
+
+You already have `AGENTS.md` and `b_cycle_runbook.md`. The cleanest approach is:
+
+* Keep those as the permanent rules
+* Start a fresh chat with a **single tight task prompt** + minimal attachments
+
+### Copy-paste starter prompt for the new chat
+
+```text
+Read AGENTS.md and b_cycle_runbook.md first.
+
+Task: Fix the L3-orphan bug causing phantom orders and token shortages.
+
+Invariant (must enforce in code):
+- Canonical order line keys come ONLY from Level 1 (Order ID + SKU from OrderItems).
+- Level 2/3 may enrich those keys but may never create new keys.
+- Order_Master.Date must come from Level 1 purchase date only.
+- Token allocation demand must come from Level 1 quantities only.
+
+Deliverables:
+1) Patch B004_build_order_master.py:
+   - left-join L2 and L3 onto Level 1 keys
+   - output out/l3_orphans.csv (L3 keys not in L1)
+   - exclude L3-only rows from Order_Master
+2) Patch B007_allocate_tokens_live.py:
+   - allocate only from Level 1 demand
+   - skip+log rows with missing qty/date
+3) Patch A015_build_system_health_check.py:
+   - add l3_orphans_count and order_master_orphans_count and order_master_blank_qty
+   - make these FAIL by default
+4) Update b_cycle_runbook.md: add rule "L3-only rows excluded until L1 exists"
+
+Proof required:
+- Show before/after row counts for:
+  - out/l3_orphans.csv
+  - Order_Master row count
+  - token_shortages_by_sku.csv (should drop if the shortages were caused by phantom demand)
+- Run B004 then A015 and paste the A015 summary output.
+Constraints:
+- No Google Sheets writes unless explicitly asked. Stage outputs locally first.
+```
+
+### What to attach (minimum)
+
+To implement this properly, attach these scripts (not just outputs):
+
+* `scripts/B004_build_order_master.py`
+* `scripts/B007_allocate_tokens_live.py`
+* `scripts/A015_build_system_health_check.py`
+
+And these outputs for proof:
+
+* `out/system_health_checklist.csv`
+* `out/token_shortages_by_sku.csv`
+* `out/financial_events_level1.csv`
+* `out/order_items_raw.csv` (or whatever file is the true Level 1 order-items keyset)
+* `out/financial_events_level3_official.csv`
+
+Optional but useful:
+
+* `out/order_master.csv` (full, not SKU-filtered)
+* `out/token_allocations_live.csv`
+* `out/token_ledger_live.csv`
+* `out/token_cogs_ledger.csv`
+
+Note: some attachments can expire in chat history; if any of the above aren’t visible when you go to the new chat, re-upload them.
+
+---
+
+## Which scripts I want to see first (highest leverage)
+
+If you only upload three files, make it these:
+
+1. `B004_build_order_master.py` (this is where L3-orphans enter)
+2. `B007_allocate_tokens_live.py` (this is where phantom demand becomes shortages)
+3. `A015_build_system_health_check.py` (this is why it wasn’t caught)
+
+With those, I can tell you exactly what line(s) are creating the mess and what the safest minimal diff looks like.
+
+---
+
+## One brutal truth
+
+Right now the pipeline is violating its own rulebook: it is treating a finance feed as an order feed. Until you force “L1 defines keys; L3 enriches only”, you will keep getting:
+
+* random “new” rows with old dates,
+* token shortages that don’t make sense,
+* and health-check whack-a-mole.
+
+Upload the three scripts above and I’ll map the exact failure path (join + fallback + allocation) and the minimal patch that permanently shuts it down.

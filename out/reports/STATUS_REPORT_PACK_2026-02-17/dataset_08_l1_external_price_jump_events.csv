@@ -1,0 +1,6 @@
+"event_ts_utc","prev_new_price_gbp","current_old_price_gbp","jump_gbp","write_status","state"
+"2026-02-16T17:45:05Z","13.7","17.99","4.29","WRITE_NOT_APPLIED","REGAIN"
+"2026-02-16T18:01:02Z","13.7","14.3","0.6","WRITE_NOT_APPLIED","REGAIN"
+"2026-02-17T00:07:25Z","13.64","15.3","1.66","WRITE_NOT_APPLIED","REGAIN"
+"2026-02-17T01:27:04Z","13.16","14.3","1.14","WRITE_NOT_APPLIED","REGAIN"
+"2026-02-17T08:44:05Z","12.84","14.3","1.46","WRITE_NOT_APPLIED","REGAIN"

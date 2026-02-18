@@ -1,0 +1,9 @@
+check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
+order_items_all_rows,ok,6982,,,,,,shared
+level2_duplicate_keys,ok,0,,,,,,shared
+tokens_total,ok,9638,,,,,,shared
+tokens_available,ok,1865,,,,,,shared
+tokens_allocated,ok,7686,,,,,,shared
+tokens_stock_receipt_missing_order_key,ok,0,stock_receipt_rows=123,,,,,shared
+inventory_rows,ok,336,,,,,,shared
+fee_rules_unknown_countries,ok,0,,,,,,shared

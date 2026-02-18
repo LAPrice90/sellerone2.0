@@ -1,0 +1,4 @@
+check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
+a_fees_failed_rows_today,ok,0,path=out\fees_failed.csv;total_rows=0,,,,,A
+a_daily_intel_coverage_non_parked,ok,0,date=2026-02-18; non_parked=57; covered=57; missing_sample=,,,,,A
+a_daily_intel_compliance_nonempty_non_parked,ok,0,date=2026-02-18; non_parked=57; missing_rows=0; blank_compliance=0,,,,,A

@@ -1,0 +1,9 @@
+asof_utc,seller_sku,asin,cpt_status,cpt_gbp,our_live_price_gbp,last_sold_price_gbp,price_reference_gbp,price_reference_source,delta_cpt_minus_reference_gbp,group_ab,cpt_error_summary
+2026-02-14T14:06:21Z,4W-VS57-BV6A,B0C9LJNJWZ,OK,35.00,35.91,126.71,126.71,avg_sold_price,-91.71,B,
+2026-02-14T14:06:21Z,6V-EEC1-2S9Z,B06WW79DX5,ERROR,,7.99,8.18,8.18,avg_sold_price,,UNKNOWN,http_429
+2026-02-14T14:06:21Z,AX-NKNU-29C1,B08M52B4M5,OK,1.15,3.98,6.71,6.71,avg_sold_price,-5.56,B,
+2026-02-14T14:06:21Z,JB-RGB6-LZOJ,B0001P0DLU,ERROR,,9.99,6.30,6.30,avg_sold_price,,UNKNOWN,http_429
+2026-02-14T14:06:21Z,VF-3T0K-DR5O,B08KFFY86W,OK,5.29,5.35,6.13,6.13,avg_sold_price,-0.84,B,
+2026-02-14T14:06:21Z,XH-0LAE-FQO5,B00AOES9GE,ERROR,,6.90,8.43,8.43,avg_sold_price,,UNKNOWN,http_429
+2026-02-14T14:06:21Z,XY-UM2X-TPS3,B003VTZAM0,OK,10.85,11.47,11.97,11.97,avg_sold_price,-1.12,B,
+2026-02-14T14:06:21Z,YC-3L3M-BV48,B0CTD6Q6KY,ERROR,,79.24,130.56,130.56,avg_sold_price,,UNKNOWN,http_429

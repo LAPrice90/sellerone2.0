@@ -1,0 +1,202 @@
+﻿E Cycle - Full Context Report for ChatGPT Planning
+Generated: 2026-02-06 (UTC)
+Repo: SellerOne 2.0
+
+1) Purpose
+- Provide full context so planning can continue without blind spots.
+- Explain why progress feels stuck on CSV inputs.
+- Identify root causes (earliest stage) and define a concrete next-step plan to move into API-backed data.
+
+2) Files reviewed
+Guides:
+- out/process_guides/E Cycle/Blueprint_E_H_F0_v1.md
+- out/process_guides/E Cycle/EHF_phases_v1.md
+- out/process_guides/E Cycle/Codex_task_cards_EHF0_v1.md
+- out/process_guides/E Cycle/F0_checklist_v1.md
+- out/process_guides/E Cycle/F0_manual_execution_runbook_v1.md
+- out/process_guides/E Cycle/H0_listing_offer_history_spec_v1.md
+- out/process_guides/E Cycle/H0_backfill_from_BBP_v1.md
+- out/process_guides/E Cycle/F0_paste_template.md
+- out/process_guides/E Cycle/F0_decision_log_template.csv
+- out/process_guides/E Cycle/F0_outcome_log_template.csv
+- out/process_guides/E Cycle/log.txt
+
+Code:
+- scripts/run_E_cycle.py
+- scripts/E001_build_sales_velocity.py
+- scripts/E002_build_roi_snapshot.py
+- scripts/E003_build_restock_signals.py
+- scripts/E004_build_performance_summary.py
+- scripts/E010_publish_e_outputs.py
+- scripts/H001_capture_offer_snapshot.py
+- scripts/f_training_set.py
+- scripts/run_A_all.py
+- scripts/api/get_pricing.py
+- scripts/api/get_listing_item_price.py
+
+Runtime outputs/logs checked:
+- out/sku_sales_velocity.csv
+- out/sku_roi_snapshot.csv
+- out/sku_restock_signals.csv
+- out/sku_performance_summary.csv
+- out/e_decision_log.csv
+- out/e_run_log.jsonl
+- out/listing_offer_snapshot_2026-02-06.csv
+- out/listing_offer_history.csv
+- out/system_health_checklist.csv
+- out/health_status.csv
+- out/audit_daily_guardrails.csv
+- WORK_LOG.md
+
+3) Current state snapshot (observed)
+- E cycle runs successfully end-to-end:
+  - out/sku_sales_velocity.csv lines=403
+  - out/sku_roi_snapshot.csv lines=67
+  - out/sku_restock_signals.csv lines=135
+  - out/sku_performance_summary.csv lines=135
+  - out/e_run_log.jsonl lines=1
+- H001 is wired into A cycle before A015 as fail-soft (per scripts/run_A_all.py).
+- Training set exists and is populated:
+  - config/f_training_set.csv has 10 enabled SKUs.
+- H outputs exist:
+  - out/listing_offer_snapshot_2026-02-06.csv has 10 rows.
+  - out/listing_offer_history.csv has matching rows.
+
+4) What is working vs not working
+Working:
+- Daily structure is in place (E and H script sequence exists).
+- H001 successfully pulls our own offer price (`our_price`) via Listings Items API.
+- Schema checks for E and H outputs are present in A015 and currently pass.
+
+Not working / incomplete:
+- H market context fields are mostly blank:
+  - `buy_box_price`, `lowest_fba_price`, `lowest_fbm_price`, offer counts, BSR fields.
+- E projected decision fields are still placeholders (blank):
+  - `current_token_cost_gbp`, `break_even_price_gbp`, `expected_refund_cost_per_unit_gbp`, `roi_at_our_price_pct`, `roi_at_buy_box_price_pct`.
+- `out/e_decision_log.csv` only contains header, no decision rows.
+- Guide expectation and output reality are diverged:
+  - Guide says decision-ready fields and reason trails.
+  - Current output is mostly schema scaffolding plus historical ROI.
+
+5) Root-cause findings (earliest-stage, evidence-based)
+Root cause A (primary API blocker): SKU parse bug in Product Pricing response handling.
+- File: scripts/api/get_pricing.py
+- Function expects SKU under `item["Identifier"]["SellerSKU"]`.
+- Live payload from `/products/pricing/v0/price` (ItemType=Sku) currently returns top-level `SellerSKU` (no `Identifier`).
+- Result: `run_live_price_lookup(...)` returns empty map even when API call succeeds.
+
+Evidence:
+- Direct API probe for SKU `6V-EEC1-2S9Z` returned status 200 and payload with:
+  - item keys: `status`, `SellerSKU`, `Product`
+  - `Identifier` is null/absent
+  - `Product.Offers` contains price data
+- Direct function test:
+  - `run_live_price_lookup(['6V-EEC1-2S9Z','AX-NKNU-29C1'], 'A1F83G8C2ARO7P')`
+  - result: `{}` (len 0)
+
+Impact:
+- H001 cannot populate `buy_box_price` from this source.
+- This creates a false impression that API data is unavailable, when the real issue is parsing logic.
+
+Root cause B: H001 only populates a subset of H schema fields.
+- File: scripts/H001_capture_offer_snapshot.py
+- Current implementation only writes:
+  - `our_price` from Listings Items API
+  - `buy_box_price` from run_live_price_lookup (currently broken by Root cause A)
+- Fields like `lowest_fba_price`, `lowest_fbm_price`, `offer_count_fba`, `offer_count_fbm`, `bsr`, `bsr_category` are defined in schema but not yet populated from API.
+
+Impact:
+- H data exists but is not decision-rich.
+- F0 state decisions remain partly manual/guess-driven.
+
+Root cause C: E decision layer is not yet connected to current-cost and projected-math inputs.
+- Files: scripts/E004_build_performance_summary.py, scripts/run_E_cycle.py
+- `E004` intentionally creates projected ROI fields as empty placeholders.
+- `run_E_cycle.py` ensures log files exist but does not populate decision log rows.
+
+Impact:
+- E is still a reporting scaffold, not yet decision-ready per blueprint.
+- Perceived "stuck" feeling is accurate because core decision signals are not yet wired.
+
+6) Guide alignment check
+Blueprint and task cards require:
+- API-first H snapshots for training set.
+- Projected ROI for decision use (not historical ROI) with reason codes when missing.
+- Decision logs with reason trail.
+
+Current codebase status vs guide:
+- API-first H path exists, but one key parser bug prevents buy box fill and other context fields are not yet implemented.
+- Projected ROI columns exist but are placeholders.
+- Decision log schema exists; row-level decision write path is not implemented.
+
+7) Why this looked like a CSV dead-end
+- Most CSVs are being generated correctly, so pipeline appears healthy.
+- But data quality in decision-critical fields remains blank.
+- The deepest blocker is not "no API". It is:
+  1) a parser mismatch in one API adapter (buy box map returns empty), and
+  2) planned-but-not-yet-implemented enrichment in H and E.
+
+8) Recommended execution plan (pragmatic, low-risk, root-cause first)
+Phase 1 - Fix API extraction defect (single focused patch)
+- Patch scripts/api/get_pricing.py to resolve SKU from both shapes:
+  - top-level `SellerSKU` / `SellerSku`
+  - fallback `Identifier.SellerSKU` / `Identifier.SellerSku`
+- Validate with 2-5 known SKUs:
+  - expected: non-empty lookup map with price/currency.
+- Re-run H001 and verify `buy_box_price` starts populating.
+
+Phase 2 - Complete minimum H schema population from SP-API
+- Extend H001 mapping from pricing payload to fill when available:
+  - `buy_box_channel`
+  - `lowest_fba_price`
+  - `lowest_fbm_price`
+  - `offer_count_fba`
+  - `offer_count_fbm`
+- Keep BSR fields blank if endpoint not available yet, but set clear reason in `notes` or future reason code column.
+- Re-run H001 and prove column fill rates.
+
+Phase 3 - Add explicit confidence/missing reason codes in E output
+- Add `needs_review` and `reason_codes` columns to `sku_performance_summary.csv`.
+- Rule:
+  - if projected ROI inputs are missing -> `needs_review=yes` with stable reason codes (example: MISSING_CURRENT_TOKEN_COST, MISSING_BUY_BOX_PRICE).
+- This avoids silent blanks and matches guide intent.
+
+Phase 4 - Wire projected ROI from current-cost sources
+- Source inputs:
+  - current token cost from token COGS lineage (current token or weighted recent batch policy).
+  - expected refund cost per unit from refund history signal.
+  - live/near-live price points from H outputs.
+- Compute:
+  - `break_even_price_gbp`
+  - `roi_at_our_price_pct`
+  - `roi_at_buy_box_price_pct`
+- Keep historical ROI in E002 strictly reporting-only.
+
+Phase 5 - Decision logging minimum viable behavior
+- Implement row append in `out/e_decision_log.csv` for training SKUs with:
+  - run_id, sku, key metrics, needs_review, reason_codes, source, asof_date.
+- This creates traceability before full F automation.
+
+9) Validation checklist for each phase
+- After each code change, run only relevant script(s), then provide proof:
+  - row counts
+  - non-empty field counts in target columns
+  - 3 sample rows (fast, slow, non-UK if applicable)
+- Keep A015 green and check that new columns are included in schema checks.
+
+10) Known open alerts (must not be ignored)
+- `out/audit_daily_guardrails.csv` currently shows FAIL:
+  - `fee_vat_missing_rows_gbp = FAIL (vat_source_missing)`
+  - `vat_daily_fresh = FAIL (70.64h > 36.0h threshold)`
+- `out/health_status.csv` shows historical FAIL/WARN entries before most recent OK line.
+
+11) Suggested first concrete ticket
+Ticket proposal:
+- "Fix `get_pricing.py` SKU parsing so H001 buy-box lookup uses live API payload shape; rerun H001 and show buy_box_price fill evidence."
+
+Why this first:
+- Smallest change with immediate unblock impact.
+- Root-cause fix at ingestion layer (not downstream masking).
+- Creates valid input for later projected ROI and decision logic.
+
+End of report.

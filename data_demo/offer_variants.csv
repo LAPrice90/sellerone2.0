@@ -1,0 +1,3 @@
+offer_variant_id,sku,seller_id_canonical,fulfilment_channel,condition,shipping_template,variant_first_seen_utc,variant_last_seen_utc,variant_active_flag
+ov_339114d7b097bfda0c2a,DEMO-SKU,our_seller,FBA,,UNKNOWN,2026-02-13T15:55:59Z,2026-02-13T15:55:59Z,1
+ov_477f5eaed6e356fa1854,DEMO-SKU,rival_a,FBA,,UNKNOWN,2026-02-13T15:55:59Z,2026-02-13T15:55:59Z,1

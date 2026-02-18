@@ -1,0 +1,3 @@
+date,date_source,amount_type,fee_reason,fee_description,currency,total_amount
+2026-02-18,estimated,FBAInboundTransportationFee,,,GBP,-131.98000000000002
+2026-02-18,estimated,FBAInboundTransportationProgramFee,,,GBP,-5.57

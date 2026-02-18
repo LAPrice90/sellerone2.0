@@ -1,0 +1,31 @@
+{
+  "batch_id": "20260216T165059373222Z_28936",
+  "artifact": "h_worker_probe_response_log",
+  "state": "green",
+  "created_utc": "2026-02-16T16:50:59Z",
+  "validated_utc": "2026-02-16T16:50:59Z",
+  "row_count": 120,
+  "column_count": 18,
+  "required_columns": [
+    "probe_event_id",
+    "asof_date",
+    "response_utc",
+    "response_window_minutes",
+    "marketplace",
+    "sku",
+    "asin",
+    "competitor_moved_flag",
+    "competitor_move_direction",
+    "competitor_move_size_gbp",
+    "reaction_lag_minutes",
+    "buy_box_price_gbp_after",
+    "buy_box_channel_after",
+    "buy_box_owner_after",
+    "our_price_gbp_after",
+    "outcome_code",
+    "source",
+    "notes"
+  ],
+  "missing_columns": [],
+  "target_path": "out/h_worker_probe_response_log.csv"
+}

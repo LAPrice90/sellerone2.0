@@ -1,0 +1,37 @@
+2026-02-04T12:36:33Z [2026-02-04T12:36:33Z] run B001_run_orders_to_sheet.py attempt 1
+2026-02-04T12:38:08Z [2026-02-04T12:36:33Z] ok B001_run_orders_to_sheet.py
+2026-02-04T12:38:08Z [2026-02-04T12:36:33Z] skip B002_run_pending_orders_to_sheet.py (last run 1653s ago)
+2026-02-04T12:38:08Z [2026-02-04T12:36:33Z] run B007_allocate_tokens_live.py attempt 1
+2026-02-04T12:38:14Z [2026-02-04T12:36:33Z] ok B007_allocate_tokens_live.py
+2026-02-04T12:38:14Z [2026-02-04T12:36:33Z] run B030_sync_token_allocations_from_sheet.py attempt 1
+2026-02-04T12:38:18Z [2026-02-04T12:36:33Z] ok B030_sync_token_allocations_from_sheet.py
+2026-02-04T12:38:18Z [2026-02-04T12:36:33Z] run B025_build_token_cogs_ledger.py attempt 1
+2026-02-04T12:38:19Z [2026-02-04T12:36:33Z] ok B025_build_token_cogs_ledger.py
+2026-02-04T12:38:19Z [2026-02-04T12:36:33Z] run B004_build_order_master.py attempt 1
+2026-02-04T12:38:46Z [2026-02-04T12:36:33Z] ok B004_build_order_master.py
+2026-02-04T12:38:46Z [2026-02-04T12:36:33Z] run B011_recover_l3_orphans.py attempt 1
+2026-02-04T12:38:47Z [2026-02-04T12:36:33Z] ok B011_recover_l3_orphans.py
+2026-02-04T12:38:48Z [2026-02-04T12:36:33Z] publish Order_Master
+2026-02-04T12:38:48Z [2026-02-04T12:36:33Z] run B004_build_order_master.py attempt 1
+2026-02-04T12:39:27Z [2026-02-04T12:36:33Z] ok B004_build_order_master.py
+2026-02-04T12:39:27Z [2026-02-04T12:36:33Z] publish P&L
+2026-02-04T12:39:27Z [2026-02-04T12:36:33Z] run D001_build_pnl_daily.py attempt 1
+2026-02-04T12:39:35Z [2026-02-04T12:36:33Z] ok D001_build_pnl_daily.py
+2026-02-04T12:39:35Z [2026-02-04T12:36:33Z] cycle sleep 30s
+2026-02-04T12:40:05Z [2026-02-04T12:36:33Z] run_once enabled, exiting after single cycle
+2026-02-04T14:04:17Z [2026-02-04T14:04:17Z] run B001_run_orders_to_sheet.py attempt 1
+2026-02-04T14:05:14Z [2026-02-04T14:04:17Z] ok B001_run_orders_to_sheet.py
+2026-02-04T14:05:14Z [2026-02-04T14:04:17Z] run B002_run_pending_orders_to_sheet.py attempt 1
+2026-02-04T14:07:08Z [2026-02-04T14:04:17Z] ok B002_run_pending_orders_to_sheet.py
+2026-02-04T14:07:08Z [2026-02-04T14:04:17Z] run B007_allocate_tokens_live.py attempt 1
+2026-02-04T14:07:17Z [2026-02-04T14:04:17Z] ok B007_allocate_tokens_live.py
+2026-02-04T14:07:17Z [2026-02-04T14:04:17Z] run B030_sync_token_allocations_from_sheet.py attempt 1
+2026-02-04T14:07:22Z [2026-02-04T14:04:17Z] ok B030_sync_token_allocations_from_sheet.py
+2026-02-04T14:07:22Z [2026-02-04T14:04:17Z] run B025_build_token_cogs_ledger.py attempt 1
+2026-02-04T14:07:23Z [2026-02-04T14:04:17Z] ok B025_build_token_cogs_ledger.py
+2026-02-04T14:07:23Z [2026-02-04T14:04:17Z] run B004_build_order_master.py attempt 1
+2026-02-04T14:07:49Z [2026-02-04T14:04:17Z] ok B004_build_order_master.py
+2026-02-04T14:07:49Z [2026-02-04T14:04:17Z] run B011_recover_l3_orphans.py attempt 1
+2026-02-04T14:07:50Z [2026-02-04T14:04:17Z] ok B011_recover_l3_orphans.py
+2026-02-04T14:07:51Z [2026-02-04T14:04:17Z] health_check FAIL - skip publish
+2026-02-04T14:07:51Z [2026-02-04T14:04:17Z] run_once enabled, exiting after single cycle

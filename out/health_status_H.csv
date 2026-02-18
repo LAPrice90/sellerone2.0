@@ -1,0 +1,5 @@
+timestamp_utc,status,fail_count,warn_count,notes
+2026-02-18T10:30:23.316812+00:00,WARN,0,2,fail=0 warn=2
+2026-02-18T10:50:01.919618+00:00,WARN,0,2,fail=0 warn=2
+2026-02-18T11:09:21.716049+00:00,WARN,0,2,fail=0 warn=2
+2026-02-18T11:29:13.163543+00:00,WARN,0,2,fail=0 warn=2

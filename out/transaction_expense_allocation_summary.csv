@@ -1,0 +1,9 @@
+status,transaction_type,breakdown_type,currency,rows,amount_total
+unallocated,Refund,Refunded Expenses,GBP,2,2.24
+unallocated,Refund,Refunded Sales,GBP,2,-17.57
+unallocated,ServiceFee,Expenses,GBP,1,-5.33
+unallocated,ServiceFee,Sales,GBP,1,0.0
+unallocated,Shipment,Expenses,AED,1,-105.74
+unallocated,Shipment,Expenses,GBP,90,-306.88
+unallocated,Shipment,Sales,AED,1,347.2
+unallocated,Shipment,Sales,GBP,90,803.99

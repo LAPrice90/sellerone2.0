@@ -1,0 +1,34 @@
+missing_reason,transaction_type,category_type,category,currency,rows,amount_total
+transaction_type_missing_in_api,COMPENSATED_CLAWBACK,other_amount,other_amount,,1,-10.47
+transaction_type_missing_in_api,Inbound Transportation Fee,other_amount,other_amount,,6,-23.74
+transaction_type_missing_in_api,Order,item_fee_type,Commission,,650,-1119.21
+transaction_type_missing_in_api,Order,item_fee_type,Digital Services Fee,,13,-1.31
+transaction_type_missing_in_api,Order,item_fee_type,DigitalServicesFee,,615,-52.08
+transaction_type_missing_in_api,Order,item_fee_type,FBAPerUnitFulfillmentFee,,663,-1636.82
+transaction_type_missing_in_api,Order,item_fee_type,ShippingChargeback,,27,-72.22
+transaction_type_missing_in_api,Order,price_type,MarketplaceFacilitatorVAT-Principal,,11,-28.12
+transaction_type_missing_in_api,Order,price_type,MarketplaceFacilitatorVAT-Shipping,,11,0.0
+transaction_type_missing_in_api,Order,price_type,Principal,,663,5913.4
+transaction_type_missing_in_api,Order,price_type,Shipping,,76,97.58
+transaction_type_missing_in_api,Order,price_type,ShippingTax,,72,17.48
+transaction_type_missing_in_api,Order,price_type,Tax,,659,1176.45
+transaction_type_missing_in_api,Order,promotion_type,Principal,,2,-0.68
+transaction_type_missing_in_api,Order,promotion_type,Shipping,,45,-33.98
+transaction_type_missing_in_api,Order,promotion_type,TaxDiscount,,47,-7.11
+transaction_type_missing_in_api,Order_Retrocharge,price_type,ShippingTax,,1,0.0
+transaction_type_missing_in_api,Order_Retrocharge,price_type,Tax,,1,1.08
+transaction_type_missing_in_api,REVERSAL_REIMBURSEMENT,other_amount,other_amount,,16,50.910000000000004
+transaction_type_missing_in_api,Refund,item_fee_type,Commission,,15,32.33
+transaction_type_missing_in_api,Refund,item_fee_type,DigitalServicesFee,,15,0.68
+transaction_type_missing_in_api,Refund,item_fee_type,RefundCommission,,15,-6.46
+transaction_type_missing_in_api,Refund,item_fee_type,ShippingChargeback,,1,1.0
+transaction_type_missing_in_api,Refund,price_type,Principal,,15,-165.48
+transaction_type_missing_in_api,Refund,price_type,Shipping,,4,-3.87
+transaction_type_missing_in_api,Refund,price_type,ShippingTax,,4,-0.78
+transaction_type_missing_in_api,Refund,price_type,Tax,,15,-33.11
+transaction_type_missing_in_api,Refund,promotion_type,Shipping,,3,3.04
+transaction_type_missing_in_api,Refund,promotion_type,TaxDiscount,,3,0.6100000000000001
+transaction_type_missing_in_api,Refund_Retrocharge,price_type,ShippingTax,,1,0.0
+transaction_type_missing_in_api,Refund_Retrocharge,price_type,Tax,,1,-1.08
+transaction_type_missing_in_api,RemovalComplete,other_amount,other_amount,,2,-2.76
+transaction_type_missing_in_api,WAREHOUSE_LOST,other_amount,other_amount,,4,8.04

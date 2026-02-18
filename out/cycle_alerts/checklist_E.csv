@@ -1,0 +1,11 @@
+check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
+e_schema_sales_velocity,ok,ok,,,,,,E
+e_schema_roi_snapshot,ok,ok,,,,,,E
+e_schema_roi_snapshot_uk,ok,ok,,,,,,E
+e_schema_roi_snapshot_non_uk,ok,ok,,,,,,E
+e_schema_roi_snapshot_by_country,ok,ok,,,,,,E
+e_schema_restock_signals,ok,ok,,,,,,E
+e_schema_performance_summary,ok,ok,,,,,,E
+e_schema_study_report,ok,ok,,,,,,E
+e_schema_run_log,ok,ok,,,,,,E
+e_schema_decision_log,ok,ok,,,,,,E

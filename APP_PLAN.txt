@@ -1,0 +1,88 @@
+SellerOne App Bible (No Chaos, Full Transparency)
+================================================
+
+Principles
+----------
+- Single source of truth: Product_DB (Sheet now; DB later). Every script owns specific columns and never overwrites manual data with blanks.
+- Always verify in Sheets: After each script run, user must confirm the tab is populated and sane before proceeding. No “it’s probably fine.”
+- No blame shifting: Assume it’s our script until proven otherwise. Fix credentials/logic/retries before saying “permissions issue.”
+- Ask the user when data is external: If we need costs, VAT, statuses, or supplier data, prompt the user to supply/confirm—don’t invent.
+- Preserve manual fields: supplier data, pack sizes, costs, VAT, notes, sale_status are sacred. Leave them untouched unless explicitly edited by the user.
+- Staleness visible: Each module stamps its own last_updated_*; an Alerts row flags errors/quotas.
+- Estimates vs. actuals: Keep both; prefer actuals when present; never delete estimates—mark which is active.
+
+Module Groups (A, B, C…)
+------------------------
+- A: Catalog & stock
+  - A001 Listings (active listings + last_updated_A001)
+  - A002 Catalog (images, dimensions, identifiers + last_updated_A002)
+  - A003 Inventory (FBA stock + last_updated_A003)
+  - A004 Fees estimates (£10, £100) for ACTIVE SKUs only; margin_10/100; last_updated_A004
+- B: Orders & finances
+  - B001 Orders + OrderItems → Orders_raw, OrderItems_raw, summary fields in Product_DB (last_order_date, units_sold_30d, last_updated_B001)
+  - B002 Finances/settlements → fee_actual_*, fee_actual_ts; prefer actual over estimate in the view; last_updated_B002
+- C: DB and publishing
+  - C001 DB schema + importer (product, inventory_snapshots, fees_estimates, fees_actuals, orders, order_items, finances, manual_overrides)
+  - C002 Publisher to Sheets/CSV from DB view (Product_DB_view)
+  - C003 Alerts tab generator (per-script status, last_updated, errors)
+- D: Inventory health (optional but recommended)
+  - D001 Aged inventory report to ageing buckets (+ last_updated_D001)
+- E: Housekeeping & automation
+  - E001 Scheduler (cadence per module)
+  - E002 Shared throttle/retry/logging (propagate A004 pattern)
+  - E003 Backups of out/ snapshots and DB dumps
+
+Rules (must-follow)
+-------------------
+- Merge keys: seller_sku primary, ASIN secondary. Multiple SKUs per ASIN allowed; never create ASIN-only rows.
+- No blank overwrite: If an API field is empty, leave the existing cell untouched.
+- Manual columns protected: supplier_code, supplier_name, supplier_pack_size, amazon_pack_size, pack_conversion_note, moq, supplier_catalog_price, last_purchase_price, target_margin, sale_status, vat_rate, notes.
+- Timestamps: Each script must set its own last_updated_* so staleness is obvious.
+- Logs: Each script writes a failed list with reasons (e.g., out/fees_failed.csv, out/orders_failed.csv).
+- User confirmation: After any module run, pause and have the user confirm the Sheet tab looks correct before chaining the next module.
+- Self-check first: Network/permission errors are investigated locally (env, creds, typos, retry, throttle) before assuming external denial.
+- External data: Ask the user for missing costs/VAT/status/pack info; do not guess.
+
+Current State (12-Dec)
+----------------------
+- A001–A003 populate Product_DB and out/product_db_preview.csv; manual fields preserved; timestamps per A001–A003.
+- A004 filters active SKUs, retries, and leaves existing fee/margin cells when API returns nothing; writes fee_total_10/100, margin_10/100, last_updated_A004; failed SKUs logged.
+- Pack sizes defaulted to 1/1/unconfirmed and made sticky.
+- Notes/TODO in NOTES.md include: later replace estimates with actuals; build B modules; DB pivot.
+
+Gaps To Close
+-------------
+- Build B001 (orders/items) and B002 (finances) with failure logs and timestamps.
+- Add Alerts tab (status per script, last_updated, errors count).
+- Add aged inventory (D001) if needed.
+- Pivot to DB (C001–C002) once stable; keep manual_overrides table; publish Product_DB_view back to Sheets.
+- Harden A001–A003 with the same “no blank overwrite” guard as A004 (if not already).
+
+Cadence (proposed)
+------------------
+- Daily: A001, A003; B001; B002.
+- Weekly: A002; A004 (or after price changes).
+- Optional daily/weekly: D001 ageing.
+- Each run updates timestamps + Alerts.
+
+Checklist To Work Through
+-------------------------
+- [ ] Add “no blank overwrite” guard to A001–A003.
+ - [ ] Add Alerts tab (script, status, last_updated, errors summary).
+ - [ ] B001 orders/items → Product_DB summary + failed log.
+ - [ ] B002 finances → fee_actual_* + ts; prefer actual in view; failed log.
+ - [ ] D001 aged inventory (if desired) + ts.
+ - [ ] C001 DB schema/import; C002 publisher back to Sheets; C003 Alerts publisher.
+ - [ ] Scheduler (E001) with per-script cadence; shared throttle/retry/logging (E002); backups (E003).
+
+Behavior With User
+------------------
+- Always ask the user to confirm Sheet tabs after runs.
+- If a field is missing, ask the user to supply/confirm (costs, VAT, statuses, packs).
+- Treat permission/quota issues as ours to fix first (env, spelling, retries, throttle). Only declare external block after evidence.
+
+Outcome
+-------
+A transparent pipeline mirroring the old functionality but with clean merges, preserved manual data, visible freshness, and clear logs. Estimates live alongside actuals, and moving to a DB won’t break the user-facing Sheet. 
+
+Done.

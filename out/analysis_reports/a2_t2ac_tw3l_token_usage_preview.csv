@@ -1,0 +1,3 @@
+row_idx,order_date,ordered,sent_to_fba,cost,used_for_stock,used_for_orders,unused
+955,05/01/26,360,120,4.51,120,240,0
+939,10/11/25,450,450,4.51,67,273,110

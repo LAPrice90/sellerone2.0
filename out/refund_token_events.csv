@@ -1,0 +1,2 @@
+order_id,sku,refund_date,requested_qty,applied_qty,status,note,refund_event_id,event_ts
+205-4897433-1069154,JB-RGB6-LZOJ,2026-02-18T00:17:06Z,1,1,ok,,5138052240387506765,2026-02-18T07:04:49Z

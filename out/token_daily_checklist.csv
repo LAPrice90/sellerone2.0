@@ -1,0 +1,6 @@
+timestamp,check,value
+2026-02-18T07:06:02.207077+00:00,tests_fail_count,1
+2026-02-18T07:06:02.207077+00:00,tests_warn_count,2
+2026-02-18T07:06:02.207077+00:00,events_last_24h,367
+2026-02-18T07:06:02.207077+00:00,recon_mismatch_count,55
+2026-02-18T07:06:02.207077+00:00,returned_pending_count,36

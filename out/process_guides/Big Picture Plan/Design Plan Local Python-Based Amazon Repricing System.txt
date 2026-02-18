@@ -1,0 +1,599 @@
+Skip to content
+Chat history
+
+
+
+
+You said:
+I want to work on a repricing api, I will get the competitive summary ready, I am able to pull competitive summaries, product rank etc, whatever we need from api, I have a morning run of "Tasks 1–3 (pricing_engine) are about pricing/eligibility snapshots, not orders/financials:
+
+Task1 (task1_listings_pull.py): Pulls your active listings/catalog for the marketplace (ASIN/SKU/condition/price/quantity, etc.), builds/refreshes the ASIN/SKU map in the DB.
+Task2 (task2_pricing_and_fees.py): For those ASINs, fetches current buy box/offer prices and fee estimates, and stores pricing + fees into asin_snapshot (bb_price, foep_price if available, total_fees/referral/fba_fees). No competitor names, just prices.
+Task2b (task2b_pricing_reference.py): Fetches CompetitiveSummary + FOEP and upserts CPT/comp/was price fields into the same asin_snapshot (comp_price, was_price, cpt_price, foep_*). Still no seller identities.
+Task3 (task3_inventory_age.py + task3b_age_join_view.py): Pulls inventory age data and combines it with pricing snapshots for downstream views (joins/age view).
+So tasks 1–3 collect catalog eligibility, current prices (buy box/comp thresholds), and fee estimates; they do not collect competitor seller names." I run at 7am for product data, But I will switch this up so we run on a loop but for my repricer I need to design a strategy that makes decisions for changing price, Its no good picking one price in the morning based on this data and at the same time its pointless running all of these on a loop because we will not be updating our pricing frequently enough. We need to find a balance of what data to pull and how frequently to keep on top of price changing as frequently as possible, we could run this as several different processes, for example pricing pull could be on a loop and submitting a new price right after, for example (not real data) If we can pull prices every 2 seconds and could submit a new price every 2 seconds, we could pull a price, cache the time, push a new cost, then check the cache time to see when the next price call could be done, ie in 1.5 seconds... Is there also a strategy for making attack strategies for different competition, for example if we call the name of a competition, they may have an aggressive strategy, could we store the name and create a self learning process about this competition, for example we could push them to their minimum cost and run down their stock, and when they come back we can push them right down again without trying to find their bottom, or see if they have updated the bottom. One product I have I compete against a FBM supplier, because I am FMB and the product is hazmat I am actually slower to deliver because of the single amazon warehouse. But I can actually sit at a price where I can make money I'm happy with and get the buy box lower than their minimum, I was only able to do this manually, any repricing software I have would have had me sitting at the same price of a 1-5p lower than the competitor not making any sales... how many product do I have that I cant make these kind of calls on with hundreds of products in stock, I want a system that has a plan for multiple scenarios that the system can identify, all the while records its data so that I can analyse with AI to tweak and improve as necessary. This is a small part of my work so it cant have all my attention so I need easy outputs, it could tell me of new scenarioes and prompt for a strategy, or it reports the strategy its using and what it has achieved. I essentially want a system that focuses on one product like that one product is the whole business and pushes it to its full potential, if its not savable then it could be dropped. It will have sales data available, refund data, stock data etc from the rest of the system. Could you look into API calls an similar systems and propose a plan for the new system. With will be ran locally using .py files and background task schedulers. we nede the plan then we can decide how to deal with different strategies, do we create a number of headers like "Amazon Selling" "FBA Buy box" "FBM Buy Box" with TRUE and FALSE to create our scenarios? 
+ChatGPT said:
+Thanks for the detailed context. To build a useful research plan, could you please clarify a few points:
+
+Are you exclusively selling via FBM or also FBA?
+
+How many SKUs/products are you actively managing for repricing?
+
+Do you have a preferred frequency limit (e.g., once per minute, once every 10 seconds) for price updates to avoid throttling or account risk?
+
+Would you like the proposed system to include AI-based dynamic strategy generation (e.g., reinforcement learning), or stick with rule-based logic initially?
+
+Are you using the Amazon SP-API, and if so, do you already have access to endpoints like getPricing, getCompetitivePricing, and updateListings?
+
+Once I have that, I’ll outline a complete system plan for you—including data flow, recommended API interactions, local architecture (.py tasks), and a strategy decision matrix.
+
+You said:
+fba. 104 currently in stock but this will increase dramatically hopefully. I want to run each product to its max, it will run to call the strategy price at its max pace using the gap to do other calls when needed, for example if one call is 15 seconds for a product that we need always, we cache the time and fill the gap with other useful calls. yes we have most running but we will adjust to our new frequency, currently set up to just get daily product data
+ChatGPT said:
+Great. I’ll design a comprehensive plan for a local, Python-based repricing system that operates continuously, dynamically analyzes competitive and pricing data, and executes per-product pricing strategies at optimal intervals. I’ll also explore self-learning strategy tagging (e.g., "Amazon Selling", "FBM Buy Box") and architecture that enables scenario detection and future AI improvements.
+
+I’ll let you know once the full plan is ready. You can keep chatting with me in the meantime!
+
+Research completed in 14m · 8 sources · 71 searches
+ChatGPT said:
+Design Plan: Local Python-Based Amazon Repricing System
+System Overview
+This document outlines a technical design for a Python-based Amazon repricing system that runs locally using background task schedulers. The system manages pricing for ~104 FBA products (with potential for growth) by leveraging Amazon’s Selling Partner API (SP-API) to gather product data (pricing, competitive offers, inventory age, fees, sales/refunds) and to update prices. The design emphasizes continuous data fetching at optimal intervals, per-SKU pricing strategies to maximize Buy Box ownership and profitability, and a robust scheduling, caching, and logging framework. Key features include:
+Continuous Data Fetching: Intelligent polling of pricing & competitive data, balancing API throttling with time-sensitive price updates.
+Per-Product Strategy Rules: Customizable rules (per SKU) to adjust prices for Buy Box wins and profit maximization.
+Rate Limiting & Caching: Tracking API call timestamps to respect rate limits and fill idle periods with calls for other SKUs.
+Scenario Tagging: Use of boolean strategy flags (e.g. Amazon Selling, FBA Buy Box, FBM Buy Box) to mark scenarios and tailor pricing behavior.
+Decision Logging: Detailed logs of all pricing decisions, actions, and outcomes for analysis and future tuning.
+Competitor Behavior Adaptation: Framework to detect competitor pricing patterns (e.g. constant undercutting) and adapt strategy (e.g. aggressive response to specific sellers).
+Unsavable SKU Flagging: Identification of SKUs that cannot compete profitably (due to fees, delivery disadvantages, etc.) for potential deactivation or alternate handling.
+Summary Reporting: Human-readable summaries of actions taken, new scenarios identified, and system performance metrics (delivered via logs or alerts).
+Extensibility: A modular design allowing future integration of AI-driven strategy selection or reinforcement learning components.
+This plan is structured into sections covering the overall architecture, API usage patterns and scheduling, strategy engine design, data storage, logging/reporting, and optional advanced components.
+Architecture Design
+Components and Workflow
+The repricing system consists of several coordinated components running on a local machine, orchestrated by a background task scheduler. Below is a breakdown of the main components and their interactions:
+Scheduler: A background task scheduler (e.g. Python’s APScheduler or Celery Beat) triggers various jobs at defined intervals. It coordinates periodic data fetch tasks, pricing evaluation tasks, and reporting tasks. The scheduler ensures tasks are spread out to avoid API rate limit bursts and can adjust frequencies dynamically.
+Data Fetcher: A module responsible for calling Amazon SP-API endpoints to retrieve the latest data for products. It fetches pricing and competitive offer data, as well as periodic retrieval of inventory age, fees, and sales/refund reports. Fetched data is stored in a local database or cache for quick access by the strategy engine.
+Pricing Strategy Engine: The core logic that evaluates each SKU’s situation and decides if a price change is needed. It uses per-SKU strategy rules and current data (our price, Buy Box price, competitor offers, costs/fees, etc.) to determine the optimal price that balances Buy Box win probability and profit. This engine factors in scenario flags (e.g. whether Amazon is a competitor, whether the current Buy Box winner is FBA or FBM) to apply the correct pricing rules. It also checks constraints like minimum margin and flags “unsavable” products that cannot win profitably.
+Price Updater: This component takes the strategy engine’s pricing decisions and submits price updates to Amazon via SP-API. It may use either the Listings API (e.g. patchListingsItem for price updates) or feeds to update prices. The updater respects any Amazon-imposed throttle (e.g. max 1 price update per SKU per 10-15 seconds) by queuing updates and spacing them appropriately.
+Local Data Store & Cache: A storage layer (e.g. a lightweight database like SQLite/PostgreSQL, with an in-memory cache for fast access) holds product info, strategy configurations, recent API responses, and history. This enables persistence of state (like last known competitor prices, last update timestamps) and quick reads without excessive API calls. A cache of last API call times per endpoint/SKU is maintained to calculate safe windows for the next call.
+Logging & Reporting Module: Every pricing decision, API call, and outcome is logged. Logs are stored in a human-readable format (e.g. append-only log files or a “Decisions” table in the DB) with timestamps and details. A reporting sub-task periodically aggregates these logs to produce summary metrics (e.g. how many price changes per day, Buy Box win rate, new competitor identified) and alerts for notable events (like an SKU flagged as unsavable or a persistent undercutting competitor). Summaries can be output to console, stored as reports, or emailed, giving the user an at-a-glance view of system performance.
+Architecture Diagram
+The following diagram illustrates the system architecture and data flow between components: System architecture for the repricing system, showing the Scheduler triggering data fetches and pricing evaluations, the flow of data to/from Amazon SP-API, and the interactions between the Strategy Engine, Data Store, Price Updater, and Logging. In the diagram, solid arrows indicate data or command flow. The Scheduler triggers periodic tasks for data fetching (to Amazon SP-API) and pricing strategy evaluation. The Data Fetcher stores results in the local Data Store/Cache. The Strategy Engine reads current data and computes pricing actions, which the Price Updater sends to Amazon. All actions and outcomes are logged for analysis. The Scheduler also triggers summary report generation from logs and the database.
+Amazon SP-API Usage and Scheduling
+A crucial part of the design is determining which API calls to make, how often, and in what batches to optimize data freshness without breaching rate limits or incurring excessive costs. Amazon’s SP-API imposes throttling quotas (limited calls per second or per minute and/or payload sizes) and, as of 2025, usage fees for high volumes of calls
+flashpricer.com
+flashpricer.com
+. The system will use a combination of batched calls, staggered scheduling, and event-driven updates to stay efficient. The table below outlines the key API endpoints and recommended usage patterns:
+API Endpoint	Data Retrieved / Action	Batching & Throttle	Call Frequency Strategy
+Product Pricing – getCompetitiveSummary (Pricing API)	Competitive pricing summary for up to 20 ASINs: includes the Buy Box (featured offer) info, lowest offers, etc.
+github.com
+. Crucial for knowing current market prices and competition.	Supports batching of up to 20 ASINs per call
+github.com
+. Rate limit e.g. ~1 request/sec (exact limit per SP-API specs).	Frequent: High-priority SKUs (fast-selling or highly competitive) fetched every 1–3 minutes; others every 5–15 minutes. Batching used to fetch multiple SKUs per call to maximize throughput. Adaptive: increase frequency if frequent changes detected, slow down if stable. Also consider Amazon’s notifications (ANY_OFFER_CHANGED, PRICING_HEALTH) to reduce polling by reacting to events
+github.com
+.
+Listings API – patchListingsItem (Pricing Update)	Update our listing price for a SKU (or feed submission for batch updates).	Typically 1 SKU per call (REST patch). Throttle example: ~5 requests/min per SKU (to avoid rapid re-updates). Price updates might have a 10-15s minimum interval per SKU as a best practice (to let Amazon process and avoid oscillations).	As needed: Triggered immediately after strategy decision if a price change is warranted. Use a queue to ensure a single SKU isn’t updated more than once per ~15 seconds; interleave different SKUs’ updates to utilize time gaps. Bulk feed updates can be used if many SKUs need changes at once (e.g., end-of-day broad adjustments), bundling them into one feed submission to save calls.
+Inventory & Fees – getInventorySummaries / Reports	Inventory levels, inventory age, and estimated fees. Inventory age reports show how long units have been in FBA (for storage fee implications). Fee data (FBA fees, referral fees) used to compute profit margins.	Can request a report (e.g., FBA Inventory Age report) or call inventory API for summaries. These can cover all SKUs in one report. Throttled by report generation limits (maybe 1-2 reports per hour). Fees: a getMyFeesEstimate API exists (1 SKU per request; not heavily used for every update, rather on demand).	Infrequent: Inventory age and fee data changes slowly. Pull inventory age report daily (off-peak hours) to update which SKUs are aging or incurring high fees. Fees can be cached; update fee info weekly or when costs change. These calls are scheduled when other high-priority calls are idle (e.g., overnight or once a day).
+Orders/Sales – Orders API / Reports	Sales and refunds data to gauge performance (units sold, refund counts per SKU) and detect anomalies (sudden spike or drop in sales).	Can use Orders API (paginated list of recent orders, throttled by calls/hour) or generate a daily sales report. Batching not applicable, but data for all SKUs can be retrieved in one report file.	Moderate: For repricing, real-time sales data is not critical, but daily trends inform strategy tweaks. Fetch sales/refund reports daily (or every few hours for fast sellers) to identify slow-moving stock or high-return items. This can flag SKUs for price reductions or deactivation if needed.
+Catalog & Product Info – Catalog Items API	Product details like title, category, or buy cost (if stored in system), mainly static data. Not directly needed for pricing decisions except initial setup.	Batching available for some catalog calls. Low frequency needed.	On-demand: Use during initialization or if product info changes. Not part of regular cycle.
+Optimal Scheduling: The scheduler staggers these calls to ensure the API’s rate limits are never exceeded and that we “do exactly the right things — and nothing wasteful”
+flashpricer.com
+. For example, the system might execute a getCompetitiveSummary batch for 20 high-priority SKUs every minute, rotating through groups of SKUs, so each is updated ~every 5 minutes. If a particular SKU is in a price war (frequent changes), the system can temporarily boost its frequency (e.g. every 1-2 minutes) to capture changes quickly, since missing a price change event by 90 seconds can cost the sale
+flashpricer.com
+. Conversely, if another SKU’s competitive landscape hasn’t changed for hours, the fetch interval for that SKU can be relaxed to save calls. The system also leverages batching aggressively. For pricing data, using the max batch size (e.g. 20 ASINs) per call yields efficiency – e.g. 5 calls can refresh 100 ASINs. This approach aligns with Amazon’s design, which allows fetching many ASINs at once to gather featured offer and lowest offer info in one response
+github.com
+. Additionally, Amazon’s notification services (ANY_OFFER_CHANGED, etc.) are considered: the system can subscribe to these notifications to get instant push alerts when a Buy Box offer changes or when our offer becomes non-competitive
+github.com
+. Such events can trigger immediate repricing outside the normal schedule (an event-driven supplement to polling)
+flashpricer.com
+, ensuring instant reactivity to critical changes. API Call Throttling and Fill-Rate: All API calls include timestamp logging in the cache. Before any call, the system checks the last call time and the endpoint’s rate limit rules. For instance, if patchListingsItem allows 5 calls per minute, after one price update, the system knows the next update call slot is 12 seconds later (60/5). It then utilizes the interim by executing other tasks or calls for different SKUs. By caching each SKU’s last update time, the scheduler can round-robin through SKUs that need updates, ensuring no single SKU is updated more frequently than allowed (e.g., one product’s price update every 15 seconds as given in the example scenario). In effect, if SKU1’s price was just updated, the system will shift to update SKU2, SKU3, etc., then come back to SKU1 when its 15-second window passes. This prevents idle time – the system is always doing a useful call for some SKU as long as there’s any pending action, thus filling the gaps with other SKUs’ operations.
+Pricing Strategy Engine Design
+The pricing strategy engine is the brain of the repricing system. It applies a set of rules and algorithms per product to decide if and how to adjust the price. The design allows each SKU to have a tailored strategy aiming to maximize Buy Box ownership while maintaining profitability. Key aspects of the strategy engine include scenario-based rules, profit guardrails, and adaptability to competitor behavior.
+Per-SKU Strategy Rules and Execution Flow
+For each SKU, the strategy engine executes the following general flow when triggered:
+Data Gathering: Retrieve the latest data for the SKU from the local store/cache – including our current price, the current Buy Box price and owner, and a list of competitor offers (price, seller type FBA/FBM, seller name/ID, stock if available). Also fetch any SKU-specific settings like minimum allowable price (floor), maximum price (ceiling), and cost/fee info for profit calculation.
+Scenario Flag Evaluation: Determine which strategy scenarios are in effect by evaluating the data. For example:
+Amazon Selling: True if Amazon Retail (sold by Amazon) is one of the competing sellers on this listing.
+FBA Buy Box: True if the current Buy Box winner (featured offer) is an FBA seller (could be us or another FBA seller).
+FBM Buy Box: True if the Buy Box is currently held by a FBM (merchant-fulfilled) seller, implying we might have a shipping advantage if we are FBA.
+(Other flags can be defined as needed, e.g., Low Stock, High Price Elasticity, etc., but the above are the ones requested.)
+These boolean flags are set to indicate the competitive scenario. Multiple flags can be true simultaneously (e.g., Amazon is selling and currently has the Buy Box, or Amazon is selling but an FBM seller holds the Buy Box, etc.). The flags will determine which subset of rules to apply.
+Apply Pricing Rules: Based on the active flags and the SKU’s configured strategy, evaluate rules to decide on a new price. The rules can be seen as an if-else decision tree or a small rule engine. Examples of rule application:
+If AmazonSelling = True: Amazon is a competitor on this listing. Strategy might dictate not trying to undercut Amazon aggressively if they have a price much lower than our cost (to avoid a race we can’t win). If Amazon’s price is only slightly below ours and we can afford a small cut, we might lower our price to just below Amazon’s to attempt Buy Box (keeping profit in mind). If Amazon holds the Buy Box and is far cheaper than our min price, the engine might decide this SKU is currently “unsavable” (we cannot compete) and mark it (see Unsavable logic below).
+If FBA Buy Box = True: The Buy Box winner is an FBA seller (i.e., another FBA competitor or even Amazon). We likely need to price match or slightly beat the competitor’s price to win. The rule might be “set our price = competitor price - $0.01” (or -1 penny) to undercut if that’s above our minimum. However, if we already are the Buy Box winner (we’re FBA and currently winning), the strategy might instead consider raising our price gradually to increase profit until we lose the Buy Box (a technique to maximize profit while maintaining Buy Box).
+If FBMBuyBox = True: A FBM competitor currently has the Buy Box. Since we fulfill via FBA, we have Prime shipping which often gives an edge. A rule here might be “we can match the FBM price or even price up to a small percentage higher (e.g. 5% higher) and still win due to faster delivery”. Thus, the engine could choose a price equal to the FBM price (to safely win) or slightly above if profit is a concern and we believe we’d still win the box (this could be tested over time).
+General Under-cutting Rule: In competitor-based strategies, a common rule is to undercut the Buy Box price by the minimum increment (e.g., $0.01) if it doesn’t violate profit margins. The engine will ensure any new price >= minimum allowed price. If undercutting would go below cost or minimum margin, it will either keep the price or only match the competitor. Profit protection is critical – the system will not chase the Buy Box below a floor price that ensures at least, say, 5% margin or a few dollars profit.
+Raise Price Opportunity: If our offer currently holds the Buy Box at a price higher than our minimum (meaning we have room to spare), and competitors are out-of-stock or significantly higher, the engine might raise our price towards the next highest competitor or a defined ceiling, to maximize profit while still holding the Buy Box. (This is an advanced behavior for when competition vanishes or we’re dominating the listing.)
+Unsavable SKU Logic: As part of rule evaluation, the engine checks if the SKU is “unsavable” under current conditions. An unsavable scenario is when our offer cannot realistically win the Buy Box at a profitable price. Indicators include: our minimum profitable price is higher than the Buy Box price by a large margin (due to high FBA fees or a competitor with a much lower cost base), or the Buy Box is held by Amazon at a price near or below our cost. If these conditions persist, the engine will mark a flag on that SKU (e.g., unsavable=True) and log a warning. The strategy for unsavables could be to stop further price decreases (no “race to bottom”), and possibly trigger an alert to review this SKU (maybe we consider removing it from FBA or waiting for a better time). Unsavable SKUs might be periodically revisited to see if conditions change (e.g., competitor goes out of stock, allowing a profitable sale at our price).
+Decision Output: The engine produces a decision – either “keep price as is” or “new price = X”. It also attaches a rationale (which rule fired, which competitor we’re responding to, etc.) for logging. If a price change is recommended, this decision is passed to the Price Updater component to execute the update via API. The whole decision (old price, new price, reason, flags, competitor data) is sent to the Logger as well.
+The strategy execution is designed to be fast (low latency) since it may be reacting to real-time changes. We want the end-to-end loop (fetch data -> decide -> update price) to be quick, ideally a few seconds. This ensures we don’t miss short-lived opportunities. A low-latency decision cycle, combined with stable throughput of API calls, is crucial because repricing is highly time-sensitive
+flashpricer.com
+flashpricer.com
+.
+Strategy Tagging and Scenario Flags
+The system uses scenario flags to make the decision logic transparent and configurable. For each SKU, the current state of these flags can be logged (e.g., “SKU123: AmazonSelling=False, FBABuyBox=True, FBMBuyBox=False”) alongside the decision, which helps in debugging and tuning strategy. Moreover, these flags allow the user to tag and filter SKUs by scenario. For instance, one could query all SKUs where AmazonSelling=True to identify products competing with Amazon, and perhaps apply a more conservative global strategy to them (since competing with Amazon often requires different tactics). Under the hood, these flags are determined either by real-time data (e.g., seeing Amazon as a seller in the competitive summary sets AmazonSelling=True automatically) or by some configuration. The system design allows future addition of more flags or strategy tags. For example, a “Clearance” flag could be toggled manually for SKUs we want to liquidate, causing the strategy to ignore normal profit floors and price very aggressively to sell out. All flags and strategy parameters for each SKU are stored in the data store, so they persist across runs and can be edited via a config UI or file.
+Example Strategy Rules Table
+To illustrate, here is a simplified table of strategy rules based on scenarios (the actual implementation can use these as guidelines):
+Scenario (Flags)	Pricing Tactic	Conditions/Notes
+AmazonSelling = True	- If Amazon’s price < our cost: Do not compete (hold price or exit).
+- Else if Amazon slightly above our min price: Match or undercut Amazon by a few cents to attempt Buy Box.	Only attempt undercut if we can profit. Often, Amazon’s high trust and stock means they win even at equal price; undercut by a tiny amount might be needed. If Amazon has Buy Box and we can't beat their price, consider SKU unsavable.
+FBA Buy Box = True (competitor is FBA)	- Underprice the competitor by $0.01 (or minimal increment) to take Buy Box.
+- If we currently have Buy Box: Maintain price or consider slight increase until Buy Box is lost, then revert.	Competing against FBA requires price parity or lower price, assuming seller metrics are comparable. Ensure not to drop below minimum margin. If competitor lowers price further, decide if we follow down to floor or hold (could lead to price war).
+FBM Buy Box = True (competitor is FBM)	- Match price (we likely win due to Prime shipping), or even price up to ~5% higher if profit allows, since FBA has advantage.
+- If no buy box (Amazon sometimes suppresses if price too high): consider lowering price.	FBM competitors often have slower shipping, giving FBA an edge. We can win at same price, so no need to undercut – this protects some margin. Monitor that we do win after matching; if not, then undercut a bit.
+No competitor undercutting (we are lowest)	- Raise price gradually until just below next competitor or a set ceiling to maximize profit.
+- Hold if raising could lose Buy Box.	This is applied if we hold Buy Box comfortably (e.g., others are out of stock or far higher). The engine could increase price in small increments and monitor Buy Box status.
+Unsavable (flagged)	- Do not lower price further (it won’t help), maybe increase price to cover fees if someone buys by chance.
+- Mark for review: possibly remove from FBA or wait for market changes.	If unsavable due to fees or competition, it’s better not to sell at a loss. System may send an alert for this SKU. It might also periodically check if conditions have improved (e.g., competitor went away).
+These rules illustrate how scenario tagging informs actions. The engine’s design allows these rules to be coded in Python (if-else or lookup tables) for clarity. The modular design also means we could swap this out for an AI module later – e.g. an AI that looks at the same data and outputs a price decision – by adhering to the same input/output interface (data in, price decision out).
+Rate Limiting and Caching Mechanism
+Efficient use of API quotas and timely responses rely on a robust rate limiting and caching mechanism. This subsystem works behind the scenes to support the scheduler and strategy engine:
+API Rate Limit Tracker: The system maintains a global registry of API endpoints with their known rate limits (from Amazon’s documentation or responses). Each time an API call is made, it records the timestamp and decrement the available “token” count for that endpoint. A background process or the scheduler monitors these timestamps. For example, if getCompetitiveSummary allows 10 calls per minute (hypothetical), the tracker will ensure we do not exceed this by delaying or queueing calls. If a call is attempted and the limit would be exceeded, the call is deferred until the next available window. This can be implemented with a token bucket or leaky bucket algorithm, or simply by computing next allowed time. The cache of last-call times per SKU per operation is also kept, so we avoid, say, fetching the same SKU’s data twice in very short succession unless an external event warranted it.
+Caching of Responses: Recently fetched data (like the competitive summary for a SKU) is stored in memory or a fast cache layer (with a copy in the DB if persistence needed). This cache entry might include a TTL (time-to-live). If the strategy engine requests data for a SKU that was just fetched 30 seconds ago and no significant event occurred, the system can use the cached data instead of calling the API again, to reduce calls. This is especially useful for data that doesn’t change second-to-second (inventory age, fees, etc. can be cached for hours). However, pricing data is time-sensitive; caching is used carefully there – for example, cache competitive prices for a minute, but if a new decision cycle comes after a minute, likely refresh from API to avoid missing a competitor’s price change. The caching strategy thus preserves precision without sacrificing freshness
+flashpricer.com
+ by choosing appropriate TTLs per data type (short TTL for price data, long TTL for static data).
+Filling Call Gaps: As discussed, when a particular SKU is on cooldown (e.g., we just updated its price and don’t want to call again immediately), the scheduler will pick another SKU to operate on. The cache/tracker helps by providing a list of “allowed calls” at any given second. For instance, if only 1 price update per 15 seconds per SKU is allowed but we have 10 SKUs needing updates, the system can update SKU1, then in the next second update SKU2, and so on, cycling through until SKU1’s 15 seconds have passed. Similarly, if getCompetitiveSummary calls are limited to, say, 30 calls/hour, the system spreads them out (about one every 2 minutes) and might batch 20 SKUs in each to cover all SKUs in that hour. Any idle time is avoided by adjusting task frequencies – if at some moment no SKU needs immediate attention, the system can either wait or use the time to do lower-priority updates (like fetch a daily report).
+Error Handling and Backoff: If the SP-API returns a throttle error or any failure, the system’s rate limiter catches it and backs off appropriately. It logs these events. If a burst of calls triggered a limit, the scheduler can pause certain tasks briefly and then resume. The cache may mark data as stale if an update failed, and those SKUs might be retried sooner once allowed.
+Overall, this mechanism acts like a traffic cop, ensuring we never hit Amazon’s hard limits (which could result in request failures or API penalties) while still making as many calls as needed for real-time performance. The careful orchestration of calls, guided by caching models and internal routing logic, achieves the goal of maintaining repricing speed and responsiveness without waste
+flashpricer.com
+.
+Logging and Reporting
+Every action the repricing system takes is logged for audit and analysis. Logging serves two purposes:
+Debugging and Analysis: to understand why the system made a particular decision (useful for tweaking strategies).
+Performance Monitoring: to track how often we’re winning the Buy Box, how often prices change, and identify any issues (like thrashing prices or prolonged Buy Box loss).
+Decision and Action Logs
+Each price evaluation cycle for a SKU produces a log entry. The log is written to a text file and/or a database table. A log entry contains fields such as:
+Timestamp: Date/time of the decision.
+SKU/ASIN: Identifier of the product.
+Current Price (Before): Our price before change.
+New Price (After): Our price after change (or “(no change)” if none made).
+Buy Box Price & Seller: The Buy Box price at the time and who held it (e.g., competitor’s ID or “us”).
+Competitor Overview: A brief summary of key competitors, e.g., “Amazon at £19.99, FBM seller at £20.49 (shipping not Prime)”.
+Flags/Scenario: Which scenario flags were true, e.g., “[AmazonSelling=False, FBMBuyBox=True]”.
+Decision Rationale: A message describing the action: e.g., “Matched FBM competitor price to win Buy Box (we have Prime advantage)” or “No change – our price is lowest, holding Buy Box” or “Price lowered from £15.00 to £14.80 to undercut competitor X by £0.01”. In case of no change: “Kept price; undercutting would violate min margin.”
+Outcome/Result: If known immediately or later, note the outcome such as “Buy Box won” or “Still second place”. (Immediate outcome might not always be available unless we query again; this could be updated on next cycle or inferred from notifications.)
+Action Type: e.g., “Price Update API called” or “No update needed”. If an update API was called, we also log success/failure of that API call.
+These logs are written in a human-readable form. For example, a log line might look like:
+2025-12-02 10:15:00 SKU1234: Price £19.99 -> £19.50. Flags[AmazonSelling=False, FBABuyBox=True]. Lowered price by £0.49 to beat competitor (FBA competitor was £19.99). Buy Box expected to win.  
+Or if no change:
+2025-12-02 10:15:00 SKU5678: Price £15.00 unchanged. Flags[AmazonSelling=True, FBMBuyBox=False]. Amazon at £12.99 - below cost, marked unsavable.  
+All API calls are also logged (at least at a summary level), for example: “Called getCompetitiveSummary for 20 SKUs (IDs)…”, “Patched price for SKU1234 to £19.50 – SUCCESS”. This helps track our API usage and detect any call failures or throttling events.
+Summary Reports and Alerts
+In addition to the granular log, the system generates periodic summary reports to highlight overall performance and any important events:
+Buy Box Win Rate: The percentage of time (or of checks) each SKU is in the Buy Box. This can be computed from competitive data or notifications. A daily summary might say “Buy Box held for 80% of checks across all SKUs today. Notable losers: SKU XYZ lost Buy Box 10 times to competitor ABC.”
+Price Changes Count: How many price updates were made per SKU per day, and overall. E.g., “Total 50 price adjustments today (0.48 per SKU on average). SKU123 had 5 changes (high competition).” This can reveal if a SKU is “thrashing” (too many changes) which might warrant strategy adjustment.
+New Competitors or Scenarios: If a new competitor appears on a listing for the first time, or if Amazon itself joins a listing, the system flags that. For example, “New competitor detected on SKU789: Seller ‘BestDeals’ (FBM) entered at £10.99.” Or “Amazon is now selling SKU101 (was previously third-party only). Strategy flag AmazonSelling activated.” Such events are important for the user to know.
+Unsavable SKU Alerts: If any SKU was flagged as unsavable during the day, highlight it: “SKU5678 flagged unsavable – Buy Box price below our cost due to fees. Recommended to review this SKU’s viability.”
+Performance & Errors: Report any API throttling incidents or errors. E.g., “Hit rate limit 3 times today on competitive price fetch – consider reducing frequency or batching more.” Also include latency stats if relevant (e.g., average decision cycle time).
+Revenue/Sales Impact (optional): If sales data is integrated, report on sales achieved and if repricing had an obvious effect. For example, “SKU1234 sold 10 units after aggressive repricing, clearing 50% of aged inventory.”
+These summaries are designed to be human-readable and could be delivered as daily emails or printed to console/log. They condense the day’s activity so the user doesn’t have to sift through detailed logs unless needed. The logs and reports follow a structured format (so they can be parsed or analyzed further), but are also meant to be readable. For instance, the system might use a simple markdown or table format for daily reports if emailed, or just plain text bullet points.
+Logging Implementation
+Under the hood, logging can be done using Python’s logging library, writing to rotating log files. A separate “analysis” thread or scheduled task can query the database for interesting events (like unsavable flags set, or count of price changes) to compile the summary. The logs can also serve as training data if in the future an AI model is introduced (the AI could learn from historical decisions and outcomes). All logging and reporting events also increment counters or update state in the data store (for example, a counter for how many times competitor X undercut us today, to facilitate competitor modeling described next).
+Data Storage and Strategy State Management
+A structured approach to data storage ensures that the system can quickly access current state and also analyze historical trends. We recommend using a relational database (like SQLite for simplicity, or PostgreSQL/MySQL if scaling up) combined with an in-memory cache for hot data. The schema might include tables or collections for:
+Products Table: List of SKUs/ASINs under management. Fields: SKU, ASIN, product title, cost (our buy cost), min_price, max_price, etc., and flags for strategy (AmazonSelling, FBABuyBox, etc. – though these particular flags are dynamic state updated each cycle and might reside in a state table instead). Also store static info like FBA fees (if known per unit) and dimensions that affect fees.
+Strategy Configs: Could be combined with Products table or separate. This holds the per-SKU strategy parameters: e.g., which repricing strategy type is assigned (if we have named strategies), the minimum margin percentage allowed, whether aggressive mode is on, etc. It can also include boolean fields for toggling strategies like “allow price increase” or “only match not undercut” for certain scenarios. Essentially, this is where the user’s preferences per SKU are stored.
+Current State Table: This table holds the most recent dynamic data for each SKU, updated after each API fetch. Fields might include: last known buy box price, buy box owner, our current price, our last update time, our stock level, total competitor count, lowest competitor price, etc. The scenario flags (AmazonSelling, FBMBuyBox, etc.) can also be stored here for quick reference and debugging. This table is essentially overwritten or upserted each cycle with fresh data. By having this in a table, the strategy engine can query many SKUs at once if needed (for example, to find all SKUs where we lost Buy Box, if we wanted to batch decisions).
+Historical Price/Competition Table: A log of key metrics over time for analysis. Each entry could record, say, on each significant event or time interval: SKU, timestamp, our price, buy box price, competitor count, our buy box status (won/lost), etc. This would grow over time and could be used for trend analysis (e.g., seeing how often price wars happen, or how a competitor’s price moves). We might not log every single check to avoid enormous data, but maybe only when things change or on a timed interval (e.g., snapshot once an hour per SKU).
+Decision Log Table: As described in logging, we might store structured fields for each price decision made. This might overlap with the Historical table above, but includes the specific action taken and rationale. Storing it in a table (in addition to flat log file) allows running queries like “show all cases where we lowered price but still didn’t get Buy Box” etc., which is useful to refine strategies.
+Competitor Info Table (Optional Advanced): If we want to model competitor behavior, we can have a table keyed by Competitor (seller ID) and SKU, storing information like how many times that competitor was observed holding the Buy Box, average price, how often they change price, last seen price, and any pattern notes. For example, competitor X on SKU Y tends to undercut by 1p and changes price 5 times a day, etc. This is populated from the competitive data we fetch. Over time, this becomes a rich dataset of competitor behaviors.
+All these tables together form our internal knowledge base. The data store doesn’t need to be overly complex given the scale (hundreds of SKUs), but designing it with clarity ensures we can scale to thousands of SKUs in future. The cache layer (e.g., a dictionary or a Redis if needed) would mirror some of this data in memory for quick access, especially the Current State for each SKU and the last API call times. Storage and Retrieval Operations: Typical operations include:
+On fetching new data for SKU(s), update the Current State table and append to Historical table.
+The strategy engine reads from Current State (and possibly Strategy Config) for its logic.
+When a SKU is flagged unsavable or a strategy flag changes, update the Products/Config tables so that state persists.
+When logging decisions, insert into Decision Log table.
+Periodic archival: older historical data could be archived or pruned if space is a concern (or kept indefinitely for AI training possibilities).
+Competitor Behavior Modeling (Optional Enhancement)
+To further strengthen pricing strategy, the system can incorporate a competitive intelligence module that analyzes competitor behavior patterns over time. This goes beyond immediate reactions and looks for trends such as: who the frequent Buy Box winners are, how often competitors change prices, and how they respond to our price moves. Modern repricing tools gather a wealth of such data
+repricer.com
+, and leveraging it can turn raw data into strategic insights. Here’s how this can be approached:
+Data Collection: Using the logs and historical tables, aggregate competitor information. For each competitor (by seller ID) on each SKU, track metrics like: Buy Box Win Rate (how often they hold the Buy Box), Price Change Frequency (e.g., do they change price hourly, daily?), Typical Undercut Amount (do they undercut by $0.01 or larger jumps?), Fulfillment Method (FBA vs FBM), and Stock Trends (if stock info can be inferred from inventory listings or if they go out of stock often). Much of this data is already available via our periodic competitive price fetches
+repricer.com
+. For example, if in each getCompetitiveSummary we see the list of lowest offers, we can log “Seller X was at price P at time T”. Over a few days, we have a time series of Seller X’s pricing.
+Pattern Recognition: Analyze the collected data for patterns. For instance:
+Competitor A seems to drop their price every Friday afternoon by 5% (perhaps to clear weekend sales) – a pattern we can exploit by anticipating with our own drop on Friday morning
+repricer.com
+.
+Competitor B always matches our price within 10 minutes whenever we change – indicating an algorithmic repricer. If we notice this, we might attempt a strategy like price cycling: temporarily drop price to flush out their response, then raise it back to test if they follow, etc.
+Competitor C (FBM) only has 5 units in stock and often runs out -> when we detect they go out of stock, we can raise our price to capture more margin while they’re gone
+repricer.com
+.
+If a competitor has a slower repricing cycle (e.g., they only check prices hourly), we could exploit that by making more frequent small adjustments to capture the Buy Box in between their updates
+repricer.com
+.
+Identify if our true competition is Amazon or a specific set of sellers. For example, perhaps Amazon’s own brand or a known big seller consistently wins – we might choose to avoid direct price wars with them and instead find a price point that yields some profit until they stock out (if they ever do), or focus on other SKUs.
+Adaptive Strategy Rules: Feed these insights back into our strategy engine. This could mean dynamic rule adjustments
+repricer.com
+repricer.com
+, for example:
+“If competitor X undercuts by $0.01 consistently, consider undercutting by $0.02 once to see if they follow or if that wins the Buy Box outright.”
+“If a competitor usually raises price when stock is low, don’t automatically undercut them to the minimum; instead hold price and let them sell out, then we can take the Buy Box at a higher price.”
+Automatically flag high-frequency price wars: if SKU is changing price 20+ times a day, maybe enable an “Aggressive Mode” or conversely a “Cooldown” where we pause to see if competitors stabilize (to avoid both of us tanking the price continuously).
+Use time-of-day rules if patterns found (e.g., at midnight, many repricers reset – perhaps we can take advantage by being the last to change price in the evening, holding Buy Box overnight at a higher price).
+Implementation: A separate analysis module can run daily to process the last day/week of data and update a “Competitor Profile” for each competitor. This could simply be stored in tables or even output as a report to the user for transparency. Then the strategy engine can reference these profiles. For instance, if a competitor profile indicates “Seller123 is an aggressive penny-undercutter with fast reaction”, we might set a flag in the strategy config for that SKU like aggressive_competitor=True which triggers a different set of rules (maybe more willingness to undercut deeper or to attempt price hiking strategy).
+This competitive intelligence feature is optional in the initial design but is a powerful extension. It transforms the repricer from a reactive tool to a more proactive, strategic tool, effectively “learning” competitor behaviors and using that to our advantage. According to repricing experts, such data-driven analysis of competitors can become a “secret weapon” for marketplace success
+repricer.com
+repricer.com
+. It allows creation of sophisticated rules like “if competitor drops price on Fridays, adjust earlier” or “when competitor goes out of stock, raise price by X%”
+repricer.com
+ – which we have considered in our strategy design.
+Extensibility and Future Enhancements
+The architecture and design outlined above ensure a solid foundation for rule-based repricing. Importantly, we have kept the system modular and future-proof for advanced upgrades, including AI-driven strategies and reinforcement learning, as mentioned by the user’s requirements. Here’s how the system can be extended:
+Pluggable Strategy Module: The current rule-based Strategy Engine can be abstracted behind an interface (e.g., a function determine_new_price(state)). In the future, an AI module (say a machine learning model or a reinforcement learning agent) could replace or augment this function. For example, a reinforcement learning agent could observe the state (prices, competition) and reward outcomes (sales, profit) from the logs to learn an optimal pricing policy. The system’s rich logs and state history would provide excellent training data for such a model. We could start by running the AI in “shadow mode” (it suggests prices while the rule engine still makes the real call, to compare performance) and gradually trust it for live decisions. The modular design (where the engine reads from the database and outputs a decision) makes this swap relatively straightforward.
+Scalability: With growth beyond a few hundred SKUs, we might need to distribute tasks or scale the database. The design can scale vertically (faster machine, more threads) or horizontally by separating concerns: e.g., run data fetching in one process, and price evaluations in parallel workers. Using a task queue like Celery or Amazon SQS could allow distributing workload if needed. The database can be upgraded to a full SQL server or a cloud database if the volume grows. The architecture diagram components could be split into microservices (e.g., a dedicated service for repricing decisions), but for now a single application is sufficient.
+User Interface: Although not in scope, one could add a small UI or config file for the user to adjust strategy parameters (like minimum margins, or toggling certain strategies). Because the strategy configs are in a database, an interface to edit those would be a logical addition.
+Additional Data Inputs: We can incorporate more data into pricing decisions, like Amazon’s Sales Rank, product page traffic, or even external market prices (if this were a multichannel repricer). The system can be extended to fetch such data (respecting their own APIs’ limits) and include them in the state for decision making (for example, if sales rank is dropping despite low price, maybe the issue isn’t price but something else – not directly for repricing, but good to know).
+Serverless/Event-Driven Possibilities: In the future, parts of the system might be moved to an event-driven model using AWS tools (for instance, receiving SP-API notifications via an SQS queue and using AWS Lambda to trigger our logic). However, since the requirement is a local system, we stick to local scheduling. Still, the modular design could let us swap the data source from “poller” to “push” events easily for certain data.
+By implementing the system with clean separation of concerns (fetching, deciding, updating, logging), we ensure that improvements or new algorithms can be integrated with minimal disruption. The ultimate goal is a system that not only reacts to the current market but learns and improves, staying one step ahead of competitors. With this design, the user will have a powerful local repricing solution that is comprehensive now and ready for smarter enhancements in the future. Sources: The design principles and strategies referenced are informed by Amazon SP-API capabilities and repricing best practices, including Amazon’s competitive pricing API documentation
+github.com
+github.com
+, industry discussions on optimizing API call usage
+flashpricer.com
+flashpricer.com
+, and modern competitor analysis techniques in repricing
+repricer.com
+repricer.com
+.
+
+
+
+Sources
+
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info. See Cookie Preferences.
+
+Local Repricing Engine With Dynamic Amazon Strategy Logic
+Searched for Amazon SP-API repricing system design
+ChatGPT
+I’m gathering info on SP-API endpoints for repricing, examining the architecture, managing API call frequencies, and proposing a strategy engine design.
+
+I'm mapping out a detailed architecture for a repricing system, including API call strategies, pricing strategy engine, logging, data storage, and optional competitive intelligence.
+
+Searched for Amazon repricer architecture diagram
+ChatGPT
+Focusing on "technical design Amazon repricing engine" for precise results on this topic.
+
+Searched for Amazon repricing technical design
+ChatGPT
+I’m thinking about searching for "SP-API repricing sample" or "SP-API automate pricing rules" due to the unique requirements.
+
+
+Read developer-docs.amazon.com
+
+ChatGPT
+Exploring "Automate Pricing" implies a desire for automation or self-built logic, potentially aligning Amazon's API innovations with the user's requirements.
+
+
+Read github.com
+
+ChatGPT
+I'm examining the getCompetitiveSummary SP-API operation, noting its patchListingsItem functionality for updating prices and considering CompetitivePriceThreshold as a price-setting mechanism.
+
+
+Read flashpricer.com
+
+Searched for Python repricer background tasks design
+ChatGPT
+I'm examining the choice of a scheduling library, considering APScheduler or Celery. For simpler needs, schedule or a loop with sleep might suffice. Caching API call timestamps is also under review.
+
+I'm mapping out "getCompetitiveSummary" within "Product Pricing API v2022-05-01". Searching the developer docs site for "getCompetitiveSummary rate limit" should provide more insights.
+
+
+Read github.com
+
+ChatGPT
+I'm working through scheduling competitive pricing adjustments, deciding on batching and frequency based on SKU importance. Also, considering alert setups for rapid changes.
+
+Searched for Celery architecture diagram
+ChatGPT
+I’m thinking about enhancing the plan with a diagram or step-by-step description of the Amazon repricer architecture. A visual aid, like an image of the architecture, could be impactful.
+
+Searched for Amazon repricer system architecture image
+ChatGPT
+Mapping out options: diagram programming, text drawing, architecture images.
+
+Searched for Python background tasks scheduler architecture diagram
+ChatGPT
+I’m thinking through a system design using Graphviz to create a clear, concise diagram of the architecture. This approach will map out the components and their interactions effectively.
+
+
+Read flashpricer.com
+
+ChatGPT
+I’m thinking through a Graphviz diagram to map connections in a synthetic node network. This should clarify the various parts and their relationships effectively.
+
+Analyzed with python
+ChatGPT
+It's good to see that the architecture outline has been successfully saved to both 'repricer_architecture.dot' and rendered as 'repricer_architecture.png'.
+
+I’m looking into various methods for integrating images, including base64 encoding and direct embedding, to adhere to the guidelines provided.
+
+Analyzed with python
+ChatGPT
+I'm suggesting schedule revisions for competitive price updates, considering SKU categorization by competition level and leveraging Amazon's new API features for efficient adjustments.
+
+
+Read sellerengine.com
+
+ChatGPT
+I’m looking at cost, margin, and profit to ensure sustainability. This approach ties into managing unsavable SKUs and pricing rules.
+
+
+Read more from sellerengine.com
+
+ChatGPT
+I'm digging into how competitors might seem to undercut with their prices. Progress is steady, and I’m making meaningful observations.
+
+Searched for competitive repricing patterns on Amazon
+
+Read repricer.com
+
+ChatGPT
+I'm pulling together a detailed overview of pricing strategies, API calls, data storage, and logging. Advanced tactics like dynamic pricing updates and competitor modeling are optional for future development.
+
+I’m planning the structure for the Amazon Repricing System design, including system overview, architecture, Amazon SP-API usage, pricing strategy engine, rate limiting, caching, logging, data storage, competitor behavior modeling, and potential future enhancements like AI/ML integration.
+
+Research completed in 14m · 8 sources
+
+Design Plan: Local Python-Based Amazon Repricing System
+System Overview
+This document outlines a technical design for a Python-based Amazon repricing system that runs locally using background task schedulers. The system manages pricing for ~104 FBA products (with potential for growth) by leveraging Amazon’s Selling Partner API (SP-API) to gather product data (pricing, competitive offers, inventory age, fees, sales/refunds) and to update prices. The design emphasizes continuous data fetching at optimal intervals, per-SKU pricing strategies to maximize Buy Box ownership and profitability, and a robust scheduling, caching, and logging framework. Key features include:
+Continuous Data Fetching: Intelligent polling of pricing & competitive data, balancing API throttling with time-sensitive price updates.
+Per-Product Strategy Rules: Customizable rules (per SKU) to adjust prices for Buy Box wins and profit maximization.
+Rate Limiting & Caching: Tracking API call timestamps to respect rate limits and fill idle periods with calls for other SKUs.
+Scenario Tagging: Use of boolean strategy flags (e.g. Amazon Selling, FBA Buy Box, FBM Buy Box) to mark scenarios and tailor pricing behavior.
+Decision Logging: Detailed logs of all pricing decisions, actions, and outcomes for analysis and future tuning.
+Competitor Behavior Adaptation: Framework to detect competitor pricing patterns (e.g. constant undercutting) and adapt strategy (e.g. aggressive response to specific sellers).
+Unsavable SKU Flagging: Identification of SKUs that cannot compete profitably (due to fees, delivery disadvantages, etc.) for potential deactivation or alternate handling.
+Summary Reporting: Human-readable summaries of actions taken, new scenarios identified, and system performance metrics (delivered via logs or alerts).
+Extensibility: A modular design allowing future integration of AI-driven strategy selection or reinforcement learning components.
+This plan is structured into sections covering the overall architecture, API usage patterns and scheduling, strategy engine design, data storage, logging/reporting, and optional advanced components.
+Architecture Design
+Components and Workflow
+The repricing system consists of several coordinated components running on a local machine, orchestrated by a background task scheduler. Below is a breakdown of the main components and their interactions:
+Scheduler: A background task scheduler (e.g. Python’s APScheduler or Celery Beat) triggers various jobs at defined intervals. It coordinates periodic data fetch tasks, pricing evaluation tasks, and reporting tasks. The scheduler ensures tasks are spread out to avoid API rate limit bursts and can adjust frequencies dynamically.
+Data Fetcher: A module responsible for calling Amazon SP-API endpoints to retrieve the latest data for products. It fetches pricing and competitive offer data, as well as periodic retrieval of inventory age, fees, and sales/refund reports. Fetched data is stored in a local database or cache for quick access by the strategy engine.
+Pricing Strategy Engine: The core logic that evaluates each SKU’s situation and decides if a price change is needed. It uses per-SKU strategy rules and current data (our price, Buy Box price, competitor offers, costs/fees, etc.) to determine the optimal price that balances Buy Box win probability and profit. This engine factors in scenario flags (e.g. whether Amazon is a competitor, whether the current Buy Box winner is FBA or FBM) to apply the correct pricing rules. It also checks constraints like minimum margin and flags “unsavable” products that cannot win profitably.
+Price Updater: This component takes the strategy engine’s pricing decisions and submits price updates to Amazon via SP-API. It may use either the Listings API (e.g. patchListingsItem for price updates) or feeds to update prices. The updater respects any Amazon-imposed throttle (e.g. max 1 price update per SKU per 10-15 seconds) by queuing updates and spacing them appropriately.
+Local Data Store & Cache: A storage layer (e.g. a lightweight database like SQLite/PostgreSQL, with an in-memory cache for fast access) holds product info, strategy configurations, recent API responses, and history. This enables persistence of state (like last known competitor prices, last update timestamps) and quick reads without excessive API calls. A cache of last API call times per endpoint/SKU is maintained to calculate safe windows for the next call.
+Logging & Reporting Module: Every pricing decision, API call, and outcome is logged. Logs are stored in a human-readable format (e.g. append-only log files or a “Decisions” table in the DB) with timestamps and details. A reporting sub-task periodically aggregates these logs to produce summary metrics (e.g. how many price changes per day, Buy Box win rate, new competitor identified) and alerts for notable events (like an SKU flagged as unsavable or a persistent undercutting competitor). Summaries can be output to console, stored as reports, or emailed, giving the user an at-a-glance view of system performance.
+Architecture Diagram
+The following diagram illustrates the system architecture and data flow between components: System architecture for the repricing system, showing the Scheduler triggering data fetches and pricing evaluations, the flow of data to/from Amazon SP-API, and the interactions between the Strategy Engine, Data Store, Price Updater, and Logging. In the diagram, solid arrows indicate data or command flow. The Scheduler triggers periodic tasks for data fetching (to Amazon SP-API) and pricing strategy evaluation. The Data Fetcher stores results in the local Data Store/Cache. The Strategy Engine reads current data and computes pricing actions, which the Price Updater sends to Amazon. All actions and outcomes are logged for analysis. The Scheduler also triggers summary report generation from logs and the database.
+Amazon SP-API Usage and Scheduling
+A crucial part of the design is determining which API calls to make, how often, and in what batches to optimize data freshness without breaching rate limits or incurring excessive costs. Amazon’s SP-API imposes throttling quotas (limited calls per second or per minute and/or payload sizes) and, as of 2025, usage fees for high volumes of calls
+flashpricer.com
+flashpricer.com
+. The system will use a combination of batched calls, staggered scheduling, and event-driven updates to stay efficient. The table below outlines the key API endpoints and recommended usage patterns:
+API Endpoint	Data Retrieved / Action	Batching & Throttle	Call Frequency Strategy
+Product Pricing – getCompetitiveSummary (Pricing API)	Competitive pricing summary for up to 20 ASINs: includes the Buy Box (featured offer) info, lowest offers, etc.
+github.com
+. Crucial for knowing current market prices and competition.	Supports batching of up to 20 ASINs per call
+github.com
+. Rate limit e.g. ~1 request/sec (exact limit per SP-API specs).	Frequent: High-priority SKUs (fast-selling or highly competitive) fetched every 1–3 minutes; others every 5–15 minutes. Batching used to fetch multiple SKUs per call to maximize throughput. Adaptive: increase frequency if frequent changes detected, slow down if stable. Also consider Amazon’s notifications (ANY_OFFER_CHANGED, PRICING_HEALTH) to reduce polling by reacting to events
+github.com
+.
+Listings API – patchListingsItem (Pricing Update)	Update our listing price for a SKU (or feed submission for batch updates).	Typically 1 SKU per call (REST patch). Throttle example: ~5 requests/min per SKU (to avoid rapid re-updates). Price updates might have a 10-15s minimum interval per SKU as a best practice (to let Amazon process and avoid oscillations).	As needed: Triggered immediately after strategy decision if a price change is warranted. Use a queue to ensure a single SKU isn’t updated more than once per ~15 seconds; interleave different SKUs’ updates to utilize time gaps. Bulk feed updates can be used if many SKUs need changes at once (e.g., end-of-day broad adjustments), bundling them into one feed submission to save calls.
+Inventory & Fees – getInventorySummaries / Reports	Inventory levels, inventory age, and estimated fees. Inventory age reports show how long units have been in FBA (for storage fee implications). Fee data (FBA fees, referral fees) used to compute profit margins.	Can request a report (e.g., FBA Inventory Age report) or call inventory API for summaries. These can cover all SKUs in one report. Throttled by report generation limits (maybe 1-2 reports per hour). Fees: a getMyFeesEstimate API exists (1 SKU per request; not heavily used for every update, rather on demand).	Infrequent: Inventory age and fee data changes slowly. Pull inventory age report daily (off-peak hours) to update which SKUs are aging or incurring high fees. Fees can be cached; update fee info weekly or when costs change. These calls are scheduled when other high-priority calls are idle (e.g., overnight or once a day).
+Orders/Sales – Orders API / Reports	Sales and refunds data to gauge performance (units sold, refund counts per SKU) and detect anomalies (sudden spike or drop in sales).	Can use Orders API (paginated list of recent orders, throttled by calls/hour) or generate a daily sales report. Batching not applicable, but data for all SKUs can be retrieved in one report file.	Moderate: For repricing, real-time sales data is not critical, but daily trends inform strategy tweaks. Fetch sales/refund reports daily (or every few hours for fast sellers) to identify slow-moving stock or high-return items. This can flag SKUs for price reductions or deactivation if needed.
+Catalog & Product Info – Catalog Items API	Product details like title, category, or buy cost (if stored in system), mainly static data. Not directly needed for pricing decisions except initial setup.	Batching available for some catalog calls. Low frequency needed.	On-demand: Use during initialization or if product info changes. Not part of regular cycle.
+Optimal Scheduling: The scheduler staggers these calls to ensure the API’s rate limits are never exceeded and that we “do exactly the right things — and nothing wasteful”
+flashpricer.com
+. For example, the system might execute a getCompetitiveSummary batch for 20 high-priority SKUs every minute, rotating through groups of SKUs, so each is updated ~every 5 minutes. If a particular SKU is in a price war (frequent changes), the system can temporarily boost its frequency (e.g. every 1-2 minutes) to capture changes quickly, since missing a price change event by 90 seconds can cost the sale
+flashpricer.com
+. Conversely, if another SKU’s competitive landscape hasn’t changed for hours, the fetch interval for that SKU can be relaxed to save calls. The system also leverages batching aggressively. For pricing data, using the max batch size (e.g. 20 ASINs) per call yields efficiency – e.g. 5 calls can refresh 100 ASINs. This approach aligns with Amazon’s design, which allows fetching many ASINs at once to gather featured offer and lowest offer info in one response
+github.com
+. Additionally, Amazon’s notification services (ANY_OFFER_CHANGED, etc.) are considered: the system can subscribe to these notifications to get instant push alerts when a Buy Box offer changes or when our offer becomes non-competitive
+github.com
+. Such events can trigger immediate repricing outside the normal schedule (an event-driven supplement to polling)
+flashpricer.com
+, ensuring instant reactivity to critical changes. API Call Throttling and Fill-Rate: All API calls include timestamp logging in the cache. Before any call, the system checks the last call time and the endpoint’s rate limit rules. For instance, if patchListingsItem allows 5 calls per minute, after one price update, the system knows the next update call slot is 12 seconds later (60/5). It then utilizes the interim by executing other tasks or calls for different SKUs. By caching each SKU’s last update time, the scheduler can round-robin through SKUs that need updates, ensuring no single SKU is updated more frequently than allowed (e.g., one product’s price update every 15 seconds as given in the example scenario). In effect, if SKU1’s price was just updated, the system will shift to update SKU2, SKU3, etc., then come back to SKU1 when its 15-second window passes. This prevents idle time – the system is always doing a useful call for some SKU as long as there’s any pending action, thus filling the gaps with other SKUs’ operations.
+Pricing Strategy Engine Design
+The pricing strategy engine is the brain of the repricing system. It applies a set of rules and algorithms per product to decide if and how to adjust the price. The design allows each SKU to have a tailored strategy aiming to maximize Buy Box ownership while maintaining profitability. Key aspects of the strategy engine include scenario-based rules, profit guardrails, and adaptability to competitor behavior.
+Per-SKU Strategy Rules and Execution Flow
+For each SKU, the strategy engine executes the following general flow when triggered:
+Data Gathering: Retrieve the latest data for the SKU from the local store/cache – including our current price, the current Buy Box price and owner, and a list of competitor offers (price, seller type FBA/FBM, seller name/ID, stock if available). Also fetch any SKU-specific settings like minimum allowable price (floor), maximum price (ceiling), and cost/fee info for profit calculation.
+Scenario Flag Evaluation: Determine which strategy scenarios are in effect by evaluating the data. For example:
+Amazon Selling: True if Amazon Retail (sold by Amazon) is one of the competing sellers on this listing.
+FBA Buy Box: True if the current Buy Box winner (featured offer) is an FBA seller (could be us or another FBA seller).
+FBM Buy Box: True if the Buy Box is currently held by a FBM (merchant-fulfilled) seller, implying we might have a shipping advantage if we are FBA.
+(Other flags can be defined as needed, e.g., Low Stock, High Price Elasticity, etc., but the above are the ones requested.)
+These boolean flags are set to indicate the competitive scenario. Multiple flags can be true simultaneously (e.g., Amazon is selling and currently has the Buy Box, or Amazon is selling but an FBM seller holds the Buy Box, etc.). The flags will determine which subset of rules to apply.
+Apply Pricing Rules: Based on the active flags and the SKU’s configured strategy, evaluate rules to decide on a new price. The rules can be seen as an if-else decision tree or a small rule engine. Examples of rule application:
+If AmazonSelling = True: Amazon is a competitor on this listing. Strategy might dictate not trying to undercut Amazon aggressively if they have a price much lower than our cost (to avoid a race we can’t win). If Amazon’s price is only slightly below ours and we can afford a small cut, we might lower our price to just below Amazon’s to attempt Buy Box (keeping profit in mind). If Amazon holds the Buy Box and is far cheaper than our min price, the engine might decide this SKU is currently “unsavable” (we cannot compete) and mark it (see Unsavable logic below).
+If FBA Buy Box = True: The Buy Box winner is an FBA seller (i.e., another FBA competitor or even Amazon). We likely need to price match or slightly beat the competitor’s price to win. The rule might be “set our price = competitor price - $0.01” (or -1 penny) to undercut if that’s above our minimum. However, if we already are the Buy Box winner (we’re FBA and currently winning), the strategy might instead consider raising our price gradually to increase profit until we lose the Buy Box (a technique to maximize profit while maintaining Buy Box).
+If FBMBuyBox = True: A FBM competitor currently has the Buy Box. Since we fulfill via FBA, we have Prime shipping which often gives an edge. A rule here might be “we can match the FBM price or even price up to a small percentage higher (e.g. 5% higher) and still win due to faster delivery”. Thus, the engine could choose a price equal to the FBM price (to safely win) or slightly above if profit is a concern and we believe we’d still win the box (this could be tested over time).
+General Under-cutting Rule: In competitor-based strategies, a common rule is to undercut the Buy Box price by the minimum increment (e.g., $0.01) if it doesn’t violate profit margins. The engine will ensure any new price >= minimum allowed price. If undercutting would go below cost or minimum margin, it will either keep the price or only match the competitor. Profit protection is critical – the system will not chase the Buy Box below a floor price that ensures at least, say, 5% margin or a few dollars profit.
+Raise Price Opportunity: If our offer currently holds the Buy Box at a price higher than our minimum (meaning we have room to spare), and competitors are out-of-stock or significantly higher, the engine might raise our price towards the next highest competitor or a defined ceiling, to maximize profit while still holding the Buy Box. (This is an advanced behavior for when competition vanishes or we’re dominating the listing.)
+Unsavable SKU Logic: As part of rule evaluation, the engine checks if the SKU is “unsavable” under current conditions. An unsavable scenario is when our offer cannot realistically win the Buy Box at a profitable price. Indicators include: our minimum profitable price is higher than the Buy Box price by a large margin (due to high FBA fees or a competitor with a much lower cost base), or the Buy Box is held by Amazon at a price near or below our cost. If these conditions persist, the engine will mark a flag on that SKU (e.g., unsavable=True) and log a warning. The strategy for unsavables could be to stop further price decreases (no “race to bottom”), and possibly trigger an alert to review this SKU (maybe we consider removing it from FBA or waiting for a better time). Unsavable SKUs might be periodically revisited to see if conditions change (e.g., competitor goes out of stock, allowing a profitable sale at our price).
+Decision Output: The engine produces a decision – either “keep price as is” or “new price = X”. It also attaches a rationale (which rule fired, which competitor we’re responding to, etc.) for logging. If a price change is recommended, this decision is passed to the Price Updater component to execute the update via API. The whole decision (old price, new price, reason, flags, competitor data) is sent to the Logger as well.
+The strategy execution is designed to be fast (low latency) since it may be reacting to real-time changes. We want the end-to-end loop (fetch data -> decide -> update price) to be quick, ideally a few seconds. This ensures we don’t miss short-lived opportunities. A low-latency decision cycle, combined with stable throughput of API calls, is crucial because repricing is highly time-sensitive
+flashpricer.com
+flashpricer.com
+.
+Strategy Tagging and Scenario Flags
+The system uses scenario flags to make the decision logic transparent and configurable. For each SKU, the current state of these flags can be logged (e.g., “SKU123: AmazonSelling=False, FBABuyBox=True, FBMBuyBox=False”) alongside the decision, which helps in debugging and tuning strategy. Moreover, these flags allow the user to tag and filter SKUs by scenario. For instance, one could query all SKUs where AmazonSelling=True to identify products competing with Amazon, and perhaps apply a more conservative global strategy to them (since competing with Amazon often requires different tactics). Under the hood, these flags are determined either by real-time data (e.g., seeing Amazon as a seller in the competitive summary sets AmazonSelling=True automatically) or by some configuration. The system design allows future addition of more flags or strategy tags. For example, a “Clearance” flag could be toggled manually for SKUs we want to liquidate, causing the strategy to ignore normal profit floors and price very aggressively to sell out. All flags and strategy parameters for each SKU are stored in the data store, so they persist across runs and can be edited via a config UI or file.
+Example Strategy Rules Table
+To illustrate, here is a simplified table of strategy rules based on scenarios (the actual implementation can use these as guidelines):
+Scenario (Flags)	Pricing Tactic	Conditions/Notes
+AmazonSelling = True	- If Amazon’s price < our cost: Do not compete (hold price or exit).
+- Else if Amazon slightly above our min price: Match or undercut Amazon by a few cents to attempt Buy Box.	Only attempt undercut if we can profit. Often, Amazon’s high trust and stock means they win even at equal price; undercut by a tiny amount might be needed. If Amazon has Buy Box and we can't beat their price, consider SKU unsavable.
+FBA Buy Box = True (competitor is FBA)	- Underprice the competitor by $0.01 (or minimal increment) to take Buy Box.
+- If we currently have Buy Box: Maintain price or consider slight increase until Buy Box is lost, then revert.	Competing against FBA requires price parity or lower price, assuming seller metrics are comparable. Ensure not to drop below minimum margin. If competitor lowers price further, decide if we follow down to floor or hold (could lead to price war).
+FBM Buy Box = True (competitor is FBM)	- Match price (we likely win due to Prime shipping), or even price up to ~5% higher if profit allows, since FBA has advantage.
+- If no buy box (Amazon sometimes suppresses if price too high): consider lowering price.	FBM competitors often have slower shipping, giving FBA an edge. We can win at same price, so no need to undercut – this protects some margin. Monitor that we do win after matching; if not, then undercut a bit.
+No competitor undercutting (we are lowest)	- Raise price gradually until just below next competitor or a set ceiling to maximize profit.
+- Hold if raising could lose Buy Box.	This is applied if we hold Buy Box comfortably (e.g., others are out of stock or far higher). The engine could increase price in small increments and monitor Buy Box status.
+Unsavable (flagged)	- Do not lower price further (it won’t help), maybe increase price to cover fees if someone buys by chance.
+- Mark for review: possibly remove from FBA or wait for market changes.	If unsavable due to fees or competition, it’s better not to sell at a loss. System may send an alert for this SKU. It might also periodically check if conditions have improved (e.g., competitor went away).
+These rules illustrate how scenario tagging informs actions. The engine’s design allows these rules to be coded in Python (if-else or lookup tables) for clarity. The modular design also means we could swap this out for an AI module later – e.g. an AI that looks at the same data and outputs a price decision – by adhering to the same input/output interface (data in, price decision out).
+Rate Limiting and Caching Mechanism
+Efficient use of API quotas and timely responses rely on a robust rate limiting and caching mechanism. This subsystem works behind the scenes to support the scheduler and strategy engine:
+API Rate Limit Tracker: The system maintains a global registry of API endpoints with their known rate limits (from Amazon’s documentation or responses). Each time an API call is made, it records the timestamp and decrement the available “token” count for that endpoint. A background process or the scheduler monitors these timestamps. For example, if getCompetitiveSummary allows 10 calls per minute (hypothetical), the tracker will ensure we do not exceed this by delaying or queueing calls. If a call is attempted and the limit would be exceeded, the call is deferred until the next available window. This can be implemented with a token bucket or leaky bucket algorithm, or simply by computing next allowed time. The cache of last-call times per SKU per operation is also kept, so we avoid, say, fetching the same SKU’s data twice in very short succession unless an external event warranted it.
+Caching of Responses: Recently fetched data (like the competitive summary for a SKU) is stored in memory or a fast cache layer (with a copy in the DB if persistence needed). This cache entry might include a TTL (time-to-live). If the strategy engine requests data for a SKU that was just fetched 30 seconds ago and no significant event occurred, the system can use the cached data instead of calling the API again, to reduce calls. This is especially useful for data that doesn’t change second-to-second (inventory age, fees, etc. can be cached for hours). However, pricing data is time-sensitive; caching is used carefully there – for example, cache competitive prices for a minute, but if a new decision cycle comes after a minute, likely refresh from API to avoid missing a competitor’s price change. The caching strategy thus preserves precision without sacrificing freshness
+flashpricer.com
+ by choosing appropriate TTLs per data type (short TTL for price data, long TTL for static data).
+Filling Call Gaps: As discussed, when a particular SKU is on cooldown (e.g., we just updated its price and don’t want to call again immediately), the scheduler will pick another SKU to operate on. The cache/tracker helps by providing a list of “allowed calls” at any given second. For instance, if only 1 price update per 15 seconds per SKU is allowed but we have 10 SKUs needing updates, the system can update SKU1, then in the next second update SKU2, and so on, cycling through until SKU1’s 15 seconds have passed. Similarly, if getCompetitiveSummary calls are limited to, say, 30 calls/hour, the system spreads them out (about one every 2 minutes) and might batch 20 SKUs in each to cover all SKUs in that hour. Any idle time is avoided by adjusting task frequencies – if at some moment no SKU needs immediate attention, the system can either wait or use the time to do lower-priority updates (like fetch a daily report).
+Error Handling and Backoff: If the SP-API returns a throttle error or any failure, the system’s rate limiter catches it and backs off appropriately. It logs these events. If a burst of calls triggered a limit, the scheduler can pause certain tasks briefly and then resume. The cache may mark data as stale if an update failed, and those SKUs might be retried sooner once allowed.
+Overall, this mechanism acts like a traffic cop, ensuring we never hit Amazon’s hard limits (which could result in request failures or API penalties) while still making as many calls as needed for real-time performance. The careful orchestration of calls, guided by caching models and internal routing logic, achieves the goal of maintaining repricing speed and responsiveness without waste
+flashpricer.com
+.
+Logging and Reporting
+Every action the repricing system takes is logged for audit and analysis. Logging serves two purposes:
+Debugging and Analysis: to understand why the system made a particular decision (useful for tweaking strategies).
+Performance Monitoring: to track how often we’re winning the Buy Box, how often prices change, and identify any issues (like thrashing prices or prolonged Buy Box loss).
+Decision and Action Logs
+Each price evaluation cycle for a SKU produces a log entry. The log is written to a text file and/or a database table. A log entry contains fields such as:
+Timestamp: Date/time of the decision.
+SKU/ASIN: Identifier of the product.
+Current Price (Before): Our price before change.
+New Price (After): Our price after change (or “(no change)” if none made).
+Buy Box Price & Seller: The Buy Box price at the time and who held it (e.g., competitor’s ID or “us”).
+Competitor Overview: A brief summary of key competitors, e.g., “Amazon at £19.99, FBM seller at £20.49 (shipping not Prime)”.
+Flags/Scenario: Which scenario flags were true, e.g., “[AmazonSelling=False, FBMBuyBox=True]”.
+Decision Rationale: A message describing the action: e.g., “Matched FBM competitor price to win Buy Box (we have Prime advantage)” or “No change – our price is lowest, holding Buy Box” or “Price lowered from £15.00 to £14.80 to undercut competitor X by £0.01”. In case of no change: “Kept price; undercutting would violate min margin.”
+Outcome/Result: If known immediately or later, note the outcome such as “Buy Box won” or “Still second place”. (Immediate outcome might not always be available unless we query again; this could be updated on next cycle or inferred from notifications.)
+Action Type: e.g., “Price Update API called” or “No update needed”. If an update API was called, we also log success/failure of that API call.
+These logs are written in a human-readable form. For example, a log line might look like:
+2025-12-02 10:15:00 SKU1234: Price £19.99 -> £19.50. Flags[AmazonSelling=False, FBABuyBox=True]. Lowered price by £0.49 to beat competitor (FBA competitor was £19.99). Buy Box expected to win.  
+Or if no change:
+2025-12-02 10:15:00 SKU5678: Price £15.00 unchanged. Flags[AmazonSelling=True, FBMBuyBox=False]. Amazon at £12.99 - below cost, marked unsavable.  
+All API calls are also logged (at least at a summary level), for example: “Called getCompetitiveSummary for 20 SKUs (IDs)…”, “Patched price for SKU1234 to £19.50 – SUCCESS”. This helps track our API usage and detect any call failures or throttling events.
+Summary Reports and Alerts
+In addition to the granular log, the system generates periodic summary reports to highlight overall performance and any important events:
+Buy Box Win Rate: The percentage of time (or of checks) each SKU is in the Buy Box. This can be computed from competitive data or notifications. A daily summary might say “Buy Box held for 80% of checks across all SKUs today. Notable losers: SKU XYZ lost Buy Box 10 times to competitor ABC.”
+Price Changes Count: How many price updates were made per SKU per day, and overall. E.g., “Total 50 price adjustments today (0.48 per SKU on average). SKU123 had 5 changes (high competition).” This can reveal if a SKU is “thrashing” (too many changes) which might warrant strategy adjustment.
+New Competitors or Scenarios: If a new competitor appears on a listing for the first time, or if Amazon itself joins a listing, the system flags that. For example, “New competitor detected on SKU789: Seller ‘BestDeals’ (FBM) entered at £10.99.” Or “Amazon is now selling SKU101 (was previously third-party only). Strategy flag AmazonSelling activated.” Such events are important for the user to know.
+Unsavable SKU Alerts: If any SKU was flagged as unsavable during the day, highlight it: “SKU5678 flagged unsavable – Buy Box price below our cost due to fees. Recommended to review this SKU’s viability.”
+Performance & Errors: Report any API throttling incidents or errors. E.g., “Hit rate limit 3 times today on competitive price fetch – consider reducing frequency or batching more.” Also include latency stats if relevant (e.g., average decision cycle time).
+Revenue/Sales Impact (optional): If sales data is integrated, report on sales achieved and if repricing had an obvious effect. For example, “SKU1234 sold 10 units after aggressive repricing, clearing 50% of aged inventory.”
+These summaries are designed to be human-readable and could be delivered as daily emails or printed to console/log. They condense the day’s activity so the user doesn’t have to sift through detailed logs unless needed. The logs and reports follow a structured format (so they can be parsed or analyzed further), but are also meant to be readable. For instance, the system might use a simple markdown or table format for daily reports if emailed, or just plain text bullet points.
+Logging Implementation
+Under the hood, logging can be done using Python’s logging library, writing to rotating log files. A separate “analysis” thread or scheduled task can query the database for interesting events (like unsavable flags set, or count of price changes) to compile the summary. The logs can also serve as training data if in the future an AI model is introduced (the AI could learn from historical decisions and outcomes). All logging and reporting events also increment counters or update state in the data store (for example, a counter for how many times competitor X undercut us today, to facilitate competitor modeling described next).
+Data Storage and Strategy State Management
+A structured approach to data storage ensures that the system can quickly access current state and also analyze historical trends. We recommend using a relational database (like SQLite for simplicity, or PostgreSQL/MySQL if scaling up) combined with an in-memory cache for hot data. The schema might include tables or collections for:
+Products Table: List of SKUs/ASINs under management. Fields: SKU, ASIN, product title, cost (our buy cost), min_price, max_price, etc., and flags for strategy (AmazonSelling, FBABuyBox, etc. – though these particular flags are dynamic state updated each cycle and might reside in a state table instead). Also store static info like FBA fees (if known per unit) and dimensions that affect fees.
+Strategy Configs: Could be combined with Products table or separate. This holds the per-SKU strategy parameters: e.g., which repricing strategy type is assigned (if we have named strategies), the minimum margin percentage allowed, whether aggressive mode is on, etc. It can also include boolean fields for toggling strategies like “allow price increase” or “only match not undercut” for certain scenarios. Essentially, this is where the user’s preferences per SKU are stored.
+Current State Table: This table holds the most recent dynamic data for each SKU, updated after each API fetch. Fields might include: last known buy box price, buy box owner, our current price, our last update time, our stock level, total competitor count, lowest competitor price, etc. The scenario flags (AmazonSelling, FBMBuyBox, etc.) can also be stored here for quick reference and debugging. This table is essentially overwritten or upserted each cycle with fresh data. By having this in a table, the strategy engine can query many SKUs at once if needed (for example, to find all SKUs where we lost Buy Box, if we wanted to batch decisions).
+Historical Price/Competition Table: A log of key metrics over time for analysis. Each entry could record, say, on each significant event or time interval: SKU, timestamp, our price, buy box price, competitor count, our buy box status (won/lost), etc. This would grow over time and could be used for trend analysis (e.g., seeing how often price wars happen, or how a competitor’s price moves). We might not log every single check to avoid enormous data, but maybe only when things change or on a timed interval (e.g., snapshot once an hour per SKU).
+Decision Log Table: As described in logging, we might store structured fields for each price decision made. This might overlap with the Historical table above, but includes the specific action taken and rationale. Storing it in a table (in addition to flat log file) allows running queries like “show all cases where we lowered price but still didn’t get Buy Box” etc., which is useful to refine strategies.
+Competitor Info Table (Optional Advanced): If we want to model competitor behavior, we can have a table keyed by Competitor (seller ID) and SKU, storing information like how many times that competitor was observed holding the Buy Box, average price, how often they change price, last seen price, and any pattern notes. For example, competitor X on SKU Y tends to undercut by 1p and changes price 5 times a day, etc. This is populated from the competitive data we fetch. Over time, this becomes a rich dataset of competitor behaviors.
+All these tables together form our internal knowledge base. The data store doesn’t need to be overly complex given the scale (hundreds of SKUs), but designing it with clarity ensures we can scale to thousands of SKUs in future. The cache layer (e.g., a dictionary or a Redis if needed) would mirror some of this data in memory for quick access, especially the Current State for each SKU and the last API call times. Storage and Retrieval Operations: Typical operations include:
+On fetching new data for SKU(s), update the Current State table and append to Historical table.
+The strategy engine reads from Current State (and possibly Strategy Config) for its logic.
+When a SKU is flagged unsavable or a strategy flag changes, update the Products/Config tables so that state persists.
+When logging decisions, insert into Decision Log table.
+Periodic archival: older historical data could be archived or pruned if space is a concern (or kept indefinitely for AI training possibilities).
+Competitor Behavior Modeling (Optional Enhancement)
+To further strengthen pricing strategy, the system can incorporate a competitive intelligence module that analyzes competitor behavior patterns over time. This goes beyond immediate reactions and looks for trends such as: who the frequent Buy Box winners are, how often competitors change prices, and how they respond to our price moves. Modern repricing tools gather a wealth of such data
+repricer.com
+, and leveraging it can turn raw data into strategic insights. Here’s how this can be approached:
+Data Collection: Using the logs and historical tables, aggregate competitor information. For each competitor (by seller ID) on each SKU, track metrics like: Buy Box Win Rate (how often they hold the Buy Box), Price Change Frequency (e.g., do they change price hourly, daily?), Typical Undercut Amount (do they undercut by $0.01 or larger jumps?), Fulfillment Method (FBA vs FBM), and Stock Trends (if stock info can be inferred from inventory listings or if they go out of stock often). Much of this data is already available via our periodic competitive price fetches
+repricer.com
+. For example, if in each getCompetitiveSummary we see the list of lowest offers, we can log “Seller X was at price P at time T”. Over a few days, we have a time series of Seller X’s pricing.
+Pattern Recognition: Analyze the collected data for patterns. For instance:
+Competitor A seems to drop their price every Friday afternoon by 5% (perhaps to clear weekend sales) – a pattern we can exploit by anticipating with our own drop on Friday morning
+repricer.com
+.
+Competitor B always matches our price within 10 minutes whenever we change – indicating an algorithmic repricer. If we notice this, we might attempt a strategy like price cycling: temporarily drop price to flush out their response, then raise it back to test if they follow, etc.
+Competitor C (FBM) only has 5 units in stock and often runs out -> when we detect they go out of stock, we can raise our price to capture more margin while they’re gone
+repricer.com
+.
+If a competitor has a slower repricing cycle (e.g., they only check prices hourly), we could exploit that by making more frequent small adjustments to capture the Buy Box in between their updates
+repricer.com
+.
+Identify if our true competition is Amazon or a specific set of sellers. For example, perhaps Amazon’s own brand or a known big seller consistently wins – we might choose to avoid direct price wars with them and instead find a price point that yields some profit until they stock out (if they ever do), or focus on other SKUs.
+Adaptive Strategy Rules: Feed these insights back into our strategy engine. This could mean dynamic rule adjustments
+repricer.com
+repricer.com
+, for example:
+“If competitor X undercuts by $0.01 consistently, consider undercutting by $0.02 once to see if they follow or if that wins the Buy Box outright.”
+“If a competitor usually raises price when stock is low, don’t automatically undercut them to the minimum; instead hold price and let them sell out, then we can take the Buy Box at a higher price.”
+Automatically flag high-frequency price wars: if SKU is changing price 20+ times a day, maybe enable an “Aggressive Mode” or conversely a “Cooldown” where we pause to see if competitors stabilize (to avoid both of us tanking the price continuously).
+Use time-of-day rules if patterns found (e.g., at midnight, many repricers reset – perhaps we can take advantage by being the last to change price in the evening, holding Buy Box overnight at a higher price).
+Implementation: A separate analysis module can run daily to process the last day/week of data and update a “Competitor Profile” for each competitor. This could simply be stored in tables or even output as a report to the user for transparency. Then the strategy engine can reference these profiles. For instance, if a competitor profile indicates “Seller123 is an aggressive penny-undercutter with fast reaction”, we might set a flag in the strategy config for that SKU like aggressive_competitor=True which triggers a different set of rules (maybe more willingness to undercut deeper or to attempt price hiking strategy).
+This competitive intelligence feature is optional in the initial design but is a powerful extension. It transforms the repricer from a reactive tool to a more proactive, strategic tool, effectively “learning” competitor behaviors and using that to our advantage. According to repricing experts, such data-driven analysis of competitors can become a “secret weapon” for marketplace success
+repricer.com
+repricer.com
+. It allows creation of sophisticated rules like “if competitor drops price on Fridays, adjust earlier” or “when competitor goes out of stock, raise price by X%”
+repricer.com
+ – which we have considered in our strategy design.
+Extensibility and Future Enhancements
+The architecture and design outlined above ensure a solid foundation for rule-based repricing. Importantly, we have kept the system modular and future-proof for advanced upgrades, including AI-driven strategies and reinforcement learning, as mentioned by the user’s requirements. Here’s how the system can be extended:
+Pluggable Strategy Module: The current rule-based Strategy Engine can be abstracted behind an interface (e.g., a function determine_new_price(state)). In the future, an AI module (say a machine learning model or a reinforcement learning agent) could replace or augment this function. For example, a reinforcement learning agent could observe the state (prices, competition) and reward outcomes (sales, profit) from the logs to learn an optimal pricing policy. The system’s rich logs and state history would provide excellent training data for such a model. We could start by running the AI in “shadow mode” (it suggests prices while the rule engine still makes the real call, to compare performance) and gradually trust it for live decisions. The modular design (where the engine reads from the database and outputs a decision) makes this swap relatively straightforward.
+Scalability: With growth beyond a few hundred SKUs, we might need to distribute tasks or scale the database. The design can scale vertically (faster machine, more threads) or horizontally by separating concerns: e.g., run data fetching in one process, and price evaluations in parallel workers. Using a task queue like Celery or Amazon SQS could allow distributing workload if needed. The database can be upgraded to a full SQL server or a cloud database if the volume grows. The architecture diagram components could be split into microservices (e.g., a dedicated service for repricing decisions), but for now a single application is sufficient.
+User Interface: Although not in scope, one could add a small UI or config file for the user to adjust strategy parameters (like minimum margins, or toggling certain strategies). Because the strategy configs are in a database, an interface to edit those would be a logical addition.
+Additional Data Inputs: We can incorporate more data into pricing decisions, like Amazon’s Sales Rank, product page traffic, or even external market prices (if this were a multichannel repricer). The system can be extended to fetch such data (respecting their own APIs’ limits) and include them in the state for decision making (for example, if sales rank is dropping despite low price, maybe the issue isn’t price but something else – not directly for repricing, but good to know).
+Serverless/Event-Driven Possibilities: In the future, parts of the system might be moved to an event-driven model using AWS tools (for instance, receiving SP-API notifications via an SQS queue and using AWS Lambda to trigger our logic). However, since the requirement is a local system, we stick to local scheduling. Still, the modular design could let us swap the data source from “poller” to “push” events easily for certain data.
+By implementing the system with clean separation of concerns (fetching, deciding, updating, logging), we ensure that improvements or new algorithms can be integrated with minimal disruption. The ultimate goal is a system that not only reacts to the current market but learns and improves, staying one step ahead of competitors. With this design, the user will have a powerful local repricing solution that is comprehensive now and ready for smarter enhancements in the future. Sources: The design principles and strategies referenced are informed by Amazon SP-API capabilities and repricing best practices, including Amazon’s competitive pricing API documentation
+github.com
+github.com
+, industry discussions on optimizing API call usage
+flashpricer.com
+flashpricer.com
+, and modern competitor analysis techniques in repricing
+repricer.com
+repricer.com
+.
+Citations
+
+Amazon’s SP-API Changes Raise Costs — But Our Goal Is Making Sure Sellers Don’t Pay Them
+
+https://www.flashpricer.com/post/amazon-s-sp-api-changes-raise-costs-but-our-goal-is-making-sure-sellers-don-t-pay-them
+
+Amazon’s SP-API Changes Raise Costs — But Our Goal Is Making Sure Sellers Don’t Pay Them
+
+https://www.flashpricer.com/post/amazon-s-sp-api-changes-raise-costs-but-our-goal-is-making-sure-sellers-don-t-pay-them
+
+Using SP-API to improve Price Competitiveness · amzn selling-partner-api-samples · Discussion #100 · GitHub
+
+https://github.com/amzn/selling-partner-api-samples/discussions/100
+
+Using SP-API to improve Price Competitiveness · amzn selling-partner-api-samples · Discussion #100 · GitHub
+
+https://github.com/amzn/selling-partner-api-samples/discussions/100
+
+Amazon’s SP-API Changes Raise Costs — But Our Goal Is Making Sure Sellers Don’t Pay Them
+
+https://www.flashpricer.com/post/amazon-s-sp-api-changes-raise-costs-but-our-goal-is-making-sure-sellers-don-t-pay-them
+
+Amazon’s SP-API Changes Raise Costs — But Our Goal Is Making Sure Sellers Don’t Pay Them
+
+https://www.flashpricer.com/post/amazon-s-sp-api-changes-raise-costs-but-our-goal-is-making-sure-sellers-don-t-pay-them
+
+Amazon’s SP-API Changes Raise Costs — But Our Goal Is Making Sure Sellers Don’t Pay Them
+
+https://www.flashpricer.com/post/amazon-s-sp-api-changes-raise-costs-but-our-goal-is-making-sure-sellers-don-t-pay-them
+
+Repricer Competitor Analysis Tools: Smart Data-Driven Strategies
+
+https://www.repricer.com/blog/repricer-competitor-analysis-tools/
+
+Repricer Competitor Analysis Tools: Smart Data-Driven Strategies
+
+https://www.repricer.com/blog/repricer-competitor-analysis-tools/
+
+Repricer Competitor Analysis Tools: Smart Data-Driven Strategies
+
+https://www.repricer.com/blog/repricer-competitor-analysis-tools/
+
+Repricer Competitor Analysis Tools: Smart Data-Driven Strategies
+
+https://www.repricer.com/blog/repricer-competitor-analysis-tools/
+
+Repricer Competitor Analysis Tools: Smart Data-Driven Strategies
+
+https://www.repricer.com/blog/repricer-competitor-analysis-tools/
+
+Using SP-API to improve Price Competitiveness · amzn selling-partner-api-samples · Discussion #100 · GitHub
+
+https://github.com/amzn/selling-partner-api-samples/discussions/100
+All Sources
+
+flashpricer
+
+github
+
+repricer

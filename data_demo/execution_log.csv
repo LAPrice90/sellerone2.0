@@ -1,0 +1,2 @@
+event_ts_utc,sku,state,old_price_gbp,new_price_gbp,write_status,write_error,final_ceiling_landed_gbp,hard_floor_gbp,reason_codes_json
+2026-02-13T15:55:59Z,DEMO-SKU,REGAIN,10.40,10.30,READ_ONLY_NO_WRITE,,18.33,9.50,"[""FEATURED_NOT_OURS_REGAIN"",""STEP_REGAIN_TO_RIVAL"",""BINDING_CEILING_COMPLIANCE"",""LIVE_WRITES_DISABLED""]"

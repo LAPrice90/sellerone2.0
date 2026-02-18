@@ -1,0 +1,8 @@
+event_ts_utc,sku,state,old_price_gbp,new_price_gbp,write_status,write_error,final_ceiling_landed_gbp,hard_floor_gbp,profit_floor_required_total_gbp,effective_floor_gbp,profit_floor_cogs_exvat_gbp,profit_floor_cogs_total_gbp,reason_codes_json
+2026-02-16T16:11:59Z,L1-54EX-56YC,FOLLOWER,14.30,14.30,DRY_RUN_NO_WRITE,,17.99,0.01,,,,,"[""phase1_live_pilot"",""seller_mode_learning_down"",""cooldown_enforced"",""live_write_skipped""]"
+2026-02-16T16:20:58Z,L1-54EX-56YC,FOLLOWER,14.30,14.30,DRY_RUN_NO_WRITE,,17.99,0.01,,,,,"[""phase1_live_pilot"",""seller_mode_learning_down"",""cooldown_enforced"",""live_write_skipped""]"
+2026-02-16T16:24:17Z,L1-54EX-56YC,FOLLOWER,14.30,14.30,DRY_RUN_NO_WRITE,,17.99,0.01,11.87,11.87,5.35,6.42,"[""phase1_live_pilot"",""seller_mode_learning_down"",""cooldown_enforced"",""live_write_skipped""]"
+2026-02-16T16:30:59Z,L1-54EX-56YC,FOLLOWER,14.30,14.30,DRY_RUN_NO_WRITE,,17.99,10.90,11.87,11.87,5.35,6.42,"[""phase1_live_pilot"",""seller_mode_learning_down"",""cooldown_enforced"",""max_probes_per_day_enforced"",""live_write_skipped""]"
+2026-02-16T16:36:03Z,L1-54EX-56YC,FOLLOWER,14.30,14.30,DRY_RUN_NO_WRITE,,17.99,10.90,11.87,11.87,5.35,6.42,"[""phase1_live_pilot"",""seller_mode_learning_down"",""cooldown_enforced"",""live_write_skipped""]"
+2026-02-16T16:41:43Z,L1-54EX-56YC,FOLLOWER,14.30,14.20,DRY_RUN_NO_WRITE,,17.99,10.90,11.87,11.87,5.35,6.42,"[""phase1_live_pilot"",""seller_mode_learning_down"",""live_write_skipped""]"
+2026-02-16T16:49:52Z,L1-54EX-56YC,FOLLOWER,14.30,13.70,DRY_RUN_NO_WRITE,,17.99,10.90,11.83,11.83,5.35,6.42,"[""phase1_live_pilot"",""seller_mode_force_match_when_losing"",""live_write_skipped""]"

@@ -1,0 +1,7 @@
+{
+  "vat_registered": true,
+  "recover_input_vat_on_cogs": true,
+  "recover_input_vat_on_fees": true,
+  "formula_version": "vat_registered_exvat_basis_v1",
+  "note": "Official H floor policy: remove output VAT from sale first; use ex-VAT COGS and fees for floor math."
+}

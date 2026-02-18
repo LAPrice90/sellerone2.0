@@ -1,0 +1,202 @@
+return_event_id,return_date,seller_sku,token_id,token_cost,currency,source,event_type
+20016211017387-retry2,2026-01-21T00:00:00+0000,R7-98IN-2PW8,R7-98IN-2PW8-090925-row857-0024,"3036    2.50
+Name: cost_per_unit, dtype: object","3036    GBP
+Name: currency, dtype: object",stock_events_raw,Adjustments
+20016299243679-retry2,2026-01-26T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-1425,"2684    2.25
+Name: cost_per_unit, dtype: object","2684    GBP
+Name: currency, dtype: object",stock_events_raw,Adjustments
+FBA15LCBT9DP-retry2,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0389,"3607    4.51
+Name: cost_per_unit, dtype: object","3607    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry2,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0158,"3376    4.51
+Name: cost_per_unit, dtype: object","3376    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry2,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0066,"3284    4.51
+Name: cost_per_unit, dtype: object","3284    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry2,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0271,"3489    4.51
+Name: cost_per_unit, dtype: object","3489    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry8,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0042,"6199    3.79
+Name: cost_per_unit, dtype: object","6199    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry8,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0120,"6135    3.79
+Name: cost_per_unit, dtype: object","6135    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry8,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0123,"6138    3.79
+Name: cost_per_unit, dtype: object","6138    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry8,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0058,"3879    4.44
+Name: cost_per_unit, dtype: object","3879    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry8,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0042,"3863    4.44
+Name: cost_per_unit, dtype: object","3863    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry3,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0389,"3607    4.51
+Name: cost_per_unit, dtype: object","3607    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry3,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0158,"3376    4.51
+Name: cost_per_unit, dtype: object","3376    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry3,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0066,"3284    4.51
+Name: cost_per_unit, dtype: object","3284    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry3,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0271,"3489    4.51
+Name: cost_per_unit, dtype: object","3489    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry15,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0042,"6199    3.79
+Name: cost_per_unit, dtype: object","6199    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry15,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0120,"6135    3.79
+Name: cost_per_unit, dtype: object","6135    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry15,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0123,"6138    3.79
+Name: cost_per_unit, dtype: object","6138    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry15,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0058,"3879    4.44
+Name: cost_per_unit, dtype: object","3879    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry15,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0042,"3863    4.44
+Name: cost_per_unit, dtype: object","3863    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry4,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0389,"3607    4.51
+Name: cost_per_unit, dtype: object","3607    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry4,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0158,"3376    4.51
+Name: cost_per_unit, dtype: object","3376    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry4,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0066,"3284    4.51
+Name: cost_per_unit, dtype: object","3284    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry4,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0271,"3489    4.51
+Name: cost_per_unit, dtype: object","3489    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry22,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0042,"6199    3.79
+Name: cost_per_unit, dtype: object","6199    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry22,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0120,"6135    3.79
+Name: cost_per_unit, dtype: object","6135    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry22,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0123,"6138    3.79
+Name: cost_per_unit, dtype: object","6138    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry22,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0058,"3879    4.44
+Name: cost_per_unit, dtype: object","3879    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry22,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0042,"3863    4.44
+Name: cost_per_unit, dtype: object","3863    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry6,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0389,"3688    4.51
+Name: cost_per_unit, dtype: object","3688    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry6,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0158,"3457    4.51
+Name: cost_per_unit, dtype: object","3457    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry6,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0066,"3365    4.51
+Name: cost_per_unit, dtype: object","3365    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCBT9DP-retry6,2026-01-26T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0271,"3570    4.51
+Name: cost_per_unit, dtype: object","3570    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry36,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0041,"1198    3.79
+Name: cost_per_unit, dtype: object","1198    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry36,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0120,"1134    3.79
+Name: cost_per_unit, dtype: object","1134    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry36,2026-01-27T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-071025-row917-0123,"1137    3.79
+Name: cost_per_unit, dtype: object","1137    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry36,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0058,"5604    4.44
+Name: cost_per_unit, dtype: object","5604    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry36,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0042,"5588    4.44
+Name: cost_per_unit, dtype: object","5588    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry64,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"8068    4.44
+Name: cost_per_unit, dtype: object","8068    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry71,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry78,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry85,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry92,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry99,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15LCY2JPY-retry106,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0187,"3181    4.44
+Name: cost_per_unit, dtype: object","3181    GBP
+Name: currency, dtype: object",stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0316-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0140-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0322-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0326-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0473-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0601-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15J8S81WD-retry49,2025-11-04T00:00:00+0000,SU-5LQH-2DVN,SU-5LQH-2DVN-101125-row940-0042-RFBA15J8S81WD-retry49,2.19,GBP,stock_events_raw,Receipts
+20015106838608-retry49,2025-11-08T00:00:00+0000,XY-UM2X-TPS3,XY-UM2X-TPS3-140525-row687-0019-R20015106838608-retry49,4.57,GBP,stock_events_raw,Adjustments
+20015106854487-retry49,2025-11-08T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0508-R20015106854487-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015284027053-retry49,2025-11-15T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0504-R20015284027053-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015299054476-retry49,2025-11-16T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0603-R20015299054476-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015311768044-retry49,2025-11-17T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0543-R20015311768044-retry49,2.25,GBP,stock_events_raw,Adjustments
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0035-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0036-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0033-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-161225-row949-0049-RFBA15L34VWBX-retry673,3.99,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,EE-KTDC-KCFY,EE-KTDC-KCFY-101125-row941-0010-RFBA15L34VWBX-retry673,3.46,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0249-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0341-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0136-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-050126-row952-0058-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+20015524113840-retry49,2025-12-01T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0081-R20015524113840-retry49,4.44,GBP,stock_events_raw,Adjustments
+FBA15KTYHQ71-retry49,2025-12-14T00:00:00+0000,DC-K5WH-R7F5,DC-K5WH-R7F5-090925-row850-0003-RFBA15KTYHQ71-retry49,0.63,GBP,stock_events_raw,Receipts
+20015767060518-retry49,2025-12-16T00:00:00+0000,VF-3T0K-DR5O,VF-3T0K-DR5O-181125-row947-0282-R20015767060518-retry49,2.05,GBP,stock_events_raw,Adjustments
+20015776821879-retry49,2025-12-17T00:00:00+0000,VF-3T0K-DR5O,VF-3T0K-DR5O-181125-row947-0291-R20015776821879-retry49,2.05,GBP,stock_events_raw,Adjustments
+20016074231046-retry49,2026-01-13T00:00:00+0000,DC-K5WH-R7F5,DC-K5WH-R7F5-101125-row934-0163-R20016074231046-retry49,0.68,GBP,stock_events_raw,Adjustments
+20016144516474-retry49,2026-01-16T00:00:00+0000,MW-9K5M-VKW8,MW-9K5M-VKW8-040825-row802-0010-R20016144516474-retry49,13.65,GBP,stock_events_raw,Adjustments
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,H4-86XG-NLX6,H4-86XG-NLX6-061025-row897-0003-RFBA15LBGBK4F-retry913,3.25,GBP,stock_events_raw,Receipts
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,3X-EXDD-TD2K,3X-EXDD-TD2K-090925-row861-0007-RFBA15LBGBK4F-retry913,20.37,GBP,stock_events_raw,Receipts
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,3X-EXDD-TD2K,3X-EXDD-TD2K-061025-row911-0005-RFBA15LBGBK4F-retry913,20.51,GBP,stock_events_raw,Receipts
+20016211017387-retry49,2026-01-21T00:00:00+0000,R7-98IN-2PW8,R7-98IN-2PW8-090925-row857-0026-R20016211017387-retry49,2.50,GBP,stock_events_raw,Adjustments
+FBA15LCY2JPY-retry337,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0097-RFBA15LCY2JPY-retry337,4.44,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0316-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0140-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0322-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0326-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0473-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15K4CB8J0-retry49,2025-11-01T00:00:00+0000,WX-L5UA-UB1Q,WX-L5UA-UB1Q-190625-row756-0601-RFBA15K4CB8J0-retry49,1.72,GBP,stock_events_raw,Receipts
+FBA15J8S81WD-retry49,2025-11-04T00:00:00+0000,SU-5LQH-2DVN,SU-5LQH-2DVN-101125-row940-0042-RFBA15J8S81WD-retry49,2.19,GBP,stock_events_raw,Receipts
+20015106838608-retry49,2025-11-08T00:00:00+0000,XY-UM2X-TPS3,XY-UM2X-TPS3-140525-row687-0019-R20015106838608-retry49,4.57,GBP,stock_events_raw,Adjustments
+20015106854487-retry49,2025-11-08T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0508-R20015106854487-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015284027053-retry49,2025-11-15T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0504-R20015284027053-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015299054476-retry49,2025-11-16T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0603-R20015299054476-retry49,2.25,GBP,stock_events_raw,Adjustments
+20015311768044-retry49,2025-11-17T00:00:00+0000,6V-EEC1-2S9Z,6V-EEC1-2S9Z-101125-row938-0543-R20015311768044-retry49,2.25,GBP,stock_events_raw,Adjustments
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0035-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0036-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-101125-row935-0033-RFBA15L34VWBX-retry673,3.79,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,NN-TSZ1-X2RD,NN-TSZ1-X2RD-161225-row949-0049-RFBA15L34VWBX-retry673,3.99,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry673,2025-11-19T00:00:00+0000,EE-KTDC-KCFY,EE-KTDC-KCFY-101125-row941-0010-RFBA15L34VWBX-retry673,3.46,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0249-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0341-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-101125-row939-0136-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+FBA15L2Z8DHC-retry49,2025-11-20T00:00:00+0000,A2-T2AC-TW3L,A2-T2AC-TW3L-050126-row952-0058-RFBA15L2Z8DHC-retry49,4.51,GBP,stock_events_raw,Receipts
+20015524113840-retry49,2025-12-01T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0081-R20015524113840-retry49,4.44,GBP,stock_events_raw,Adjustments
+FBA15KTYHQ71-retry49,2025-12-14T00:00:00+0000,DC-K5WH-R7F5,DC-K5WH-R7F5-090925-row850-0003-RFBA15KTYHQ71-retry49,0.63,GBP,stock_events_raw,Receipts
+20015767060518-retry49,2025-12-16T00:00:00+0000,VF-3T0K-DR5O,VF-3T0K-DR5O-181125-row947-0282-R20015767060518-retry49,2.05,GBP,stock_events_raw,Adjustments
+20015776821879-retry49,2025-12-17T00:00:00+0000,VF-3T0K-DR5O,VF-3T0K-DR5O-181125-row947-0291-R20015776821879-retry49,2.05,GBP,stock_events_raw,Adjustments
+20016074231046-retry49,2026-01-13T00:00:00+0000,DC-K5WH-R7F5,DC-K5WH-R7F5-101125-row934-0163-R20016074231046-retry49,0.68,GBP,stock_events_raw,Adjustments
+20016144516474-retry49,2026-01-16T00:00:00+0000,MW-9K5M-VKW8,MW-9K5M-VKW8-040825-row802-0010-R20016144516474-retry49,13.65,GBP,stock_events_raw,Adjustments
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,H4-86XG-NLX6,H4-86XG-NLX6-061025-row897-0003-RFBA15LBGBK4F-retry913,3.25,GBP,stock_events_raw,Receipts
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,3X-EXDD-TD2K,3X-EXDD-TD2K-090925-row861-0007-RFBA15LBGBK4F-retry913,20.37,GBP,stock_events_raw,Receipts
+FBA15LBGBK4F-retry913,2026-01-19T00:00:00+0000,3X-EXDD-TD2K,3X-EXDD-TD2K-061025-row911-0005-RFBA15LBGBK4F-retry913,20.51,GBP,stock_events_raw,Receipts
+20016211017387-retry49,2026-01-21T00:00:00+0000,R7-98IN-2PW8,R7-98IN-2PW8-090925-row857-0026-R20016211017387-retry49,2.50,GBP,stock_events_raw,Adjustments
+FBA15LCY2JPY-retry337,2026-01-27T00:00:00+0000,Z7-26PV-O9LR,Z7-26PV-O9LR-150925-row865-0097-RFBA15LCY2JPY-retry337,4.44,GBP,stock_events_raw,Receipts
+FBA15L34VWBX-retry785,2025-11-19T00:00:00+0000,8R-E0Y9-0LAU,8R-E0Y9-0LAU-120126-row955-0007-RFBA15L34VWBX-retry785,38.10,GBP,stock_events_raw,Receipts
+FBA15LBGBK4F-retry1122,2026-01-19T00:00:00+0000,3X-EXDD-TD2K,3X-EXDD-TD2K-061025-row911-0011-RFBA15LBGBK4F-retry1122,20.51,GBP,stock_events_raw,Receipts

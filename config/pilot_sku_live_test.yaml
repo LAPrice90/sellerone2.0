@@ -1,0 +1,42 @@
+sku: 6V-EEC1-2S9Z
+pilot_whitelist_sku: 6V-EEC1-2S9Z
+pilot_whitelist_skus: 6V-EEC1-2S9Z
+target_universe_mode: single_sku
+asin: B06WW79DX5
+marketplace_id: A1F83G8C2ARO7P
+seller_id: AB5OM860MS57Z
+pricing_writer_mode: CODEX_H
+enabled_live_writes: true
+live_sku_allowlist: 6V-EEC1-2S9Z
+scan_cooldown_minutes: 15
+use_active_merchant_skus: false
+max_skus_per_run: 1
+allow_h_intraday_intel_refresh: false
+
+boundaries:
+  hard_floor_gbp: 7.00
+  manual_cap_gbp: 9.19
+  policy_buffer_pct: 0.03
+
+guardrails:
+  max_step_down_gbp: 0.10
+  max_step_up_gbp: 0.10
+  max_daily_drop_gbp: 0.30
+  price_apply_tolerance_gbp: 0.01
+
+eligibility:
+  foep_stale_hours: 48
+  foep_sanity_min_mult: 0.50
+  foep_sanity_max_mult: 2.00
+  use_cpt_ceiling: false
+
+learning:
+  delta_tolerance_gbp: 0.02
+  stable_buffer_gbp: 0.02
+  min_clean_tests_for_confidence: 5
+
+daily_intel:
+  foep_status: MISSING
+  foep_price_gbp: ""
+  cpt_gbp: ""
+  last_known_safe_gbp: ""

@@ -1,0 +1,15 @@
+"""
+Fetch fee estimates at fixed price points (£10 and £100) and update Product_DB with fees and margins.
+
+What it does:
+- Reads SKUs from Product_DB.
+- Calls SP-API FeesEstimate for each SKU at £10 and £100 (GBP, FBA).
+- Writes fee_total_10, fee_total_100, margin_10, margin_100, last_updated_A004 back to Product_DB.
+- Saves a CSV snapshot to out/fees_estimates.csv.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import time

@@ -1,0 +1,2 @@
+order_id,order_date,seller_sku,quantity,token_id,token_cost,currency,allocation_date,source_level,notes
+206-6284029-7006746,2026-01-24T13:24:11Z,SU-5LQH-2DVN,1,SU-5LQH-2DVN1-0072,2.01,GBP,2026-01-24T13:39:13Z,1,live_allocation

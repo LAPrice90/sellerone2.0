@@ -1,0 +1,16 @@
+sku: YC-3L3M-BV48
+asin: B0CTD6Q6KY
+marketplace_id: A1F83G8C2ARO7P
+boundaries:
+  manual_cap_gbp: 109.45
+  policy_buffer_pct: 0.03
+eligibility:
+  foep_stale_hours: 48
+  foep_sanity_min_mult: 0.50
+  foep_sanity_max_mult: 2.00
+  use_cpt_ceiling: false
+daily_intel:
+  foep_status: MISSING
+  foep_price_gbp: ""
+  cpt_gbp: ""
+  last_known_safe_gbp: "79.00"

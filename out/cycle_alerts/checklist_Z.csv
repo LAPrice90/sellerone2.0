@@ -1,0 +1,2 @@
+check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
+z_schema_health_status,ok,ok,,,,,,Z

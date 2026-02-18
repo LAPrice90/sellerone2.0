@@ -1,0 +1,3 @@
+sku,lane,enabled,effective_utc,expiry_utc,hard_floor_gbp,ceiling_gbp,max_move_per_cycle_gbp,max_daily_down_move_gbp,cooldown_minutes,max_probes_per_day,max_active_probe_skus,note
+JB-RGB6-LZOJ,managed,yes,2026-02-11T00:00:00Z,,0.01,999.00,999.00,999.00,15,4,1,phase0_head_boundary_template_effectively_no_down_caps
+L1-54EX-56YC,managed,yes,2026-02-16T00:00:00Z,,10.90,17.99,999.00,999.00,1,0,1,phase1_live_pilot_free_move_within_floor_ceiling

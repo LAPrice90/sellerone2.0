@@ -1,0 +1,52 @@
+﻿VAT and Currency Rules - Working Notes
+
+Price columns
+- Price_Total: order currency item total. Level 3 actuals, Level 2 API actuals, Level 1 estimate from product DB price converted to order currency.
+- Price_VAT: VAT on item total in order currency. Level 3 actuals, Level 2 API actuals, Level 1 estimated from rolling VAT model (last 10 orders per marketplace/country), excluding VAT-exempt products.
+- Price_ExVAT: Price_Total minus Price_VAT.
+
+Shipping, Gift, Promotion
+- Level 1: do not estimate (0).
+- Level 2: use API values (already in order currency, includes VAT where provided).
+- Level 3: use actuals.
+
+COGS
+- COGS are internal GBP costs only.
+- No currency conversion.
+- Apply standard VAT rules for our internal accounting.
+
+General
+- Order currency is taken from the order/marketplace for Level 1, and from API for Level 2/3.
+- Do not convert Level 2 or Level 3 values.
+
+VAT rolling model storage
+- Stored in out/vat_country_model.csv (rolling last 10 orders per marketplace/country).
+- This file is the single source of truth for estimated VAT in Level 1/2.
+
+FBA/Commission/DSF rules (self learning)
+- Fees are always recorded in order currency (no conversion for Level 2/3).
+- For Level 1/2 estimates, use a rolling model like VAT: last 10 orders per marketplace+country.
+- Track per fee type:
+  - FBA_Fee VAT rate (often 0 in AED example).
+  - Commission VAT rate (may be >0 in some EU).
+  - DSF presence (binary) and DSF rate (0 if not present).
+- Store these fee-tax/DSF stats in out/fee_country_model.csv (rolling last 10 orders per marketplace+country+currency).
+- AED example: no fee VAT, no DSF, fees shown in AED.
+- EUR example: referral fee has VAT, FBA fee may have 0 VAT, fees in EUR, shipping chargeback in EUR.
+- Fee VAT is not uniform: each fee type has its own VAT status and rate (FBA, Commission, DSF, Shipping Chargeback).
+- Fee model lookup priority: ship_country_code, then marketplace default country, then marketplace-only.
+- DSF VAT is recorded as 0.00 when not charged (never blank).
+
+Level 1 data hygiene
+- Canceled orders are excluded from Level 1.
+- Zero-quantity item rows are ignored.
+
+Fixed fee VAT rules (initial set)
+- AE: no DSF, no VAT on FBA fee, no VAT on referral fee.
+- SA: no DSF, no VAT on FBA fee, no VAT on referral fee. (same as AE)
+- IE: no DSF, no VAT on FBA fee, VAT on referral fee.
+- PT: same as GB when billed in GBP (VAT all round).
+- FR: VAT on commission and DSF, no VAT on FBA fee (based on transaction examples).
+- CA: VAT on commission and DSF, no VAT on FBA fee (based on transaction examples).
+- GG: VAT on commission and DSF, no VAT on FBA fee (based on transaction examples).
+- Stored in reference/fee_vat_rules.csv (country_code, dsf_enabled, fba_vat_rate, commission_vat_rate, dsf_vat_rate).

@@ -1,0 +1,275 @@
+Using Amazon SP-API (Finances) to Track FBA Fees by SKU
+SP-API Endpoints for Financial Events
+Amazon’s Selling Partner API (SP-API) includes a Finances API that provides detailed transaction data on sales, fees, and other charges. The key endpoints (all under /finances/v0/) include:
+GET /financialEventGroups – listFinancialEventGroups: Retrieves summary financial event groups (usually settlement periods) by date range
+. Each group has an ID, date range, total amount, etc.
+GET /financialEventGroups/{eventGroupId}/financialEvents – listFinancialEventsByGroupId: Returns all financial events in a given group (e.g. all transactions in one settlement)
+. Useful for pulling a complete settlement’s breakdown.
+GET /orders/{orderId}/financialEvents – listFinancialEventsByOrderId: Returns financial events for a specific Amazon Order ID
+. This can isolate charges/refunds for one order.
+GET /financialEvents – listFinancialEvents: Returns financial events for a specified date range (or using a NextToken for pagination)
+. This is a broad query that can fetch rolling transactions without waiting for a full settlement.
+All these endpoints return a JSON payload with a top-level FinancialEvents object containing various lists of event types (shipments, refunds, service fees, etc.). You can filter by date with PostedAfter and PostedBefore on the listFinancialEvents endpoint
+. Note that Amazon limits date ranges to 180 days max for a single query
+, so longer periods require breaking into multiple calls.
+Understanding Fee Categories and Structure
+Amazon categorizes fees by the event type, each providing different breakdowns of charges:
+Order Shipment Events (ShipmentEventList): These correspond to orders fulfilled (shipped) to customers. Each shipment event includes one or more items and their associated charges and fees. For example, an event will list the SellerSKU for each item, along with what the buyer was charged (ItemChargeList) and fees Amazon charged the seller (ItemFeeList)
+. Within ItemFeeList you’ll find per-unit fees like the FBA fulfillment fee and Amazon’s commission. For instance, an FBA order might show a fee breakdown such as:
+"ItemFeeList": [
+    { "FeeType": "FBAPerUnitFulfillmentFee", "FeeAmount": { "CurrencyCode": "USD", "CurrencyAmount": -3.50 } },
+    { "FeeType": "Commission", "FeeAmount": { "CurrencyCode": "USD", "CurrencyAmount": -2.42 } },
+    { "FeeType": "FixedClosingFee", "FeeAmount": { "CurrencyCode": "USD", "CurrencyAmount": -0.50 } }
+]
+In this example, FeeType values like FBAPerUnitFulfillmentFee (the per-unit pick/pack fee for FBA) and Commission (Amazon’s referral fee) are present
+. The amounts are negative, indicating charges to the seller (money Amazon deducts)
+. There may also be an OrderFeeList or ShipmentFeeList at the order level for things like per-order fulfillment fees or refund adjustments (e.g. GiftwrapChargeback, ShippingChargeback)
+.
+Service Fee Events (ServiceFeeEventList): These cover various non-order specific fees Amazon charges the seller. Notably, this is where FBA storage fees and other fulfillment-related charges appear. Each service fee event typically includes a short description/reason and is directly tied to a specific SKU/FNSKU. The data fields include a FeeReason (e.g. “Monthly Storage Fee”), a FeeDescription (often detailing the period or specifics), and a list of fee components with amounts
+. Crucially, Amazon provides identifiers here to link the fee to your product: you get the SellerSKU, FnSKU, and ASIN associated with the fee
+. For example, a monthly storage fee event might have FeeType: "StorageFee" in the FeeList and show the SKU, FNSKU, and ASIN of the product incurring the storage charge. Storage fees are typically charged monthly (and long-term storage fees monthly or yearly, depending on policy) based on volume tiers, and will appear as separate service fee events per SKU.
+Other Event Categories: The Finances API response can include many other lists (if applicable), such as RefundEventList (fees/refunds for returned orders), AdjustmentEventList (account-level adjustments), RemovalShipmentEventList (fees for inventory removals or disposals, using FNSKUs), and more
+. Each of these has its own structure. For instance, removal events use FulfillmentNetworkSKU (FNSKU) and include a fee per removal order item
+. If you are tracking all costs per SKU for profitability, you would also include these event types (e.g. removal fees, refund commissions, etc.) as negative contributions to profit. However, for FBA shipment fees and storage fees specifically, the ShipmentEventList and ServiceFeeEventList are the primary sources.
+Fee hierarchy: FBA fulfillment fees are typically per unit (weight/size based) and will show up in each ShipmentEvent’s item fees. There might also be order-level FBA fees (e.g. a per-shipment fee if applicable) – these would show under ShipmentFeeList. Storage fees are levied per SKU by month, and appear as their own service fee events (not tied to a customer order). Amazon’s fee data is additive, meaning you may need to combine multiple fees to get the total cost per SKU (e.g. add the per-unit fulfillment fee + monthly storage fee + any long-term storage fee + referral fee, etc., for a complete cost picture).
+Linking Fees to SKUs, FNSKUs, or ASINs
+One of the strengths of the Finances API is that it provides product identifiers with each fee event, which allows you to tie costs back to individual SKUs:
+SellerSKU – This is the seller’s own SKU for the item. In shipment events, each line item includes SellerSKU
+, so you can directly attribute order fees to that SKU. In service fee events, the presence of SellerSKU (alongside FNSKU) means you know exactly which of your SKUs a fee pertains to
+. Use SellerSKU as the primary key to join with your catalog or reporting system, since it’s your internal identifier.
+FnSKU – FNSKU stands for Fulfillment Network SKU, which is Amazon’s unique identifier for your item in their fulfillment centers (used on FBA item barcodes). Some financial events, especially those related to FBA inventory (storage fees, removals, etc.), provide the FnSKU. For example, removal events list FulfillmentNetworkSKU for each removed item
+. In ServiceFee events, FnSKU is also given in addition to SellerSKU
+. If your workflow prefers using FnSKUs (or if an event lacks the SellerSKU), you can maintain a mapping of FnSKU to your SKU. Amazon’s Inventory APIs or reports can provide a SKU–FnSKU mapping, or you can derive it from shipments. Typically, however, the SellerSKU will be present for fees you care about, and that is easiest to use for lookup.
+ASIN – Amazon Standard Identification Number, the marketplace catalog identifier. The finances data sometimes includes ASIN as well (e.g. in ServiceFeeEventList, ASIN is given)
+. ASIN can be used as a cross-reference if needed, but note that ASIN is not unique to your SKU (many sellers share an ASIN). It’s safer to use ASIN in combination with your seller ID or to stick with SKU/FNSKU for internal linking. ASIN might be useful if you need to fetch additional product info from the Catalog API, or if you only have ASIN and need to find the corresponding SKU.
+Strategy: As you pull financial events, for each fee record extract the SKU (or FnSKU). Then use that as a key to aggregate or join with your own data (for example, to subtract these costs from the SKU’s sales revenue). Because the API explicitly provides SKU/FNSKU for FBA fees, you can do a direct association without having to call other APIs. For instance, when parsing a monthly storage fee event, you might capture something like “SKU123 – September 2025 storage fee – $5.00”, and record that against SKU123’s expenses. Likewise, an order shipment event might give “SKU123 – FBA fulfillment fee – $3.50; Commission – $2.42”, which you record per unit of SKU123 sold. By summing all such fees per SKU, and comparing to the sales for that SKU (from orders data or FinancialEvents “ChargeType: Principal” entries), you can compute per-SKU profitability.
+Retrieving and Parsing Fee Data with Python
+Using Python, you can interact with these SP-API endpoints either by making direct signed HTTP requests (using AWS Signature Version 4) or by leveraging community SDKs. A popular choice is the python-amazon-sp-api package, which wraps the SP-API endpoints in Pythonic methods. Below is a general pattern for pulling finances data and extracting fee info by SKU:
+Authentication Setup: Ensure you have your SP-API credentials (LWA app ID, client secret, AWS IAM keys, and a refresh token for the seller). These credentials are required to authorize calls. For example, with python-amazon-sp-api, you would supply a credentials dict containing the AWS keys and LWA token
+.
+Instantiate the Finances client: Using the library, you can create a Finances API client, specifying the marketplace. For example:
+from sp_api.api import Finances
+from sp_api.base import Marketplaces
+
+finances_api = Finances(credentials=aws_credentials, marketplace=Marketplaces.US)
+Call the desired endpoint: To get recent financial events (fees), you can call list_financial_events. You might specify a date range with PostedAfter (and optionally PostedBefore). For example, to fetch January 2025 events:
+response = finances_api.list_financial_events(
+    PostedAfter='2025-01-01T00:00:00Z', 
+    PostedBefore='2025-01-31T23:59:59Z'
+)
+data = response.payload.get("FinancialEvents", {})
+This returns a JSON structure containing keys like "ShipmentEventList", "ServiceFeeEventList", etc., each a list of events
+. If you have a NextToken (meaning there are more than the max 100 events in the date range), you would call list_financial_events(NextToken=token) to retrieve the next page
+. The library can loop automatically, or you handle it in a while loop until no NextToken is returned. (The API’s MaxResultsPerPage default is 100
+, so be prepared to page through if you expect many events.)
+Parse the JSON to extract fees by SKU: Iterate through each list in FinancialEvents. For each ShipmentEvent, iterate its ShipmentItemList. Each item will have a SellerSKU and possibly multiple fee entries. For example:
+fees_by_sku = {}  # accumulate fees per SKU
+for shipment in data.get("ShipmentEventList", []):
+    for item in shipment.get("ShipmentItemList", []):
+        sku = item.get("SellerSKU")
+        for fee in item.get("ItemFeeList", []):
+            amount = fee["FeeAmount"]["CurrencyAmount"]
+            fee_type = fee["FeeType"]
+            fees_by_sku.setdefault(sku, []).append((fee_type, amount))
+Do similar for service fees:
+for svc_fee_event in data.get("ServiceFeeEventList", []):
+    sku = svc_fee_event.get("SellerSKU")
+    fnsku = svc_fee_event.get("FnSKU")
+    reason = svc_fee_event.get("FeeReason")
+    for fee in svc_fee_event.get("FeeList", []):
+        amt = fee["FeeAmount"]["CurrencyAmount"]
+        ftype = fee["FeeType"]
+        fees_by_sku.setdefault(sku, []).append((ftype, amt))
+Here, fees_by_sku will map each SKU to a list of (FeeType, Amount) tuples, which you can then sum or report on. For instance, SKU123 might end up with [("FBAPerUnitFulfillmentFee", -3.5), ("Commission", -2.42), ("StorageFee", -5.00)] indicating $3.50 FBA fee, $2.42 commission (both per order, per unit), and $5.00 storage (perhaps for the month). You could further organize by fee type or date as needed.
+Joining with SKU info (if necessary): If you maintain a database or spreadsheet of SKUs, you can now join on the SKU to pull in product name, cost of goods, etc., and compute profitability. Often, developers will also fetch the sales data (principal amounts) from either the Orders API or from the FinancialEvents (the OrderChargeList inside ShipmentEvent will include the product price and shipping credits) to get revenue per SKU
+. Combining revenue and all associated fees yields the profit. For example, the JSON above shows a principal charge of ¥2000 for the item and an FBA fee of ¥434 and commission ¥242
+ – using those, one can compute net proceeds per item.
+Example Output or Reporting: Finally, format the results as needed – e.g., a CSV report with columns: SKU, Total Fees, Fulfillment Fee, Storage Fee, etc., or integrate into your accounting system. Each fee event also has a PostedDate which you can use to time-stamp the cost (especially for storage fees which typically post at month-end).
+Tips, Limitations, and Common Pitfalls
+Pagination and Data Volume: As noted, the Finances API paginates results (100 events per page by default)
+. Always check if a "NextToken" is returned in the response and loop accordingly
+. Missing this will cause you to silently drop transactions. The python-amazon-sp-api library provides a convenience to auto-iterate pages if you use the Finances().list_financial_events(...).payload in a loop, or you can manually feed NextToken back into the same call
+.
+Time Lag for Data: Financial events are not always real-time. Amazon’s documentation mentions it can take up to 48 hours for some transactions to appear
+. In practice, order shipment fees usually show up soon after shipment (often within minutes or hours), but certain fees like monthly storage are posted on specific schedules (e.g. around the 7th of the month for the previous month’s storage). If you query too soon, you might miss events. A best practice is to always pull data up to the most recent available date and perhaps re-pull recent days to catch late-posted fees.
+Date Range Limits: You cannot pull an arbitrarily large date span in one call. The Finances API requires that PostedAfter and PostedBefore be within 180 days of each other
+. If you need a full year of data, for example, you’ll have to break it into chunks (e.g. Jan–Jun, then Jul–Dec). Similarly, the API might not return events older than a certain threshold (often 18 months to 2 years in the past) – for very old data, you might need Amazon’s settlement reports (discussed below) if available.
+Rate Limits: The Finances API endpoints typically have a modest rate limit (e.g. 0.5 requests per second, with a burst limit of 30)
+. This means you should pace your calls (2 per second or slower) to avoid 429 rate limit errors. If pulling data for many sellers or a large timeframe with pagination, build in delay or retry logic.
+Interpreting Amounts: In the Finances API JSON, fees charged to you (the seller) often appear as negative amounts, while credits or revenue appear as positive. This can be counter-intuitive at first. In our example above, the item price a customer paid is a positive 2000 JPY (ChargeType: Principal), but the FBA fee is -434 JPY
+. When aggregating, you may want to take the absolute value for cost reporting or keep the sign to sum net profit. Just be consistent – for instance, sum of all transaction amounts (charges + fees + refunds) for a period should net out to the payout amount deposited to your bank for that period. Many developers will multiply all fees by -1 to store them as positive costs in their own systems.
+Joining with Other Data: While the Finances API gives you fees, you might need product metadata (name, cost price) from elsewhere. Ensure your SKU or ASIN mapping is up-to-date. If you only have ASINs, consider using the Catalog Items API to get the SKU or set up a manual map. For FNSKUs, Amazon’s reports like “Inventory Ledger” or FBA shipment reports can provide a SKU-to-FNSKU link. Having a unified product identifier in your database that corresponds to SellerSKU in Amazon makes this process much easier.
+Reconciliation and Completeness: To truly verify profitability, you should account for all types of fees: the Finances API covers not just fulfillment and storage, but also things like refund fees, disposal fees, Lightning Deal fees (as service fees with a “FeeReason”), reimbursement credits, etc. Keep an eye on categories like AdjustmentEventList or SAFETReimbursementEventList for inventory reimbursements – these can offset costs (and they include details like FNSKU and quantity). In short, the Finances data is comprehensive
+, but it’s on you to decide which event types are relevant for your SKU profitability tracking. FBA shipment and storage fees will likely be the major items, but don’t overlook refund-related fees (e.g. Amazon might refund the customer and charge you a refund commission or return fee, which would appear in RefundEventList).
+Using Reports as an Alternative: Before SP-API, many sellers pulled fee data via settlement flat-file reports. SP-API still offers reports like GET_V2_SETTLEMENT or specialized reports (e.g. GET_FBA_FULFILLMENT_MONTHLY_INVENTORY_DATA for storage detail, GET_FBA_FULFILLMENT_LONGTERM_STORAGE_FEE_CHARGES_DATA for long-term storage fees)
+. These reports can be accessed via the Reports API if needed. However, the Finances API approach described above provides a more immediate and flexible way to get near-real-time fees without waiting for a bi-weekly report. It’s fine to use both: for example, you might use the Finances API for ongoing updates, and occasionally pull a settlement report to double-check totals.
+Newer SP-API Models: Amazon introduced a newer Finances API v2024-06-19 with a consolidated listTransactions endpoint
+. This newer endpoint aims to stream all financial transactions in a paginated fashion (potentially simplifying data retrieval). As of 2025, most implementations still use the Finances v0 methods discussed above, but keep an eye on Amazon’s documentation for updates. If you encounter limitations with v0, the newer API might be worth exploring in the future.
+By using the SP-API Finances endpoints with the approach above, you can programmatically fetch FBA fulfillment fees and storage fees (among others) and tie each charge back to your SKUs. This enables a detailed per-SKU profitability analysis – combining sales revenue with these cost breakdowns yields insight into how much each product truly earns after Amazon’s fees. The structured JSON data and identifiers (SKU/FNSKU/ASIN) make it straightforward to parse and join with your internal data. With Python handling the API calls and data processing, you can automate regular fee extraction and feed the results into your accounting or BI system for ongoing profit tracking. Sources: Amazon SP-API Documentation
+; Example SP-API responses and usage guides
+; Amazon seller community insights
+ and third-party tool documentation
+.
+Citations
+Finances v0
+
+https://developer-docs.amazon.com/sp-api/reference/finances-v0
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Amazon Selling Partner Connection | COZYROC
+
+https://www.cozyroc.com/ssis/amazon-selling-partner-connection
+
+Amazon Selling Partner Connection | COZYROC
+
+https://www.cozyroc.com/ssis/amazon-selling-partner-connection
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Help Needed, Finances API not returning all of my financial events : r/aws
+
+https://www.reddit.com/r/aws/comments/1ghezuk/help_needed_finances_api_not_returning_all_of_my/
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+AMAZON FINANCIAL MANAGEMENT
+
+https://hub.suiteengine.com/knowledge-base/amazon-financial-management
+
+[BUG] [SP-API] Has the long term storage fee changed the field name, I get a result of 0 for the data · Issue #2622 · amzn/selling-partner-api-models · GitHub
+
+https://github.com/amzn/selling-partner-api-models/issues/2622
+
+[BUG] [SP-API] Has the long term storage fee changed the field name, I get a result of 0 for the data · Issue #2622 · amzn/selling-partner-api-models · GitHub
+
+https://github.com/amzn/selling-partner-api-models/issues/2622
+Finances v0
+
+https://developer-docs.amazon.com/sp-api/reference/finances-v0
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Selling Partner API for Finances
+
+https://cleo-infoeng.s3.us-east-2.amazonaws.com/cic-userguide/AWS-SP-API+Connector/API-References/financesV0.html
+
+Python x SP-API で財務情報検索 | Amazon Selling partner API
+
+https://www.robin-planning.com/post/python-x-sp-api-%E3%81%A7%E8%B2%A1%E5%8B%99%E6%83%85%E5%A0%B1%E6%A4%9C%E7%B4%A2-amazon-selling-partner-api
+
+Help Needed, Finances API not returning all of my financial events : r/aws
+
+https://www.reddit.com/r/aws/comments/1ghezuk/help_needed_finances_api_not_returning_all_of_my/
+
+Amazon Selling Partner Connection | COZYROC
+
+https://www.cozyroc.com/ssis/amazon-selling-partner-connection
+All Sources
+develope...cs.amazon
+
+cleo-inf...amazonaws
+
+robin-planning
+
+cozyroc
+
+reddit
+
+hub.suiteengine

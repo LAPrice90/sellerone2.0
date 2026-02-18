@@ -1,0 +1,1 @@
+inbound_shipment_id,sku,expected_qty,received_qty,in_flight_qty,status,updated_at_utc,mature_on_utc,is_mature

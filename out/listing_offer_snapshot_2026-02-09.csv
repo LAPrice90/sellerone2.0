@@ -1,0 +1,11 @@
+timestamp_utc,asof_date,marketplace,sku,asin,our_price,buy_box_price,buy_box_channel,lowest_fba_price,lowest_fbm_price,offer_count_fba,offer_count_fbm,bsr,bsr_category,source,notes
+2026-02-09T00:00:00Z,2026-02-09,UK,6V-EEC1-2S9Z,B06WW79DX5,7.99,7.99,FBA,7.99,8.71,2,8,,,SPAPI,high velocity consistent
+2026-02-09T00:00:00Z,2026-02-09,UK,AX-NKNU-29C1,B08M52B4M5,3.99,,,3.99,4.99,1,4,,,SPAPI,high velocity inconsistent | buy_box_price_missing | buy_box_channel_missing
+2026-02-09T00:00:00Z,2026-02-09,UK,JB-RGB6-LZOJ,B0001P0DLU,6.15,6.15,FBA,6.15,6.35,1,13,,,SPAPI,mid velocity consistent
+2026-02-09T00:00:00Z,2026-02-09,UK,VF-3T0K-DR5O,B08KFFY86W,5.35,4.85,FBA,4.85,5.14,17,3,,,SPAPI,mid velocity inconsistent
+2026-02-09T00:00:00Z,2026-02-09,UK,XY-UM2X-TPS3,B003VTZAM0,11.47,9.99,FBM,11.2,9.99,5,5,,,SPAPI,mid velocity consistent
+2026-02-09T00:00:00Z,2026-02-09,UK,4W-VS57-BV6A,B0C9LJNJWZ,35.91,35.0,FBA,23.05,35.0,1,11,,,SPAPI,low velocity consistent
+2026-02-09T00:00:00Z,2026-02-09,UK,TJ-6LOP-OPEU,B08P63MSS9,8.46,,,8.46,8.45,2,3,,,SPAPI,low velocity consistent | buy_box_price_missing | buy_box_channel_missing
+2026-02-09T00:00:00Z,2026-02-09,UK,RZ-6ZL9-CZ7J,B075XT2J8X,6.97,6.35,FBA,6.35,3.27,4,6,,,SPAPI,low velocity inconsistent
+2026-02-09T00:00:00Z,2026-02-09,UK,XH-0LAE-FQO5,B00AOES9GE,6.9,6.75,FBA,6.75,,4,,,,SPAPI,low velocity inconsistent
+2026-02-09T00:00:00Z,2026-02-09,UK,YC-3L3M-BV48,B0CTD6Q6KY,74.26,74.0,FBA,74.0,105.95,2,1,,,SPAPI,low velocity inconsistent

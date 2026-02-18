@@ -1,0 +1,4 @@
+check,status,first_seen_utc,last_seen_utc,consecutive_runs
+b_cycle_recent_fail_lines,warn,2026-02-18T09:24:18.696002+00:00,2026-02-18T11:37:37.358686+00:00,35
+h_e_outputs_latest_asof,warn,2026-02-18T07:06:59.366026+00:00,2026-02-18T11:37:37.358686+00:00,37
+h_floor_referral_source_coverage,warn,2026-02-17T17:43:23.964340+00:00,2026-02-18T11:37:37.358686+00:00,233

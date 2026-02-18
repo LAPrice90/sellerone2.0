@@ -1,0 +1,37 @@
+{
+  "listings_items_get_item": {
+    "last_call_time": 1771414497.7011278,
+    "recent_request_count": 11144,
+    "backoff_until": 0.0
+  },
+  "products_pricing_get_price": {
+    "last_call_time": 1770895046.4963684,
+    "recent_request_count": 8,
+    "backoff_until": 0.0
+  },
+  "products_pricing_get_item_offers": {
+    "last_call_time": 1771414604.48141,
+    "recent_request_count": 10684,
+    "backoff_until": 1771411618.6814618
+  },
+  "fba_inventory_get_summaries": {
+    "last_call_time": 1771394911.708955,
+    "recent_request_count": 288,
+    "backoff_until": 0.0
+  },
+  "finances_get_financial_events": {
+    "last_call_time": 1771381107.4028065,
+    "recent_request_count": 42,
+    "backoff_until": 0.0
+  },
+  "products_pricing_post_competitive_summary_batch": {
+    "last_call_time": 1771398204.389164,
+    "recent_request_count": 1129,
+    "backoff_until": 1771398203.4604974
+  },
+  "listings_items_patch_item": {
+    "last_call_time": 1771344550.565511,
+    "recent_request_count": 78,
+    "backoff_until": 0.0
+  }
+}

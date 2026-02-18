@@ -1,0 +1,15 @@
+file,status,row_count,columns,latest_ts,file_mtime,tests_fail_count,tests_warn_count
+out\token_ledger_live.csv,ok,9638,31,2026-02-15T21:27:51+00:00,2026-02-18T05:57:08.844465+00:00,,
+out\token_events.csv,ok,87467,8,2026-02-18T07:05:09+00:00,2026-02-18T07:05:35.581029+00:00,,
+out\token_allocations_live.csv,ok,7753,10,,2026-02-18T05:57:08.754489+00:00,,
+out\refund_token_events.csv,ok,1,9,2026-02-18T07:04:49+00:00,2026-02-18T07:04:50.326086+00:00,,
+out\stock_adjustment_token_events.csv,ok,14096,10,2026-02-18T07:05:09+00:00,2026-02-18T07:05:09.580575+00:00,,
+out\token_tests_daily.csv,ok,5,4,2026-01-28T11:23:23.513759+00:00,2026-01-28T11:23:23.930276+00:00,,
+out\token_daily_checklist.csv,ok,5,3,2026-02-18T07:06:02.207077+00:00,2026-02-18T07:06:04.990824+00:00,,
+out\token_stock_recon.csv,ok,336,29,2026-01-30T13:09:49.217287+00:00,2026-01-30T13:09:50.238960+00:00,,
+out\token_stock_recon_mismatches.csv,ok,55,29,2026-01-30T13:09:49.217287+00:00,2026-01-30T13:09:51.757130+00:00,,
+out\token_drift_weekly.csv,ok,50,5,,2026-02-18T07:05:55.907223+00:00,,
+out\token_exceptions_weekly.csv,ok,53,7,,2026-02-18T07:05:58.475906+00:00,,
+out\token_movement_log.csv,ok,17767,8,2026-02-18T07:05:09+00:00,2026-02-18T07:05:38.562576+00:00,,
+out\order_cogs_from_tokens.csv,ok,6793,5,,2026-02-18T07:05:38.623553+00:00,,
+token_tests_summary,ok,,,2026-02-18T07:06:07.868284+00:00,,1,2

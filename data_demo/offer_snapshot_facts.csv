@@ -1,0 +1,3 @@
+offer_snapshot_id,snapshot_ts_utc,sku,asin,marketplace_id,seller_id_raw,seller_id_canonical,offer_variant_id,fulfilment_channel,condition,listing_price_gbp,shipping_gbp,landed_price_gbp,min_delivery_days,max_delivery_days,is_prime,is_featured_offer_winner,is_our_offer,promo_suspected_flag,unknown_outcome_flag
+49e903ff-7571-47da-ba2a-23776825a960,2026-02-13T15:55:59Z,DEMO-SKU,DEMO-ASIN,A1F83G8C2ARO7P,OUR_SELLER,our_seller,ov_339114d7b097bfda0c2a,FBA,,10.40,0.00,10.40,1,2,,0,1,0,0
+49bb433f-4d0f-40c6-91fe-f85bcfc84696,2026-02-13T15:55:59Z,DEMO-SKU,DEMO-ASIN,A1F83G8C2ARO7P,RIVAL_A,rival_a,ov_477f5eaed6e356fa1854,FBA,,10.30,0.00,10.30,1,1,,1,0,0,0

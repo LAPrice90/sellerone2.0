@@ -1,0 +1,18 @@
+marketplace_id,name,country_code,domain_name,default_currency,default_language,is_participating,has_suspended_listings
+A13V1IB3VIYZZH,Amazon.fr,FR,www.amazon.fr,EUR,fr_FR,True,False
+A17E79C6D8DWNP,Amazon.sa,SA,www.amazon.sa,SAR,en_AE,True,False
+A1805IZSGTT6HS,Amazon.nl,NL,www.amazon.nl,EUR,nl_NL,True,False
+A1C3SOZRARQ6R3,Amazon.pl,PL,www.amazon.pl,PLN,pl_PL,True,False
+A1F83G8C2ARO7P,Amazon.co.uk,GB,www.amazon.co.uk,GBP,en_GB,True,False
+A1PA6795UKMFR9,Amazon.de,DE,www.amazon.de,EUR,de_DE,True,False
+A1RKKUPIHCS9HS,Amazon.es,ES,www.amazon.es,EUR,es_ES,True,False
+A1ZFFQZ3HTUKT9,Non-Amazon FR,FR,si-prod-fr-marketplace.stores.amazon.fr,EUR,fr_FR,True,False
+A28R8C7NBKEWEA,Amazon.ie,IE,www.amazon.ie,EUR,en_IE,True,False
+A2NODRKZP88ZB9,Amazon.se,SE,www.amazon.se,SEK,sv_SE,True,False
+A2VIGQ35RCS4UG,Amazon.ae,AE,www.amazon.ae,AED,en_AE,True,False
+A38D8NSA03LJTC,Non-Amazon DE,DE,si-prod-marketplace-de.stores.amazon.de,EUR,de_DE,True,False
+A62U237T8HV6N,Non-Amazon IT,IT,siprod.stores.amazon.it,EUR,it_IT,True,False
+AFQLKURYRPEL8,Non-Amazon ES,ES,siprod.stores.amazon.es,EUR,es_ES,True,False
+AMEN7PMS3EDWL,Amazon.com.be,BE,www.amazon.com.be,EUR,fr_BE,True,False
+APJ6JRA9NG5V4,Amazon.it,IT,www.amazon.it,EUR,it_IT,True,False
+AZMDEXL2RVFNN,Non-Amazon UK,GB,siprodukmarketplace.stores.amazon.co.uk,GBP,en_GB,True,False

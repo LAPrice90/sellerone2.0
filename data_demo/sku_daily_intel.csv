@@ -1,0 +1,2 @@
+date_utc,sku,foep_price_gbp,foep_status,foep_last_refresh_utc,cpt_gbp,cpt_last_refresh_utc,cpt_status,eligibility_ceiling_landed_gbp,eligibility_source,eligibility_confidence,eligibility_reason_codes_json,compliance_ceiling_landed_gbp,compliance_confidence
+2026-02-13,DEMO-SKU,18.95,OK,2026-02-13T15:55:59Z,18.90,2026-02-13T15:55:59Z,OK,18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",18.33,1

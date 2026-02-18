@@ -1,0 +1,11 @@
+asof_utc,seller_sku,asin,cpt_status,cpt_gbp,our_live_price_gbp,last_sold_price_gbp,price_reference_gbp,price_reference_source,delta_cpt_minus_reference_gbp,group_ab,cpt_error_summary
+2026-02-14T14:21:26Z,4W-VS57-BV6A,B0C9LJNJWZ,OK,35.00,35.91,126.71,126.71,avg_sold_price,-91.71,B,
+2026-02-14T14:21:26Z,6V-EEC1-2S9Z,B06WW79DX5,OK,21.41,7.99,8.18,8.18,avg_sold_price,13.23,A,
+2026-02-14T14:21:26Z,AX-NKNU-29C1,B08M52B4M5,OK,1.15,3.98,6.71,6.71,avg_sold_price,-5.56,B,
+2026-02-14T14:21:26Z,JB-RGB6-LZOJ,B0001P0DLU,OK,6.15,9.99,6.30,6.30,avg_sold_price,-0.15,B,
+2026-02-14T14:21:26Z,RZ-6ZL9-CZ7J,B075XT2J8X,OK,7.47,6.97,8.36,8.36,avg_sold_price,-0.89,B,
+2026-02-14T14:21:26Z,TJ-6LOP-OPEU,B08P63MSS9,OK,6.49,9.00,7.08,7.08,avg_sold_price,-0.59,B,
+2026-02-14T14:21:26Z,VF-3T0K-DR5O,B08KFFY86W,OK,5.29,5.35,6.13,6.13,avg_sold_price,-0.84,B,
+2026-02-14T14:21:26Z,XH-0LAE-FQO5,B00AOES9GE,MISSING,,6.90,8.43,8.43,avg_sold_price,,UNKNOWN,
+2026-02-14T14:21:26Z,XY-UM2X-TPS3,B003VTZAM0,OK,10.85,11.47,11.97,11.97,avg_sold_price,-1.12,B,
+2026-02-14T14:21:26Z,YC-3L3M-BV48,B0CTD6Q6KY,MISSING,,79.24,130.56,130.56,avg_sold_price,,UNKNOWN,

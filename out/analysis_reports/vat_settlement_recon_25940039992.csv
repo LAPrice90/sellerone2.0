@@ -1,0 +1,12 @@
+metric,amount
+Settlement_Order_VAT,1195.07
+System_Order_VAT,1195.07
+Delta_Order_VAT,0.0
+Settlement_Refund_VAT,-42.85
+System_Refund_VAT,-42.85
+Delta_Refund_VAT,0.0
+Settlement_Withheld_VAT,-23.96
+System_Withheld_VAT,-23.96
+Delta_Withheld_VAT,0.0
+System_Input_VAT_Order_Fees,0.0
+System_Input_VAT_Service_Fees,-17.53

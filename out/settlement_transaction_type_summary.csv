@@ -1,0 +1,11 @@
+transaction-type,currency,rows
+,GBP,1
+COMPENSATED_CLAWBACK,,1
+Inbound Transportation Fee,,6
+Order,,4217
+Order_Retrocharge,,2
+REVERSAL_REIMBURSEMENT,,16
+Refund,,90
+Refund_Retrocharge,,2
+RemovalComplete,,2
+WAREHOUSE_LOST,,4

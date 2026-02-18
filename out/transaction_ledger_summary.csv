@@ -1,0 +1,9 @@
+transaction_type,breakdown_type,currency,rows,amount_total
+Refund,Refunded Expenses,GBP,2,2.24
+Refund,Refunded Sales,GBP,2,-17.57
+ServiceFee,Expenses,GBP,1,-5.33
+ServiceFee,Sales,GBP,1,0.0
+Shipment,Expenses,AED,1,-105.74
+Shipment,Expenses,GBP,90,-306.88
+Shipment,Sales,AED,1,347.2
+Shipment,Sales,GBP,90,803.99

@@ -1,0 +1,421 @@
+Answer to your question: your breakdown is already the right shape. You have Phase 1 (health checks + run lock + alert discipline) working, and your pending phases are exactly what stops the “spider web” effect: staged writes, contracts, rollback, and controlled retries. The missing piece is turning what you have into a hard gate + repeatable test harness that makes failures reproducible and prevents partial publishes.
+
+Alert: your latest health check includes FAIL: missing L1 keys in Order_Master and WARN: blank COGS in lvl1plus (you noted this is being fixed in B004). Do not build new features until B004 is merged, a full rebuild is done, and the health suite goes green—otherwise you’ll keep spawning needles. 
+
+b_cycle_runbook
+
+Below is a plan in 3 perspectives, using what’s already in your runbooks/rulebook and keeping “self-healing” safe.
+
+Perspective 1: Engineering plan (make the system provable)
+A) Turn A015 into a gate, not just a report
+
+Right now A015 is a checklist that prints FAIL/WARN and writes out/system_health_checklist.csv (good). The engineering upgrade is:
+
+A015 must return an exit code:
+
+exit 0 if no FAIL
+
+exit 2 if any FAIL
+
+exit 1 if WARN-only (optional)
+
+Run orchestration must treat FAIL as a publish blocker:
+
+build outputs locally
+
+run A015
+
+if FAIL: stop; do not publish to Sheets; write failure bundle
+
+This matches the intent already in both runbooks: “If any FAIL appears, stop and fix that first.” 
+
+a_cycle_runbook
+
+ 
+
+b_cycle_runbook
+
+Why this matters: it converts “whack-a-mole debugging” into “the pipeline refuses to corrupt the world.”
+
+B) Phase 2 (staged writes): make partial writes impossible
+
+You already listed this as pending: “Build outputs locally then publish once complete; prevent partial sheet updates.” That is the spiderweb killer.
+
+Concrete implementation pattern:
+
+Each script writes to a run staging folder:
+out/staging/<run_id>/...
+
+Each stage produces:
+
+output CSV(s)
+
+a tiny manifest.json (row counts, timestamps, inputs used)
+
+Only the orchestrator is allowed to publish to Sheets, and only from staging.
+
+Publish is done as a single commit step per tab (or per cycle), not throughout the run.
+
+You already have a version of this idea in B cycle (“quiet publish mode”, publish once at end). Extend that pattern to everything, including A. 
+
+b_cycle_runbook
+
+Minimum win: even if a run fails mid-way, Sheets stay consistent.
+
+C) Phase 3 (data contracts): fail fast on column drift
+
+You called this out: “Fail fast if CSV columns/types change.”
+
+Implement a schema registry (simple, no heavy frameworks required):
+
+For every CSV output you depend on, define:
+
+required columns
+
+optional columns
+
+expected types (at least for key columns)
+
+key uniqueness rules (if applicable)
+
+Then enforce it in two places:
+
+at read time (before doing any transforms)
+
+at write time (before publishing)
+
+This aligns with your AGENTS rule: “Any new output file must have a schema check.” 
+
+AGENTS
+
+D) Phase 4 (rollback): keep last 3 publishable states
+
+You listed: “Keep last 3 snapshots and restore quickly.”
+
+Engineering-grade approach:
+
+Before publishing, snapshot:
+
+the exact CSVs you’re about to publish
+
+plus the previous published state (export sheet tabs to CSV, if you have that capability)
+
+Save:
+
+out/snapshots/<timestamp>_<run_id>/...
+
+Keep only last 3 “green” snapshots.
+
+Provide a restore command that republished from a snapshot (only from a known-good snapshot, never from random local state).
+
+E) Phase 5 (rate-limit handling): centralize retries
+
+You want: “Standard retries with backoff and caps.”
+
+The key is one wrapper used everywhere:
+
+retries only for retryable errors (429, 5xx, transient network)
+
+exponential backoff + jitter
+
+max attempts + max total wait
+
+every retry logs:
+
+endpoint
+
+attempt
+
+wait time
+
+request id (if available)
+
+Do not sprinkle try/except across scripts. Centralize.
+
+F) Make “self-healing” safe: only do reversible, bounded actions
+
+Your rulebooks are explicit about what must never happen:
+
+backdating inside live loops
+
+masking downstream outputs
+
+rewrite/delete token ledger in normal ops 
+
+token_system_rulebook
+
+ 
+
+AGENTS
+
+So define two classes of “healing”:
+
+Auto-heal allowed (safe, reversible):
+
+delete obvious blank rows (with before/after counts logged)
+
+backfill missing keys from authoritative upstream sources
+
+quarantine bad rows instead of half-writing them
+
+re-run a stage from cached inputs
+
+Auto-heal forbidden (dangerous):
+
+rewriting Token_Ledger history
+
+changing allocations for historical orders without explicit mode
+
+“fixing” P&L by adjusting output numbers
+
+This is consistent with your “root-cause first (no output-masking)” rule. 
+
+AGENTS
+
+Perspective 2: Codex plan (force disciplined debugging + test-first fixes)
+
+You already have strong operating rules in AGENTS.md. 
+
+AGENTS
+
+
+The upgrade is to make Codex produce artifacts that plug into your health/test pipeline automatically.
+
+A) Codex must output a “4-part patch report” for every change
+
+Add (or enforce) a standard report structure:
+
+Root cause (1–3 sentences, includes exact file + function + why it broke)
+
+Fix (what changed and why it’s the smallest safe change)
+
+Test added (what test/fixture was added that fails before / passes after)
+
+Evidence (row counts, deltas, health check output)
+
+You already require proof before done; this just standardizes it. 
+
+AGENTS
+
+B) Codex’s default move should be: “turn the bug into a fixture”
+
+Your current known bug class is perfect for this: missing L1 keys and blank COGS.
+
+Codex workflow for a bug like this:
+
+capture minimal CSV slices that reproduce the FAIL/WARN
+
+save to tests/fixtures/...
+
+add a test that asserts:
+
+B004 backfills keys
+
+health check FAIL disappears
+
+WARN either disappears or remains intentionally
+
+This matches your B cycle health check targets (it explicitly checks Level 1 keys missing, blank COGS, etc.). 
+
+b_cycle_runbook
+
+C) Create “static guard” tests for your non-negotiables
+
+Some rules don’t require running the pipeline at all—they’re structural:
+
+One-off scripts must never run in daily loops 
+
+AGENTS
+
+
+Add a test that scans imports/calls and fails if any daily script imports scripts/one_off/....
+
+This protects the “must never happen again” list in your token rulebook. 
+
+token_system_rulebook
+
+D) Codex should not be allowed to widen scope during bugfixes
+
+Codex tends to refactor when it sees mess. Your AGENTS rules already discourage this; make it explicit:
+
+bugfix PRs: only touch:
+
+the failing stage
+
+health check
+
+new tests/fixtures
+
+refactors: separate, scheduled, and only after health suite stays green for X runs
+
+Perspective 3: Operator plan (so you can run it without deep coding skill)
+
+This is the “how you work day-to-day without digging.”
+
+A) One command to run a cycle, one command to validate
+
+Based on your runbooks, your operational flow becomes:
+
+Run the cycle (A or B)
+
+Run health suite (A015) and treat it as the gate
+
+If FAIL: stop; inspect failure bundle; fix root cause; re-run
+
+Your A runbook already positions A015 as “use after changes or failed runs” and notes shared run lock; this becomes your default workflow. 
+
+a_cycle_runbook
+
+B) A single folder contains “what happened”
+
+Make these always appear after a run:
+
+out/run_summaries/latest.json
+
+out/failures/<timestamp>_<run_id>/... (only if FAIL)
+
+out/quarantine/<run_id>.csv (only if WARN/quarantine conditions)
+
+out/system_health_checklist.csv (always)
+
+This is how “needle in a haystack” becomes “open one folder.”
+
+C) Your operator decision table (no judgement calls)
+
+If FAIL appears
+
+do not publish
+
+open the failure bundle
+
+fix only the earliest stage involved
+
+re-run until FAIL = 0
+
+If WARN appears
+
+allow publish (optional), but log and track it until cleared
+
+WARNs should be finite and trend down, not be permanent background noise
+
+This matches your intended end-state behavior. 
+
+b_cycle_runbook
+
+D) Token system: keep your existing checklist, but automate it
+
+You already wrote the token test checklist as PASS/FAIL. 
+
+token_tests
+
+
+Turn it into an automated script that reads the files it references and prints PASS/FAIL. Start with the “big wins”:
+
+recon mismatches must be empty except known in-flight SKUs
+
+no unexpected statuses in token ledger
+
+purchase allocation mismatches must be zero (or explicitly whitelisted)
+
+This is the fastest path to confidence without mocking Amazon/Sheets.
+
+The practical “test foundation” you should build next (in order)
+Step 1: Make A015 machine-readable and enforceable
+
+Add exit codes
+
+Add stable check IDs (e.g., OM_MISSING_L1_KEYS, COGS_BLANK_LVL1PLUS)
+
+Ensure it can run without network calls (only reads out/)
+
+This makes it runnable anytime, even when APIs are down. 
+
+a_cycle_runbook
+
+ 
+
+b_cycle_runbook
+
+Step 2: Introduce a “post-run test runner” (very small)
+
+No pytest required at first if you want minimal friction:
+
+python scripts/run_tests_postrun.py
+
+runs A015
+
+runs token_tests automation
+
+outputs out/test_results.csv
+
+returns exit code
+
+Later you can move to pytest.
+
+Step 3: Implement staged writes for the top-risk publish
+
+Do it first where it hurts most:
+
+Order_Master publish
+
+Token_Ledger/Token_Allocations publish
+
+P&L summary publish
+
+B cycle already has “quiet publish”; formalize and apply the same idea elsewhere. 
+
+b_cycle_runbook
+
+Step 4: Add schemas for the “spine” files
+
+Start with:
+
+out/order_master.csv
+
+out/token_ledger_live.csv
+
+out/inventory_summaries.csv
+
+These are the system’s spine per your runbooks/rulebook. 
+
+a_cycle_runbook
+
+ 
+
+token_system_rulebook
+
+Step 5: Snapshot/rollback only for publish artifacts
+
+Do not snapshot everything. Snapshot only what you publish (plus summaries). This keeps it usable.
+
+External reviewer “timeline version” (short)
+
+Phase 1 (done): health check + run lock + alert discipline 
+
+a_cycle_runbook
+
+ 
+
+AGENTS
+
+Phase 2: staged writes + publish gating (no partial sheet updates) 
+
+b_cycle_runbook
+
+Phase 3: schema contracts on all outputs (fail fast on drift) 
+
+AGENTS
+
+Phase 4: 3-snapshot rollback on publish targets
+
+Phase 5: centralized rate-limit retries
+
+Exit criteria before “build more features”:
+
+A015 returns 0 FAIL for multiple consecutive runs
+
+token test checklist automated and passing (except explicit in-flight list) 
+
+token_tests
+
+publish is atomic (staged) for Order_Master + token tabs

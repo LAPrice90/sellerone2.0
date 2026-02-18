@@ -1,0 +1,11 @@
+country_code,dsf_enabled,fba_vat_rate,commission_vat_rate,dsf_vat_rate
+AE,0,0,0,0
+SA,0,0,0,0
+IE,0,0,0.2,0
+GB,1,0.2,0.2,0.2
+PT,1,0.2,0.2,0.2
+FR,1,0,0.2,0.2
+BE,1,0,0.2,0.2
+CA,1,0,0.2,0.2
+GG,1,0,0.2,0.2
+QA,0,0,0,0

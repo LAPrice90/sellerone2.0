@@ -1,0 +1,7 @@
+token_id,seller_sku,asin,lot_id,purchase_order_id,order_confirmation_id,invoice_id,shipment_id,cost_per_unit,currency,status,received_date,allocated_order_id,allocated_date,return_order_id,return_date,notes
+KI-CR51-18J31-0001,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,available,,,,,,rebuild_target
+KI-CR51-18J31-0002,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,available,,,,,,rebuild_target
+KI-CR51-18J31-0003,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,available,,,,,,rebuild_target
+KI-CR51-18J31-0004,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,available,,,,,,rebuild_target
+KI-CR51-18J31-0005,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,available,,,,,,rebuild_target
+KI-CR51-18J31-0006,KI-CR51-18J3,B0070Y60K8,KI-CR51-18J31,,,,,28.2,GBP,warehouse,,,,,,rebuild_target

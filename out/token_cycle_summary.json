@@ -1,0 +1,72 @@
+{
+  "status": "success",
+  "steps": [
+    {
+      "step": "build_tokens_november_anchor",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/B024_build_tokens_november_anchor.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'token_ledger': 'out\\\\token_ledger_live.csv', 'allocations': 'out\\\\token_allocations_live.csv', 'summary': 'out\\\\token_november_build_summary.csv', 'purchase_usage': 'out\\\\token_november_purchase_usage.csv', 'order_shortfalls': 'out\\\\token_november_order_shortfalls.csv'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:52:41.557423+00:00",
+      "ended_at": "2026-01-20T14:52:43.225965+00:00",
+      "duration_sec": 1.668542
+    },
+    {
+      "step": "build_token_cogs_ledger",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/B025_build_token_cogs_ledger.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'rows': 7992, 'snapshot': 'out\\\\token_cogs_ledger.csv'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:52:43.227965+00:00",
+      "ended_at": "2026-01-20T14:52:44.098586+00:00",
+      "duration_sec": 0.870621
+    },
+    {
+      "step": "rebuild_level1_from_archive",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/rebuild_level1_from_archive.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'rows': 6186, 'snapshot': 'out\\\\financial_events_level1.csv'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:52:44.099587+00:00",
+      "ended_at": "2026-01-20T14:52:56.601856+00:00",
+      "duration_sec": 12.502269
+    },
+    {
+      "step": "build_order_master",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/B004_build_order_master.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'rows': 6186, 'snapshot': 'out\\\\order_master.csv'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:52:56.601856+00:00",
+      "ended_at": "2026-01-20T14:53:12.820570+00:00",
+      "duration_sec": 16.218714
+    },
+    {
+      "step": "build_token_tests_daily",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/B011_build_token_tests_daily.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'rows': 5, 'snapshot': 'out\\\\token_tests_daily.csv', 'tab': 'Token_Tests_Daily'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:53:12.821564+00:00",
+      "ended_at": "2026-01-20T14:53:16.001571+00:00",
+      "duration_sec": 3.180007
+    },
+    {
+      "step": "build_token_daily_checklist",
+      "command": "C:\\Users\\Luke\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/B014_build_token_daily_checklist.py",
+      "status": "ok",
+      "returncode": 0,
+      "stdout": "{'status': 'success', 'rows': 5, 'tab': 'Token_Daily_Checklist', 'snapshot': 'out\\\\token_daily_checklist.csv'}",
+      "stderr": "",
+      "started_at": "2026-01-20T14:53:16.002572+00:00",
+      "ended_at": "2026-01-20T14:53:21.203813+00:00",
+      "duration_sec": 5.201241
+    }
+  ],
+  "updated_at": "2026-01-20T14:53:21.204814+00:00"
+}

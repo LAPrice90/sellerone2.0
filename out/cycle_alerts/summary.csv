@@ -1,0 +1,10 @@
+cycle,rows,fail_count,warn_count
+all,140,0,3
+A,3,0,0
+B,23,0,1
+H,75,0,2
+E,10,0,0
+C,19,0,0
+F,1,0,0
+Z,1,0,0
+shared,8,0,0

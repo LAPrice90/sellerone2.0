@@ -1,0 +1,1358 @@
+[13/02/2026 15:27:20.49] Phase1 pilot H-once starting 
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=9.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_DOWN,BINDING_CEILING_MANUAL_CAP,LIVE_WRITES_DISABLED
+[H_cycle] run_once enabled - exiting after one loop
+[13/02/2026 15:27:26.63] Phase1 pilot H-once finished (exit 0) 
+[13/02/2026 15:27:46.04] Phase1 pilot H-once starting 
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=9.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_DOWN,BINDING_CEILING_MANUAL_CAP,LIVE_WRITES_DISABLED
+[H_cycle] run_once enabled - exiting after one loop
+[13/02/2026 15:27:48.86] Phase1 pilot H-once finished (exit 0) 
+[13/02/2026 15:29:48.58] H-cycle loop starting 
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=9.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_DOWN,BINDING_CEILING_MANUAL_CAP,LIVE_WRITES_DISABLED
+[H_cycle] run_once enabled - exiting after one loop
+[13/02/2026 15:29:58.65] H-cycle loop finished (exit 0) 
+[13/02/2026 15:31:43.25] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260213T153144Z phase1_pilot=1 run_once=1 loop_sleep_seconds=900.00
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=9.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_DOWN,BINDING_CEILING_MANUAL_CAP,LIVE_WRITES_DISABLED
+[H_cycle] run_once enabled - exiting after one loop
+[13/02/2026 15:31:46.27] H-cycle loop finished (exit 0) 
+[13/02/2026 15:34:31.24] H-cycle loop starting 
+^C[13/02/2026 15:51:52.61] H-cycle loop starting 
+^C[13/02/2026 15:58:35.80] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260213T155836Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=9.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T161341Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T162845Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T164349Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T165853Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T171357Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T172902Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T174406Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T175910Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T181414Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T182918Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T184422Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T185926Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T191430Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T192934Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T194438Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T195942Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T201446Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T202950Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T204454Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T205958Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T211501Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T213005Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T214509Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T220013Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T221518Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T223022Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T224526Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T230029Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T231534Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T233037Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260213T234541Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T000045Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T001549Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T003053Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T004557Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T010101Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T011605Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T013109Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T014613Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T020117Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T021621Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T023125Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T024629Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T030133Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T031637Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T033140Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T034644Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T040148Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T041652Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T043156Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=5.97 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_COMPLIANCE,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T044700Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=14
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[14/02/2026 12:48:51.77] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260214T124853Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=13
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=7.49 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T130357Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=13
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=7.49 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T131900Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=1 seller_rows=13
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=7.49 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T133409Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku=JB-RGB6-LZOJ state=REGAIN write_status=READ_ONLY_NO_WRITE ceiling=7.49 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,LIVE_WRITES_DISABLED
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T135852Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku= state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T142336Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku= state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T144818Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku= state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T151257Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=7.49 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_FINAL_CEILING_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T153805Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku= state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T160244Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle sku= state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T162725Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T165226Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T171729Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T174228Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T180726Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T183232Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T185734Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T192237Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T194741Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T201249Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T203751Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T210252Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T212752Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T215252Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T221754Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T224255Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T230754Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T233301Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260214T235809Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T002318Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=RAISE_FIND_LOSS write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T004821Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T011332Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=96
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T013833Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=96
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T020337Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=96
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T022844Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T025345Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T031846Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T034349Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T040858Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T043401Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T045900Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T052407Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T054907Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T061419Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T063918Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T070417Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T072917Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T075416Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T081915Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T084414Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T090914Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T093415Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T095915Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T102414Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T104914Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T111413Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T113912Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T120412Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T122911Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T125412Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T131911Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T134410Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T140910Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T143409Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T145909Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T152408Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T154908Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T161407Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T163907Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T170406Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T172906Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T175405Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T181907Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T184407Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T190907Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T193406Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260215T195906Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[16/02/2026  9:16:23.07] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260216T091627Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=98
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T093234Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T094839Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T100444Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T102047Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T103657Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T105303Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T110915Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T112527Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T114139Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T115747Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=10 seller_rows=97
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=YC-3L3M-BV48 processed_count=10 processed_skus=4W-VS57-BV6A,6V-EEC1-2S9Z,AX-NKNU-29C1,JB-RGB6-LZOJ,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,VF-3T0K-DR5O,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48 skipped_cooldown_count=0 state=REGAIN write_status=DRY_RUN_NO_WRITE ceiling=109.45 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN,DRY_RUN_MODE,DRY_RUN_MODE_NO_WRITE
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T121354Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+^C[16/02/2026 17:13:16.06] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260216T171317Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T172909Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T174505Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T180102Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T181656Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T183247Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T184840Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T190433Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T192026Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T193622Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T195221Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=109
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T200825Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=109
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T202423Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=111
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T204018Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=111
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T205614Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=111
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T211208Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=111
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T212813Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T214405Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T220003Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T221555Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T223148Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T224746Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T230343Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T231939Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T233534Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260216T235130Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T000725Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T002318Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T003909Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T005507Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T011106Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T012704Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T014300Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T015855Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T021450Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T023045Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T024645Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T030246Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T031849Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,BINDING_CEILING_MANUAL_CAP,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00
+[H_cycle] cycle_start run_id=20260217T033442Z phase1_pilot=1 run_once=0 loop_sleep_seconds=900.00
+[H_cycle] snapshot_refresh ok listing_rows=12 seller_rows=110
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[17/02/2026  8:43:58.14] H-cycle loop starting 
+^C[17/02/2026 15:07:23.94] H-cycle loop starting 
+^C[17/02/2026 15:23:51.38] H-cycle loop starting 
+[H_cycle] cycle_start run_id=20260217T152352Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T152825Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T153304Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T153751Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,GUARDRAIL_HARD_FLOOR_CLAMP,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T154232Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T154710Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T155143Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,STEP_RAISE_FIND_LOSS_UP,CPT_RISK_UNKNOWN_CONSERVATIVE_HOLD,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T155602Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T160023Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=WRITE_NOT_APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T160450Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=APPLIED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T160911Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T161333Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T161757Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T162217Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T162636Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T163106Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T163531Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T163952Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T164411Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T164831Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T165253Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T165748Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T170209Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku=L1-54EX-56YC processed_count=1 processed_skus=L1-54EX-56YC skipped_cooldown_count=0 state=REGAIN write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=FEATURED_NOT_OURS_REGAIN,STEP_REGAIN_TO_RIVAL,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T170636Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=60 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=1 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=DAILY_INTEL_REFRESH_ATTEMPTED,MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=633.00 mode=next_due next_due_seconds=633 next_due_sku=L1-54EX-56YC
+[H_cycle] cycle_start run_id=20260217T172404Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=60 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=1 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00 mode=next_due next_due_seconds=900 next_due_sku=6V-EEC1-2S9Z
+[H_cycle] cycle_start run_id=20260217T174559Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=60 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=1 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00 mode=next_due next_due_seconds=900 next_due_sku=6V-EEC1-2S9Z
+[H_cycle] cycle_start run_id=20260217T180756Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=60 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=1 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=900.00 mode=next_due next_due_seconds=900 next_due_sku=6V-EEC1-2S9Z
+[H_cycle] cycle_start run_id=20260217T182957Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=60 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=1 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=663.00 mode=next_due next_due_seconds=663 next_due_sku=6V-EEC1-2S9Z
+[H_cycle] cycle_start run_id=20260217T184805Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T185509Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=476.00 mode=next_due next_due_seconds=476 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T190737Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T191433Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=484.00 mode=next_due next_due_seconds=484 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T192705Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T193411Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=474.00 mode=next_due next_due_seconds=474 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T194638Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T195336Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=482.00 mode=next_due next_due_seconds=482 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T200622Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T201354Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=448.00 mode=next_due next_due_seconds=448 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T202556Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T203258Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=478.00 mode=next_due next_due_seconds=478 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T204636Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T205353Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=463.00 mode=next_due next_due_seconds=463 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T210615Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T211326Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=469.00 mode=next_due next_due_seconds=469 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T212558Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T213310Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=468.00 mode=next_due next_due_seconds=468 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T214535Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T215259Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=456.00 mode=next_due next_due_seconds=456 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T220512Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T221238Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=454.00 mode=next_due next_due_seconds=454 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T222450Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T223156Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=474.00 mode=next_due next_due_seconds=474 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T224430Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T225134Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=476.00 mode=next_due next_due_seconds=476 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T230418Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T231128Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=470.00 mode=next_due next_due_seconds=470 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T232353Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T233100Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=473.00 mode=next_due next_due_seconds=473 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260217T234328Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=RAISE_FIND_LOSS write_status=NO_WRITE_REQUIRED ceiling=17.99 reason_codes=MISSING_BOUND_RAISE_FIND_LOSS,FAIL_CEILING_BELOW_HARD_FLOOR,FLOOR_PRIORITY_CEILING_CONFLICT,FLOOR_PRIORITY_ALREADY_SAFE_NO_WRITE,BINDING_CEILING_COMPLIANCE,DVE_DISABLED_FEATURED_WINNER_DELIVERY_UNKNOWN
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260217T235040Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=468.00 mode=next_due next_due_seconds=468 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T000305Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T001017Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=486
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=468.00 mode=next_due next_due_seconds=468 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T002244Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T003000Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=464.00 mode=next_due next_due_seconds=464 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T004210Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T004927Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=463.00 mode=next_due next_due_seconds=463 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T010140Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T010851Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=469.00 mode=next_due next_due_seconds=469 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T012116Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T012824Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=472.00 mode=next_due next_due_seconds=472 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T014056Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T014806Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=470.00 mode=next_due next_due_seconds=470 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T020025Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T020749Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=456.00 mode=next_due next_due_seconds=456 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T021956Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T022715Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=461.00 mode=next_due next_due_seconds=461 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T023932Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T024645Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=467.00 mode=next_due next_due_seconds=467 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T025911Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T030623Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=468.00 mode=next_due next_due_seconds=468 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T031845Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T032552Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=473.00 mode=next_due next_due_seconds=473 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T033817Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T034526Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=471.00 mode=next_due next_due_seconds=471 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T035751Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T040507Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=464.00 mode=next_due next_due_seconds=464 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T041722Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T042446Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=487
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=456.00 mode=next_due next_due_seconds=456 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T043652Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T044416Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=456.00 mode=next_due next_due_seconds=456 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T045621Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T050331Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=470.00 mode=next_due next_due_seconds=470 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T051552Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T052314Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=458.00 mode=next_due next_due_seconds=458 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T053535Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T054257Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=458.00 mode=next_due next_due_seconds=458 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T055510Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=488
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T060223Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=467.00 mode=next_due next_due_seconds=467 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T061428Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle daily_intel missing for today; run A016_refresh_phase1_daily_intel.py
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=61 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,7M-48OU-23X3,8M-LM6B-F2Q5,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,EV-CHU5-XU3G,FB-6FW0-Z82Q,GA-9DTN-9O1E,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,L1-54EX-56YC,L5-PF3B-WHU4,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_STALE,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] cycle_sleep seconds=1.00 mode=fixed next_due_seconds=0 next_due_sku=
+[H_cycle] cycle_start run_id=20260218T062132Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=61 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] cycle_sleep seconds=476.00 mode=next_due next_due_seconds=476 next_due_sku=0G-JB6S-PN34
+[H_cycle] cycle_start run_id=20260218T063347Z phase1_pilot=1 run_once=0 loop_sleep_seconds=1.00
+[H_cycle] snapshot_refresh ok listing_rows=61 seller_rows=489
+Traceback (most recent call last):
+  File "C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py", line 2041, in <module>
+    "--scope",
+               
+  File "C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py", line 1942, in main
+    else:
+         
+  File "C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py", line 1892, in _run_phase1_pilot_subprocess
+    "reason_codes_json": json.dumps(reason_codes, ensure_ascii=True, separators=(",", ":")),
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: phase1 pilot step returned no output
+[18/02/2026  6:38:28.79] H-cycle loop finished (exit 9009) 
+[18/02/2026  6:38:28.80] H-cycle launcher restart in 10s (last exit 9009) 
+[18/02/2026  6:38:35.11] H-cycle loop starting 
+[18/02/2026  9:09:14.32] H-cycle loop starting 
+[18/02/2026 10:25:39.71] H-cycle loop starting 
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\run_H_pricing_cycle.py:210: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")

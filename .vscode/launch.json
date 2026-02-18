@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run listings fetch (one-click)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/get_merchant_listings_report.py",
+      "args": [
+        "--marketplace-id",
+        "A1F83G8C2ARO7P",
+        "--poll-interval",
+        "10",
+        "--max-attempts",
+        "24"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/secrets/.env",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

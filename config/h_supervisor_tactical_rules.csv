@@ -1,0 +1,9 @@
+sku,lane,state,trigger_code,allowed_probe_type,target_adjustment_gbp,cooldown_minutes,expiry_minutes,priority,enabled,stop_condition,escalation_action,note
+JB-RGB6-LZOJ,managed,follower,buy_box_loss_or_close_gap,match,0.00,15,60,10,yes,daily_probe_budget_exhausted,wait_cooldown,phase0_supervisor_rule_follower_match_fast
+JB-RGB6-LZOJ,managed,stable,buy_box_stable,match,0.00,30,120,20,yes,risk_guardrail_hit,escalate_head,phase0_supervisor_rule_stable
+JB-RGB6-LZOJ,managed,aggressor_candidate,repeat_fast_downward_reaction,raise,0.10,30,60,30,yes,floor_breach_risk,escalate_head,phase0_supervisor_rule_aggressor_candidate
+JB-RGB6-LZOJ,managed,unknown,baseline_check,hold,0.00,30,240,90,yes,data_sparse,collect_more_data,phase0_supervisor_rule_unknown_fallback
+L1-54EX-56YC,managed,follower,buy_box_loss_or_close_gap,match,0.00,1,60,10,yes,daily_probe_budget_exhausted,wait_cooldown,phase1_supervisor_rule_follower_match_fast
+L1-54EX-56YC,managed,stable,buy_box_stable,match,0.00,1,120,20,yes,risk_guardrail_hit,escalate_head,phase1_supervisor_rule_stable
+L1-54EX-56YC,managed,aggressor_candidate,repeat_fast_downward_reaction,raise,0.10,1,60,30,yes,floor_breach_risk,escalate_head,phase1_supervisor_rule_aggressor_candidate
+L1-54EX-56YC,managed,unknown,baseline_check,hold,0.00,1,240,90,yes,data_sparse,collect_more_data,phase1_supervisor_rule_unknown_fallback

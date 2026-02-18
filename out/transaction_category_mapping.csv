@@ -1,0 +1,14 @@
+description_contains,category
+FBAPostInboundTransportation,Inbound_Transportation_Fee
+FBAInboundTransportation,Inbound_Transportation_Fee
+FBALongTermStorageBilling,Storage_Charges
+FBALongTermStorageFee,Storage_Charges
+FBAStorageBilling,Storage_Charges
+FBAStorageFee,Storage_Charges
+FBARemoval,Removal_Fee
+FBADisposalFee,Disposal_Fee
+FBADisposal,Disposal_Fee
+CustomerReturnHRRUnitFee,Customer_Returns_Fee
+CustomerReturnHRREvent,Customer_Returns_Fee
+Customer Returns Fee,Customer_Returns_Fee
+Subscription,Subscription_Fee

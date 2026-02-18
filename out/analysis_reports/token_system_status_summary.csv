@@ -1,0 +1,11 @@
+metric,value
+report_ts,2026-01-20T13:24:57Z
+order_qty_total,6031
+allocated_qty_total,3
+unallocated_qty_total,6028
+available_tokens_total,2674
+returned_pending_tokens_total,19
+unsellable_tokens_total,8
+allocation_coverage_rate,0.0005
+available_vs_unallocated,-3354
+orders_with_shortfall,5306

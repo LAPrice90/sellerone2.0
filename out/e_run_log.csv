@@ -1,0 +1,9 @@
+run_id,started_utc,finished_utc,status,tasks_run,elapsed_seconds,error
+20260206T113141Z,2026-02-06T11:31:41.460047+00:00,2026-02-06T11:31:44.685500+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.224,
+20260206T113650Z,2026-02-06T11:36:50.088299+00:00,2026-02-06T11:36:53.661306+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.567,
+20260206T122805Z,2026-02-06T12:28:05.083913+00:00,2026-02-06T12:28:08.404798+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.317,
+20260206T131053Z,2026-02-06T13:10:53.570345+00:00,2026-02-06T13:10:57.004929+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.432,
+20260206T135843Z,2026-02-06T13:58:43.370694+00:00,2026-02-06T13:58:47.301220+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.926,
+20260206T140700Z,2026-02-06T14:07:00.642301+00:00,2026-02-06T14:07:04.373302+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.727,
+20260206T141321Z,2026-02-06T14:13:21.423487+00:00,2026-02-06T14:13:25.043489+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.613,
+20260206T143237Z,2026-02-06T14:32:37.306007+00:00,2026-02-06T14:32:40.774171+00:00,success,E001_build_sales_velocity.py;E002_build_roi_snapshot.py;E003_build_restock_signals.py;E004_build_performance_summary.py,3.464,

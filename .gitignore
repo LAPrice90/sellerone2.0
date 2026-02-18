@@ -1,0 +1,16 @@
+# Secrets and credentials
+secrets/
+.env
+*.pem
+*.key
+
+# Old reference archives not needed in backup repo
+Reference only/
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
+# Local tooling/cache
+.cache/
+.pytest_cache/
