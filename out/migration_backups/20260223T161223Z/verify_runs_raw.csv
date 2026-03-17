@@ -1,0 +1,10 @@
+﻿"scenario","run","rc","exit_marker","lock_exists","publish_done_line"
+"scenarioA_publish0","1","2","EXIT_CRASH utc=2026-02-23T16:16:30Z","0","2026-02-23T16:08:57Z phase1 publish_done status=ok"
+"scenarioA_publish0","2","2","EXIT_CRASH utc=2026-02-23T16:16:30Z","0","2026-02-23T16:08:57Z phase1 publish_done status=ok"
+"scenarioA_publish0","3","2","EXIT_CRASH utc=2026-02-23T16:16:30Z","0","2026-02-23T16:08:57Z phase1 publish_done status=ok"
+scenarioA_publish0_fixed,1,0,,1,2026-02-23T16:08:57Z phase1 publish_done status=ok
+scenarioA_publish0_fixed,2,0,,1,2026-02-23T16:08:57Z phase1 publish_done status=ok
+scenarioA_publish0_fixed,3,1,SYSTEMEXIT utc=2026-02-23T16:17:25Z,1,2026-02-23T16:08:57Z phase1 publish_done status=ok
+scenarioA_publish0_final,1,0,,1,2026-02-23T16:24:03Z phase1 publish_done status=skipped_disabled
+scenarioA_publish0_final,2,0,,1,2026-02-23T16:24:03Z phase1 publish_done status=skipped_disabled
+scenarioA_publish0_final,3,0,,1,2026-02-23T16:24:03Z phase1 publish_done status=skipped_disabled

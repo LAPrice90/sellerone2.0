@@ -1,0 +1,8 @@
+START utc=2026-02-23T16:31:14Z
+argv=['scripts/cycles/run_H_pricing_cycle_guarded.py', '--phase1-pilot', '--phase1-config', 'config/pilot_sku.yaml', '--sleep-minutes', '0', '--run-once']
+PHASE=phase1_pilot(inline) phase1_intel(inline) phase1_publish(inline)
+GUARD_DIAGNOSTIC_MODE=0
+BISECT_FORCE_INLINE=0
+STAGES snapshot_refresh=1 item_offers=1 phase1_pilot=1 phase1_intel=1 phase1_publish=0
+EXIT_OK utc=2026-02-23T16:33:38Z
+rc=0

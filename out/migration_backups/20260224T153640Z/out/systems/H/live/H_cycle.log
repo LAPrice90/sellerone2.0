@@ -1,0 +1,400 @@
+2026-02-24T14:52:25Z stage item_offers enter
+2026-02-24T14:52:30Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T14:52:30Z snapshot_refresh working stage=item_offers elapsed_seconds=30.78 completed=? total=56
+2026-02-24T14:53:00Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.02 completed=? total=56
+2026-02-24T14:53:01Z snapshot_refresh working stage=item_offers elapsed_seconds=61.05 completed=? total=56
+2026-02-24T14:53:30Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.02 completed=? total=56
+2026-02-24T14:53:32Z snapshot_refresh working stage=item_offers elapsed_seconds=92.74 completed=? total=56
+2026-02-24T14:54:00Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+2026-02-24T14:54:02Z snapshot_refresh working stage=item_offers elapsed_seconds=122.81 completed=? total=56
+2026-02-24T14:54:30Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.05 completed=? total=56
+2026-02-24T14:54:35Z snapshot_refresh working stage=item_offers elapsed_seconds=155.27 completed=? total=56
+2026-02-24T14:55:05Z signal_policy sigint=ignored
+2026-02-24T14:55:05Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=28588
+2026-02-24T14:55:06Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=28588
+2026-02-24T14:55:06Z cycle_start run_id=20260224T145506Z pid=15160 ppid=15268 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=inline bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T14:55:06Z phase1 snapshot_refresh start
+2026-02-24T14:55:06Z stage snapshot_refresh enter
+2026-02-24T14:55:30Z stage item_offers enter
+2026-02-24T14:55:36Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T14:55:36Z snapshot_refresh working stage=item_offers elapsed_seconds=30.17 completed=? total=56
+2026-02-24T14:56:06Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.02 completed=? total=56
+2026-02-24T14:56:06Z snapshot_refresh working stage=item_offers elapsed_seconds=60.44 completed=? total=56
+2026-02-24T14:56:50Z signal_policy sigint=ignored
+2026-02-24T14:56:50Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=15160
+2026-02-24T14:56:51Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=15160
+2026-02-24T14:56:51Z cycle_start run_id=20260224T145651Z pid=9528 ppid=4780 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=inline bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T14:56:51Z phase1 snapshot_refresh start
+2026-02-24T14:56:51Z stage snapshot_refresh enter
+2026-02-24T14:57:16Z stage item_offers enter
+2026-02-24T14:57:21Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.01 completed=? total=56
+2026-02-24T14:57:21Z snapshot_refresh working stage=item_offers elapsed_seconds=30.67 completed=? total=56
+2026-02-24T14:57:51Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.03 completed=? total=56
+2026-02-24T14:57:54Z snapshot_refresh working stage=item_offers elapsed_seconds=63.09 completed=? total=56
+2026-02-24T14:58:21Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.05 completed=? total=56
+2026-02-24T14:58:24Z snapshot_refresh working stage=item_offers elapsed_seconds=93.70 completed=? total=56
+2026-02-24T14:58:51Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.08 completed=? total=56
+2026-02-24T14:58:57Z snapshot_refresh working stage=item_offers elapsed_seconds=126.33 completed=? total=56
+2026-02-24T14:59:21Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.09 completed=? total=56
+2026-02-24T14:59:29Z snapshot_refresh working stage=item_offers elapsed_seconds=158.64 completed=? total=56
+2026-02-24T14:59:51Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.09 completed=? total=56
+2026-02-24T14:59:58Z stage item_offers exit rc=0 duration_s=162.44
+2026-02-24T14:59:58Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T14:59:58Z snapshot_refresh timing elapsed_seconds=187.34
+2026-02-24T14:59:58Z stage=snapshot_refresh attempt=1 rc=0 elapsed=187.42
+2026-02-24T14:59:58Z stage snapshot_refresh exit rc=0 duration_s=187.42
+2026-02-24T14:59:58Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T14:59:58Z stage phase1_intel enter
+2026-02-24T14:59:58Z phase1 daily_intel alignment inline_start timeout_seconds=2700
+2026-02-24T15:00:00Z phase1 daily_intel alignment inline_end rc=0 duration_s=1.83
+2026-02-24T15:00:00Z stage=phase1_intel attempt=1 rc=0 elapsed=1.83
+2026-02-24T15:00:00Z stage phase1_intel exit rc=0 duration_s=1.83
+2026-02-24T15:00:00Z phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+2026-02-24T15:00:00Z phase1 build_seller_profiles start
+2026-02-24T15:00:00Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.09
+2026-02-24T15:00:00Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:00:00Z phase1 split_health gate evaluation start
+2026-02-24T15:00:00Z split_health_run_start mode=shadow inline=1 timeout_seconds=120
+2026-02-24T15:00:08Z split_health_run mode=shadow inline=1 rc=1 fresh=1 fail=0 warn=3 readable=1 elapsed_seconds=7.68
+2026-02-24T15:00:08Z split_shadow_h clean=1 fail=0 warn=3 block_live_writes=0 b_match_streak=0 h_clean_streak=16 ready_for_cutover=0
+2026-02-24T15:00:08Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:00:08Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:00:08Z stage phase1_pilot enter
+2026-02-24T15:00:08Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:00:08Z phase1 pilot_step child_started pid=27944 run_id=20260224T145651Z
+2026-02-24T15:00:31Z signal_policy sigint=ignored
+2026-02-24T15:00:31Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=9528
+2026-02-24T15:00:31Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=9528
+2026-02-24T15:00:32Z cycle_start run_id=20260224T150031Z pid=23164 ppid=1784 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=inline bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:00:32Z phase1 snapshot_refresh start
+2026-02-24T15:00:32Z stage snapshot_refresh enter
+2026-02-24T15:00:58Z stage item_offers enter
+2026-02-24T15:01:02Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:01:04Z snapshot_refresh working stage=item_offers elapsed_seconds=32.58 completed=? total=56
+2026-02-24T15:01:32Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+2026-02-24T15:01:35Z snapshot_refresh working stage=item_offers elapsed_seconds=63.09 completed=? total=56
+2026-02-24T15:02:02Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.05 completed=? total=56
+2026-02-24T15:02:07Z snapshot_refresh working stage=item_offers elapsed_seconds=95.73 completed=? total=56
+2026-02-24T15:02:32Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.06 completed=? total=56
+2026-02-24T15:02:40Z snapshot_refresh working stage=item_offers elapsed_seconds=128.36 completed=? total=56
+2026-02-24T15:03:02Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.08 completed=? total=56
+2026-02-24T15:03:12Z snapshot_refresh working stage=item_offers elapsed_seconds=160.84 completed=? total=56
+2026-02-24T15:03:32Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.08 completed=? total=56
+2026-02-24T15:03:39Z stage item_offers exit rc=0 duration_s=161.01
+2026-02-24T15:03:39Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:03:39Z snapshot_refresh timing elapsed_seconds=187.86
+2026-02-24T15:03:39Z stage=snapshot_refresh attempt=1 rc=0 elapsed=187.94
+2026-02-24T15:03:39Z stage snapshot_refresh exit rc=0 duration_s=187.94
+2026-02-24T15:03:39Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:03:39Z stage phase1_intel enter
+2026-02-24T15:03:39Z phase1 daily_intel alignment inline_start timeout_seconds=2700
+2026-02-24T15:03:41Z phase1 daily_intel alignment inline_end rc=0 duration_s=1.84
+2026-02-24T15:03:41Z stage=phase1_intel attempt=1 rc=0 elapsed=1.84
+2026-02-24T15:03:41Z stage phase1_intel exit rc=0 duration_s=1.86
+2026-02-24T15:03:41Z phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+2026-02-24T15:03:41Z phase1 build_seller_profiles start
+2026-02-24T15:03:41Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+2026-02-24T15:03:41Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:03:41Z phase1 split_health gate evaluation start
+2026-02-24T15:03:41Z split_health_run_start mode=shadow inline=1 timeout_seconds=120
+2026-02-24T15:03:49Z split_health_run mode=shadow inline=1 rc=1 fresh=1 fail=0 warn=3 readable=1 elapsed_seconds=7.79
+2026-02-24T15:03:49Z split_shadow_h clean=1 fail=0 warn=3 block_live_writes=0 b_match_streak=0 h_clean_streak=17 ready_for_cutover=0
+2026-02-24T15:03:49Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:03:49Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:03:49Z stage phase1_pilot enter
+2026-02-24T15:03:49Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:03:49Z phase1 pilot_step child_started pid=6528 run_id=20260224T150031Z
+2026-02-24T15:07:12Z signal_policy sigint=ignored
+2026-02-24T15:07:12Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=23164
+2026-02-24T15:07:12Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=23164
+2026-02-24T15:07:12Z cycle_start run_id=20260224T150712Z pid=29580 ppid=10220 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:07:12Z phase1 snapshot_refresh start
+2026-02-24T15:07:12Z stage snapshot_refresh enter
+2026-02-24T15:07:44Z signal_policy sigint=ignored
+2026-02-24T15:07:44Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=29580
+2026-02-24T15:07:45Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=29580
+2026-02-24T15:07:45Z cycle_start run_id=20260224T150745Z pid=26716 ppid=5224 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:07:45Z phase1 snapshot_refresh start
+2026-02-24T15:07:45Z stage snapshot_refresh enter
+2026-02-24T15:08:06Z signal_policy sigint=ignored
+2026-02-24T15:08:06Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=26716
+2026-02-24T15:08:07Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=26716
+2026-02-24T15:08:07Z cycle_start run_id=20260224T150807Z pid=5372 ppid=26064 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:08:07Z phase1 snapshot_refresh start
+2026-02-24T15:08:07Z stage snapshot_refresh enter
+2026-02-24T15:08:32Z stage item_offers enter
+2026-02-24T15:08:37Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:08:37Z snapshot_refresh working stage=item_offers elapsed_seconds=30.75 completed=? total=56
+2026-02-24T15:09:07Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.02 completed=? total=56
+2026-02-24T15:09:12Z snapshot_refresh working stage=item_offers elapsed_seconds=65.25 completed=? total=56
+2026-02-24T15:09:37Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.03 completed=? total=56
+2026-02-24T15:09:45Z snapshot_refresh working stage=item_offers elapsed_seconds=97.98 completed=? total=56
+2026-02-24T15:10:07Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.05 completed=? total=56
+2026-02-24T15:10:17Z snapshot_refresh working stage=item_offers elapsed_seconds=130.62 completed=? total=56
+2026-02-24T15:10:37Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.06 completed=? total=56
+2026-02-24T15:10:50Z snapshot_refresh working stage=item_offers elapsed_seconds=163.19 completed=? total=56
+2026-02-24T15:11:07Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.06 completed=? total=56
+2026-02-24T15:11:11Z stage item_offers exit rc=0 duration_s=159.42
+2026-02-24T15:11:11Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:11:11Z snapshot_refresh timing elapsed_seconds=184.47
+2026-02-24T15:11:11Z stage=snapshot_refresh attempt=1 rc=0 elapsed=184.59
+2026-02-24T15:11:11Z stage snapshot_refresh exit rc=0 duration_s=184.59
+2026-02-24T15:11:11Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:11:11Z stage phase1_intel enter
+2026-02-24T15:11:11Z phase1 daily_intel alignment inline_start timeout_seconds=2700
+2026-02-24T15:11:13Z phase1 daily_intel alignment inline_end rc=0 duration_s=1.73
+2026-02-24T15:11:13Z stage=phase1_intel attempt=1 rc=0 elapsed=1.77
+2026-02-24T15:11:13Z stage phase1_intel exit rc=0 duration_s=1.77
+2026-02-24T15:11:13Z phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+2026-02-24T15:11:13Z phase1 build_seller_profiles start
+2026-02-24T15:11:13Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+2026-02-24T15:11:13Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:11:13Z phase1 split_health gate evaluation start
+2026-02-24T15:11:13Z split_health_run_start mode=shadow inline=1 timeout_seconds=120
+2026-02-24T15:11:35Z signal_policy sigint=ignored
+2026-02-24T15:11:35Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=5372
+2026-02-24T15:11:36Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=5372
+2026-02-24T15:11:36Z cycle_start run_id=20260224T151136Z pid=27904 ppid=6468 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:11:36Z phase1 snapshot_refresh start
+2026-02-24T15:11:36Z stage snapshot_refresh enter
+2026-02-24T15:12:00Z stage item_offers enter
+2026-02-24T15:12:06Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.01 completed=? total=56
+2026-02-24T15:12:06Z snapshot_refresh working stage=item_offers elapsed_seconds=30.39 completed=? total=56
+2026-02-24T15:12:36Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.03 completed=? total=56
+2026-02-24T15:12:38Z snapshot_refresh working stage=item_offers elapsed_seconds=62.66 completed=? total=56
+2026-02-24T15:13:06Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.05 completed=? total=56
+2026-02-24T15:13:11Z snapshot_refresh working stage=item_offers elapsed_seconds=95.05 completed=? total=56
+2026-02-24T15:13:36Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.05 completed=? total=56
+2026-02-24T15:13:41Z snapshot_refresh working stage=item_offers elapsed_seconds=125.62 completed=? total=56
+2026-02-24T15:14:06Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.06 completed=? total=56
+2026-02-24T15:14:12Z snapshot_refresh working stage=item_offers elapsed_seconds=156.50 completed=? total=56
+2026-02-24T15:14:36Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.08 completed=? total=56
+2026-02-24T15:14:42Z snapshot_refresh working stage=item_offers elapsed_seconds=186.56 completed=? total=56
+2026-02-24T15:14:42Z stage item_offers exit rc=0 duration_s=162.25
+2026-02-24T15:14:43Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:14:43Z snapshot_refresh timing elapsed_seconds=186.89
+2026-02-24T15:14:43Z stage=snapshot_refresh attempt=1 rc=0 elapsed=186.97
+2026-02-24T15:14:43Z stage snapshot_refresh exit rc=0 duration_s=186.97
+2026-02-24T15:14:43Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:14:43Z stage phase1_intel enter
+2026-02-24T15:14:43Z phase1 daily_intel alignment inline_start timeout_seconds=2700
+2026-02-24T15:14:44Z phase1 daily_intel alignment inline_end rc=0 duration_s=1.80
+2026-02-24T15:14:44Z stage=phase1_intel attempt=1 rc=0 elapsed=1.80
+2026-02-24T15:14:44Z stage phase1_intel exit rc=0 duration_s=1.80
+2026-02-24T15:14:44Z phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+2026-02-24T15:14:44Z phase1 build_seller_profiles start
+2026-02-24T15:14:44Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+2026-02-24T15:14:44Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:14:44Z phase1 split_health gate evaluation start
+2026-02-24T15:14:44Z split_health_run_start mode=shadow inline=1 timeout_seconds=120
+2026-02-24T15:14:52Z split_health_run mode=shadow inline=1 rc=1 fresh=1 fail=0 warn=3 readable=1 elapsed_seconds=7.72
+2026-02-24T15:14:52Z split_shadow_h clean=1 fail=0 warn=3 block_live_writes=0 b_match_streak=0 h_clean_streak=18 ready_for_cutover=0
+2026-02-24T15:14:52Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:14:52Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:14:52Z stage phase1_pilot enter
+2026-02-24T15:14:52Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:14:52Z phase1 pilot_step child_started pid=28336 run_id=20260224T151136Z
+2026-02-24T15:16:35Z phase1 pilot_step done rc=0 elapsed_seconds=102.83 stderr_tail=2026-02-24T15:16:35Z h110 run_once done processed_count=56 last_sku=ZT-QPY3-P24I progress_tail=2026-02-24T15:16:35Z h110 run_once done processed_count=56 last_sku=ZT-QPY3-P24I
+2026-02-24T15:16:35Z stage=phase1_pilot attempt=1 rc=0 elapsed=102.84
+2026-02-24T15:16:35Z stage phase1_pilot exit rc=0 duration_s=102.84
+2026-02-24T15:16:35Z phase1 daily_intel alignment invalidated reason=pilot_missing_or_stale_intel; will_retry_next_loop=1
+2026-02-24T15:16:40Z stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.38
+2026-02-24T15:16:40Z phase1 h_cycle sku=ZT-QPY3-P24I processed_count=56 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4U-9ZL6-9G0Y,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,FB-6FW0-Z82Q,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_MISSING,A_CYCLE_MISSING_DEFENSIVE_HOLD
+2026-02-24T15:16:40Z phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+2026-02-24T15:16:40Z phase1 publish_start
+2026-02-24T15:16:40Z stage phase1_publish enter
+2026-02-24T15:16:54Z stage=phase1_publish attempt=1 rc=0 elapsed=13.34
+2026-02-24T15:16:54Z stage phase1_publish exit rc=0 duration_s=13.34
+2026-02-24T15:16:54Z phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+2026-02-24T15:16:54Z phase1 publish_done status=ok
+2026-02-24T15:16:54Z phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+2026-02-24T15:16:54Z run_once enabled - exiting after one loop
+2026-02-24T15:16:54Z process_exit reason=main_return rc=0
+2026-02-24T15:17:14Z signal_policy sigint=ignored
+2026-02-24T15:17:14Z cycle_start run_id=20260224T151714Z pid=20340 ppid=14692 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:17:14Z phase1 snapshot_refresh start
+2026-02-24T15:17:14Z stage snapshot_refresh enter
+2026-02-24T15:17:42Z stage item_offers enter
+2026-02-24T15:17:44Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.02 completed=? total=56
+2026-02-24T15:17:45Z snapshot_refresh working stage=item_offers elapsed_seconds=30.48 completed=? total=56
+2026-02-24T15:18:14Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.03 completed=? total=56
+2026-02-24T15:18:16Z snapshot_refresh working stage=item_offers elapsed_seconds=61.77 completed=? total=56
+2026-02-24T15:18:44Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.05 completed=? total=56
+2026-02-24T15:18:48Z snapshot_refresh working stage=item_offers elapsed_seconds=94.05 completed=? total=56
+2026-02-24T15:19:14Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.06 completed=? total=56
+2026-02-24T15:19:22Z snapshot_refresh working stage=item_offers elapsed_seconds=127.91 completed=? total=56
+2026-02-24T15:19:44Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.08 completed=? total=56
+2026-02-24T15:19:54Z snapshot_refresh working stage=item_offers elapsed_seconds=159.72 completed=? total=56
+2026-02-24T15:20:14Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.08 completed=? total=56
+2026-02-24T15:20:26Z snapshot_refresh working stage=item_offers elapsed_seconds=191.89 completed=? total=56
+2026-02-24T15:20:43Z stage item_offers exit rc=0 duration_s=180.91
+2026-02-24T15:20:43Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:20:43Z snapshot_refresh timing elapsed_seconds=208.38
+2026-02-24T15:20:43Z stage=snapshot_refresh attempt=1 rc=0 elapsed=208.44
+2026-02-24T15:20:43Z stage snapshot_refresh exit rc=0 duration_s=208.44
+2026-02-24T15:20:43Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:20:43Z stage phase1_intel enter
+2026-02-24T15:20:43Z phase1 daily_intel alignment inline_start timeout_seconds=2700
+2026-02-24T15:20:44Z phase1 daily_intel alignment inline_end rc=0 duration_s=1.81
+2026-02-24T15:20:44Z stage=phase1_intel attempt=1 rc=0 elapsed=1.81
+2026-02-24T15:20:44Z stage phase1_intel exit rc=0 duration_s=1.81
+2026-02-24T15:20:44Z phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+2026-02-24T15:20:44Z phase1 build_seller_profiles start
+2026-02-24T15:20:45Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.09
+2026-02-24T15:20:45Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:20:45Z phase1 split_health gate evaluation start
+2026-02-24T15:20:45Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:20:45Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:20:45Z stage phase1_pilot enter
+2026-02-24T15:20:45Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:20:45Z phase1 pilot_step child_started pid=10324 run_id=20260224T151714Z
+2026-02-24T15:20:47Z phase1 pilot_step done rc=0 elapsed_seconds=2.05 stderr_tail=2026-02-24T15:20:47Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN progress_tail=2026-02-24T15:20:47Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN
+2026-02-24T15:20:47Z stage=phase1_pilot attempt=1 rc=0 elapsed=2.06
+2026-02-24T15:20:47Z stage phase1_pilot exit rc=0 duration_s=2.06
+2026-02-24T15:20:52Z stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.27
+2026-02-24T15:20:52Z phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=56 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+2026-02-24T15:20:52Z phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+2026-02-24T15:20:52Z phase1 publish_start
+2026-02-24T15:20:52Z stage phase1_publish enter
+2026-02-24T15:21:04Z stage=phase1_publish attempt=1 rc=0 elapsed=12.03
+2026-02-24T15:21:04Z stage phase1_publish exit rc=0 duration_s=12.05
+2026-02-24T15:21:04Z phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+2026-02-24T15:21:04Z phase1 publish_done status=ok
+2026-02-24T15:21:04Z phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+2026-02-24T15:21:04Z run_once enabled - exiting after one loop
+2026-02-24T15:21:04Z process_exit reason=main_return rc=0
+2026-02-24T15:21:15Z signal_policy sigint=ignored
+2026-02-24T15:21:15Z cycle_start run_id=20260224T152115Z pid=10660 ppid=22956 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:21:15Z phase1 snapshot_refresh start
+2026-02-24T15:21:15Z stage snapshot_refresh enter
+2026-02-24T15:21:40Z stage item_offers enter
+2026-02-24T15:21:45Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:21:49Z snapshot_refresh working stage=item_offers elapsed_seconds=33.44 completed=? total=56
+2026-02-24T15:22:15Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.02 completed=? total=56
+2026-02-24T15:22:21Z snapshot_refresh working stage=item_offers elapsed_seconds=65.92 completed=? total=56
+2026-02-24T15:22:45Z signal_policy sigint=ignored
+2026-02-24T15:22:45Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=10660
+2026-02-24T15:22:46Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=10660
+2026-02-24T15:22:46Z cycle_start run_id=20260224T152246Z pid=28788 ppid=29536 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:22:46Z phase1 snapshot_refresh start
+2026-02-24T15:22:46Z stage snapshot_refresh enter
+2026-02-24T15:23:08Z signal_policy sigint=ignored
+2026-02-24T15:23:08Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=28788
+2026-02-24T15:23:08Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=28788
+2026-02-24T15:23:08Z cycle_start run_id=20260224T152308Z pid=3700 ppid=28104 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:23:08Z phase1 snapshot_refresh start
+2026-02-24T15:23:08Z stage snapshot_refresh enter
+2026-02-24T15:23:33Z stage item_offers enter
+2026-02-24T15:23:39Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:23:43Z snapshot_refresh working stage=item_offers elapsed_seconds=34.23 completed=? total=56
+2026-02-24T15:24:09Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+2026-02-24T15:24:15Z snapshot_refresh working stage=item_offers elapsed_seconds=66.28 completed=? total=56
+2026-02-24T15:24:39Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+2026-02-24T15:24:47Z snapshot_refresh working stage=item_offers elapsed_seconds=98.81 completed=? total=56
+2026-02-24T15:25:09Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+2026-02-24T15:25:20Z snapshot_refresh working stage=item_offers elapsed_seconds=131.28 completed=? total=56
+2026-02-24T15:25:39Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.05 completed=? total=56
+2026-02-24T15:25:52Z snapshot_refresh working stage=item_offers elapsed_seconds=163.59 completed=? total=56
+2026-02-24T15:26:09Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.06 completed=? total=56
+2026-02-24T15:26:33Z signal_policy sigint=ignored
+2026-02-24T15:26:33Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=3700
+2026-02-24T15:26:34Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=3700
+2026-02-24T15:26:34Z cycle_start run_id=20260224T152634Z pid=10108 ppid=7040 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:26:34Z phase1 snapshot_refresh start
+2026-02-24T15:26:34Z stage snapshot_refresh enter
+2026-02-24T15:27:00Z stage item_offers enter
+2026-02-24T15:27:04Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:27:05Z snapshot_refresh working stage=item_offers elapsed_seconds=31.72 completed=? total=56
+2026-02-24T15:27:34Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+2026-02-24T15:27:38Z snapshot_refresh working stage=item_offers elapsed_seconds=64.31 completed=? total=56
+2026-02-24T15:28:04Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+2026-02-24T15:28:08Z snapshot_refresh working stage=item_offers elapsed_seconds=94.72 completed=? total=56
+2026-02-24T15:28:34Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+2026-02-24T15:28:41Z snapshot_refresh working stage=item_offers elapsed_seconds=127.28 completed=? total=56
+2026-02-24T15:29:04Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.03 completed=? total=56
+2026-02-24T15:29:13Z snapshot_refresh working stage=item_offers elapsed_seconds=159.73 completed=? total=56
+2026-02-24T15:29:34Z snapshot_refresh still_working stage=item_offers elapsed_seconds=180.05 completed=? total=56
+2026-02-24T15:29:41Z stage item_offers exit rc=0 duration_s=161.03
+2026-02-24T15:29:41Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:29:41Z snapshot_refresh timing elapsed_seconds=186.98
+2026-02-24T15:29:41Z stage=snapshot_refresh attempt=1 rc=0 elapsed=187.05
+2026-02-24T15:29:41Z stage snapshot_refresh exit rc=0 duration_s=187.05
+2026-02-24T15:29:41Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:29:41Z phase1 build_seller_profiles start
+2026-02-24T15:29:41Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+2026-02-24T15:29:41Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:29:41Z phase1 split_health gate evaluation start
+2026-02-24T15:29:41Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:29:41Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:29:41Z stage phase1_pilot enter
+2026-02-24T15:29:41Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:29:41Z phase1 pilot_step child_started pid=27932 run_id=20260224T152634Z
+2026-02-24T15:29:43Z phase1 pilot_step done rc=0 elapsed_seconds=2.17 stderr_tail=2026-02-24T15:29:43Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN progress_tail=2026-02-24T15:29:43Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN
+2026-02-24T15:29:43Z stage=phase1_pilot attempt=1 rc=0 elapsed=2.19
+2026-02-24T15:29:43Z stage phase1_pilot exit rc=0 duration_s=2.19
+2026-02-24T15:29:48Z stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.36
+2026-02-24T15:29:48Z phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=56 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+2026-02-24T15:29:48Z phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+2026-02-24T15:29:48Z phase1 publish_start
+2026-02-24T15:29:48Z stage phase1_publish enter
+2026-02-24T15:30:01Z stage=phase1_publish attempt=1 rc=0 elapsed=12.20
+2026-02-24T15:30:01Z stage phase1_publish exit rc=0 duration_s=12.20
+2026-02-24T15:30:01Z phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+2026-02-24T15:30:01Z phase1 publish_done status=ok
+2026-02-24T15:30:01Z phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+2026-02-24T15:30:01Z run_once enabled - exiting after one loop
+2026-02-24T15:30:01Z process_exit reason=main_return rc=0
+2026-02-24T15:30:21Z signal_policy sigint=ignored
+2026-02-24T15:30:21Z cycle_start run_id=20260224T153021Z pid=5776 ppid=25388 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:30:21Z phase1 snapshot_refresh start
+2026-02-24T15:30:21Z stage snapshot_refresh enter
+2026-02-24T15:30:34Z signal_policy sigint=ignored
+2026-02-24T15:30:34Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=5776
+2026-02-24T15:30:35Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=5776
+2026-02-24T15:30:35Z cycle_start run_id=20260224T153035Z pid=25448 ppid=8024 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:30:35Z phase1 snapshot_refresh start
+2026-02-24T15:30:35Z stage snapshot_refresh enter
+2026-02-24T15:30:59Z stage item_offers enter
+2026-02-24T15:31:05Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:31:05Z snapshot_refresh working stage=item_offers elapsed_seconds=30.53 completed=? total=56
+2026-02-24T15:31:35Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+2026-02-24T15:31:36Z snapshot_refresh working stage=item_offers elapsed_seconds=61.31 completed=? total=56
+2026-02-24T15:32:05Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+2026-02-24T15:32:07Z snapshot_refresh working stage=item_offers elapsed_seconds=92.66 completed=? total=56
+2026-02-24T15:32:35Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+2026-02-24T15:32:40Z snapshot_refresh working stage=item_offers elapsed_seconds=125.33 completed=? total=56
+2026-02-24T15:33:05Z snapshot_refresh still_working stage=item_offers elapsed_seconds=150.05 completed=? total=56
+2026-02-24T15:33:13Z snapshot_refresh working stage=item_offers elapsed_seconds=158.01 completed=? total=56
+2026-02-24T15:33:32Z stage item_offers exit rc=0 duration_s=152.38
+2026-02-24T15:33:32Z snapshot_refresh ok listing_rows=56 seller_rows=454
+2026-02-24T15:33:32Z snapshot_refresh timing elapsed_seconds=177.23
+2026-02-24T15:33:32Z stage=snapshot_refresh attempt=1 rc=0 elapsed=177.33
+2026-02-24T15:33:32Z stage snapshot_refresh exit rc=0 duration_s=177.33
+2026-02-24T15:33:32Z phase1 snapshot_refresh done attempted=1 status=ok
+2026-02-24T15:33:32Z phase1 build_seller_profiles start
+2026-02-24T15:33:32Z stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+2026-02-24T15:33:32Z phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+2026-02-24T15:33:32Z phase1 split_health gate evaluation start
+2026-02-24T15:33:32Z split_health_run_start mode=shadow inline=1 timeout_seconds=120
+2026-02-24T15:33:40Z split_health_run mode=shadow inline=1 rc=1 fresh=1 fail=0 warn=3 readable=1 elapsed_seconds=7.65
+2026-02-24T15:33:40Z split_shadow_h clean=1 fail=0 warn=3 block_live_writes=0 b_match_streak=0 h_clean_streak=19 ready_for_cutover=0
+2026-02-24T15:33:40Z phase1 split_health gate evaluation done fail=0 warn=3 block=0
+2026-02-24T15:33:40Z split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+2026-02-24T15:33:40Z stage phase1_pilot enter
+2026-02-24T15:33:40Z phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+2026-02-24T15:33:40Z phase1 pilot_step child_started pid=9352 run_id=20260224T153035Z
+2026-02-24T15:34:24Z signal_policy sigint=ignored
+2026-02-24T15:34:25Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=25448
+2026-02-24T15:34:25Z lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=25448
+2026-02-24T15:34:25Z cycle_start run_id=20260224T153425Z pid=28072 ppid=11504 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+2026-02-24T15:34:25Z phase1 snapshot_refresh start
+2026-02-24T15:34:25Z stage snapshot_refresh enter
+2026-02-24T15:34:50Z stage item_offers enter
+2026-02-24T15:34:55Z snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+2026-02-24T15:34:55Z snapshot_refresh working stage=item_offers elapsed_seconds=30.53 completed=? total=56
+2026-02-24T15:35:25Z snapshot_refresh still_working stage=item_offers elapsed_seconds=60.00 completed=? total=56
+2026-02-24T15:35:29Z snapshot_refresh working stage=item_offers elapsed_seconds=63.75 completed=? total=56
+2026-02-24T15:35:55Z snapshot_refresh still_working stage=item_offers elapsed_seconds=90.02 completed=? total=56
+2026-02-24T15:36:01Z snapshot_refresh working stage=item_offers elapsed_seconds=95.77 completed=? total=56
+2026-02-24T15:36:25Z snapshot_refresh still_working stage=item_offers elapsed_seconds=120.05 completed=? total=56
+2026-02-24T15:36:33Z snapshot_refresh working stage=item_offers elapsed_seconds=128.38 completed=? total=56

@@ -1,0 +1,7 @@
+﻿scenario,run,rc,exit_marker,lock_present
+guard_publish0,1,0,EXIT_OK utc=2026-02-23T16:36:46Z,0
+guard_publish0,2,0,EXIT_OK utc=2026-02-23T16:38:19Z,0
+guard_publish0,3,0,,1
+guard_publish1,1,0,,1
+guard_publish1,2,0,,1
+guard_publish1,3,0,,1

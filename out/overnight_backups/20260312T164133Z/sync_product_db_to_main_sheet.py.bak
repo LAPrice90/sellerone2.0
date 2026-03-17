@@ -1,0 +1,77 @@
+﻿"""
+Sync Product_DB from the product database sheet into the main orders sheet.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+import gspread
+import pandas as pd
+
+
+SOURCE_SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
+SOURCE_TAB = "Product_DB"
+DEST_SHEET_ID = "1BHueJTk4dvvhIXypzh6i2hQTgc0pB3DWj2khQ2IT6_A"
+DEST_TAB = "Product_DB_Export"
+
+
+def get_gspread_client() -> gspread.Client:
+    cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
+    return gspread.service_account(filename=str(cred_path))
+
+
+def main() -> None:
+    client = get_gspread_client()
+    src_sheet = client.open_by_key(SOURCE_SHEET_ID)
+    dst_sheet = client.open_by_key(DEST_SHEET_ID)
+
+    try:
+        src_ws = src_sheet.worksheet(SOURCE_TAB)
+    except gspread.WorksheetNotFound:
+        raise RuntimeError("Source Product_DB tab not found")
+
+    values = src_ws.get_all_values()
+    if not values or len(values) < 2:
+        print({"status": "skip", "reason": "source_empty"})
+        return
+
+    try:
+        dst_ws = dst_sheet.worksheet(DEST_TAB)
+        dst_ws.clear()
+    except gspread.WorksheetNotFound:
+        dst_ws = dst_sheet.add_worksheet(
+            title=DEST_TAB,
+            rows=max(len(values) + 10, 2000),
+            cols=max(len(values[0]) + 5, 40),
+        )
+
+    headers = values[0]
+    data = values[1:]
+    pdf = pd.DataFrame(data, columns=headers).fillna("")
+
+    # De-duplicate by seller_sku; keep the row with the latest timestamp if possible.
+    if "seller_sku" in pdf.columns:
+        ts_col = None
+        for cand in ["last_updated_A003", "last_updated", "last_updated_A002", "last_updated_A001"]:
+            if cand in pdf.columns:
+                ts_col = cand
+                break
+        if ts_col:
+            ts_vals = pdf[ts_col]
+            if isinstance(ts_vals, pd.DataFrame):
+                ts_vals = ts_vals.iloc[:, 0]
+            pdf["__ts"] = pd.to_datetime(ts_vals, errors="coerce")
+            pdf = pdf.sort_values(by=["seller_sku", "__ts"], ascending=[True, True])
+            pdf = pdf.drop_duplicates(subset=["seller_sku"], keep="last")
+            pdf = pdf.drop(columns=["__ts"])
+        else:
+            pdf = pdf.drop_duplicates(subset=["seller_sku"], keep="last")
+
+    payload = [list(pdf.columns)] + pdf.astype(str).values.tolist()
+    dst_ws.update(range_name="A1", values=payload)
+    print({"status": "success", "rows": len(pdf), "tab": DEST_TAB})
+
+
+if __name__ == "__main__":
+    main()
+

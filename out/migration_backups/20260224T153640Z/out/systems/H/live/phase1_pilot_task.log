@@ -1,0 +1,400 @@
+[H_cycle] stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.38
+[H_cycle] phase1 h_cycle sku=ZT-QPY3-P24I processed_count=56 processed_skus=0G-JB6S-PN34,0R-GRRH-W0Z9,2G-AYBQ-TUQG,3X-EXDD-TD2K,4U-9ZL6-9G0Y,4W-VS57-BV6A,5Z-6Z0P-9TQQ,6Q-9G2A-IKVV,6V-EEC1-2S9Z,714810,8M-NHB7-T8TR,8U-QPFH-3EKQ,9X-HL62-83C7,A1-KSU1-GZMS,A2-T2AC-TW3L,AF-KIHX-ANYY,AX-NKNU-29C1,BL-WX51-KQOK,CJ-X0SS-QOUW,CX-SMCH-4DYA,D0-C7C0-H6LN,D8-1A3E-I37F,DC-K5WH-R7F5,FB-6FW0-Z82Q,GY-FO04-RDYL,H6-E7MP-EBPD,HL-03ZR-QPHH,HS-R5IP-7E1C,IJ-V0PQ-4CZ4,JB-RGB6-LZOJ,LP-QMNJ-J49G,LR-7GM6-1RCH,OV-LVEL-DQL6,R4-0AXZ-ZZ9D,R7-98IN-2PW8,RI-VSUS-0YTD,RW-AZK6-O4M2,RZ-6ZL9-CZ7J,TJ-6LOP-OPEU,TK-E7QE-T40G,UR-Q7TM-1F3I,US-AK96-YFSB,VF-3T0K-DR5O,VO-A6AR-18YS,VU-8KRA-QP5M,W3-8FN7-FSP0,WE-1Z7L-SA2I,X7-MY4W-H2I4,XE-27ZG-EZPZ,XE-YPAI-HX9F,XH-0LAE-FQO5,XY-UM2X-TPS3,YC-3L3M-BV48,YO-EKK2-FRCC,Z7-26PV-O9LR,ZT-QPY3-P24I skipped_cooldown_count=0 state=DEFENSIVE_HOLD write_status=READ_ONLY_NO_WRITE ceiling= reason_codes=DAILY_INTEL_MISSING,A_CYCLE_MISSING_DEFENSIVE_HOLD
+[H_cycle] phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+[H_cycle] phase1 publish_start
+[H_cycle] stage phase1_publish enter
+[H_cycle] stage=phase1_publish attempt=1 rc=0 elapsed=13.34
+[H_cycle] stage phase1_publish exit rc=0 duration_s=13.34
+[H_cycle] phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+[H_cycle] phase1 publish_done status=ok
+[H_cycle] phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+[H_cycle] run_once enabled - exiting after one loop
+[H_cycle] process_exit reason=main_return rc=0
+[24/02/2026 15:16:54.46] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:16:54.48] H-cycle child exit raw_rc=0 
+[24/02/2026 15:16:54.49] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+publish_marker_missing run_id=20260224T150807Z last_publish_run_id=20260224T142227Z wait_s=8 
+[24/02/2026 15:17:02.96] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=97 
+[24/02/2026 15:17:02.97] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=97 
+[24/02/2026 15:17:02.98] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=97 
+[24/02/2026 15:17:02.99] H-cycle loop finished (exit 97) 
+[24/02/2026 15:17:03.51] H-cycle launcher restart in 10s (last exit 97) 
+[24/02/2026 15:17:13.15] H-cycle loop starting 
+[24/02/2026 15:17:13.15] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:17:13.18] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] cycle_start run_id=20260224T151714Z pid=20340 ppid=14692 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.02 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=30.48 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.03 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=61.77 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=90.05 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=94.05 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=120.06 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=127.91 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=150.08 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=159.72 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=180.08 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=191.89 completed=? total=56
+[H_cycle] stage item_offers exit rc=0 duration_s=180.91
+[H_cycle] snapshot_refresh ok listing_rows=56 seller_rows=454
+[H_cycle] snapshot_refresh timing elapsed_seconds=208.38
+[H_cycle] stage=snapshot_refresh attempt=1 rc=0 elapsed=208.44
+[H_cycle] stage snapshot_refresh exit rc=0 duration_s=208.44
+[H_cycle] phase1 snapshot_refresh done attempted=1 status=ok
+[H_cycle] stage phase1_intel enter
+[H_cycle] phase1 daily_intel alignment inline_start timeout_seconds=2700
+[H_cycle] phase1 daily_intel alignment inline_end rc=0 duration_s=1.81
+[H_cycle] stage=phase1_intel attempt=1 rc=0 elapsed=1.81
+[H_cycle] stage phase1_intel exit rc=0 duration_s=1.81
+[H_cycle] phase1 daily_intel alignment status=ok target_mode=active_merchant resolved_count=56 processed=56 missing_compliance=0
+[H_cycle] phase1 build_seller_profiles start
+[H_cycle] stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.09
+[H_cycle] phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+[H_cycle] phase1 split_health gate evaluation start
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\cycles\run_H_pricing_cycle.py:399: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+[H_cycle] phase1 split_health gate evaluation done fail=0 warn=3 block=0
+[H_cycle] split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+[H_cycle] stage phase1_pilot enter
+[H_cycle] phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+[H_cycle] phase1 pilot_step child_started pid=10324 run_id=20260224T151714Z
+[H_cycle] phase1 pilot_step done rc=0 elapsed_seconds=2.05 stderr_tail=2026-02-24T15:20:47Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN progress_tail=2026-02-24T15:20:47Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN
+[H_cycle] stage=phase1_pilot attempt=1 rc=0 elapsed=2.06
+[H_cycle] stage phase1_pilot exit rc=0 duration_s=2.06
+[H_cycle] stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.27
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=56 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+[H_cycle] phase1 publish_start
+[H_cycle] stage phase1_publish enter
+[H_cycle] stage=phase1_publish attempt=1 rc=0 elapsed=12.03
+[H_cycle] stage phase1_publish exit rc=0 duration_s=12.05
+[H_cycle] phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+[H_cycle] phase1 publish_done status=ok
+[H_cycle] phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+[H_cycle] run_once enabled - exiting after one loop
+[H_cycle] process_exit reason=main_return rc=0
+[24/02/2026 15:21:04.65] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:21:04.66] H-cycle child exit raw_rc=0 
+[24/02/2026 15:21:04.67] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+[24/02/2026 15:21:04.69] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=0 
+[24/02/2026 15:21:04.70] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=0 
+[24/02/2026 15:21:04.72] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=0 
+[24/02/2026 15:21:04.72] H-cycle loop finished (exit 0) 
+[24/02/2026 15:21:04.73] H-cycle launcher restart in 10s (last exit 0) 
+[24/02/2026 15:21:14.16] H-cycle loop starting 
+[24/02/2026 15:21:14.16] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:21:14.17] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] cycle_start run_id=20260224T152115Z pid=10660 ppid=22956 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=33.44 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.02 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=65.92 completed=? total=56
+[24/02/2026 15:22:34.26] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:22:34.26] H-cycle child exit raw_rc=0 
+[24/02/2026 15:22:34.27] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+[24/02/2026 15:22:34.29] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=0 
+[24/02/2026 15:22:34.29] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=0 
+[24/02/2026 15:22:34.32] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=0 
+[24/02/2026 15:22:34.32] H-cycle loop finished (exit 0) 
+[24/02/2026 15:22:34.33] H-cycle launcher restart in 10s (last exit 0) 
+[24/02/2026 15:22:44.14] H-cycle loop starting 
+[24/02/2026 15:22:44.14] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:22:44.16] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=10660
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=10660
+[H_cycle] cycle_start run_id=20260224T152246Z pid=28788 ppid=29536 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[24/02/2026 15:22:48.09] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:22:48.09] H-cycle child exit raw_rc=0 
+[24/02/2026 15:22:48.11] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+publish_marker_missing run_id=20260224T152115Z last_publish_run_id=20260224T151714Z wait_s=8 
+[24/02/2026 15:22:56.58] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=97 
+[24/02/2026 15:22:56.59] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=97 
+[24/02/2026 15:22:56.60] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=97 
+[24/02/2026 15:22:56.60] H-cycle loop finished (exit 97) 
+[24/02/2026 15:22:57.03] H-cycle launcher restart in 10s (last exit 97) 
+[24/02/2026 15:23:07.11] H-cycle loop starting 
+[24/02/2026 15:23:07.11] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:23:07.13] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=28788
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=28788
+[H_cycle] cycle_start run_id=20260224T152308Z pid=3700 ppid=28104 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=34.23 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=66.28 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=98.81 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=131.28 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=150.05 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=163.59 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=180.06 completed=? total=56
+[24/02/2026 15:26:13.46] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:26:13.47] H-cycle child exit raw_rc=0 
+[24/02/2026 15:26:13.48] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+publish_marker_missing run_id=20260224T152246Z last_publish_run_id=20260224T151714Z wait_s=8 
+[24/02/2026 15:26:21.89] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=97 
+[24/02/2026 15:26:21.90] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=97 
+[24/02/2026 15:26:21.90] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=97 
+[24/02/2026 15:26:21.91] H-cycle loop finished (exit 97) 
+[24/02/2026 15:26:22.33] H-cycle launcher restart in 10s (last exit 97) 
+[24/02/2026 15:26:32.20] H-cycle loop starting 
+[24/02/2026 15:26:32.20] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:26:32.22] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=3700
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=3700
+[H_cycle] cycle_start run_id=20260224T152634Z pid=10108 ppid=7040 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=31.72 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=64.31 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=94.72 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=127.28 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=150.03 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=159.73 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=180.05 completed=? total=56
+[H_cycle] stage item_offers exit rc=0 duration_s=161.03
+[H_cycle] snapshot_refresh ok listing_rows=56 seller_rows=454
+[H_cycle] snapshot_refresh timing elapsed_seconds=186.98
+[H_cycle] stage=snapshot_refresh attempt=1 rc=0 elapsed=187.05
+[H_cycle] stage snapshot_refresh exit rc=0 duration_s=187.05
+[H_cycle] phase1 snapshot_refresh done attempted=1 status=ok
+[H_cycle] phase1 build_seller_profiles start
+[H_cycle] stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+[H_cycle] phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+[H_cycle] phase1 split_health gate evaluation start
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\cycles\run_H_pricing_cycle.py:399: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+[H_cycle] phase1 split_health gate evaluation done fail=0 warn=3 block=0
+[H_cycle] split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+[H_cycle] stage phase1_pilot enter
+[H_cycle] phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+[H_cycle] phase1 pilot_step child_started pid=27932 run_id=20260224T152634Z
+[H_cycle] phase1 pilot_step done rc=0 elapsed_seconds=2.17 stderr_tail=2026-02-24T15:29:43Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN progress_tail=2026-02-24T15:29:43Z h110 run_once done reason=NO_SKU_DUE_COOLDOWN
+[H_cycle] stage=phase1_pilot attempt=1 rc=0 elapsed=2.19
+[H_cycle] stage phase1_pilot exit rc=0 duration_s=2.19
+[H_cycle] stage=phase1_runtime_floor_snapshot attempt=1 rc=0 elapsed=5.36
+[H_cycle] phase1 h_cycle sku= processed_count=0 processed_skus= skipped_cooldown_count=56 state=NO_SKU_DUE write_status=NO_SKU_DUE_COOLDOWN ceiling= reason_codes=NO_SKU_DUE_COOLDOWN
+[H_cycle] phase1 runtime_floor_snapshot status=ok rows=62 trace_rows=62
+[H_cycle] phase1 publish_start
+[H_cycle] stage phase1_publish enter
+[H_cycle] stage=phase1_publish attempt=1 rc=0 elapsed=12.20
+[H_cycle] stage phase1_publish exit rc=0 duration_s=12.20
+[H_cycle] phase1 observation_publish status=ok view_tab=2026-02-24 rows=56 error=
+[H_cycle] phase1 publish_done status=ok
+[H_cycle] phase1 observation_publish_target sheet_id=18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY sheet_url=https://docs.google.com/spreadsheets/d/18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY view_tab=2026-02-24
+[H_cycle] run_once enabled - exiting after one loop
+[H_cycle] process_exit reason=main_return rc=0
+[24/02/2026 15:30:01.47] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:30:01.48] H-cycle child exit raw_rc=0 
+[24/02/2026 15:30:01.49] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+publish_marker_missing run_id=20260224T152308Z last_publish_run_id=20260224T151714Z wait_s=8 
+[24/02/2026 15:30:10.03] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=97 
+[24/02/2026 15:30:10.04] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=97 
+[24/02/2026 15:30:10.05] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=97 
+[24/02/2026 15:30:10.06] H-cycle loop finished (exit 97) 
+[24/02/2026 15:30:10.57] H-cycle launcher restart in 10s (last exit 97) 
+[24/02/2026 15:30:20.13] H-cycle loop starting 
+[24/02/2026 15:30:20.13] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:30:20.14] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] cycle_start run_id=20260224T153021Z pid=5776 ppid=25388 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[24/02/2026 15:30:23.86] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:30:23.87] H-cycle child exit raw_rc=0 
+[24/02/2026 15:30:23.89] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+[24/02/2026 15:30:23.91] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=0 
+[24/02/2026 15:30:23.91] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=0 
+[24/02/2026 15:30:23.93] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=0 
+[24/02/2026 15:30:23.94] H-cycle loop finished (exit 0) 
+[24/02/2026 15:30:23.95] H-cycle launcher restart in 10s (last exit 0) 
+[24/02/2026 15:30:33.18] H-cycle loop starting 
+[24/02/2026 15:30:33.18] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:30:33.19] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=5776
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=5776
+[H_cycle] cycle_start run_id=20260224T153035Z pid=25448 ppid=8024 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=30.53 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=61.31 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=90.01 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=92.66 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=120.03 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=125.33 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=150.05 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=158.01 completed=? total=56
+[H_cycle] stage item_offers exit rc=0 duration_s=152.38
+[H_cycle] snapshot_refresh ok listing_rows=56 seller_rows=454
+[H_cycle] snapshot_refresh timing elapsed_seconds=177.23
+[H_cycle] stage=snapshot_refresh attempt=1 rc=0 elapsed=177.33
+[H_cycle] stage snapshot_refresh exit rc=0 duration_s=177.33
+[H_cycle] phase1 snapshot_refresh done attempted=1 status=ok
+[H_cycle] phase1 build_seller_profiles start
+[H_cycle] stage=phase1_build_seller_profiles attempt=1 rc=0 elapsed=0.11
+[H_cycle] phase1 build_seller_profiles done profile_rows=87 soi_rows=40
+[H_cycle] phase1 split_health gate evaluation start
+[H_cycle] split_health_run_start mode=shadow inline=1 timeout_seconds=120
+[health_check] profile_config profile=h checklist_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\cycle_alerts\checklist_H_split.csv alert_state_path=out\system_health_alert_state_H.csv health_status_path=out\health_status_H.csv no_toast=1
+[health_check] loading orders_all.csv
+[health_check] orders_all rows: 7155
+[health_check] loading order_items_all.csv
+[health_check] order_items_all rows: 7174
+[health_check] loading order_master.csv
+[health_check] loading order_master_prev.csv
+[health_check] order_master rows: 6975
+[health_check] loading financial_events_level1.csv
+[health_check] loading financial_events_level2.csv
+[health_check] loading financial_events_level3_official.csv
+[health_check] level1 rows: 6987
+[health_check] loading token_ledger_live.csv
+[health_check] token_ledger rows: 9908
+[health_check] loading token_cogs_ledger.csv
+[health_check] token_cogs rows: 7966
+[health_check] loading inventory_summaries.csv
+[health_check] inventory rows: 336
+[health_check] writing checklist output
+{'status': 'success', 'rows': 80, 'snapshot': 'C:\\Users\\Luke\\Desktop\\SellerOne 2.0\\out\\cycle_alerts\\checklist_H_split.csv', 'profile': 'h'}
+                                                check status       value                                                                                                                                                                                                                            notes             alert_first_seen_utc              alert_last_seen_utc alert_consecutive_runs alert_age_hours
+                         h_health_alert_snooze_config     ok     expired                                                                                                                                   until=2026-02-14T23:59:00Z;reason=temporary suppression while focusing on H-cycle blocker gate                                                                                                         
+                                     h_e_inputs_fresh     ok           0                                                                                                                                                                                             asof_date=2026-02-24; max_age_days=1                                                                                                         
+                              h_e_outputs_latest_asof     ok           0                                                                                                                                                                                               expected_any=2026-02-23,2026-02-24                                                                                                         
+                                  h_schema_lab_cohort     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                             h_schema_head_boundaries     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                   h_schema_supervisor_tactical_rules     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                             h_lab_cohort_active_rows     ok          12                                                                                                                                                                                                              expected_at_least=1                                                                                                         
+                        h_head_boundaries_active_rows     ok           2                                                                                                                                                                                                              expected_at_least=1                                                                                                         
+                        h_head_boundary_pilot_present     ok           1                                                                                                                                                                                                 expected_active_sku=L1-54EX-56YC                                                                                                         
+                      h_head_boundaries_numeric_valid     ok           0                                                                                                                      rules=ceiling>=floor,max_move>0,max_daily_down>=max_move,cooldown>=1,max_probes>=0,max_active_probe_skus>=1                                                                                                         
+                    h_supervisor_tactical_active_rows     ok           8                                                                                                                                                                                                              expected_at_least=1                                                                                                         
+                 h_supervisor_tactical_pilot_coverage     ok           1                                                                                                                                                                                                 expected_active_sku=L1-54EX-56YC                                                                                                         
+                    h_supervisor_tactical_rules_valid     ok           0                                                                                                                                               rules=state_enum,probe_enum,target_adjustment>=0,cooldown>=1,expiry>=1,priority>=1                                                                                                         
+                      h_schema_worker_probe_event_log     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                   h_schema_worker_probe_response_log     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                      h_schema_executioner_action_log     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                             h_schema_seller_profiles     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                                  h_schema_seller_soi     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                         h_seller_soi_active_coverage     ok           0                                                                                                                                                                                                         all_active_skus_have_soi                                                                                                         
+                      h_worker_probe_event_idempotent     ok           0                                                                                                                                                                                                               key=probe_event_id                                                                                                         
+                   h_worker_probe_event_numeric_valid     ok           0                                                                                                                                 rules=target_in_floor_ceiling,move_within_max,cooldown>=1,state_enum,probe_enum,valid_timestamps                                                                                                         
+                      h_safe_mode_pilot_event_present     ok           0                                                                                                                                                                                       no recent safe mode rows;window_hours=48.0                                                                                                         
+                   h_safe_mode_pilot_scope_pilot_only     ok           0                                                                                                                                                                                       no recent safe mode rows;window_hours=48.0                                                                                                         
+                    h_safe_mode_pilot_actions_allowed     ok           0                                                                                                                                                                                       no recent safe mode rows;window_hours=48.0                                                                                                         
+                  h_executioner_action_log_idempotent     ok           0                                                                                                                                                                                                               key=probe_event_id                                                                                                         
+                  h_executioner_live_write_guardrails     ok           0                                                                                                                        rules=bool_flags_valid,numeric_prices_present,attempt_scope_pilot_only,attempt_source=run_H_pricing_cycle                                                                                                         
+                   h_worker_probe_response_idempotent     ok           0                                                                                                                                                                                       key=probe_event_id+response_window_minutes                                                                                                         
+                  h_worker_probe_response_types_valid     ok           0                                                                                                                                 rules=window_enum,moved_flag_binary,direction_enum,move_size>=0,reaction_lag>=0,valid_timestamps                                                                                                         
+                       h_schema_listing_offer_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                h_schema_listing_offer_seller_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                       h_schema_phase1_seller_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                              h_phase1_contract_types     ok           0                                                                                                                                    non_null=0;bad_date=0;bad_datetime=0;bad_numeric=0;bad_binary=0;bad_direction=0;bad_channel=0                                                                                                         
+                          h_phase1_history_idempotent     ok           0                                                                                                                                                                                                                 global_key_check                                                                                                         
+                                h_schema_api_call_log     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                                 h_schema_api_run_log     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                               h_api_recent_fail_runs     ok           0                                                                                                                                                                                                                window_hours=24.0                                                                                                         
+                              h_schema_api_rate_state     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                                 h_spapi_lock_present     ok           0                                                                                                                                                                                                                                                                                                                                          
+                                   h_cycle_stale_lock     ok           0                                                                                                                                                                                     path=out\systems\H\live\H_pricing_cycle.lock                                                                                                         
+                      h_schema_listing_offer_snapshot     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                        h_market_context_fill_nonzero     ok           0                                                                                                                             buy_box_channel=56; lowest_fba_price=56; lowest_fbm_price=46; offer_count_fba=56; offer_count_fbm=46                                                                                                         
+               h_schema_listing_offer_seller_snapshot     ok          ok                                                                                                                                                                                                                                                                                                                                          
+           h_seller_snapshot_landed_non_null_training     ok           0                                                                                                                                                                                                                training_rows=108                                                                                                         
+                  h_seller_snapshot_landed_ge_listing     ok           0                                                                                                                                                                                                              comparable_rows=108                                                                                                         
+              h_seller_snapshot_shipping_non_negative     ok           0                                                                                                                                                                                                                shipping_rows=108                                                                                                         
+                             h_market_snapshot_exists     ok         yes                                                                                                                                                                                path out\hos_daily_market_snapshot_2026-02-13.csv                                                                                                         
+                            h_market_snapshot_rows_10     ok          10                                                                                                                                                                                                                      expected=10                                                                                                         
+                   h_market_snapshot_required_columns     ok           0                                                                                                                                                                                                                                                                                                                                          
+                h_market_snapshot_no_null_core_fields     ok           0                                                                                                                                                                 buy_box_price_used_gross=0; offer_count_fba=0; offer_count_fbm=0                                                                                                         
+             h_market_snapshot_delivery_parity_binary     ok           0                                                                                                                                                                                                               allowed_values=0,1                                                                                                         
+                h_market_snapshot_econ_anchors_filled     ok           0                                                                                     training_rows=10; break_even_exvat_gbp=0; break_even_gross_gbp=0; token_cost_exvat_gbp=0; min_price_gross_10pct=0; max_price_gross_current=0                                                                                                         
+                          h_market_report_html_exists     ok         yes                                                                                                                                                                      path out\reports\hos_daily\hos_daily_report_2026-02-13.html                                                                                                         
+                           h_market_report_pdf_exists     ok         yes                                                                                                                                                                       path out\reports\hos_daily\hos_daily_report_2026-02-13.pdf                                                                                                         
+                   h_market_report_price_charts_count     ok          10                                                                                                                                                                                                             expected_at_least=10                                                                                                         
+              h_market_report_seller_mix_charts_count     ok          10                                                                                                                                                                                                             expected_at_least=10                                                                                                         
+                           h_schema_inventory_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                             h_schema_inbound_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                   h_schema_refund_adjustment_history     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                          h_schema_inventory_snapshot     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                            h_schema_inbound_snapshot     ok          ok                                                                                                                                                                                                                                                                                                                                          
+                  h_schema_refund_adjustment_snapshot     ok          ok                                                                                                                                                                                                                                                                                                                                          
+             h_listing_offer_history_idempotent_today     ok           0                                                                                                                                                                                                             asof_date=2026-02-24                                                                                                         
+      h_listing_offer_seller_history_idempotent_today     ok           0                                                                                                                                                                                                             asof_date=2026-02-24                                                                                                         
+                 h_inventory_history_idempotent_today     ok           0                                                                                                                                                                                                             asof_date=2026-02-24                                                                                                         
+                   h_inbound_history_idempotent_today     ok           0                                                                                                                                                                                                             asof_date=2026-02-24                                                                                                         
+         h_refund_adjustment_history_idempotent_today     ok           0                                                                                                                                                                                                             asof_date=2026-02-24                                                                                                         
+                     h_ceiling_rule_bbp_missing_trial   warn missing_row                                                                                                                                                                                                 sku=L1-54EX-56YC;date=2026-02-24 2026-02-24T09:14:49.943468+00:00 2026-02-24T15:33:32.547141+00:00                     23            6.31
+                     h_ceiling_rule_cpt_missing_trial   warn missing_row                                                                                                                                                                                                 sku=L1-54EX-56YC;date=2026-02-24 2026-02-24T09:14:49.943468+00:00 2026-02-24T15:33:32.547141+00:00                     23            6.31
+                  h_ceiling_rule_inputs_missing_trial   warn missing_row                                                                                                                                                                                                 sku=L1-54EX-56YC;date=2026-02-24 2026-02-24T09:14:49.943468+00:00 2026-02-24T15:33:32.547141+00:00                     23            6.31
+                   h_scope_non_parked_matches_targets     ok           0                                                                                          processed=0; non_parked_scope=56; skipped_parked=0; invalid_processed_sample=; state_path=out/systems/H/live/h_pricing_cycle_state.json                                                                                                         
+                          h_parked_sku_write_attempts     ok           0                                                                                                                                                         date=2026-02-24; parked_skus=550; parked_rows_today=0; attempt_statuses=                                                                                                         
+                            h_no_cpt_calls_in_h_cycle     ok           0                                                                                                                                               date=2026-02-24; endpoint=products_pricing_post_competitive_summary_batch; sample=                                                                                                         
+                            h_floor_vat_policy_config     ok          ok vat_registered=1;recover_input_vat_on_cogs=1;recover_input_vat_on_fees=1;formula_version=vat_registered_exvat_basis_v1;note=Official H floor policy: remove output VAT from sale first; use ex-VAT COGS and fees for floor math.                                                                                                         
+                      h_floor_phase1_cogs_basis_drift     ok           0                                                                                                                       date=2026-02-24;latest_asof=2026-02-24T15:29:42Z;rows_in_run=606;compared=150;missing_expected=456;sample=                                                                                                         
+                      h_floor_legacy_cogs_basis_drift     ok           0                                                                                                                                                                                  date=2026-02-24;rows_today=0;compared=0;sample=                                                                                                         
+                              h_floor_no_order_inputs     ok           0                                                                                                                                                                                         date=2026-02-24;rows_today=39996;sample=                                                                                                         
+                      h_floor_referral_band_integrity     ok           0                                                                                                                                                                                         date=2026-02-24;rows_today=39996;sample=                                                                                                         
+                     h_floor_referral_source_coverage     ok          76                     date=2026-02-24;rows_today=39996;rows_non_parked=3696;rows_parked=36300;missing_rate_pct=2.06;warn_rate_pct=5.00;fail_rate_pct=20.00;sample=GY-FO04-RDYL,5Z-6Z0P-9TQQ,GY-FO04-RDYL,5Z-6Z0P-9TQQ,GY-FO04-RDYL                                                                                                         
+h_floor_referral_source_coverage_parked_observability     ok       11758                                                                                                   date=2026-02-24;rows_parked=36300;observability_only=1;sample=UC-D1G4-MTYN,RJ-OVDC-R9JF,9G-57PS-EN16,S2-RZ4R-15M6,UE-BZE5-I0WM                                                                                                         
+                          h_floor_formula_consistency     ok           0                                                                                                                                                                        date=2026-02-24;rows_today=39996;comparable=39996;sample=                                                                                                         
+C:\Users\Luke\Desktop\SellerOne 2.0\scripts\cycles\run_H_pricing_cycle.py:399: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  return datetime.utcfromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+[H_cycle] split_health_run mode=shadow inline=1 rc=1 fresh=1 fail=0 warn=3 readable=1 elapsed_seconds=7.65
+[H_cycle] split_shadow_h clean=1 fail=0 warn=3 block_live_writes=0 b_match_streak=0 h_clean_streak=19 ready_for_cutover=0
+[H_cycle] phase1 split_health gate evaluation done fail=0 warn=3 block=0
+[H_cycle] split_health_shadow_candidate fail=0 warn=3 candidate_block_live_writes=0
+[H_cycle] stage phase1_pilot enter
+[H_cycle] phase1 pilot_step start mode=subprocess timeout_seconds=300 read_only=0 progress_path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\phase1_pilot_step.progress.log
+[H_cycle] phase1 pilot_step child_started pid=9352 run_id=20260224T153035Z
+[24/02/2026 15:34:04.60] H-cycle launcher postchild checkpoint=after_python 
+[24/02/2026 15:34:04.60] H-cycle child exit raw_rc=0 
+[24/02/2026 15:34:04.61] H-cycle launcher postchild checkpoint=before_publish_marker_check rc=0 
+publish_marker_missing run_id=20260224T153021Z last_publish_run_id=20260224T152634Z wait_s=8 
+[24/02/2026 15:34:13.12] H-cycle launcher postchild checkpoint=after_publish_marker_check rc=97 
+[24/02/2026 15:34:13.13] H-cycle launcher postchild checkpoint=before_heartbeat_check rc=97 
+[24/02/2026 15:34:13.14] H-cycle launcher postchild checkpoint=after_heartbeat_check rc=97 
+[24/02/2026 15:34:13.15] H-cycle loop finished (exit 97) 
+[24/02/2026 15:34:13.70] H-cycle launcher restart in 10s (last exit 97) 
+[24/02/2026 15:34:23.13] H-cycle loop starting 
+[24/02/2026 15:34:23.13] H-cycle launcher mode H_RUN_ONCE=0 EXTRA_ARGS=--run-once H_BISECT_FORCE_INLINE=0 SNAPSHOT=1 ITEM_OFFERS=1 PILOT=1 INTEL=1 PUBLISH=1 PUBLISH_ENABLED=1 PILOT_MODE=subprocess INTEL_MODE=inline PUBLISH_MODE=subprocess OFFERS_MAX_ASINS=0 USE_GUARD=1 GUARD_DIAG=0 H_HEALTH_RUN_INLINE=1 
+[24/02/2026 15:34:23.15] H-cycle supervisor path=guard restart_on_exit=1 
+[H_cycle] signal_policy sigint=ignored
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock reason=dead_pid pid=25448
+[H_cycle] lock_recovered path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock reason=dead_pid pid=25448
+[H_cycle] cycle_start run_id=20260224T153425Z pid=28072 ppid=11504 phase1_pilot=1 run_once=1 loop_sleep_seconds=1.00 h_split_mode_requested=shadow h_split_mode_effective=shadow phase1_pilot_mode=subprocess phase1_intel_mode=inline phase1_publish_mode=subprocess bisect_force_inline=0 stage_snapshot_refresh=1 stage_item_offers=1 stage_phase1_pilot=1 stage_phase1_intel=1 stage_phase1_publish=1
+[H_cycle] phase1 snapshot_refresh start
+[H_cycle] stage snapshot_refresh enter
+[H_cycle] stage item_offers enter
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=30.53 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=60.00 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=63.75 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=90.02 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=95.77 completed=? total=56
+[H_cycle] snapshot_refresh still_working stage=item_offers elapsed_seconds=120.05 completed=? total=56
+[H_cycle] snapshot_refresh working stage=item_offers elapsed_seconds=128.38 completed=? total=56

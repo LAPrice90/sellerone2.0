@@ -1,0 +1,5 @@
+﻿scenario,run,bat_rc,heartbeat_marker,lock_present
+bat_publish0,1,0,EXIT_OK utc=2026-02-23T17:01:56Z,0
+bat_publish0,2,0,EXIT_OK utc=2026-02-23T17:02:47Z,0
+bat_publish1,1,98,,0
+bat_publish1,2,98,,0

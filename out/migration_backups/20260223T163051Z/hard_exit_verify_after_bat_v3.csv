@@ -1,0 +1,3 @@
+﻿scenario,run,bat_rc,heartbeat_marker,exit_status_marker,lock_present
+bat_publish0,1,0,EXIT_OK utc=2026-02-23T17:10:07Z,EXIT_OK utc=2026-02-23T17:10:07Z,0
+bat_publish1,1,98,,,0
