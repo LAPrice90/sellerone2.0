@@ -1,0 +1,2 @@
+sku,rival_key,learned_delta_effective_gbp,highest_delta_win_effective_gbp,lowest_delta_loss_effective_gbp,delta_confidence,valid_test_count,contaminated_test_count,last_valid_test_utc
+DEMO-GUARD-SKU,BEST_RIVAL,0.11,0.15,0.07,0.90,9,1,2026-02-07T11:34:34Z

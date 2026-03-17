@@ -1,2 +1,9 @@
-date_utc,sku,foep_price_gbp,foep_status,foep_last_refresh_utc,cpt_gbp,cpt_last_refresh_utc,cpt_status,eligibility_ceiling_landed_gbp,eligibility_source,eligibility_confidence,eligibility_reason_codes_json,compliance_ceiling_landed_gbp,compliance_confidence
-2026-02-13,DEMO-SKU,18.95,OK,2026-02-13T15:55:59Z,18.90,2026-02-13T15:55:59Z,OK,18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",18.33,1
+date_utc,sku,foep_price_gbp,foep_status,foep_last_refresh_utc,bbp_max_sold_gbp,cpt_gbp,cpt_ceiling_input_gbp,cpt_x1_2_gbp,cpt_last_refresh_utc,cpt_status,cpt_risk_band,cpt_delta_vs_buy_box_gbp,cpt_delta_vs_buy_box_pct,cpt_call_tier,cpt_call_reason_codes_json,ceiling_rule_value_gbp,ceiling_source_used,ceiling_inputs_missing_flag,parked_flag,park_reason_codes_json,eligibility_ceiling_landed_gbp,eligibility_source,eligibility_confidence,eligibility_reason_codes_json,compliance_ceiling_landed_gbp,compliance_confidence
+2026-02-13,DEMO-SKU,18.95,OK,2026-02-13T15:55:59Z,,18.90,,,2026-02-13T15:55:59Z,OK,,,,,,,,,,,18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",18.33,1
+2026-02-27,DEMO-SKU,18.95,OK,2026-02-27T11:31:29Z,,18.90,,,2026-02-27T11:31:29Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,DEMO-GUARD-SKU,18.95,OK,2026-02-27T11:34:34Z,,18.90,,,2026-02-27T11:34:34Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,0G-JB6S-PN34,18.95,OK,2026-02-27T12:24:11Z,,18.90,,,2026-02-27T12:24:11Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,ZZ-NOT-COHORT,18.95,OK,2026-02-27T12:24:11Z,,18.90,,,2026-02-27T12:24:11Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,6V-EEC1-2S9Z,18.95,OK,2026-02-27T12:24:11Z,,18.90,,,2026-02-27T12:24:11Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,0R-GRRH-W0Z9,18.95,OK,2026-02-27T12:24:11Z,,18.90,,,2026-02-27T12:24:11Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7
+2026-02-27,2G-AYBQ-TUQG,18.95,OK,2026-02-27T12:19:57Z,,18.90,,,2026-02-27T12:19:57Z,OK,LOW,,,,[],,MISSING,1,0,[],18.95,FOEP,0.95,"[""ELIG_CEILING_FOEP_USED""]",20.00,0.7

@@ -1,0 +1,3 @@
+event_ts_utc,probe_id,sku,context_quality_score,admissible_flag,hard_fail_reason_codes_json,notes
+2026-02-27T11:34:02Z,PROBE-GUARD-001,DEMO-GUARD-SKU,0,0,"[""OAS_FAIL_MARKET_STRUCTURE_CHANGED""]",
+2026-02-27T11:34:34Z,PROBE-GUARD-002,DEMO-GUARD-SKU,0,0,"[""OAS_FAIL_MARKET_STRUCTURE_CHANGED""]",
