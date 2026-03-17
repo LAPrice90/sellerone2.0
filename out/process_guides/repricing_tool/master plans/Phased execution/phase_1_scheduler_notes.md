@@ -30,6 +30,8 @@ Use `scripts/bat/run_phase1_pilot_h_once.bat` for Task Scheduler.
 - CPT calls are A-cycle only (`A016_refresh_phase1_daily_intel.py`).
 - H-cycle must not call CPT endpoints directly.
 - `out/phase1_sku_scope.csv` is the target source for H-cycle.
+- Recommended target mode is `scope_non_parked`.
+- If `active_merchant` is configured, target resolution still applies scope guardrail and excludes parked SKUs.
 - SKUs with `parked_flag=1` are excluded from H targets and must remain no-write.
 
 ## Whole DB rollout sequence
@@ -54,10 +56,17 @@ Use `scripts/bat/run_phase1_pilot_h_once.bat` for Task Scheduler.
 - `a_daily_intel_coverage_non_parked`
 - `a_daily_intel_compliance_nonempty_non_parked`
 - `h_scope_non_parked_matches_targets`
+- A015 resolves H state path in this order:
+- `out/systems/H/live/h_pricing_cycle_state.json`
+- `out/h_pricing_cycle_state.json`
 
 ## Lock behavior
-- H runner uses `out/H_pricing_cycle.lock`.
+- H runner uses live-first lock `out/systems/H/live/H_pricing_cycle.lock` with legacy mirror `out/H_pricing_cycle.lock`.
 - If lock exists and process is active, new launch exits (prevents double-run conflicts).
+- E runner uses explicit lock `out/systems/E/live/E_cycle.lock` with legacy mirror `out/E_cycle.lock`.
+- Health checks enforce stale lock detection:
+- `h_cycle_stale_lock`
+- `e_cycle_stale_lock`
 
 ## Split health isolation (B vs H)
 - H split mode env:

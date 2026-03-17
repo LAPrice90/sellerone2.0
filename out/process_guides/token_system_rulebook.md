@@ -23,6 +23,14 @@ Tokens are created only for **what is actually live**:
 
 ## 2) Core rules (non-negotiable)
 
+### Rule SOT - Single source of truth for live allocation
+For live runs, local token files are the single source of truth.
+
+- `out/token_ledger_live.csv` and `out/token_allocations_live.csv` are authoritative.
+- Google Sheets are visibility/intake surfaces only and must not drive live allocation decisions.
+- B030 validates local allocations and records `mode=local_master`.
+- B007 allocates from local files and records `mode=local_master`.
+
 ### Rule A — Tokens are limited to live reality
 Only create enough tokens to cover:
 

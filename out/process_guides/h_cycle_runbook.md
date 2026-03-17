@@ -4,9 +4,33 @@ This guide explains how `scripts/run_H_pricing_cycle.py` runs, and how split hea
 
 ## 1) Core loop behavior
 
-- H loop owns `out/H_pricing_cycle.lock` to prevent double-run overlap.
+- H loop owns live-first lock path `out/systems/H/live/H_pricing_cycle.lock` (legacy mirror `out/H_pricing_cycle.lock`) to prevent double-run overlap.
 - In Phase 1 pilot mode, H refreshes snapshots, aligns daily intel, rebuilds seller profile artifacts, then runs the pilot subprocess.
-- The loop always keeps writing observability/state fields to `out/h_pricing_cycle_state.json`.
+- The loop writes observability/state fields to the H live state path first:
+- `out/systems/H/live/h_pricing_cycle_state.json`
+- Legacy mirror path may still exist:
+- `out/h_pricing_cycle_state.json`
+
+## 1.1) Batch state machine (H-BATCH-001)
+
+- H now writes a batch state file per run at:
+- `out/systems/H/live/H_batch_state.json`
+- Status transitions are explicit and use one `run_id`:
+- `started -> collect_done -> compute_done -> validate_done -> published -> finalized`
+- On failure, status is `failed` with a reason field.
+- Every transition is also logged in `H_cycle.log` as:
+- `h_batch_state_transition run_id=<id> from=<old> to=<new>`
+
+## 1.2) Staged outputs (H-BATCH-002)
+
+- Each run now creates a staged workspace:
+- `out/systems/H/staged/<run_id>/`
+- Phase 1 storage writes are redirected to:
+- `out/systems/H/staged/<run_id>/data/*.csv`
+- Stage pointer file:
+- `out/systems/H/live/H_batch_stage_dir.txt`
+- H publish flow now promotes staged Phase 1 tables into `data/*.csv` during publish commit.
+- Before publish commit, Phase 1 table writes should land only in staged paths.
 
 ## 2) Split health isolation modes
 
@@ -22,14 +46,24 @@ Mode behavior:
 
 ## 3) Gate fields written to state
 
-`out/h_pricing_cycle_state.json` includes:
+`out/systems/H/live/h_pricing_cycle_state.json` includes (legacy mirror `out/h_pricing_cycle_state.json`):
 - `h_split_health_mode`
 - `h_gate_fail_count`
 - `h_gate_warn_count`
 - `h_gate_block_live_writes`
 - `h_gate_snapshot_utc`
 
+Health readers must resolve H state path in this order:
+- `out/systems/H/live/h_pricing_cycle_state.json`
+- `out/h_pricing_cycle_state.json`
+
 When `h_gate_block_live_writes=1`, pilot writes are blocked but the loop continues.
+
+## 3.1) Lock liveness guardrail
+
+- A015 now checks stale cycle locks directly:
+- `h_cycle_stale_lock` (H lock exists but PID is dead -> FAIL)
+- `e_cycle_stale_lock` (E lock exists but PID is dead -> FAIL)
 
 ## 4) Shadow compare and cutover tracker
 

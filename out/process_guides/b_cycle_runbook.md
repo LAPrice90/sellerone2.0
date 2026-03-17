@@ -33,6 +33,18 @@ If B_CYCLE_QUIET=1, the cycle runs "silent" and does NOT write sheets mid-run.
 At the end of the cycle, it publishes Order_Master and P&L once, in one clean update.
 This avoids temporary inflated profit while COGS/fees are still catching up.
 
+Token source behavior in quiet mode:
+- Quiet mode suppresses token sheet writes only.
+- Quiet mode does not force local token fallback.
+- B007 reads token sheet data in live mode unless explicitly disabled.
+- Emergency-only local fallback flag: `TOKEN_ALLOW_LOCAL_FALLBACK=1`
+
+Token source behavior (current):
+- Live B token flow is local-master.
+- B030 validates local `token_allocations_live.csv` only.
+- B007 uses local `token_ledger_live.csv` + `token_allocations_live.csv` only.
+- Sheets can still be used for operator visibility/intake, but not as live allocation authority.
+
 Default publish set (minimal to avoid sheet bloat):
 - Order_Master
 - P&L summary only (P&L_Summary tab)
@@ -111,6 +123,7 @@ This prevents "whack-a-mole" and gives a single source of truth.
 - token COGS ledger row count
 - inventory row count
 - recent B cycle failures in the log
+- token source-of-truth drift (`b_token_source_single_truth`) (FAIL)
 - VAT country model present with correct schema (FAIL if missing)
 - Fee country model present with correct schema (FAIL if missing)
 

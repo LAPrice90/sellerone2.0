@@ -1,0 +1,12 @@
+source_live,destination_legacy,live_exists,legacy_exists,live_bytes
+out/systems/shared/live/api_run_log.csv,out/api_run_log.csv,1,1,16630
+out/systems/H/live/h_worker_probe_event_log.csv,out/h_worker_probe_event_log.csv,1,1,63475
+out/systems/H/live/h_worker_probe_response_log.csv,out/h_worker_probe_response_log.csv,1,1,26142
+out/systems/shared/live/inbound_history.csv,out/inbound_history.csv,1,1,302623
+out/systems/shared/live/inventory_history.csv,out/inventory_history.csv,1,1,432361
+out/systems/H/live/listing_offer_history.csv,out/listing_offer_history.csv,1,1,14603
+out/systems/H/live/listing_offer_seller_observation_history.csv,out/listing_offer_seller_observation_history.csv,1,1,99536
+out/systems/shared/live/refund_adjustment_history.csv,out/refund_adjustment_history.csv,1,1,12670
+out/systems/B/live/token_allocations_live.csv,out/token_allocations_live.csv,1,1,1108394
+out/systems/B/live/token_ledger_live.csv,out/token_ledger_live.csv,1,1,2285036
+out/systems/B/live/token_shortages_by_sku.csv,out/token_shortages_by_sku.csv,1,1,34

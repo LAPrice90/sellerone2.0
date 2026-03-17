@@ -25,6 +25,15 @@ Alert aging metadata is now added per check so repeated alerts are easier to tri
 - `alert_age_hours`
 State file:
 - `out/system_health_alert_state.csv` (active FAIL/WARN checks only)
+- B and E diagnostics now use live-first artifact paths:
+- B log source for `b_cycle_recent_fail_lines`: `out/systems/B/live/B_cycle.log` then fallback `out/B_cycle.log`.
+- E run log source for schema checks: `out/systems/E/live/e_run_log.jsonl` then fallback `out/e_run_log.jsonl`.
+- E run log rows now include:
+- `expected_input_asof`
+- `output_asof`
+- `asof_rerun_trigger`
+- New B external dependency visibility check:
+- `b_sheet_sync_external_health` (warn-only signal for sheet degradation, core B failures stay separate).
 
 Health check gate:
 - A015 exit code 2 (FAIL) blocks publishing and stops the A run.
@@ -134,6 +143,8 @@ Policy:
 - Scope default is full DB (`--scope full_db`).
 - A016 generates `out/phase1_sku_scope.csv` each run and uses strict parked classification.
 - Parked SKUs are no-write and no-CPT-call.
+- Target universe for H/A016 should be `scope_non_parked` (non-parked scope is source of truth).
+- Even when `active_merchant` mode is used, resolver applies a scope guardrail to exclude parked SKUs.
 - CPT calls are A-cycle only and tiered by writer mode / parked state.
 - `HTTP 200` with no CPT value is treated as `NO_CPT` (normal non-alerting state).
 - `NO_CPT` rows are retried weekly (default `168` hours), not every run.
