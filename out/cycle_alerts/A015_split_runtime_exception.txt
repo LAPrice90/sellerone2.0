@@ -1,0 +1,11 @@
+timestamp_utc=2026-03-14T09:55:58.656264+00:00
+profile=b
+exception=RuntimeError: boom_profile_b
+location=C:\Users\Luke\Desktop\SellerOne 2.0\tests\test_a015_health_check_runtime.py:593:_explode
+
+Traceback (most recent call last):
+  File "C:\Users\Luke\Desktop\SellerOne 2.0\scripts\flows\A\A015_build_system_health_check.py", line 5064, in _run_main_fail_closed
+    main_fn()
+  File "C:\Users\Luke\Desktop\SellerOne 2.0\tests\test_a015_health_check_runtime.py", line 593, in _explode
+    raise RuntimeError("boom_profile_b")
+RuntimeError: boom_profile_b

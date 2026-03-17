@@ -1,0 +1,2 @@
+check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours
+a015_runtime_exception,fail,1,"RuntimeError: synthetic split failure for guard test | location=<stdin>:10:<module> | traceback=Traceback (most recent call last):   File ""<stdin>"", line 10, in <module> RuntimeError: synthetic split failure for guard test",2026-02-25T11:13:32.447840+00:00,2026-02-25T11:13:32.447840+00:00,1,0.00

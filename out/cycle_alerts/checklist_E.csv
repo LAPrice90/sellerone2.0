@@ -9,3 +9,4 @@ e_schema_performance_summary,ok,ok,,,,,,E
 e_schema_study_report,ok,ok,,,,,,E
 e_schema_run_log,ok,ok,,,,,,E
 e_schema_decision_log,ok,ok,,,,,,E
+e_cycle_stale_lock,ok,0,"searched=out\systems\E\live\E_cycle.lock,out\E_cycle.lock",,,,,E

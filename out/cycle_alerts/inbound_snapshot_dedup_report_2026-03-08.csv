@@ -1,0 +1,2 @@
+asof_date,snapshot_path,snapshot_rows_today,snapshot_dup_group_count,snapshot_dup_row_count,history_rows_today,history_dup_group_count,history_dup_row_count
+2026-03-08,C:\Users\Luke\Desktop\SellerOne 2.0\out\inbound_snapshot_2026-03-08.csv,335,0,0,335,0,0

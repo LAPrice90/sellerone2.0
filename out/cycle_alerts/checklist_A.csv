@@ -1,4 +1,6 @@
 check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
 a_fees_failed_rows_today,ok,0,path=out\fees_failed.csv;total_rows=0,,,,,A
-a_daily_intel_coverage_non_parked,ok,0,date=2026-02-18; non_parked=57; covered=57; missing_sample=,,,,,A
-a_daily_intel_compliance_nonempty_non_parked,ok,0,date=2026-02-18; non_parked=57; missing_rows=0; blank_compliance=0,,,,,A
+a_stock_receipts_collection_health,ok,0,path=out\manifests\A\2026-03-17\20260317T111601Z.json;run_id=20260317T111601Z;end_time=2026-03-17T11:33:13Z;age_hours=3.62;final_state=completed;recorded_step_count=13;configured_step_count=13;health_status=current;current_cycle_evidence=1;step_status=completed;step_notes=elapsed=10.7s;fresh_outputs=1,,,,,A
+a_daily_intel_prerequisite_freshness,ok,0,date=2026-03-17; required=59; non_parked=59; dropped=374; covered=59; stock_source=out\inventory_snapshot_latest.csv; scope_mtime_utc=2026-03-17T15:08:52Z; daily_mtime_utc=2026-03-17T15:09:03.925857+00:00; stock_source_mtime_utc=2026-03-17T11:24:32Z,,,,,A
+a_daily_intel_coverage_non_parked,ok,0,date=2026-03-17; required=59; dropped=374; non_parked=59; covered=59; stock_source=out\inventory_snapshot_latest.csv;missing_sample=,,,,,A
+a_daily_intel_compliance_nonempty_non_parked,ok,0,date=2026-03-17; required=59; dropped=374; non_parked=59; missing_rows=0; blank_compliance=0; reason_coded=0; stock_source=out\inventory_snapshot_latest.csv,,,,,A
