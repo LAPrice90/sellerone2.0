@@ -1,1 +1,2 @@
-# Package marker for shared API helpers.
+﻿# Package marker for shared API helpers.
+

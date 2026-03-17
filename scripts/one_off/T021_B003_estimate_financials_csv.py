@@ -1,4 +1,4 @@
-"""
+﻿"""
 Phase-0 estimator (CSV-only): generate Estimated financial_events rows for orders lacking posted financials.
 
 Inputs (read-only, all under out/):
@@ -543,3 +543,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

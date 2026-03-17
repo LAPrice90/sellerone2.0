@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fetch financial events (posted) and flatten shipment events into fee buckets per order.
 Writes raw tab + per-order summary + CSV snapshot, updates Run_Status.
 """
@@ -439,3 +439,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

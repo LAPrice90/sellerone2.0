@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fetch marketplace participations from SP-API Sellers v0.
 """
 
@@ -125,3 +125,4 @@ def list_marketplace_participations() -> List[Dict[str, object]]:
     if isinstance(parts, list):
         return parts
     return []
+

@@ -1,9 +1,9 @@
-"""
+﻿"""
 Backfill Product_DB with banded commission rates from Level 3 official data.
 
 Writes:
-- last_commission_pct_10 (<= £10 per unit)
-- last_commission_pct_100 (> £10 per unit)
+- last_commission_pct_10 (<= Â£10 per unit)
+- last_commission_pct_100 (> Â£10 per unit)
 """
 
 from __future__ import annotations
@@ -132,3 +132,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

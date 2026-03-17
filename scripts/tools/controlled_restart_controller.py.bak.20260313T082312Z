@@ -1,0 +1,534 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(os.environ.get("CONTROLLED_RESTART_ROOT", Path(__file__).resolve().parents[2]))
+OUT = ROOT / "out"
+LOCKS_DIR = OUT / "locks"
+RESTART_DIR = LOCKS_DIR / "restart_control"
+MAINT_REQUEST_PATH = LOCKS_DIR / "maintenance.requested"
+MAINT_READY_PATH = LOCKS_DIR / "maintenance.ready"
+MAINT_ACTIVE_PATH = LOCKS_DIR / "maintenance.active"
+H_CONTROLLED_MODE_PATH = LOCKS_DIR / "h_controlled_mode.active"
+GATE_SCRIPT = Path(
+    os.environ.get(
+        "CONTROLLED_RESTART_GATE_SCRIPT",
+        str(ROOT / "scripts" / "tools" / "controlled_restart_gate.py"),
+    )
+)
+
+DEFAULT_WINDOW_START_HOUR = 2
+DEFAULT_WINDOW_END_HOUR = 3
+DEFAULT_WINDOW_MINUTE_SPAN = 60
+DEFAULT_MAX_WAIT_SECONDS = 900
+DEFAULT_POLL_SECONDS = 30
+DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS = 180
+DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS = 180
+DEFAULT_H_TASK_NAME = os.environ.get("CONTROLLED_RESTART_H_TASK_NAME", "AMZ H Cycle")
+
+
+def _norm(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_ts() -> str:
+    return _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _local_now() -> datetime:
+    return datetime.now().astimezone()
+
+
+def _ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _write_text(path: Path, text: str) -> None:
+    _ensure_dir(path.parent)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    _write_text(path, json.dumps(payload, ensure_ascii=True, indent=2) + "\n")
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    _ensure_dir(path.parent)
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n")
+
+
+def _read_text(path: Path) -> str:
+    try:
+        if not path.exists():
+            return ""
+        return path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _window_check(start_hour: int, end_hour: int, minute_span: int) -> tuple[bool, dict[str, Any]]:
+    local = _local_now()
+    minute_span_safe = max(int(minute_span), 1)
+    total_minutes = local.hour * 60 + local.minute
+    start_total = max(int(start_hour), 0) * 60
+    end_total = max(int(end_hour), 0) * 60
+    in_window = False
+    if start_total <= end_total:
+        if start_total <= total_minutes < end_total:
+            in_window = True
+    else:
+        if total_minutes >= start_total or total_minutes < end_total:
+            in_window = True
+    if in_window and minute_span_safe < 60:
+        in_window = local.minute < minute_span_safe
+    return in_window, {
+        "local_time": local.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "local_tz": str(local.tzinfo),
+        "start_hour": int(start_hour),
+        "end_hour": int(end_hour),
+        "minute_span": minute_span_safe,
+        "in_window": in_window,
+    }
+
+
+def _run_gate(
+    *,
+    request_drain: bool,
+    ignore_window: bool,
+    execute_reboot: bool,
+    allow_reboot_action: bool,
+    b_heartbeat_max_age_s: int,
+    h_heartbeat_max_age_s: int,
+) -> dict[str, Any]:
+    cmd = [sys.executable, str(GATE_SCRIPT)]
+    if request_drain:
+        cmd.append("--request-drain")
+    if ignore_window:
+        cmd.append("--ignore-window")
+    if execute_reboot:
+        cmd.append("--execute-reboot")
+    if allow_reboot_action:
+        cmd.append("--allow-reboot-action")
+    cmd.extend(["--b-heartbeat-max-age-s", str(int(b_heartbeat_max_age_s))])
+    cmd.extend(["--h-heartbeat-max-age-s", str(int(h_heartbeat_max_age_s))])
+    completed = subprocess.run(
+        cmd,
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=120,
+    )
+    lines = [ln.strip() for ln in (completed.stdout or "").splitlines() if ln.strip()]
+    gate_json: dict[str, Any] = {}
+    if lines:
+        try:
+            gate_json = json.loads(lines[-1])
+        except Exception:
+            gate_json = {}
+    return {
+        "rc": int(completed.returncode),
+        "cmd": cmd,
+        "stdout_tail": "\n".join(lines[-5:]),
+        "stderr_tail": "\n".join([ln for ln in (completed.stderr or "").splitlines()[-8:] if ln.strip()]),
+        "gate_result": gate_json,
+    }
+
+
+def _load_gate_eval(gate_result: dict[str, Any]) -> dict[str, Any]:
+    paths = gate_result.get("evidence_paths", {}) if isinstance(gate_result, dict) else {}
+    eval_path = Path(_norm(paths.get("eval_path", "")))
+    if not eval_path.exists():
+        return {}
+    try:
+        payload = json.loads(eval_path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _safe_remove_drain_marker() -> tuple[bool, str]:
+    if not MAINT_REQUEST_PATH.exists():
+        return False, "not_present"
+    if MAINT_ACTIVE_PATH.exists():
+        return False, "maintenance_active_present"
+    marker_text = _read_text(MAINT_REQUEST_PATH)
+    owner_ok = "requested_by=controlled_restart_gate" in marker_text and "reason=overnight_restart_eval" in marker_text
+    if not owner_ok:
+        return False, "ownership_not_restart_gate"
+    if MAINT_READY_PATH.exists():
+        ready_text = _read_text(MAINT_READY_PATH)
+        ready_ok = _norm(ready_text).startswith("B_READY|")
+        if not ready_ok:
+            return False, "maintenance_ready_unowned"
+    try:
+        MAINT_REQUEST_PATH.unlink(missing_ok=True)
+    except Exception:
+        return False, "unlink_failed"
+    if MAINT_READY_PATH.exists():
+        try:
+            MAINT_READY_PATH.unlink(missing_ok=True)
+        except Exception:
+            return False, "maintenance_ready_unlink_failed"
+    removed = (not MAINT_REQUEST_PATH.exists()) and (not MAINT_READY_PATH.exists())
+    return removed, "removed" if removed else "unlink_failed"
+
+
+def _safe_clear_h_controlled_mode_flag() -> tuple[bool, str]:
+    if not H_CONTROLLED_MODE_PATH.exists():
+        return False, "not_present"
+    try:
+        H_CONTROLLED_MODE_PATH.unlink(missing_ok=True)
+    except Exception:
+        return False, "unlink_failed"
+    return not H_CONTROLLED_MODE_PATH.exists(), "removed" if not H_CONTROLLED_MODE_PATH.exists() else "unlink_failed"
+
+
+def _safe_start_h_cycle_task(task_name: str) -> tuple[bool, str]:
+    task = _norm(task_name)
+    if not task:
+        return False, "missing_task_name"
+    completed = subprocess.run(
+        ["schtasks", "/Run", "/TN", task],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=30,
+    )
+    stdout_text = _norm(completed.stdout)
+    stderr_text = _norm(completed.stderr)
+    merged = f"{stdout_text}\n{stderr_text}".strip().lower()
+    if completed.returncode == 0:
+        return True, "started"
+    if "already running" in merged or "instance of the task is already running" in merged:
+        return True, "already_running"
+    return False, f"failed_rc_{completed.returncode}"
+
+
+def _write_controller_evidence(*, payload: dict[str, Any], run_id: str) -> dict[str, str]:
+    _ensure_dir(RESTART_DIR)
+    event_log = RESTART_DIR / "restart_controller.log.jsonl"
+    run_json = RESTART_DIR / f"restart_controller.{run_id}.json"
+    latest_json = RESTART_DIR / "restart_controller.latest.json"
+    latest_txt = RESTART_DIR / "restart_controller.latest.txt"
+    _write_json(run_json, payload)
+    _write_json(latest_json, payload)
+    summary = [
+        f"run_id={payload.get('run_id', '')}",
+        f"started_utc={payload.get('started_utc', '')}",
+        f"finished_utc={payload.get('finished_utc', '')}",
+        f"decision={payload.get('decision', '')}",
+        f"outcome={payload.get('outcome', '')}",
+        f"poll_attempts={payload.get('poll_attempts', 0)}",
+        f"reboot_attempted={'1' if payload.get('reboot_attempted', False) else '0'}",
+        f"drain_requested={'1' if payload.get('drain_requested', False) else '0'}",
+        f"drain_cleared={'1' if payload.get('drain_cleared', False) else '0'}",
+    ]
+    blockers = payload.get("final_blockers", [])
+    if isinstance(blockers, list) and blockers:
+        summary.append("final_blockers=" + "|".join([_norm(x) for x in blockers if _norm(x)]))
+    _write_text(latest_txt, "\n".join(summary) + "\n")
+
+    _append_jsonl(event_log, {"event": "controller_finished", "utc": _utc_ts(), "run_id": run_id, "outcome": payload.get("outcome", "")})
+    for attempt in payload.get("attempts", []):
+        if not isinstance(attempt, dict):
+            continue
+        _append_jsonl(
+            event_log,
+            {
+                "event": "poll_attempt",
+                "utc": _utc_ts(),
+                "run_id": run_id,
+                "attempt": attempt.get("attempt", 0),
+                "decision": attempt.get("decision", ""),
+                "blocker_count": attempt.get("blocker_count", 0),
+            },
+        )
+    return {
+        "run_json": str(run_json),
+        "latest_json": str(latest_json),
+        "latest_txt": str(latest_txt),
+        "event_log": str(event_log),
+    }
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Scheduler-facing controlled overnight restart controller.")
+    parser.add_argument("--window-start-hour", type=int, default=DEFAULT_WINDOW_START_HOUR)
+    parser.add_argument("--window-end-hour", type=int, default=DEFAULT_WINDOW_END_HOUR)
+    parser.add_argument("--window-minute-span", type=int, default=DEFAULT_WINDOW_MINUTE_SPAN)
+    parser.add_argument("--ignore-window", action="store_true")
+    parser.add_argument("--max-wait-seconds", type=int, default=DEFAULT_MAX_WAIT_SECONDS)
+    parser.add_argument("--poll-seconds", type=int, default=DEFAULT_POLL_SECONDS)
+    parser.add_argument("--request-drain", action="store_true")
+    parser.add_argument("--clear-drain-on-skip", action="store_true")
+    parser.add_argument("--execute-reboot", action="store_true")
+    parser.add_argument("--allow-reboot-action", action="store_true")
+    parser.add_argument("--b-heartbeat-max-age-s", type=int, default=DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS)
+    parser.add_argument("--h-heartbeat-max-age-s", type=int, default=DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS)
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + f".pid{os.getpid()}"
+    started_utc = _utc_ts()
+    in_window, window_artifacts = _window_check(
+        start_hour=args.window_start_hour,
+        end_hour=args.window_end_hour,
+        minute_span=args.window_minute_span,
+    )
+    if args.ignore_window:
+        in_window = True
+        window_artifacts["in_window"] = True
+        window_artifacts["override"] = "ignore_window=1"
+
+    request_marker_exists_before = MAINT_REQUEST_PATH.exists()
+    poll_wait_seconds = max(int(args.poll_seconds), 1)
+    max_wait_seconds = max(int(args.max_wait_seconds), 0)
+    deadline_monotonic = time.monotonic() + float(max_wait_seconds)
+    attempts: list[dict[str, Any]] = []
+    final_blockers: list[str] = []
+    final_decision = "skipped"
+    reboot_attempted = False
+    reboot_status = "not_attempted"
+    drain_requested = False
+    drain_cleared = False
+    drain_clear_reason = "not_applicable"
+    h_controlled_mode_cleared = False
+    h_controlled_mode_clear_reason = "not_applicable"
+    h_cycle_task_relaunch_ok = False
+    h_cycle_task_relaunch_reason = "not_attempted"
+    outcome = "skipped_outside_window"
+
+    event_log_path = RESTART_DIR / "restart_controller.log.jsonl"
+    _append_jsonl(event_log_path, {"event": "controller_started", "utc": started_utc, "run_id": run_id})
+
+    if in_window:
+        drain_request_performed = bool(args.request_drain)
+        if drain_request_performed:
+            _append_jsonl(event_log_path, {"event": "drain_requested", "utc": _utc_ts(), "run_id": run_id})
+        initial = _run_gate(
+            request_drain=drain_request_performed,
+            ignore_window=True,
+            execute_reboot=False,
+            allow_reboot_action=False,
+            b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
+            h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+        )
+        eval_payload = _load_gate_eval(initial.get("gate_result", {}))
+        blockers = eval_payload.get("blockers", []) if isinstance(eval_payload.get("blockers", []), list) else []
+        decision = _norm(eval_payload.get("decision", "")) or _norm(initial.get("gate_result", {}).get("decision", ""))
+        attempts.append(
+            {
+                "attempt": 1,
+                "utc": _utc_ts(),
+                "decision": decision or "unknown",
+                "blocker_count": len(blockers),
+                "blockers": blockers,
+                "gate_rc": initial.get("rc", -1),
+                "gate_eval_path": _norm(initial.get("gate_result", {}).get("evidence_paths", {}).get("eval_path", "")),
+                "request_drain": drain_request_performed,
+            }
+        )
+        drain_requested = drain_request_performed
+        approved = decision == "approved"
+
+        while not approved and time.monotonic() < deadline_monotonic:
+            time.sleep(float(poll_wait_seconds))
+            poll = _run_gate(
+                request_drain=False,
+                ignore_window=True,
+                execute_reboot=False,
+                allow_reboot_action=False,
+                b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
+                h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+            )
+            eval_payload = _load_gate_eval(poll.get("gate_result", {}))
+            blockers = eval_payload.get("blockers", []) if isinstance(eval_payload.get("blockers", []), list) else []
+            decision = _norm(eval_payload.get("decision", "")) or _norm(poll.get("gate_result", {}).get("decision", ""))
+            attempts.append(
+                {
+                    "attempt": len(attempts) + 1,
+                    "utc": _utc_ts(),
+                    "decision": decision or "unknown",
+                    "blocker_count": len(blockers),
+                    "blockers": blockers,
+                    "gate_rc": poll.get("rc", -1),
+                    "gate_eval_path": _norm(poll.get("gate_result", {}).get("evidence_paths", {}).get("eval_path", "")),
+                    "request_drain": False,
+                }
+            )
+            approved = decision == "approved"
+
+        if approved:
+            _append_jsonl(event_log_path, {"event": "restart_approval_reached", "utc": _utc_ts(), "run_id": run_id, "attempts": len(attempts)})
+        else:
+            _append_jsonl(event_log_path, {"event": "restart_timeout_or_blocked", "utc": _utc_ts(), "run_id": run_id, "attempts": len(attempts)})
+
+        last = attempts[-1] if attempts else {}
+        final_decision = _norm(last.get("decision", "")) or "skipped"
+        last_blockers = last.get("blockers", [])
+        final_blockers = last_blockers if isinstance(last_blockers, list) else []
+
+        if final_decision == "approved":
+            if args.execute_reboot and args.allow_reboot_action:
+                execute = _run_gate(
+                    request_drain=False,
+                    ignore_window=True,
+                    execute_reboot=True,
+                    allow_reboot_action=True,
+                    b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
+                    h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+                )
+                execute_eval = _load_gate_eval(execute.get("gate_result", {}))
+                final_decision = _norm(execute_eval.get("decision", "")) or _norm(execute.get("gate_result", {}).get("decision", ""))
+                final_blockers = (
+                    execute_eval.get("blockers", [])
+                    if isinstance(execute_eval.get("blockers", []), list)
+                    else final_blockers
+                )
+                reboot_attempted = bool(execute.get("gate_result", {}).get("reboot_attempted", False))
+                reboot_status = _norm(execute.get("gate_result", {}).get("reboot_status", ""))
+                attempts.append(
+                    {
+                        "attempt": len(attempts) + 1,
+                        "utc": _utc_ts(),
+                        "decision": final_decision or "unknown",
+                        "blocker_count": len(final_blockers),
+                        "blockers": final_blockers,
+                        "gate_rc": execute.get("rc", -1),
+                        "gate_eval_path": _norm(execute.get("gate_result", {}).get("evidence_paths", {}).get("eval_path", "")),
+                        "request_drain": False,
+                        "execute_reboot": True,
+                        "allow_reboot_action": True,
+                        "reboot_attempted": reboot_attempted,
+                        "reboot_status": reboot_status,
+                    }
+                )
+                if reboot_attempted:
+                    outcome = "reboot_command_submitted"
+                else:
+                    outcome = "approved_but_reboot_not_submitted"
+                _append_jsonl(
+                    event_log_path,
+                    {
+                        "event": "reboot_action_result",
+                        "utc": _utc_ts(),
+                        "run_id": run_id,
+                        "reboot_attempted": reboot_attempted,
+                        "reboot_status": reboot_status,
+                    },
+                )
+            else:
+                reboot_status = "approved_execute_flags_missing"
+                outcome = "approved_no_reboot_flags"
+                _append_jsonl(
+                    event_log_path,
+                    {
+                        "event": "reboot_action_skipped",
+                        "utc": _utc_ts(),
+                        "run_id": run_id,
+                        "reason": reboot_status,
+                    },
+                )
+        else:
+            if max_wait_seconds == 0:
+                outcome = "skipped_not_approved"
+            elif time.monotonic() >= deadline_monotonic:
+                outcome = "skipped_timeout_not_approved"
+            else:
+                outcome = "skipped_not_approved"
+    else:
+        final_blockers = ["OUTSIDE_RESTART_WINDOW"]
+        final_decision = "skipped"
+        _append_jsonl(event_log_path, {"event": "outside_window_skip", "utc": _utc_ts(), "run_id": run_id})
+
+    if final_decision != "approved" and args.clear_drain_on_skip:
+        # Always attempt to clear owned drain markers on skipped outcomes.
+        # A preexisting marker may be stale from a prior controller attempt.
+        drain_cleared, drain_clear_reason = _safe_remove_drain_marker()
+        if request_marker_exists_before and not drain_cleared:
+            drain_clear_reason = f"preexisting_marker_{drain_clear_reason}"
+        h_controlled_mode_cleared, h_controlled_mode_clear_reason = _safe_clear_h_controlled_mode_flag()
+
+    # If reboot was not attempted, ensure H launcher can return to normal mode and relaunch.
+    if not reboot_attempted:
+        if not h_controlled_mode_cleared:
+            h_controlled_mode_cleared, h_controlled_mode_clear_reason = _safe_clear_h_controlled_mode_flag()
+        h_cycle_task_relaunch_ok, h_cycle_task_relaunch_reason = _safe_start_h_cycle_task(DEFAULT_H_TASK_NAME)
+
+    finished_utc = _utc_ts()
+    payload = {
+        "run_id": run_id,
+        "started_utc": started_utc,
+        "finished_utc": finished_utc,
+        "controller": "controlled_restart_controller",
+        "window": window_artifacts,
+        "max_wait_seconds": max_wait_seconds,
+        "poll_seconds": poll_wait_seconds,
+        "drain_requested": drain_requested,
+        "request_marker_existed_before": request_marker_exists_before,
+        "drain_cleared": drain_cleared,
+        "drain_clear_reason": drain_clear_reason,
+        "h_controlled_mode_cleared": h_controlled_mode_cleared,
+        "h_controlled_mode_clear_reason": h_controlled_mode_clear_reason,
+        "h_cycle_task_relaunch_ok": h_cycle_task_relaunch_ok,
+        "h_cycle_task_relaunch_reason": h_cycle_task_relaunch_reason,
+        "h_cycle_task_name": DEFAULT_H_TASK_NAME,
+        "poll_attempts": len(attempts),
+        "attempts": attempts,
+        "decision": final_decision,
+        "final_blockers": final_blockers,
+        "reboot_requested_flags": {
+            "execute_reboot": bool(args.execute_reboot),
+            "allow_reboot_action": bool(args.allow_reboot_action),
+        },
+        "reboot_attempted": reboot_attempted,
+        "reboot_status": reboot_status,
+        "outcome": outcome,
+    }
+    paths = _write_controller_evidence(payload=payload, run_id=run_id)
+    result = {
+        "status": "ok",
+        "run_id": run_id,
+        "decision": final_decision,
+        "outcome": outcome,
+        "final_blockers": final_blockers,
+        "poll_attempts": len(attempts),
+        "drain_requested": drain_requested,
+        "drain_cleared": drain_cleared,
+        "h_controlled_mode_cleared": h_controlled_mode_cleared,
+        "h_cycle_task_relaunch_ok": h_cycle_task_relaunch_ok,
+        "h_cycle_task_relaunch_reason": h_cycle_task_relaunch_reason,
+        "reboot_attempted": reboot_attempted,
+        "reboot_status": reboot_status,
+        "evidence_paths": paths,
+    }
+    print(json.dumps(result, ensure_ascii=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

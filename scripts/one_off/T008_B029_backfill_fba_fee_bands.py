@@ -1,9 +1,9 @@
-"""
+﻿"""
 Backfill Product_DB with banded FBA fee ex-VAT from Level 3 official data.
 
 Writes:
-- last_fba_fee_ex_vat_10 (<= £10 per unit)
-- last_fba_fee_ex_vat_100 (> £10 per unit)
+- last_fba_fee_ex_vat_10 (<= Â£10 per unit)
+- last_fba_fee_ex_vat_100 (> Â£10 per unit)
 """
 
 from __future__ import annotations
@@ -135,3 +135,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

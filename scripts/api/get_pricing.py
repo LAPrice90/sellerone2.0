@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import os
 import time
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from scripts.api.get_financial_events import get_lwa_access_token, load_dotenv_if_missing
 from scripts.api.spapi_owner import SpApiCallContext, spapi_get
@@ -25,6 +25,13 @@ def _env_float(name: str, default: float) -> float:
         return float(str(os.environ.get(name, str(default))).strip())
     except Exception:
         return float(default)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(float(str(os.environ.get(name, str(default))).strip()))
+    except Exception:
+        return int(default)
 
 
 def _offer_price(offer: dict) -> Tuple[str, str]:
@@ -653,11 +660,12 @@ def fetch_market_context_for_sku_asin(
     access_token: str,
     run_id: str = "",
     script_name: str = "",
-    sleep_sec: float = 2.1,
+    sleep_sec: float = 2.5,
     timeout: int = 30,
     include_offer_rows: bool = False,
     snapshot_timestamp_utc: str = "",
     snapshot_asof_date: str = "",
+    progress_callback: Callable[..., None] | None = None,
 ) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]]]:
     """
     Fetch market offer context for SKU/ASIN rows using:
@@ -681,7 +689,21 @@ def fetch_market_context_for_sku_asin(
             asin_to_skus[asin_clean].append(sku_clean)
 
     uniq_asins = list(asin_to_skus.keys())
+    max_asins_per_run = max(_env_int("SPAPI_ITEM_OFFERS_MAX_ASINS_PER_RUN", 15), 0)
+    if max_asins_per_run > 0 and len(uniq_asins) > max_asins_per_run:
+        # Rotate the sampled ASIN window by run_id so all ASINs eventually refresh across runs.
+        start_idx = 0
+        run_seed = str(run_id or "").strip()
+        if run_seed:
+            start_idx = sum(ord(ch) for ch in run_seed) % len(uniq_asins)
+        selected: List[str] = []
+        for offset in range(max_asins_per_run):
+            selected.append(uniq_asins[(start_idx + offset) % len(uniq_asins)])
+        uniq_asins = selected
+
     for i, asin in enumerate(uniq_asins, start=1):
+        if callable(progress_callback):
+            progress_callback(stage="item_offers", index=i, total=len(uniq_asins), asin=asin)
         url = f"{SPAPI_BASE_URL}/products/pricing/v0/items/{asin}/offers"
         headers = {
             "x-amz-access-token": access_token,
@@ -705,7 +727,7 @@ def fetch_market_context_for_sku_asin(
             headers=headers,
             params=params,
             timeout=timeout,
-            min_interval_sec=max(_env_float("SPAPI_ITEM_OFFERS_MIN_INTERVAL_SEC", 2.1), 0.0),
+            min_interval_sec=max(_env_float("SPAPI_ITEM_OFFERS_MIN_INTERVAL_SEC", 2.5), 0.0),
             max_retries=2,
         )
         if resp.status_code != 200:
@@ -738,10 +760,11 @@ def run_market_context_lookup(
     marketplace_id: str,
     run_id: str = "",
     script_name: str = "",
+    progress_callback: Callable[..., None] | None = None,
 ) -> Dict[str, Dict[str, str]]:
     load_dotenv_if_missing()
     token = get_lwa_access_token()
-    sleep_sec = _env_float("SPAPI_ITEM_OFFERS_SLEEP_SEC", _env_float("PRICE_API_SLEEP_SEC", 2.1))
+    sleep_sec = _env_float("SPAPI_ITEM_OFFERS_SLEEP_SEC", _env_float("PRICE_API_SLEEP_SEC", 2.5))
     ctx_map, _ = fetch_market_context_for_sku_asin(
         sku_asin_rows=sku_asin_rows,
         marketplace_id=marketplace_id,
@@ -749,6 +772,7 @@ def run_market_context_lookup(
         run_id=run_id,
         script_name=script_name,
         sleep_sec=sleep_sec,
+        progress_callback=progress_callback,
     )
     return ctx_map
 
@@ -760,10 +784,11 @@ def run_market_context_lookup_with_offers(
     snapshot_asof_date: str,
     run_id: str = "",
     script_name: str = "",
+    progress_callback: Callable[..., None] | None = None,
 ) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]]]:
     load_dotenv_if_missing()
     token = get_lwa_access_token()
-    sleep_sec = _env_float("SPAPI_ITEM_OFFERS_SLEEP_SEC", _env_float("PRICE_API_SLEEP_SEC", 2.1))
+    sleep_sec = _env_float("SPAPI_ITEM_OFFERS_SLEEP_SEC", _env_float("PRICE_API_SLEEP_SEC", 2.5))
     return fetch_market_context_for_sku_asin(
         sku_asin_rows=sku_asin_rows,
         marketplace_id=marketplace_id,
@@ -774,4 +799,6 @@ def run_market_context_lookup_with_offers(
         include_offer_rows=True,
         snapshot_timestamp_utc=snapshot_timestamp_utc,
         snapshot_asof_date=snapshot_asof_date,
+        progress_callback=progress_callback,
     )
+

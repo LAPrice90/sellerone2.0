@@ -1,0 +1,765 @@
+﻿from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(os.environ.get("CONTROLLED_RESTART_ROOT", Path(__file__).resolve().parents[2]))
+OUT = ROOT / "out"
+LOCKS_DIR = OUT / "locks"
+RESTART_DIR = LOCKS_DIR / "restart_control"
+H_LIVE = OUT / "systems" / "H" / "live"
+B_LIVE = OUT / "systems" / "B" / "live"
+A_LIVE = OUT / "systems" / "A" / "live"
+E_LIVE = OUT / "systems" / "E" / "live"
+
+DEFAULT_WINDOW_START_HOUR = 2
+DEFAULT_WINDOW_END_HOUR = 3
+DEFAULT_WINDOW_MINUTE_SPAN = 60
+DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS = 180
+DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS = 180
+UNRESOLVED_BOUNDARY_STATUSES = {"active", "unresolved_parent_exit", "waiting"}
+FINALIZE_BLOCKED_TOKENS = {
+    "FINALIZE_BLOCKED_NO_PUBLISH",
+    "wrapper_finalize_blocked",
+}
+DEFAULT_ESCALATION_MODE_ENV = "H_RESTART_ESCALATION_MODE"
+OWNERSHIP_TRANSFER_PATH = RESTART_DIR / "h_restart_ownership_transfer.json"
+
+
+@dataclass
+class Decision:
+    approved: bool
+    blockers: list[str]
+    notes: list[str]
+    artifacts: dict[str, Any]
+
+
+def _norm(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_ts() -> str:
+    return _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _local_now() -> datetime:
+    return datetime.now().astimezone()
+
+
+def _ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _read_first_line(path: Path) -> str:
+    try:
+        if not path.exists():
+            return ""
+        return _norm(path.read_text(encoding="utf-8", errors="replace").splitlines()[0])
+    except Exception:
+        return ""
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        if not path.exists():
+            return {}
+        raw = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _write_text(path: Path, text: str) -> None:
+    _ensure_dir(path.parent)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(tmp, path)
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    _write_text(path, json.dumps(payload, ensure_ascii=True, indent=2) + "\n")
+
+
+def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    _ensure_dir(path.parent)
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n")
+
+
+def _parse_lock_value(payload: str, key: str) -> str:
+    for part in [p.strip() for p in payload.split("|") if p.strip()]:
+        if part.startswith(f"{key}="):
+            return _norm(part.split("=", 1)[1])
+    return ""
+
+
+def _parse_lock_pid(payload: str) -> int | None:
+    raw = _parse_lock_value(payload, "pid")
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
+def _parse_utc(value: str) -> datetime | None:
+    text = _norm(value)
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _pid_alive(pid: int | None) -> bool:
+    if pid is None or pid <= 0:
+        return False
+    try:
+        if os.name == "nt":
+            completed = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", f"Get-Process -Id {pid} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=5,
+            )
+            return bool(_norm(completed.stdout))
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _boundary_updated_age_seconds(payload: dict[str, Any]) -> float | None:
+    updated_dt = _parse_utc(_norm(payload.get("updated_utc", "")))
+    if updated_dt is None:
+        return None
+    return max((_utc_now() - updated_dt).total_seconds(), 0.0)
+
+
+def _restart_drain_marker_info() -> dict[str, Any]:
+    requested = LOCKS_DIR / "maintenance.requested"
+    ready = LOCKS_DIR / "maintenance.ready"
+    active = LOCKS_DIR / "maintenance.active"
+    requested_text = _read_first_line(requested)
+    ready_text = _read_first_line(ready)
+    restart_owner = "requested_by=controlled_restart_gate" in requested_text and "reason=overnight_restart_eval" in requested_text
+    return {
+        "maintenance_requested": requested.exists(),
+        "maintenance_ready": ready.exists(),
+        "maintenance_active": active.exists(),
+        "maintenance_requested_text": requested_text,
+        "maintenance_ready_text": ready_text,
+        "restart_drain_owned": restart_owner,
+    }
+
+
+def _window_check(start_hour: int, end_hour: int, minute_span: int) -> tuple[bool, dict[str, Any]]:
+    local = _local_now()
+    minute_span_safe = max(int(minute_span), 1)
+    total_minutes = local.hour * 60 + local.minute
+    start_total = max(int(start_hour), 0) * 60
+    end_total = max(int(end_hour), 0) * 60
+    in_window = False
+    if start_total <= end_total:
+        if start_total <= total_minutes < end_total:
+            in_window = True
+    else:
+        # Wrap-around window support (for example 23:00-02:00).
+        if total_minutes >= start_total or total_minutes < end_total:
+            in_window = True
+    # Optional minute precision gate for tighter replay checks.
+    if in_window and minute_span_safe < 60:
+        in_window = local.minute < minute_span_safe
+    return in_window, {
+        "local_time": local.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "local_tz": str(local.tzinfo),
+        "start_hour": int(start_hour),
+        "end_hour": int(end_hour),
+        "minute_span": minute_span_safe,
+        "in_window": in_window,
+    }
+
+
+def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -> tuple[list[str], dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    notes: list[str] = []
+    runtime_status_path = H_LIVE / "H_runtime_status.json"
+    run_in_progress_path = H_LIVE / "H_run_in_progress.txt"
+    finalized_path = H_LIVE / "H_last_finalized_run_id.txt"
+    launcher_lock_path = H_LIVE / "H_launcher.lock"
+    launcher_heartbeat_path = H_LIVE / "H_launcher.heartbeat"
+    cycle_lock_path = H_LIVE / "H_pricing_cycle.lock"
+    h_restart_drain_ready_path = H_LIVE / "H_restart_drain.ready"
+
+    runtime = _read_json(runtime_status_path)
+    mode = _norm(runtime.get("mode", "")).upper()
+    detail = _norm(runtime.get("detail", ""))
+    error = _norm(runtime.get("error", ""))
+    run_in_progress = _read_first_line(run_in_progress_path)
+    finalized = _read_first_line(finalized_path)
+
+    if mode == "ERROR":
+        blockers.append("H_RUNTIME_ERROR_MODE")
+    if error in FINALIZE_BLOCKED_TOKENS or detail in FINALIZE_BLOCKED_TOKENS:
+        blockers.append("H_FINALIZE_BLOCKED_CLASS")
+    if run_in_progress and (run_in_progress != finalized):
+        blockers.append("H_RUN_IN_PROGRESS_NOT_FINALIZED")
+
+    # Boundary state checks.
+    boundary_files = sorted(H_LIVE.glob("phase1_intel_alignment.boundary.*.json"))
+    unresolved: list[str] = []
+    boundary_details: list[dict[str, str]] = []
+    boundary_reconciled: list[str] = []
+    for path in boundary_files:
+        payload = _read_json(path)
+        run_id = _norm(payload.get("run_id", ""))
+        status = _norm(payload.get("status", "")).lower()
+        child_pid_raw = _norm(payload.get("child_pid", ""))
+        try:
+            child_pid = int(child_pid_raw) if child_pid_raw else None
+        except Exception:
+            child_pid = None
+        child_alive = _pid_alive(child_pid)
+        age_seconds = _boundary_updated_age_seconds(payload)
+        stale_terminal_threshold = max(float(h_heartbeat_max_age_s), 60.0)
+        stale_terminal = (
+            run_id
+            and status in UNRESOLVED_BOUNDARY_STATUSES
+            and not child_alive
+            and (not run_in_progress or run_in_progress != run_id)
+            and age_seconds is not None
+            and age_seconds >= stale_terminal_threshold
+        )
+        if stale_terminal:
+            payload["status"] = "released_stale_terminal"
+            payload["updated_utc"] = _utc_ts()
+            payload["state_reason"] = "gate_reconcile_no_active_child"
+            try:
+                _write_json(path, payload)
+                status = "released_stale_terminal"
+                boundary_reconciled.append(run_id)
+            except Exception:
+                # Fail closed on write errors: keep unresolved status as blocker.
+                status = _norm(payload.get("status", "")).lower()
+        if run_id and status in UNRESOLVED_BOUNDARY_STATUSES:
+            unresolved.append(run_id)
+        if run_id:
+            boundary_details.append(
+                {
+                    "path": str(path),
+                    "run_id": run_id,
+                    "status": status,
+                    "updated_utc": _norm(payload.get("updated_utc", "")),
+                    "state_reason": _norm(payload.get("state_reason", "")),
+                    "child_pid": child_pid_raw,
+                    "child_alive": "1" if child_alive else "0",
+                    "age_seconds": "" if age_seconds is None else str(round(age_seconds, 2)),
+                }
+            )
+    if unresolved:
+        blockers.append("H_UNRESOLVED_BOUNDARY_STATE")
+    if boundary_reconciled:
+        notes.append("H boundary stale-terminal reconcile released: " + ",".join(boundary_reconciled))
+
+    # Launcher lock and heartbeat state.
+    launcher_lock_line = _read_first_line(launcher_lock_path)
+    launcher_pid = _parse_lock_value(launcher_lock_line, "launcher_pid")
+    launcher_heartbeat_line = _read_first_line(launcher_heartbeat_path)
+    heartbeat_utc = _parse_lock_value(launcher_heartbeat_line, "utc")
+    heartbeat_dt = _parse_utc(heartbeat_utc)
+    heartbeat_age = None
+    if heartbeat_dt is not None:
+        heartbeat_age = max((_utc_now() - heartbeat_dt).total_seconds(), 0.0)
+    cycle_lock_line = _read_first_line(cycle_lock_path)
+    cycle_pid = _parse_lock_pid(cycle_lock_line)
+    h_restart_drain_ready_line = _read_first_line(h_restart_drain_ready_path)
+    h_drain_ready = restart_drain_owned and bool(h_restart_drain_ready_line)
+
+    if launcher_pid:
+        try:
+            launcher_pid_int = int(launcher_pid)
+        except Exception:
+            launcher_pid_int = None
+        if launcher_pid_int is None:
+            blockers.append("H_LAUNCHER_PID_INVALID")
+        elif _pid_alive(launcher_pid_int):
+            if h_drain_ready and not cycle_lock_line:
+                notes.append("H launcher in restart drain boundary wait (child work not active)")
+            else:
+                blockers.append("H_LAUNCHER_ACTIVE")
+        else:
+            blockers.append("H_LAUNCHER_PID_STALE")
+    if heartbeat_age is None and launcher_heartbeat_line:
+        blockers.append("H_LAUNCHER_HEARTBEAT_INVALID")
+    elif heartbeat_age is not None and heartbeat_age > float(h_heartbeat_max_age_s):
+        blockers.append("H_LAUNCHER_HEARTBEAT_STALE")
+
+    # Active cycle lock means protected work or uncertain recovery.
+    if cycle_lock_line:
+        if cycle_pid is None:
+            blockers.append("H_CYCLE_LOCK_UNPARSEABLE")
+        elif _pid_alive(cycle_pid):
+            blockers.append("H_CYCLE_ACTIVE_LOCK")
+        else:
+            blockers.append("H_CYCLE_STALE_LOCK_PRESENT")
+
+    artifacts = {
+        "runtime_status": runtime,
+        "run_in_progress": run_in_progress,
+        "last_finalized_run": finalized,
+        "boundary_unresolved_runs": unresolved,
+        "boundary_reconciled_runs": boundary_reconciled,
+        "boundary_details_tail": boundary_details[-10:],
+        "launcher_lock_line": launcher_lock_line,
+        "launcher_heartbeat_line": launcher_heartbeat_line,
+        "launcher_heartbeat_age_seconds": "" if heartbeat_age is None else round(heartbeat_age, 2),
+        "cycle_lock_line": cycle_lock_line,
+        "restart_drain_ready_line": h_restart_drain_ready_line,
+        "restart_drain_owned": restart_drain_owned,
+    }
+    if not runtime:
+        notes.append("H runtime status missing; treated as uncertain")
+        blockers.append("H_RUNTIME_STATUS_MISSING")
+    return blockers, artifacts, notes
+
+
+def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, maintenance_ready_text: str) -> tuple[list[str], dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    notes: list[str] = []
+    b_lock_path = B_LIVE / "B_cycle.lock"
+    b_log_path = B_LIVE / "B_cycle.log"
+    checklist_path = OUT / "cycle_alerts" / "checklist_B.csv"
+    checklist_split_path = OUT / "cycle_alerts" / "checklist_B_split.csv"
+
+    # Maintenance handshake markers.
+    maint_requested = LOCKS_DIR / "maintenance.requested"
+    maint_ready = LOCKS_DIR / "maintenance.ready"
+    maint_active = LOCKS_DIR / "maintenance.active"
+    b_maintenance = LOCKS_DIR / "b_cycle.maintenance"
+    maintenance_markers = [str(p) for p in (maint_requested, maint_ready, maint_active, b_maintenance) if p.exists()]
+
+    if maint_active.exists():
+        blockers.append("B_MAINTENANCE_ACTIVE")
+    if maint_requested.exists() and not maint_ready.exists():
+        blockers.append("B_MAINTENANCE_NOT_READY")
+    b_restart_ready = (
+        restart_drain_owned
+        and maint_requested.exists()
+        and maint_ready.exists()
+        and _norm(maintenance_ready_text).startswith("B_READY|")
+        and not maint_active.exists()
+    )
+
+    # Lock and heartbeat.
+    b_lock_line = _read_first_line(b_lock_path)
+    b_pid = _parse_lock_pid(b_lock_line)
+    b_hb = _parse_lock_value(b_lock_line, "heartbeat")
+    b_hb_dt = _parse_utc(b_hb)
+    b_hb_age = None
+    if b_hb_dt is not None:
+        b_hb_age = max((_utc_now() - b_hb_dt).total_seconds(), 0.0)
+    if b_lock_line:
+        if b_pid is None:
+            blockers.append("B_LOCK_UNPARSEABLE")
+        elif _pid_alive(b_pid):
+            if b_restart_ready:
+                notes.append("B active lock accepted during restart drain boundary pause")
+            else:
+                blockers.append("B_ACTIVE_LOCK")
+        else:
+            blockers.append("B_STALE_LOCK_PRESENT")
+        if b_hb_dt is None:
+            blockers.append("B_HEARTBEAT_INVALID")
+        elif b_hb_age is not None and b_hb_age > float(b_heartbeat_max_age_s):
+            blockers.append("B_HEARTBEAT_STALE")
+
+    def checklist_counts(path: Path) -> tuple[int, int, list[str]]:
+        if not path.exists():
+            return -1, -1, []
+        try:
+            rows = []
+            with path.open("r", encoding="utf-8", errors="replace") as fh:
+                header = [h.strip() for h in fh.readline().split(",")]
+                if not header or "status" not in header:
+                    return -2, -2, []
+                status_idx = header.index("status")
+                check_idx = header.index("check") if "check" in header else -1
+                for line in fh:
+                    parts = [p.strip() for p in line.rstrip("\n").split(",")]
+                    if status_idx >= len(parts):
+                        continue
+                    status = _norm(parts[status_idx]).lower()
+                    check_name = _norm(parts[check_idx]) if check_idx >= 0 and check_idx < len(parts) else ""
+                    rows.append((check_name, status))
+            fail = sum(1 for _, s in rows if s == "fail")
+            warn = sum(1 for _, s in rows if s == "warn")
+            warn_checks = [c for c, s in rows if s in {"warn", "fail"} and c][:20]
+            return fail, warn, warn_checks
+        except Exception:
+            return -3, -3, []
+
+    b_fail, b_warn, b_warn_checks = checklist_counts(checklist_path)
+    b_split_fail, b_split_warn, b_split_warn_checks = checklist_counts(checklist_split_path)
+    if b_fail < 0:
+        blockers.append("B_CHECKLIST_UNAVAILABLE")
+    elif b_fail > 0 or b_warn > 0:
+        blockers.append("B_HEALTH_NOT_CLEAN")
+    if b_split_fail >= 0 and (b_split_fail > 0 or b_split_warn > 0):
+        blockers.append("B_SPLIT_HEALTH_NOT_CLEAN")
+
+    # Add light log context for operator visibility.
+    b_log_tail = ""
+    try:
+        if b_log_path.exists():
+            lines = b_log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            b_log_tail = "\n".join(lines[-8:])
+    except Exception:
+        b_log_tail = ""
+        notes.append("B log tail read failed")
+
+    artifacts = {
+        "maintenance_markers_present": maintenance_markers,
+        "b_cycle_lock_line": b_lock_line,
+        "b_cycle_heartbeat_age_seconds": "" if b_hb_age is None else round(b_hb_age, 2),
+        "checklist_B_fail": b_fail,
+        "checklist_B_warn": b_warn,
+        "checklist_B_warn_fail_checks": b_warn_checks,
+        "checklist_B_split_fail": b_split_fail,
+        "checklist_B_split_warn": b_split_warn,
+        "checklist_B_split_warn_fail_checks": b_split_warn_checks,
+        "b_cycle_log_tail": b_log_tail,
+        "restart_drain_owned": restart_drain_owned,
+        "restart_ready_boundary_pause": b_restart_ready,
+        "maintenance_ready_text": _norm(maintenance_ready_text),
+    }
+    return blockers, artifacts, notes
+
+
+def _collect_ae_state() -> tuple[list[str], dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    notes: list[str] = []
+    a_lock_path = A_LIVE / "run_cycle.lock"
+    e_lock_path = E_LIVE / "E_cycle.lock"
+
+    def inspect_lock(path: Path, owner: str) -> tuple[str, int | None, bool]:
+        line = _read_first_line(path)
+        pid = _parse_lock_pid(line)
+        alive = _pid_alive(pid) if pid is not None else False
+        if line:
+            if pid is None:
+                blockers.append(f"{owner}_LOCK_UNPARSEABLE")
+            elif alive:
+                blockers.append(f"{owner}_ACTIVE_LOCK")
+            else:
+                blockers.append(f"{owner}_STALE_LOCK_PRESENT")
+        return line, pid, alive
+
+    a_line, a_pid, a_alive = inspect_lock(a_lock_path, "A")
+    e_line, e_pid, e_alive = inspect_lock(e_lock_path, "E")
+    artifacts = {
+        "a_lock_line": a_line,
+        "a_lock_pid": "" if a_pid is None else a_pid,
+        "a_lock_pid_alive": a_alive,
+        "e_lock_line": e_line,
+        "e_lock_pid": "" if e_pid is None else e_pid,
+        "e_lock_pid_alive": e_alive,
+    }
+    return blockers, artifacts, notes
+
+
+def _build_decision(*, start_hour: int, end_hour: int, minute_span: int, b_heartbeat_max_age_s: int, h_heartbeat_max_age_s: int, require_window: bool) -> Decision:
+    blockers: list[str] = []
+    notes: list[str] = []
+    in_window, window_artifacts = _window_check(start_hour, end_hour, minute_span)
+    if require_window and not in_window:
+        blockers.append("OUTSIDE_RESTART_WINDOW")
+
+    marker_info = _restart_drain_marker_info()
+    h_blockers, h_artifacts, h_notes = _collect_h_state(
+        h_heartbeat_max_age_s,
+        restart_drain_owned=bool(marker_info.get("restart_drain_owned", False)),
+    )
+    b_blockers, b_artifacts, b_notes = _collect_b_state(
+        b_heartbeat_max_age_s,
+        restart_drain_owned=bool(marker_info.get("restart_drain_owned", False)),
+        maintenance_ready_text=_norm(marker_info.get("maintenance_ready_text", "")),
+    )
+    ae_blockers, ae_artifacts, ae_notes = _collect_ae_state()
+    blockers.extend(h_blockers)
+    blockers.extend(b_blockers)
+    blockers.extend(ae_blockers)
+    notes.extend(h_notes)
+    notes.extend(b_notes)
+    notes.extend(ae_notes)
+
+    # Conservative fallback.
+    if not h_artifacts.get("runtime_status"):
+        blockers.append("H_STATE_UNCERTAIN")
+    if b_artifacts.get("checklist_B_fail", -1) < 0:
+        blockers.append("B_STATE_UNCERTAIN")
+
+    approved = len(blockers) == 0
+    artifacts = {
+        "window": window_artifacts,
+        "maintenance": marker_info,
+        "H": h_artifacts,
+        "B": b_artifacts,
+        "A_E": ae_artifacts,
+    }
+    # De-dup while preserving order.
+    seen: set[str] = set()
+    blockers_unique = []
+    for item in blockers:
+        if item not in seen:
+            seen.add(item)
+            blockers_unique.append(item)
+    return Decision(approved=approved, blockers=blockers_unique, notes=notes, artifacts=artifacts)
+
+
+def _write_evidence(*, run_id: str, decision: Decision, requested_utc: str, reboot_attempted: bool, reboot_enabled: bool, request_drain: bool) -> dict[str, Path]:
+    _ensure_dir(RESTART_DIR)
+    payload: dict[str, Any] = {
+        "run_id": run_id,
+        "requested_utc": requested_utc,
+        "evaluated_utc": _utc_ts(),
+        "decision": "approved" if decision.approved else "skipped",
+        "blocker_count": len(decision.blockers),
+        "blockers": decision.blockers,
+        "notes": decision.notes,
+        "artifacts": decision.artifacts,
+        "request_drain": bool(request_drain),
+        "reboot_hook_enabled": bool(reboot_enabled),
+        "reboot_attempted": bool(reboot_attempted),
+    }
+    event_log = RESTART_DIR / "restart_eval.log.jsonl"
+    eval_path = RESTART_DIR / f"restart_eval.{run_id}.json"
+    latest_json = RESTART_DIR / "restart_eval.latest.json"
+    latest_txt = RESTART_DIR / "restart_eval.latest.txt"
+    request_path = RESTART_DIR / f"restart_request.{run_id}.json"
+
+    _write_json(request_path, {"run_id": run_id, "requested_utc": requested_utc, "event": "restart_requested"})
+    _append_jsonl(event_log, {"event": "restart_requested", "run_id": run_id, "utc": requested_utc})
+    _append_jsonl(event_log, {"event": "restart_evaluation_started", "run_id": run_id, "utc": _utc_ts()})
+    for blocker in decision.blockers:
+        _append_jsonl(event_log, {"event": "blocker_detected", "run_id": run_id, "utc": _utc_ts(), "blocker": blocker})
+    _append_jsonl(
+        event_log,
+        {
+            "event": "restart_decision",
+            "run_id": run_id,
+            "utc": _utc_ts(),
+            "decision": payload["decision"],
+            "blocker_count": len(decision.blockers),
+            "reboot_attempted": bool(reboot_attempted),
+            "reboot_hook_enabled": bool(reboot_enabled),
+        },
+    )
+
+    _write_json(eval_path, payload)
+    _write_json(latest_json, payload)
+    summary = [
+        f"run_id={run_id}",
+        f"requested_utc={requested_utc}",
+        f"evaluated_utc={payload['evaluated_utc']}",
+        f"decision={payload['decision']}",
+        f"blocker_count={len(decision.blockers)}",
+    ]
+    if decision.blockers:
+        summary.append("blockers=" + "|".join(decision.blockers))
+    summary.append(f"request_drain={'1' if request_drain else '0'}")
+    summary.append(f"reboot_hook_enabled={'1' if reboot_enabled else '0'}")
+    summary.append(f"reboot_attempted={'1' if reboot_attempted else '0'}")
+    _write_text(latest_txt, "\n".join(summary) + "\n")
+    return {
+        "request_path": request_path,
+        "eval_path": eval_path,
+        "latest_json": latest_json,
+        "latest_txt": latest_txt,
+        "event_log": event_log,
+    }
+
+
+def _request_drain_markers() -> list[str]:
+    created: list[str] = []
+    requested = LOCKS_DIR / "maintenance.requested"
+    if not requested.exists():
+        _write_text(
+            requested,
+            (
+                f"requested_by=controlled_restart_gate|pid={os.getpid()}|ts={_utc_ts()}|reason=overnight_restart_eval\n"
+            ),
+        )
+        created.append(str(requested))
+    return created
+
+
+def _escalation_mode_enabled(args: argparse.Namespace) -> bool:
+    env_flag = _norm(os.environ.get(DEFAULT_ESCALATION_MODE_ENV, "0"))
+    arg_flag = bool(getattr(args, "escalation_mode", False))
+    return arg_flag or env_flag == "1"
+
+
+def _ownership_transfer_payload() -> dict[str, Any]:
+    payload = _read_json(OWNERSHIP_TRANSFER_PATH)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _ownership_transfer_active_for_gate() -> tuple[bool, str]:
+    payload = _ownership_transfer_payload()
+    if not payload:
+        return False, "missing_transfer_record"
+    owner = _norm(payload.get("owner", ""))
+    active = _norm(payload.get("active", "")).lower() in {"1", "true", "yes", "active"}
+    if owner != "controlled_restart":
+        return False, "transfer_owner_mismatch"
+    if not active:
+        return False, "transfer_not_active"
+    return True, "transfer_active"
+
+
+def _maybe_reboot(*, approved: bool, execute_reboot: bool, allow_reboot_action: bool) -> tuple[bool, str]:
+    # Disabled by default. Requires both explicit flags and approved decision.
+    if not approved:
+        return False, "not_approved"
+    if not execute_reboot:
+        return False, "execute_reboot_flag_disabled"
+    if not allow_reboot_action:
+        return False, "allow_reboot_action_flag_disabled"
+    # Intentionally conservative hook. Use system shutdown only when both flags are set.
+    try:
+        if os.name == "nt":
+            completed = subprocess.run(
+                ["shutdown", "/r", "/t", "60", "/c", "SellerOne controlled restart approved"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=10,
+            )
+            if completed.returncode == 0:
+                return True, "reboot_command_submitted"
+            return False, f"reboot_command_failed_rc_{completed.returncode}"
+        return False, "reboot_not_supported_on_non_windows"
+    except Exception as exc:
+        return False, f"reboot_exception_{type(exc).__name__}"
+
+
+def run_gate(args: argparse.Namespace) -> int:
+    requested_utc = _utc_ts()
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + f".pid{os.getpid()}"
+    escalation_mode = _escalation_mode_enabled(args)
+    transfer_ok, transfer_reason = _ownership_transfer_active_for_gate()
+    observer_only = not escalation_mode
+    drain_markers: list[str] = []
+    if args.request_drain and not observer_only and transfer_ok:
+        drain_markers = _request_drain_markers()
+
+    decision = _build_decision(
+        start_hour=args.window_start_hour,
+        end_hour=args.window_end_hour,
+        minute_span=args.window_minute_span,
+        b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
+        h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+        require_window=not args.ignore_window,
+    )
+    decision.notes.append("restart_owner=launcher_loop")
+    decision.notes.append("gate_role=observer_only" if observer_only else "gate_role=escalation_only")
+    decision.notes.append("escalation_mode=" + ("1" if escalation_mode else "0"))
+    decision.notes.append("ownership_transfer=" + transfer_reason)
+
+    if args.request_drain and observer_only:
+        decision.notes.append("observer_only_mode_drain_request_ignored")
+    if args.request_drain and escalation_mode and not transfer_ok:
+        decision.notes.append("ambiguous_ownership_hold_drain_blocked")
+    if escalation_mode and not transfer_ok and "OWNERSHIP_TRANSFER_MISSING_OR_INVALID" not in decision.blockers:
+        decision.blockers.append("OWNERSHIP_TRANSFER_MISSING_OR_INVALID")
+    if escalation_mode and transfer_ok and "H_LAUNCHER_ACTIVE" in decision.blockers and "AMBIGUOUS_OWNERSHIP_HOLD" not in decision.blockers:
+        decision.blockers.append("AMBIGUOUS_OWNERSHIP_HOLD")
+
+    if drain_markers:
+        decision.notes.append("drain_markers_created=" + "|".join(drain_markers))
+
+    reboot_attempted, reboot_status = _maybe_reboot(
+        approved=decision.approved,
+        execute_reboot=(bool(args.execute_reboot) and escalation_mode and transfer_ok and not observer_only),
+        allow_reboot_action=(bool(args.allow_reboot_action) and escalation_mode and transfer_ok and not observer_only),
+    )
+    if bool(args.execute_reboot or args.allow_reboot_action) and observer_only:
+        reboot_status = "observer_only_mode_reboot_blocked"
+    elif bool(args.execute_reboot or args.allow_reboot_action) and escalation_mode and not transfer_ok:
+        reboot_status = "ambiguous_ownership_hold_reboot_blocked"
+    decision.notes.append("reboot_status=" + reboot_status)
+
+    paths = _write_evidence(
+        run_id=run_id,
+        decision=decision,
+        requested_utc=requested_utc,
+        reboot_attempted=reboot_attempted,
+        reboot_enabled=bool(args.execute_reboot and args.allow_reboot_action and escalation_mode and transfer_ok),
+        request_drain=bool(args.request_drain and escalation_mode and transfer_ok and not observer_only),
+    )
+    result = {
+        "status": "ok",
+        "run_id": run_id,
+        "decision": "approved" if decision.approved else "skipped",
+        "blockers": decision.blockers,
+        "reboot_attempted": reboot_attempted,
+        "reboot_status": reboot_status,
+        "request_drain": bool(args.request_drain),
+        "observer_only_mode": observer_only,
+        "escalation_mode": escalation_mode,
+        "ownership_transfer": transfer_reason,
+        "evidence_paths": {k: str(v) for k, v in paths.items()},
+    }
+    print(json.dumps(result, ensure_ascii=True))
+    return 0
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Fail-closed controlled overnight restart gate for SellerOne."
+    )
+    parser.add_argument("--window-start-hour", type=int, default=DEFAULT_WINDOW_START_HOUR)
+    parser.add_argument("--window-end-hour", type=int, default=DEFAULT_WINDOW_END_HOUR)
+    parser.add_argument("--window-minute-span", type=int, default=DEFAULT_WINDOW_MINUTE_SPAN)
+    parser.add_argument("--ignore-window", action="store_true")
+    parser.add_argument("--request-drain", action="store_true")
+    parser.add_argument("--b-heartbeat-max-age-s", type=int, default=DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS)
+    parser.add_argument("--h-heartbeat-max-age-s", type=int, default=DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS)
+    parser.add_argument("--escalation-mode", action="store_true")
+    parser.add_argument("--execute-reboot", action="store_true")
+    parser.add_argument("--allow-reboot-action", action="store_true")
+    return parser
+
+
+def main() -> int:
+    parser = _parser()
+    args = parser.parse_args()
+    return run_gate(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+

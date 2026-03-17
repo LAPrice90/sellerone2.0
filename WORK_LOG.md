@@ -3137,3 +3137,1819 @@ Carryover:
 Next:
 - None
 ---
+[2026-02-18 12:27 UTC]
+Ticket: Out root cleanup pass 1 - archive obvious test/debug/manual clutter
+
+Scope:
+- Reduce cognitive load in out/ root without changing runtime behavior.
+- Move only clearly non-runtime files to a structured archive with rollback manifest.
+
+Changes made:
+- Created folder skeleton:
+- out/systems/A/{live,archive,todo}
+- out/systems/B/{live,archive,todo}
+- out/systems/E/{live,archive,todo}
+- out/systems/H/{live,archive,todo}
+- out/systems/shared/{live,archive,todo}
+- Archived 75 files from out/ root to:
+- out/systems/shared/archive/legacy_root_dump_20260218T122632Z/files/
+- Wrote rollback artifacts:
+- out/systems/shared/archive/legacy_root_dump_20260218T122632Z/move_manifest.csv
+- out/systems/shared/archive/legacy_root_dump_20260218T122632Z/rollback_moves.ps1
+- Added structure policy:
+- out/reviews/OUT_STRUCTURE_POLICY.md
+- Added per-system TODO placeholders:
+- out/systems/A/todo/TODO.md
+- out/systems/B/todo/TODO.md
+- out/systems/E/todo/TODO.md
+- out/systems/H/todo/TODO.md
+- out/systems/shared/todo/TODO.md
+
+Validation:
+- out root file count changed from 376 to 302.
+- Reference scan across scripts and run entrypoints found no direct references to moved file names.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T12:27:12Z
+Latest health snapshot at: 2026-02-18T12:18:09Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Continue phased migration of live writers from out/ root to out/systems/<SYSTEM>/live with compatibility mapping.
+
+Next:
+- None
+---
+[2026-02-18 13:08 UTC]
+Ticket: Out root cleanup continuation - historical snapshots and reconciliation archive
+
+Scope:
+- Further reduce out/ root clutter while keeping active runtime files in place.
+- Archive older dated snapshots and reconciliation outputs with rollback manifests.
+
+Changes made:
+- Archived 91 files to:
+- out/systems/shared/archive/legacy_root_dump_20260218T130721Z/files
+- Wrote rollback files:
+- out/systems/shared/archive/legacy_root_dump_20260218T130721Z/move_manifest.csv
+- out/systems/shared/archive/legacy_root_dump_20260218T130721Z/rollback_moves.ps1
+- Archived 33 files to:
+- out/systems/shared/archive/legacy_root_dump_20260218T130752Z/files
+- Wrote rollback files:
+- out/systems/shared/archive/legacy_root_dump_20260218T130752Z/move_manifest.csv
+- out/systems/shared/archive/legacy_root_dump_20260218T130752Z/rollback_moves.ps1
+
+Validation:
+- out root file count reduced from 301 to 178.
+- Active runtime files remained present (api logs, B/H logs+locks, health checklist, order/token core outputs, E outputs).
+- B and H logs continued updating after move.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T13:08:09Z
+Latest health snapshot at: 2026-02-18T13:07:19Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Phase 2 writer-path migration still pending for full per-system live isolation.
+
+Next:
+- None
+---
+[2026-02-18 13:14 UTC]
+Ticket: Out structure Phase 2 (control-path migration for A/B/E/H runners)
+
+Scope:
+- Redirect runner-owned lock/log/state outputs from out/ root to out/systems/<SYSTEM>/live.
+- Keep business logic unchanged.
+
+Changes made:
+- Updated run_B_cycle.bat:
+- sets B_CYCLE_LOG_PATH -> out/systems/B/live/B_cycle.log
+- sets B_CYCLE_LOCK_PATH/RUN_LOCK_PATH -> out/systems/B/live/B_cycle.lock
+- sets B002_STATE_PATH -> out/systems/B/live/B002_last_run.txt
+- sets LISTING_COLLECTION_STATE_PATH/REFUND_COLLECTION_STATE_PATH -> out/systems/B/live/*.txt
+- Updated run_A_all.bat:
+- sets RUN_LOCK_PATH -> out/systems/A/live/run_cycle.lock
+- sets B_CYCLE_LOCK_PATH -> out/systems/B/live/B_cycle.lock
+- Updated run_H_cycle.bat:
+- sets H_CYCLE_LOCK_PATH/H_PRICING_LOG_PATH/H_CYCLE_LOG_PATH/H_PRICING_STATE_PATH -> out/systems/H/live/*
+- redirects launcher task log -> out/systems/H/live/phase1_pilot_task.log
+- Updated scripts/run_H_pricing_cycle.py:
+- lock/log/state paths now env-overridable with legacy defaults preserved
+- Updated run_E_all.bat:
+- sets E_RUN_LOG_PATH/E_DECISION_LOG_PATH -> out/systems/E/live/*
+- Updated scripts/run_E_cycle.py:
+- E_RUN_LOG/E_DECISION_LOG now env-overridable with legacy defaults preserved
+- Seeded new live files from current root files for continuity.
+
+Validation:
+- Ran: python -m py_compile scripts/run_E_cycle.py scripts/run_H_pricing_cycle.py scripts/run_B_cycle.py scripts/run_A_all.py
+- Result: pass
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T13:14:13Z
+Latest health snapshot at: 2026-02-18T13:10:44Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Restart B/H/E launchers so new env paths take effect.
+- Archive stale root control files after restart confirms new live paths are active.
+
+Next:
+- None
+---
+[2026-02-18 13:23 UTC]
+Ticket: Scripts folder cycle orchestration reorganization into scripts/cycles
+
+Scope:
+- Move cycle runner scripts into a dedicated folder and keep all runtime references connected.
+
+Changes made:
+- Created cycle folder package:
+- scripts/cycles/__init__.py
+- Moved orchestrator implementations to scripts/cycles:
+- run_A_all.py
+- run_B_cycle.py
+- run_C_cycle.py
+- run_E_cycle.py
+- run_H_pricing_cycle.py
+- run_30day_catchup.py
+- Added compatibility wrappers at original paths:
+- scripts/run_A_all.py
+- scripts/run_B_cycle.py
+- scripts/run_C_cycle.py
+- scripts/run_E_cycle.py
+- scripts/run_H_pricing_cycle.py
+- scripts/run_30day_catchup.py
+- Updated runner launchers to new locations:
+- run_A_all.bat -> scripts/cycles/run_A_all.py
+- run_B_cycle.bat -> scripts/cycles/run_B_cycle.py
+- run_E_all.bat -> scripts/cycles/run_E_cycle.py
+- run_H_cycle.bat -> scripts/cycles/run_H_pricing_cycle.py
+- run_30day_catchup.bat -> scripts/cycles/run_30day_catchup.py
+- Patched moved files for new folder depth and imports:
+- repo root resolution adjusted for scripts/cycles location
+- run_manifest imports made robust via scripts.run_manifest fallback
+- H runner boot/root path split adjusted for module loading and repo-root paths
+
+Validation:
+- python -m py_compile on moved modules and wrappers: pass
+- import smoke test for all moved modules and wrappers: IMPORT_OK
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T13:23:24Z
+Latest health snapshot at: 2026-02-18T13:13:12Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Restart A/B/E/H launchers so running processes use scripts/cycles entrypoints.
+- Optional follow-up: update process docs that still reference scripts/run_*.py paths.
+
+Next:
+- None
+---
+[2026-02-18 13:45 UTC]
+Ticket: Scripts root phase-2 cleanup into grouped subfolders
+
+Scope:
+- Remove loose shared script modules from scripts root and keep imports wired.
+
+Changes made:
+- Created grouped folders:
+- scripts/core (out_paths, run_manifest, script_locator, verify_live_writer_paths)
+- scripts/phase1 (all phase1_* modules)
+- scripts/h (all h_* modules)
+- scripts/tools (dedupe_product_db, f_training_set, process_stock_receipts_sheet, sync_product_db_to_main_sheet)
+- Updated imports across scripts/tests to new package paths:
+- scripts.core.*
+- scripts.phase1.*
+- scripts.h.*
+- Adjusted moved-module repo root resolution from old depth to new depth.
+
+Validation:
+- Ran: python -m compileall scripts tests run_api_collection.py
+- Result: pass
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T13:45:23Z
+Latest health snapshot at: 2026-02-18T13:20:13Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Optional: remove root run_*.py wrappers if you want scripts root to contain folders/docs only.
+
+Next:
+- None
+---
+[2026-02-18 13:49 UTC]
+Ticket: Restore orphan ignore list for expected legacy L3 orphans
+
+Scope:
+- Restore missing out/orphan_ignore_orders_combined.csv so expected legacy orphans do not hard-fail health gate.
+
+Changes made:
+- Restored file from archive:
+- out/systems/shared/archive/legacy_root_dump_20260218T130752Z/files/orphan_ignore_orders_combined.csv
+- To live path:
+- out/orphan_ignore_orders_combined.csv
+
+Validation:
+- File exists at live path and is readable.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-18T13:49:42Z
+Latest health snapshot at: 2026-02-18T13:20:13Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-02-20 09:19 UTC]
+Ticket: Harden B/H cycle lock lifecycle to stop stale lock blocks
+
+Scope:
+- Fix recurring stale lock behavior in B and H cycle runners without changing flow business logic.
+
+Changes made:
+- Updated H cycle lock handling in scripts/cycles/run_H_pricing_cycle.py:
+- Canonical lock ownership now uses one primary lock path by default.
+- Legacy lock path is probe/cleanup-only unless H_WRITE_LEGACY_LOCK=1.
+- Stale/dead/invalid legacy locks are reclaimed during acquire/ownership checks.
+- Lock recovery logs now print full lock path to avoid duplicate ambiguous path names.
+- Updated B cycle lock handling in scripts/cycles/run_B_cycle.py:
+- Added lease-style stale lock reclaim via B_LOCK_STALE_SECONDS.
+- Lock payload now includes heartbeat and start timestamp.
+- Added heartbeat touch during cycle loop and before sleep.
+- Added probe/cleanup handling for legacy lock path unless explicitly mirrored.
+- Added exit/signal cleanup handlers for lock release on normal termination.
+
+Validation:
+- Ran: python -m py_compile scripts/cycles/run_H_pricing_cycle.py scripts/cycles/run_B_cycle.py
+- Result: pass
+- Ran isolated lock smoke tests (temp lock files, no API/sheet calls) for H and B.
+- Result: stale legacy lock reclaimed; canonical lock created; release removed lock files.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-20T09:19:00Z
+Latest health snapshot at: 2026-02-20T06:16:52Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-02-20 09:20 UTC]
+Ticket: Reduce stale-lock reclaim window for daily reboot recovery
+
+Scope:
+- Make B and H restart faster after 8am shutdown by lowering lock stale TTL defaults.
+
+Changes made:
+- Updated launcher default in run_B_cycle.bat:
+- if not defined B_LOCK_STALE_SECONDS set "B_LOCK_STALE_SECONDS=300"
+- Updated launcher default in run_H_cycle.bat:
+- if not defined H_LOCK_STALE_SECONDS set "H_LOCK_STALE_SECONDS=300"
+
+Validation:
+- Confirmed both vars present via ripgrep in launcher files.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-20T09:20:00Z
+Latest health snapshot at: 2026-02-20T06:16:52Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-02-20 09:30 UTC]
+Ticket: H stale-lock immediate cleanup at launcher boundary
+
+Scope:
+- Reduce false/stale H lock FAILs by cleaning dead lock files immediately after H process exit and before launcher restart.
+
+Changes made:
+- Updated run_H_cycle.bat:
+- After each H cycle process exit, launcher now checks lock files:
+- out/systems/H/live/H_pricing_cycle.lock
+- out/H_pricing_cycle.lock
+- If lock PID is not running, lock file is removed before restart delay.
+- If lock content is invalid/unreadable, lock file is removed.
+- Fixed cleanup PowerShell variable naming to avoid reserved $PID conflict.
+
+Validation:
+- Verified launcher contains cleanup block.
+- Ran lock cleanup smoke test with dead PID lock payload.
+- Result: dead lock file removed.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-20T09:30:20Z
+Latest health snapshot at: 2026-02-20T09:25:01Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-02-20 09:34 UTC]
+Ticket: Stabilize A015 split-profile runtime_exception handling
+
+Scope:
+- Fix intermittent A015 split-profile crash (`a015_runtime_exception`) caused by pandas RangeIndex internal failure path.
+
+Changes made:
+- Updated scripts/flows/A/A015_build_system_health_check.py:
+- Added _stabilize_index(df) helper to normalize index to plain int64 index before profile filtering/output.
+- Applied index stabilization to df_all and df_profile before write/summary operations.
+- Hardened console summary rendering with try/except so summary render issues no longer crash health run.
+
+Validation:
+- Ran: python -m py_compile scripts/flows/A/A015_build_system_health_check.py
+- Result: pass
+- Observed: out/cycle_alerts/checklist_B_split.csv currently rows=24 fails=0.
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-20T09:34:00Z
+Latest health snapshot at: 2026-02-20T06:16:52Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-02-21 13:47 UTC]
+Ticket: A015 daily-intel requirement gating excludes dropped SKUs from non-parked set
+
+Scope:
+- Fix false FAIL in A015 daily-intel coverage/compliance checks where dropped SKUs can be counted as required.
+
+Changes made:
+- Updated scripts/flows/A/A015_build_system_health_check.py:
+- In _phase1_rollout_checks, compute dropped SKU set from sale_status.
+- Required daily-intel set now equals (non_parked_skus - dropped_skus).
+- Coverage/compliance checks now evaluate against required set and include required/dropped/non_parked counts in notes.
+- Added test in tests/test_a015_health_check_runtime.py:
+- test_phase1_rollout_checks_excludes_dropped_from_non_parked_requirements
+
+Validation:
+- Ran direct function check against live files at 2026-02-21T06:17:21Z:
+- a_daily_intel_coverage_non_parked -> ok 0 (required=56, dropped=373, non_parked=59, covered=56)
+- a_daily_intel_compliance_nonempty_non_parked -> ok 0 (required=56, dropped=373, non_parked=59, missing_rows=0)
+- Ran controlled 2-SKU simulation (active OOS + dropped):
+- Result: only active SKU is required/missing (value=1), dropped SKU excluded.
+- Attempted pytest targeted run for tests/test_a015_health_check_runtime.py:
+- Blocked by existing import path issue in this workspace: from scripts import A015_build_system_health_check (tracked file path currently absent).
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-21T13:46:33.088073+00:00
+Latest health snapshot at: 2026-02-21T06:17:21.616348+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-02-23 09:44 UTC]
+Ticket: Align H observation and local Product DB stock with inventory snapshot source of truth
+
+Scope:
+- Remove stale local Product DB stock as a blocker when sheet writes are disabled in A cycle.
+
+Changes made:
+- Updated `scripts/flows/H/H130_build_phase1_observation_sheet.py`:
+- Observation stock now reads from latest `inventory_snapshot_*.csv` (fallback `inventory_summaries.csv`) and only falls back to Product DB if inventory is missing.
+- Updated `scripts/flows/A/A003_run_inventory_to_sheet.py`:
+- Added `update_local_product_db_stock(...)` to refresh `out/product_db_preview.csv` stock fields from inventory rows.
+- Local Product DB refresh now runs when `INVENTORY_WRITE_PRODUCT_DB=1` even if `INVENTORY_WRITE_SHEETS=0`.
+- Kept sheet updates unchanged: sheet Product_DB write still only runs when sheet writes are enabled.
+
+Validation:
+- `python -m py_compile scripts/flows/H/H130_build_phase1_observation_sheet.py` passed.
+- `python -m py_compile scripts/flows/A/A003_run_inventory_to_sheet.py` passed.
+- Ran H130 builder once:
+- Printed inventory source `out/inventory_snapshot_2026-02-23.csv`.
+- Combined output `out/analysis_reports/phase1_observation_combined_2026-02-23.csv` shows `L1-54EX-56YC stock_qty=1.0`.
+- Ran A003 local refresh helper directly against `out/inventory_snapshot_2026-02-23.csv`:
+- `Refreshed local Product DB stock rows=315`.
+- `out/product_db_preview.csv` now shows `L1-54EX-56YC stock_available=1, stock_total=1` (was 3/5).
+
+Verification status: Pending next cycle check
+Changed at: 2026-02-23T09:44:06.3345860+00:00
+Latest health snapshot at: 2026-02-23T06:20:54+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-03-01 12:30 UTC]
+Ticket: TASK B - H run_id single source of truth + strict propagation
+
+Scope:
+- Eliminate current vs finalized run_id mismatch by enforcing one run context and strict run_id propagation.
+- Keep business logic/pricing decisions unchanged.
+
+Changes made:
+- Updated scripts/cycles/run_H_pricing_cycle.py:
+- Added single run context singleton (_RUN_CONTEXT) with helpers _set_run_context(...) and _context_run_id().
+- Compute run_id exactly once per cycle at start via _set_run_context(_resolve_cycle_run_id(...)).
+- Replaced snapshot refresh internal run_id recompute with propagated run_id (stage_run_id/context only).
+- Finalizer and success checks now source run_id from run context (not marker-file fallback).
+- Added stage start identity line: H_RUN_ID=<run_id> stage=<name> in _stage_enter(...).
+- Updated scripts/flows/H/H110_run_phase1_h_pilot.py:
+- Enforced strict propagation: --run-id is required; removed fallback run_id generation.
+- Updated scripts/cycles/run_H_pricing_cycle_guarded.py:
+- On child c=0, commit H_last_finalized_run_id.txt from H_cycle_current_run_id.txt before launcher post-child checks.
+
+Validation:
+- Ran: python -m py_compile scripts/cycles/run_H_pricing_cycle.py -> pass.
+- Ran: python -m py_compile scripts/flows/H/H110_run_phase1_h_pilot.py -> pass.
+- Ran: python -m py_compile scripts/cycles/run_H_pricing_cycle_guarded.py -> pass.
+- Ran: cmd /c run_H_controlled_once.bat.
+- Result: [H_controlled] run_once_rc=97 (not rc=3).
+- Proof (from out/systems/H/live/phase1_pilot_task.log latest run):
+- inalizer_check ... decision=pass current=20260301T122634Z finalized=20260301T122634Z
+- H-cycle launcher postchild checkpoint=after_finalizer_check rc=0
+- Stage identity proof lines present:
+- [H_cycle] H_RUN_ID=20260301T122634Z stage=snapshot_refresh
+- [H_cycle] H_RUN_ID=20260301T122634Z stage=item_offers
+- [H_cycle] H_RUN_ID=20260301T122634Z stage=phase1_intel
+- Marker state after run:
+- H_cycle_current_run_id.txt = 20260301T122634Z
+- H_last_finalized_run_id.txt = 20260301T122634Z
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-01T12:30:31Z
+Latest health snapshot at: 2026-03-01T06:19:06.016593+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-03-01 12:30 UTC] Addendum:
+- Text encoding note for prior entry: "On child rc=0, commit H_last_finalized_run_id.txt from H_cycle_current_run_id.txt before launcher post-child checks."
+- Text encoding note for prior entry: "finalizer_check ... decision=pass current=20260301T122634Z finalized=20260301T122634Z"
+---
+---
+[2026-03-01 12:54 UTC]
+Ticket: TASK 3 - Symmetric H lock cleanup on all exits (owner-side)
+
+Scope:
+- Ensure H lock lifecycle is owned and cleaned in the Python lock-owner process for success, controlled failure, and exception exits.
+- No pricing/business logic changes.
+
+Changes made:
+- Updated scripts/cycles/run_H_pricing_cycle.py lock lifecycle only:
+- _release_lock(...) is now rc-aware and run_id-aware.
+- Success exit (c=0): removes live lock and logs lock_released path=... run_id=... rc=0.
+- Non-zero exit: archives owner lock to out/locks/archive/H.lock.<timestamp>.<run_id>.rc<rc> and logs lock_archived path=... archive=... run_id=... rc=....
+- Added lock_acquired path=... run_id=... logs at cycle start after owner writes lock with run_id.
+- Added helper _archive_lock_for_exit(...) for owner exit archive naming.
+- Main finally now calls owner cleanup with rc/run_id: _release_lock(rc_hint=loop_rc, run_id=...).
+- KeyboardInterrupt path uses _release_lock(rc_hint="130", run_id=...).
+- Added test-only lock lifecycle hook (default off): H_LOCK_TEST_RAISE_AFTER_ACQUIRE=1 to simulate owner exception after acquire.
+
+Proof:
+1) Success path (exit 0)
+- Command run:
+- cmd /c "set H_RUN_ONCE=1 && set H_STAGE_SNAPSHOT_REFRESH=0 && set H_STAGE_ITEM_OFFERS=0 && set H_STAGE_PHASE1_PILOT=0 && set H_STAGE_PHASE1_INTEL=0 && set H_STAGE_PHASE1_PUBLISH=0 && set H_PHASE1_PILOT_MODE=inline && set H_PHASE1_INTEL_MODE=inline && set H_PHASE1_PUBLISH_MODE=inline && set H_LOCK_TEST_RAISE_AFTER_ACQUIRE=0 && run_H_cycle.bat"
+- Log evidence (out/systems/H/live/phase1_pilot_task.log):
+- [H_cycle] lock_acquired path=...out\systems\H\live\H_pricing_cycle.lock run_id=20260301T125323Z
+- [H_cycle] lock_acquired path=...out\H_pricing_cycle.lock run_id=20260301T125323Z
+- [H_cycle] lock_released path=...out\systems\H\live\H_pricing_cycle.lock run_id=20260301T125323Z rc=0
+- [H_cycle] lock_released path=...out\H_pricing_cycle.lock run_id=20260301T125323Z rc=0
+- [01/03/2026 12:53:35.75] H-cycle loop finished (exit 0)
+- Post-run file checks:
+- out/systems/H/live/H_pricing_cycle.lock=False
+- out/H_pricing_cycle.lock=False
+
+2) Exception path simulation (owner exception)
+- Command run:
+- cmd /c "set H_RUN_ONCE=1 && set H_STAGE_SNAPSHOT_REFRESH=0 && set H_STAGE_ITEM_OFFERS=0 && set H_STAGE_PHASE1_PILOT=0 && set H_STAGE_PHASE1_INTEL=0 && set H_STAGE_PHASE1_PUBLISH=0 && set H_PHASE1_PILOT_MODE=inline && set H_PHASE1_INTEL_MODE=inline && set H_PHASE1_PUBLISH_MODE=inline && set H_LOCK_TEST_RAISE_AFTER_ACQUIRE=1 && run_H_cycle.bat"
+- Log evidence (out/systems/H/live/phase1_pilot_task.log):
+- [H_cycle] cycle_error RuntimeError: lock_test_forced_exception_after_acquire
+- [H_cycle] lock_archived path=...out\systems\H\live\H_pricing_cycle.lock archive=...out\locks\archive\H.lock.20260301T125349Z.20260301T125349Z.rc1 run_id=20260301T125349Z rc=1
+- [H_cycle] lock_archived path=...out\H_pricing_cycle.lock archive=...out\locks\archive\H.lock.20260301T125349Z.20260301T125349Z.rc1.2 run_id=20260301T125349Z rc=1
+- [01/03/2026 12:53:49.71] H-cycle loop finished (exit 1)
+- Post-run file checks:
+- out/systems/H/live/H_pricing_cycle.lock=False
+- out/H_pricing_cycle.lock=False
+- Archive files created:
+- out/locks/archive/H.lock.20260301T125349Z.20260301T125349Z.rc1
+- out/locks/archive/H.lock.20260301T125349Z.20260301T125349Z.rc1.2
+
+3) Immediate A015 refresh
+- Command run:
+- python scripts\flows\A\A015_build_system_health_check.py
+- Result rows:
+- out/system_health_checklist.csv -> "h_cycle_stale_lock","ok","0","searched=out\systems\H\live\H_pricing_cycle.lock,out\H_pricing_cycle.lock",...
+- out/cycle_alerts/checklist_H.csv -> "h_cycle_stale_lock","ok","0","searched=out\systems\H\live\H_pricing_cycle.lock,out\H_pricing_cycle.lock",...
+
+Verification status: Verified
+Changed at: 2026-03-01T12:54:42Z
+Latest health snapshot at: 2026-03-01T12:54:14.027Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-03-01 13:49 UTC]
+Ticket: TASK 8 - A016 authoritative full-universe build + H alignment isolation
+
+Scope:
+- Make A016 authoritative daily build write full non-parked universe to `data/sku_daily_intel.csv`.
+- Make H alignment run single-SKU mode without writing authoritative daily intel.
+- Keep pricing decision logic unchanged; only run mode/wiring/marker I/O and compliance row handling.
+
+Code changes:
+- `scripts/flows/A/A016_refresh_phase1_daily_intel.py`
+- Added explicit modes: `--mode full_universe|single_sku`.
+- `full_universe` target SKUs now computed from A015-equivalent inputs:
+  - `out/phase1_sku_scope.csv` (`parked_flag`)
+  - `out/parking/parked_skus.csv`
+  - exclude `sale_status=dropped`
+- `single_sku` now writes only to `data/sku_daily_intel_alignment.csv`.
+- Added isolated temp data-dir execution for `single_sku` so `phase1_main_loop.run_a_cycle()` cannot write `data/sku_daily_intel.csv`.
+- Added CSV upsert helpers and fallback row writer so required rows are always materialized in full-universe mode.
+- Added metadata fields handling: `compliance_status`, `compliance_reason_code`.
+
+- `scripts/phase1/phase1_storage.py`
+- Extended `sku_daily_intel` schema with:
+  - `compliance_status`
+  - `compliance_reason_code`
+
+- `scripts/cycles/run_A_all.py`
+- A-cycle A016 step now calls:
+  - `A016_refresh_phase1_daily_intel.py --mode full_universe`
+
+- `scripts/cycles/run_H_pricing_cycle.py`
+- H alignment call now passes:
+  - `--mode single_sku --sku <OFFICIAL_PILOT_SKU>`
+
+- `scripts/flows/A/A015_build_system_health_check.py`
+- Minimal compliance check update:
+  - Treat row as compliant if `compliance_ceiling_landed_gbp` is non-empty OR row has explicit `compliance_status`/`compliance_reason_code`.
+  - Kept authoritative source path unchanged (`data/sku_daily_intel.csv`).
+
+Proof outputs:
+1) A016 full-universe run
+- Command:
+  - `python scripts\flows\A\A016_refresh_phase1_daily_intel.py --mode full_universe --phase1-config out\tmp_a016_full_universe.yaml`
+- Key output:
+  - `a016_mode=full_universe`
+  - `a016_output_path=...\data\sku_daily_intel.csv`
+  - `a016_target_universe_resolved_count=51`
+  - `a016_processed=51`
+  - `a016_missing_compliance_rows=0`
+  - `a016_fallback_rows=0`
+
+2) Authoritative coverage after full-universe run
+- `data/sku_daily_intel.csv mtime=2026-03-01T13:44:43Z rows_today=51`
+- Computed against required non-parked universe:
+  - `required_count=51`
+  - `covered_required_count=51`
+  - `missing_required_count=0`
+
+3) H run once (alignment isolated)
+- Forced intel-only one-cycle run:
+  - `H_RUN_ONCE=1 H_STAGE_SNAPSHOT_REFRESH=0 H_STAGE_ITEM_OFFERS=0 H_STAGE_PHASE1_PILOT=0 H_STAGE_PHASE1_INTEL=1 H_STAGE_PHASE1_PUBLISH=0 run_H_cycle.bat`
+- H log evidence:
+  - `phase1 daily_intel alignment status=ok target_mode=single_sku resolved_count=1 processed=1 missing_compliance=0`
+- File evidence after H run:
+  - `data/sku_daily_intel.csv mtime=2026-03-01T13:44:43Z rows_today=51` (unchanged)
+  - `data/sku_daily_intel_alignment.csv mtime=2026-03-01T13:48:15Z rows_today=1`
+
+4) A015 global gate after changes
+- Command:
+  - `python scripts\flows\A\A015_build_system_health_check.py --profile global --no-toast`
+- Result (`out/system_health_checklist.csv`):
+  - `a_daily_intel_coverage_non_parked = ok, value=0`
+  - `a_daily_intel_compliance_nonempty_non_parked = ok, value=0`
+- Summary counts:
+  - `fail=0`
+  - `warn=0`
+
+Verification status: Verified
+Changed at: 2026-03-01T13:49:00Z
+Latest health snapshot at: 2026-03-01T13:48:43.376Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-03-01 13:58 UTC]
+Ticket: TASK 9 - Progressive H stage re-enable with health gating (stopped on first regression)
+
+Scope:
+- Run H once per gating step.
+- Run A015 global after each step.
+- Stop immediately on first new FAIL/WARN.
+
+Baseline (stable)
+- Env:
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=0
+  - H_STAGE_ITEM_OFFERS=0
+  - H_STAGE_PHASE1_PILOT=0
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PUBLISH=0
+  - H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1
+- Command:
+  - run_H_cycle.bat
+- Result:
+  - H exit code: 0
+- A015 global:
+  - command: python scripts\flows\A\A015_build_system_health_check.py --profile global --no-toast
+  - fail=0 warn=0
+
+Stage (a) added: snapshot_refresh
+- Env delta from baseline:
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - (others unchanged: ITEM_OFFERS=0, PILOT=0, INTEL=1, PUBLISH=0)
+- Command:
+  - run_H_cycle.bat
+- Result:
+  - H exit code: 97
+- A015 global after run:
+  - return code: 1
+  - fail=1 warn=0
+  - new FAIL: h_cycle_stale_lock
+
+Stop condition met
+- Stopped gating at stage (a) due to new FAIL.
+
+Isolated cause summary
+- New FAIL introduced after stage (a):
+  - h_cycle_stale_lock = fail, value=2
+  - notes: stale=out\systems\H\live\H_pricing_cycle.lock|pid=29100;out\H_pricing_cycle.lock|pid=29100
+- Lock artifacts left behind:
+  - out/systems/H/live/H_pricing_cycle.lock exists, run_id=20260301T135625Z, heartbeat=2026-03-01T13:56:25Z
+  - out/H_pricing_cycle.lock exists, run_id=20260301T135625Z, heartbeat=2026-03-01T13:56:25Z
+  - pid=29100 not alive at inspection time.
+- Launcher log evidence for regression run:
+  - marker_check name=completed ... decision=allow_mismatch current=20260301T135625Z marker=20260301T135538Z
+  - loop finished (exit 97)
+
+Artifact diff summary (baseline -> stage a)
+- out/system_health_checklist.csv:
+  - fail count 0 -> 1
+  - new failing key: h_cycle_stale_lock
+- Lock files:
+  - baseline: no live stale lock FAIL
+  - stage (a): both H lock files present with stale heartbeat and dead pid
+
+Proposed minimal fix (limited to this gating path)
+- For progressive stage gating runs where publish/pilot may be intentionally disabled, avoid strict marker escalation to rc=97:
+  - set H_MARKER_CHECK_STRICT=0 for gating-only runs, OR
+  - gate marker strictness on stage enablement so completed-marker mismatch does not fail when completion marker is not expected to advance.
+- This is a gating-run control-path fix only (no pricing logic change).
+
+Verification status: Blocked by new FAIL at stage (a)
+Changed at: 2026-03-01T13:58:00Z
+Latest health snapshot at: 2026-03-01T13:56:55.654847+00:00
+Next verifier: rerun stage (a) after minimal gating-path fix
+
+Carryover:
+- Resolve stage-(a) regression: rc=97 marker mismatch leaves stale H locks during gating profile
+
+Next:
+- Resume TASK 9 from stage (a) only after gating-path fix and confirm fail=0 warn=0
+---
+[2026-03-01 14:10 UTC]
+Ticket: TASK 10 - H gating mode for marker strictness + launcher lock cleanup
+
+Scope:
+- Add `H_GATING_MODE` control for completed-marker strictness in launcher.
+- Ensure launcher cleans/archives H locks on non-zero launcher exits (including rc=97 paths) without deleting active-run locks.
+- Keep full-run semantics unchanged when `H_GATING_MODE=0`.
+
+Code changes
+- File: `run_H_cycle.bat`
+- Added env default:
+  - `if not defined H_GATING_MODE set "H_GATING_MODE=0"`
+- Added required startup log line when gating mode is on:
+  - `H_GATING_MODE=1: marker strictness disabled; completed markers may not advance in partial runs`
+- Added completed-marker strictness split:
+  - `H_COMPLETED_MARKER_STRICT=%H_MARKER_CHECK_STRICT%`
+  - forced to `0` when `H_GATING_MODE=1`
+  - completed-marker mismatch in gating mode logs informational line and does not set rc=97
+- Added non-zero-exit lock cleanup block in launcher:
+  - targets both live lock paths:
+    - `out/systems/H/live/H_pricing_cycle.lock`
+    - `out/H_pricing_cycle.lock`
+  - safety guards:
+    - skip if lock `run_id` differs from current run
+    - skip if lock PID is alive
+  - archives stale/dead locks to:
+    - `out/locks/archive/H.lock.<timestamp>.<run_id>.rc<rc>.launcher`
+  - logs:
+    - `lock_cleanup_archived ...`
+    - `lock_cleanup_skip ...`
+    - `lock_cleanup_failed ...`
+- Follow-up fix during proofing:
+  - corrected cleanup script variable from PowerShell `$pid` (read-only) to `$lockPid`.
+
+Proof A - Baseline gating run
+- Command/env:
+  - `H_GATING_MODE=1`
+  - `H_RUN_ONCE=1`
+  - `H_STAGE_SNAPSHOT_REFRESH=1`
+  - `H_STAGE_ITEM_OFFERS=0`
+  - `H_STAGE_PHASE1_PILOT=0`
+  - `H_STAGE_PHASE1_INTEL=1`
+  - `H_STAGE_PHASE1_PUBLISH=0`
+  - `H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1`
+  - `run_H_cycle.bat`
+- Result:
+  - `H_RUN_RC=0`
+- Log evidence:
+  - launcher start line present:
+    - `H_GATING_MODE=1: marker strictness disabled; completed markers may not advance in partial runs`
+- Lock evidence after run:
+  - `out/systems/H/live/H_pricing_cycle.lock` missing
+  - `out/H_pricing_cycle.lock` missing
+- A015 global verification:
+  - command: `python scripts\flows\A\A015_build_system_health_check.py --profile global --no-toast`
+  - `h_cycle_stale_lock` row: `status=ok value=0 notes=searched=out\systems\H\live\H_pricing_cycle.lock,out\H_pricing_cycle.lock`
+
+Proof B - Normal strict behavior unchanged
+- Command/env:
+  - same stage env as Proof A, but `H_GATING_MODE=0`
+  - controlled mismatch injection: completed marker continuously overwritten to `FORCED_MISMATCH_<run_id>` during run
+  - `run_H_cycle.bat`
+- Result:
+  - `H_RUN_RC=97`
+- Log evidence:
+  - strict mismatch still enforced:
+    - `marker_check name=completed ... decision=allow_mismatch current=20260301T140856Z marker=20260301T140749Z`
+    - `H-cycle loop finished (exit 97)`
+- Lock cleanup evidence on rc=97 path:
+  - `lock_cleanup_archived path=C:\Users\Luke\Desktop\SellerOne 2.0\out\systems\H\live\H_pricing_cycle.lock ... run_id=20260301T140856Z rc=97`
+  - `lock_cleanup_archived path=C:\Users\Luke\Desktop\SellerOne 2.0\out\H_pricing_cycle.lock ... run_id=20260301T140856Z rc=97`
+  - no live lock files remain after run.
+
+Verification status: Verified in controlled runs
+Changed at: 2026-03-01T14:10:00Z
+Latest health snapshot at: 2026-03-01T14:08:42.565091+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Resume TASK 9 gating sequence from stage (a) using `H_GATING_MODE=1` for partial/gating runs
+---
+[2026-03-01 14:13 UTC]
+Ticket: TASK 11 - Resume TASK 9 stage gating from (b) onward using H_GATING_MODE=1
+
+Scope:
+- Run one H cycle per stage gate step with H_GATING_MODE=1.
+- After each run execute python scripts\\flows\\A\\A015_build_system_health_check.py --profile global --no-toast.
+- Stop immediately on first newly introduced FAIL/WARN key.
+
+Stage gating table:
+| stage | config (SNAPSHOT,ITEM_OFFERS,PILOT,INTEL,PUBLISH) | run_id | H rc | A015 fail | A015 warn | new failing keys | result |
+|---|---|---|---:|---:|---:|---|---|
+| (b) item_offers | 1,1,0,1,0 | 20260301T141156Z | 0 | 1 | 0 | h_cycle_stale_lock | STOP |
+| (c) phase1_intel alignment | not run | - | - | - | - | - | skipped_after_stop |
+| (d) ladder/decision build | not run | - | - | - | - | - | skipped_after_stop |
+| (e) publish outputs | not run | - | - | - | - | - | skipped_after_stop |
+| (f) repricing write | not run | - | - | - | - | - | skipped_after_stop |
+
+Stop reason (single stage introduced failure):
+- Stage introduced failure: (b) item_offers
+- New key: h_cycle_stale_lock
+- A015 row evidence:
+  - check=h_cycle_stale_lock
+  - status=fail
+  - alue=2
+  - 
+otes=stale=out\\systems\\H\\live\\H_pricing_cycle.lock|pid=30236;out\\H_pricing_cycle.lock|pid=30236
+
+Lock evidence captured immediately after stage (b):
+- out/systems/H/live/H_pricing_cycle.lock
+  - H|pid=30236|run_id=20260301T141156Z|start=2026-03-01T14:12:26Z|heartbeat=2026-03-01T14:12:26Z
+- out/H_pricing_cycle.lock
+  - H|pid=30236|run_id=20260301T141156Z|start=2026-03-01T14:12:26Z|heartbeat=2026-03-01T14:12:26Z
+
+Artifacts:
+- machine-readable run summary: out/systems/H/live/task11_stage_gating_results.json
+---
+[2026-03-01 14:22 UTC]
+Ticket: TASK 12 - Fix lock-owner release on rc=0 item_offers gating path
+
+Scope:
+- Lock lifecycle/exit path only (no pricing or marker logic changes).
+- Ensure Python lock-owner always executes lock release attempt on rc=0 partial-stage gating runs.
+
+Reproduction evidence (pre-fix failing run)
+- Existing failing run_id: 20260301T141156Z from task log.
+- Key log sequence:
+  - lock_acquired ... run_id=20260301T141156Z
+  - snapshot_refresh still_working stage=item_offers elapsed_seconds=30.00 ...
+  - launcher: child exit raw_rc=0
+  - launcher: loop finished (exit 0)
+- Missing from that run_id:
+  - no lock_released ... run_id=20260301T141156Z
+  - no process_exit reason=... for that run_id
+- Result observed at that time: stale lock files persisted and A015 reported h_cycle_stale_lock=FAIL.
+
+Code changes
+- File: scripts/cycles/run_H_pricing_cycle.py
+- Added stage tracking:
+  - _LAST_STAGE_NAME global
+  - updated in _stage_enter(...)
+- Added release reporting helpers:
+  - _owned_lock_paths_for_current_pid()
+  - _release_lock_with_report(stage, rc_hint, run_id)
+  - definitive log line format now emitted:
+    - lock_release_attempt stage=<stage> rc=<rc> released=<0/1>
+- Tightened top-level release coverage in main():
+  - initialized cycle_run_id / loop_rc before acquisition
+  - moved setup under top-level 	ry boundary (_ensure_action_log, _ensure_live_test_execution_log)
+  - replaced finalizer cleanup call with _release_lock_with_report(...) in the outer inally
+- Removed duplicate direct release call from __main__ KeyboardInterrupt block (main-finally now owns release reporting).
+
+Proof A (required): stage (b) gating run
+- Command/env:
+  - H_GATING_MODE=1
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - H_STAGE_ITEM_OFFERS=1
+  - H_STAGE_PHASE1_PILOT=0
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PUBLISH=0
+  - H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1
+  - un_H_cycle.bat
+- Result:
+  - H_RUN_RC=0
+  - un_id=20260301T141918Z
+- Log evidence:
+  - lock_release_attempt stage=phase1_publish rc=0 released=1
+  - process_exit reason=main_return rc=0
+- Live lock paths after run:
+  - out/systems/H/live/H_pricing_cycle.lock -> missing
+  - out/H_pricing_cycle.lock -> missing
+- A015 global verification:
+  - python scripts\\flows\\A\\A015_build_system_health_check.py --profile global --no-toast
+  - h_cycle_stale_lock row: status=ok, alue=0
+
+Proof B (required): non-gating strict behavior unchanged
+- Controlled strict mismatch run:
+  - H_GATING_MODE=0
+  - same stage config as above
+  - forced completed-marker mismatch during run
+- Result:
+  - H_STRICT_RUN_RC=97 (strict marker behavior still active)
+- Lock outcome after strict run:
+  - no live H lock files remained.
+
+Verification status: Verified in controlled runs
+Changed at: 2026-03-01T14:22:00Z
+Latest health snapshot at: 2026-03-01T14:20:22.675393+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-11 12:46 UTC]
+Ticket: H overnight closeout hardening - restart-drain/parent-loss recurrence containment
+
+Scope
+- Document and persist the production repair that stabilized H after reboot-related and intermittent restart failures.
+- Prevent "rediscovery loops" by writing a permanent recovery playbook and logging the validated fix path.
+
+What happened
+- H entered repeated relaunch/early-exit behavior and intermittent parent-loss symptoms.
+- Active blocker chain observed:
+  - restart-drain early exits before new cycle start
+  - finalize blocked marker state (`FINALIZE_BLOCKED_NO_PUBLISH`)
+  - stale control-plane restart artifacts
+
+Root-cause fixes applied in code
+1) `scripts/cycles/run_H_pricing_cycle.py`
+- Fixed restart-drain path where `state` could be referenced before assignment.
+- Added safe guarding so no-cycle-start paths do not execute finalizer assumptions.
+- Hardened phase1 pilot subprocess handling to result-file-first mode (`stdio_mode=result_file_only`) to reduce fragile stdout/stderr coupling.
+
+2) `scripts/tools/controlled_restart_controller.py`
+- Fixed stale restart drain clearing logic so skipped outcomes do not leave a latent drain condition active.
+
+Operational recovery actions used
+- Archived stuck failed run marker safely (no broad deletion):
+  - `python scripts/tools/archive_failed_H_run.py --run-id 20260311T115731Z --archive-reason finalize_blocked_parent_exit_investigation`
+- Preserved lock/log artifacts and used targeted safety snapshots.
+
+Evidence of stabilization
+- Three clean cycles after final repair:
+  - `20260311T121234Z`
+  - `20260311T121748Z`
+  - `20260311T122837Z`
+- Each reached publish and finalized state.
+- `H_cycle_last_publish_run_id.txt` aligned with `H_last_finalized_run_id.txt`.
+- Background H remained running and continued into next run (`20260311T123328Z`).
+
+Process documentation added
+- Updated runbook:
+  - `scripts/cycles/H_PHASE1_INLINE_MODE_RUNBOOK.md`
+- Added section:
+  - `Crash Recurrence Playbook (2026-03-11)`
+- Includes:
+  - fast triage checks
+  - stale marker handling
+  - restart-control checks
+  - parent-loss evidence capture
+  - explicit 3-clean-cycle validation gate
+
+Known residual risk
+- The exact deepest OS-level cause for all historical parent-loss events is not fully eliminated.
+- Current production failure mode is contained and validated.
+
+Verification status: Verified in live cycles
+Changed at: 2026-03-11T12:12:34Z
+Latest health snapshot at: 2026-03-11T12:33:28Z (live runtime/publish-finalize evidence)
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 21:02 UTC - Ticket: Minutes timer regression durable fix
+
+Scope
+- Eliminated the run-triggered Minutes regression on the real live `PRICING_DASHBOARD` tab and verified the fix survives the actual H-cycle publish path that had reintroduced the bad formula.
+
+Root cause
+- The regression came from the real H-cycle publish path:
+  - `scripts/cycles/run_H_pricing_cycle.py`
+  - stage `phase1_publish`
+  - inline module `scripts.flows.H.H130_build_phase1_observation_sheet`
+- The live tab was being republished through the correct builder, but existing-sheet grid expansion was not durable.
+- The old path silently ignored worksheet resize failures in `_upsert_tab(...)`.
+- When `PRICING_DASHBOARD` stayed at 19 columns, the later publish reused the legacy schema:
+  - `C3` formula reverted to `S:S`
+  - `S` was `Buy Box`
+  - `Y` did not exist
+  - Minutes returned `#VALUE!`
+
+Approved change
+1) Forced sheet-grid convergence for existing tabs
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Added `_ensure_sheet_grid(...)` using `updateSheetProperties`.
+- The live tab is now explicitly forced to `2000 x 25` both before formatting and again before formula injection.
+- Resize is no longer a best-effort hidden behind `except Exception: pass`.
+
+2) Durable formula/source enforcement
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- `PRICING_DASHBOARD` now always receives the Minutes formula against hidden helper column `Y:Y`.
+- Existing-tab rebuilds are now schema-safe before that formula is written.
+
+Proof
+- `python -m py_compile scripts/flows/H/H130_build_phase1_observation_sheet.py`
+- Republish through direct builder:
+  - `python scripts/flows/H/H130_build_phase1_observation_sheet.py --date-utc 2026-03-07 --view-tab PRICING_DASHBOARD --publish`
+- Verified actual H-cycle publish path in logs after code change:
+  - `2026-03-07T20:47:53Z phase1 publish_start`
+  - `2026-03-07T20:48:03Z phase1 observation_publish status=ok view_tab=PRICING_DASHBOARD rows=53 error=`
+
+Live verification after rerun
+- Live tab metadata after rerun:
+  - rows=`2000`
+  - cols=`25`
+- Live `C3` formula after rerun:
+  - `=ARRAYFORMULA(IF(Y3:INDEX(Y:Y,COUNTA(D:D)+1)="","",IFERROR(ROUND((NOW()-VALUE(Y3:INDEX(Y:Y,COUNTA(D:D)+1)))*1440,2),"")))`
+- Verified affected live rows still show numeric Minutes after rerun:
+  - `5Z-6Z0P-9TQQ` Minutes `15.43`, Buy Box `LOST_TO_COMPETITOR`, helper timestamp present
+  - `HS-R5IP-7E1C` Minutes `15.43`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+  - `JB-RGB6-LZOJ` Minutes `15.43`, Buy Box `NORMAL`, helper timestamp present
+  - `LP-QMNJ-J49G` Minutes `15.43`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+  - `TJ-6LOP-OPEU` Minutes `15.43`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+  - `W3-8FN7-FSP0` Minutes `15.43`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+
+Alert
+- A separate manual attempt to launch another H cycle while pid `10980` was active failed with lock contention as designed.
+- The running H cycle itself is still active and later entered snapshot refresh at `2026-03-07T20:59:40Z`; this did not reintroduce the Minutes fault.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-07T21:02:00Z
+Latest health snapshot at: 2026-03-04T10:22:05Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 20:42 UTC - Ticket: Live PRICING_DASHBOARD minutes publish-path fix
+
+Scope
+- Corrected the real live `PRICING_DASHBOARD` publish path and verified the live sheet tab itself no longer shows `#VALUE!` in Minutes.
+
+Root cause
+- The earlier change fixed the dated tab, not the active live tab the H cycle was publishing to.
+- The real live tab is `PRICING_DASHBOARD`.
+- That tab still had the legacy 19-column schema:
+  - `C3` formula still referenced `S:S`
+  - `S` is `Buy Box`
+  - `Y` did not exist on the tab
+- Existing-tab retention was the real failure:
+  - the live tab was not reliably being expanded to the current 25-column schema before formula injection
+  - so the old broken formula persisted on the live tab
+
+Approved change
+1) Real live publish path confirmed
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Verified this is the script used by the H cycle to publish `PRICING_DASHBOARD`.
+
+2) Existing-tab resize enforced
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- `_upsert_tab(...)` now resizes existing worksheets before clearing and rewriting.
+- This ensures `PRICING_DASHBOARD` is widened to the current live schema and the hidden timestamp helper column exists.
+
+3) Live Minutes formula corrected
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Minutes formula now uses the hidden helper timestamp column `Y:Y`, not `S:S`.
+- Added `IFERROR(...)` so any non-datetime legacy or mixed value resolves to blank instead of breaking the whole array.
+
+Live republish and verification
+- Command run:
+  - `python scripts/flows/H/H130_build_phase1_observation_sheet.py --date-utc 2026-03-07 --view-tab PRICING_DASHBOARD --publish`
+- Publish result:
+  - `phase1_observation_publish=ok`
+  - `phase1_observation_view_tab=PRICING_DASHBOARD`
+
+Live sheet verification
+- Tab: `PRICING_DASHBOARD`
+- Grid width after fix: `25` columns
+- Live `C3` formula now:
+  - `=ARRAYFORMULA(IF(Y3:INDEX(Y:Y,COUNTA(D:D)+1)="","",IFERROR(ROUND((NOW()-VALUE(Y3:INDEX(Y:Y,COUNTA(D:D)+1)))*1440,2),"")))`
+- Verified helper/source columns:
+  - `S3=LOST_TO_COMPETITOR`
+  - `Y3=2026-03-07 20:27:20`
+  - `C3=14.66`
+
+Affected-row checks on live `PRICING_DASHBOARD`
+- `5Z-6Z0P-9TQQ` row 3: Minutes `15.26`, Buy Box `LOST_TO_COMPETITOR`, helper timestamp present
+- `HS-R5IP-7E1C` row 8: Minutes `15.26`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+- `JB-RGB6-LZOJ` row 10: Minutes `15.26`, Buy Box `NORMAL`, helper timestamp present
+- `LP-QMNJ-J49G` row 11: Minutes `15.26`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+- `TJ-6LOP-OPEU` row 13: Minutes `15.26`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+- `W3-8FN7-FSP0` row 17: Minutes `15.26`, Buy Box `SUPPRESSED_ASIN`, helper timestamp present
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-07T20:42:00Z
+Latest health snapshot at: 2026-03-04T10:22:05Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 18:23 UTC - Ticket: Minutes timer formula fix in live sheet export
+
+Scope
+- Fixed the live H observation sheet export so the Minutes column reads the hidden timestamp helper column again and no longer parses Buy Box status text as a datetime.
+
+Approved change
+1) Corrected the source column for Minutes
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- The live sheet formula had drifted to column `S`, which is now `Buy Box`.
+- The actual timestamp helper column is the hidden final column `_last_scan_utc`, now explicitly treated as column `Y`.
+
+2) Fixed worksheet sizing in the publish path
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Existing tabs were being cleared without being resized to the full current viewer width.
+- The sheet could stay capped at 19 columns, which broke the hidden timestamp helper column and allowed the old formula to persist.
+- `_upsert_tab` now resizes existing worksheets before writing.
+
+3) Hardened the Minutes formula
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Formula now points at `Y:Y` and uses `IFERROR(...)` so non-datetime values or legacy mixed rows do not break the whole spill range.
+
+Proof
+- `python -m py_compile scripts/flows/H/H130_build_phase1_observation_sheet.py`
+- `python scripts/flows/H/H130_build_phase1_observation_sheet.py --date-utc 2026-03-07 --publish`
+  - result: `phase1_observation_publish=ok`
+
+Live verification
+- Published tab: `2026-03-07`
+- Grid width after publish: `25` columns
+- Live formula at `C3` now:
+  - `=ARRAYFORMULA(IF(Y3:INDEX(Y:Y,COUNTA(D:D)+1)="","",IFERROR(ROUND((NOW()-VALUE(Y3:INDEX(Y:Y,COUNTA(D:D)+1)))*1440,2),"")))`
+- Verified row evidence:
+  - `S3=LOST_TO_COMPETITOR`
+  - `Y3=2026-03-07 18:05:25`
+  - `C3=18.00`
+- Additional rows with `S=SUPPRESSED_ASIN` and `S=NORMAL` also show numeric Minutes values, not `#VALUE!`.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-07T18:23:00Z
+Latest health snapshot at: 2026-03-04T10:22:05Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 17:34 UTC - Ticket: Cannot-Compete Floor Execution Fix follow-up
+
+Scope
+- Completed the cannot-compete runtime fix end to end and republished live observation outputs after validating the live path on real SKUs.
+
+Approved change
+1) Cannot-compete execution truth recovery
+- File: scripts/h/h_suppression_truth.py
+- Added observed-price truth recovery for stale cannot-compete execution rows.
+- If runtime trace and observed live offer price show a floor-seek descent after a stale `NO_WRITE_REQUIRED` row, unified truth now marks:
+  - `unified_writer_outcome=APPLIED_OBSERVED`
+  - `unified_strategy_state=CONTROLLED_EXIT_TO_FLOOR`
+  - `true_binding_ceiling_type=PHASE_FLOOR`
+  - `true_binding_ceiling_gbp=<active floor>`
+
+2) Runtime snapshot integration
+- File: scripts/cycles/run_H_pricing_cycle.py
+- Unified truth snapshot now passes execution old/new price, hard floor, observed live price, and trace candidate/floor into the truth resolver so stale cannot-compete rows can be reconstructed from stronger live evidence.
+
+3) Observation view alignment
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Current price now prefers observed live offer price over stale listing snapshot when execution-applied evidence is not newer.
+- Observation build now respects the unified active ceiling and unified cannot-compete truth coming from runtime snapshot.
+
+4) Test coverage
+- File: tests/test_h_suppression_truth.py
+- Added regression coverage for observed floor-seek apply inference.
+
+Proof
+- `python -m py_compile scripts/h/h_suppression_truth.py scripts/cycles/run_H_pricing_cycle.py scripts/flows/H/H130_build_phase1_observation_sheet.py`
+- `$env:PYTHONPATH='.'; pytest tests/test_h_suppression_truth.py tests/test_phase1_probe_engine.py -q`
+  - result: `7 passed`
+- Rebuilt runtime truth:
+  - `phase1_runtime_floor_snapshot_status=ok`
+  - `phase1_runtime_floor_snapshot_rows=58`
+  - `phase1_runtime_floor_snapshot_utc=2026-03-07T17:32:18Z`
+- Republished observation outputs and dashboard:
+  - `phase1_observation_view_rows=53`
+  - `phase1_observation_publish=ok`
+
+Live verification
+- SKU `8M-NHB7-T8TR`
+  - current now shown as `29.36`
+  - active ceiling now shown as `29.37`
+  - state now shown as `CONTROLLED_EXIT_TO_FLOOR`
+  - writer outcome now shown as `APPLIED_OBSERVED`
+  - model ceiling remains visible as `17.99`
+- This matches the live cannot-compete floor-seek truth instead of the stale `RAISE_FIND_LOSS / NO_WRITE_REQUIRED / 17.99 ceiling` presentation.
+
+Alert
+- H background loop later hit `snapshot_refresh_timeout` at `2026-03-07T17:21:29Z` and moved run `20260307T171658Z` to `failed`.
+- This did not invalidate the cannot-compete code fix or the manual republish above, but scheduled cycle health confirmation is still pending.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-07T17:34:00Z
+Latest health snapshot at: 2026-03-04T10:22:05Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 17:04 UTC - Ticket: Cannot-Compete Floor Execution Fix
+
+Scope
+- Fix live H runtime so true cannot-compete SKUs execute floor-seeking / exit-price behavior instead of holding above the minimum executable price.
+- Keep hard-floor, suppression, and write guardrails intact.
+
+Approved change
+1. Runtime decision fix
+- File: `scripts/phase1/phase1_main_loop.py`
+- Added canonical cannot-compete execution states:
+  - `MARGIN_COMPRESS_TO_FLOOR`
+  - `CONTROLLED_EXIT_TO_FLOOR`
+  - `LIQUIDATE_TO_FLOOR`
+- Phase 3 and Phase 4 now override incompatible normal ladder states when the SKU is above the active floor and already in cannot-compete phase.
+- Added degraded-intel fallback so Phase 3/4 floor-seeking can still run downward toward the active floor when daily intel is stale/missing, instead of always forcing `DEFENSIVE_HOLD`.
+- Phase 3/4 now fall back to the current runtime hard floor when no explicit persisted exit floor exists.
+
+2. Target computation fix
+- File: `scripts/phase1/phase1_probe_engine.py`
+- Added floor-seeking target logic for the cannot-compete states.
+- Fixed floor-priority handling so `ceiling < floor` no longer leaves a SKU sitting above floor; runtime now enforces the floor target instead of falsely treating the SKU as already safe.
+
+3. Live config alignment
+- Files:
+  - `config/pilot_sku.yaml`
+  - `config/pilot_sku_live_test.yaml`
+- Enabled `allow_h_intraday_intel_refresh: true` so H can refresh missing/stale daily intel inside the live path instead of stalling cannot-compete execution behind old A data.
+
+4. Dashboard/runtime truth alignment
+- Files:
+  - `scripts/cycles/run_H_pricing_cycle.py`
+  - `scripts/flows/H/H130_build_phase1_observation_sheet.py`
+- Runtime floor snapshot now carries execution old/new prices.
+- Observation sheet now uses the applied execution price as current price fallback when observed price is not yet refreshed, so dashboard truth matches the actual write.
+
+5. Plan clarification
+- File: `out/process_guides/repricing_tool/master plans/masterplan_v10.md`
+- Added `15B) CANNOT-COMPETE EXECUTION MODEL`.
+- Clarified canonical rule:
+  - minimum executable target = active phase floor
+  - explicit exit floor if present, otherwise runtime hard floor
+  - Phase 3/4 must switch to phase-owned execution states and may use degraded-intel downward fallback
+
+Proof
+- Static verification:
+  - `python -m py_compile scripts/phase1/phase1_probe_engine.py scripts/phase1/phase1_main_loop.py scripts/cycles/run_H_pricing_cycle.py scripts/flows/H/H130_build_phase1_observation_sheet.py`
+- Targeted tests:
+  - `pytest tests/test_phase1_probe_engine.py -q`
+  - `pytest tests/test_phase1_main_loop.py -q -k phase3_stale_intel_uses_floor_seek_fallback`
+- Runtime rebuild:
+  - `out/phase1_runtime_floor_snapshot_latest.csv` rebuilt at `2026-03-07T17:18:00Z`, rows=`58`
+  - `out/analysis_reports/phase1_observation_view_2026-03-07.csv` rebuilt and published to `PRICING_DASHBOARD`
+
+Live verification
+- Verified live cannot-compete case: `8M-NHB7-T8TR`
+  - phase=`3`
+  - current before=`32.16`
+  - floor=`29.37`
+  - ceiling=`29.36`
+  - execution before fix path was `DEFENSIVE_HOLD`
+  - live execution after fix:
+    - `event_ts_utc=2026-03-07T17:16:30Z`
+    - `state=CONTROLLED_EXIT_TO_FLOOR`
+    - `new_price_gbp=29.37`
+    - `write_status=APPLIED`
+  - dashboard/view after rebuild:
+    - `Status=WRITE_APPLIED`
+    - `Current=29.36`
+    - `Ceiling=29.36`
+    - `State=CONTROLLED_EXIT_TO_FLOOR`
+    - `Write Result=APPLIED`
+- Additional live checks:
+  - `0G-JB6S-PN34` remained suppression-owned, not cannot-compete-owned:
+    - `Status=SUPPRESSED`
+    - `State=STATE_SUPPRESSION_REACTIVATION`
+    - `Write Result=NO_WRITE_REQUIRED`
+  - `A1-KSU1-GZMS` remained blocked on old execution history because it is already below floor and did not need a downward floor-seek write.
+
+E-cycle
+- Not involved.
+
+Verification status: Verified in live H runtime
+Changed at: 2026-03-07T17:16:30Z
+Latest health snapshot at: 2026-03-07T16:49:09Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-07 16:45 UTC]
+Ticket: SUPPRESSION TRUTH UNIFICATION AND STATUS FIX
+
+Scope
+- Unified live suppression truth across runtime snapshot, dashboard combined view, and published pricing dashboard.
+- Kept capability, writer outcome, observed price, Buy Box truth, and active ceiling separate.
+- No E-cycle files or processes were changed.
+
+Code changes
+1) Unified suppression truth helper
+- File: scripts/h/h_suppression_truth.py
+- Added shared suppression truth loader and resolver for:
+  - latest suppression state
+  - latest suppression writer outcome
+  - latest observed live price
+  - true binding ceiling vs generic model ceiling
+  - truth-status mapping for display
+
+2) Runtime snapshot truth enrichment
+- File: scripts/cycles/run_H_pricing_cycle.py
+- Enriched `out/phase1_runtime_floor_snapshot_latest.csv` with unified suppression fields:
+  - suppression state and writer outcome
+  - observed live price
+  - true binding ceiling
+  - truth status
+- Suppression clamp now overrides generic model ceiling in runtime truth when suppression is active.
+
+3) Dashboard truth model fix
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Dashboard Status no longer comes from scope capability alone.
+- Added explicit truth columns:
+  - Buy Box
+  - State
+  - Write Result
+  - Capability
+  - Ceiling Type
+  - Model Ceiling
+- Dashboard Ceiling now shows the true active ceiling.
+- Generic model ceiling remains visible separately.
+- Current price now prefers the latest observed live price.
+- Suppressed SKUs now publish as:
+  - `SUPP_BLOCKED`
+  - `SUPP_APPLIED`
+  - `SUPPRESSED`
+  instead of misleading green/write capability states.
+
+4) Master plan update
+- File: out/process_guides/repricing_tool/master plans/masterplan_v10.md
+- Added section:
+  - `15A) SUPPRESSION TRUTH MODEL`
+- Defined:
+  - write capability
+  - write attempt
+  - write applied
+  - suppression active
+  - suppression resolved
+  - displayed ceiling field
+  - true binding ceiling
+- Explicitly required dashboard/status truth to follow suppression truth and writer outcome, not eligibility alone.
+
+Proof
+- Rebuilt live runtime truth snapshot:
+  - `out/phase1_runtime_floor_snapshot_latest.csv`
+  - utc=2026-03-07T16:45:22Z
+  - rows=58
+- Republished live pricing dashboard:
+  - tab=`PRICING_DASHBOARD`
+  - publish result=`ok`
+  - view rows=53
+
+Verification cases
+- HS-R5IP-7E1C
+  - Status=`SUPP_BLOCKED`
+  - Current=`5.70`
+  - Competitor=`5.70`
+  - Ceiling=`5.70`
+  - Buy Box=`SUPPRESSED_ASIN`
+  - State=`STATE_SUPPRESSION_REACTIVATION`
+  - Write Result=`READ_ONLY_NO_WRITE`
+  - Capability=`WRITE_CAPABLE`
+  - Ceiling Type=`SUPPRESSION_TEMP`
+  - Model Ceiling=`17.99`
+- TJ-6LOP-OPEU
+  - Status=`SUPP_BLOCKED`
+  - Current=`8.68`
+  - Competitor=`8.68`
+  - Ceiling=`8.68`
+  - Write Result=`READ_ONLY_NO_WRITE`
+  - Model Ceiling=`9.00`
+- LP-QMNJ-J49G
+  - Status=`SUPP_BLOCKED`
+  - Current=`5.79`
+  - Ceiling=`5.99`
+  - Write Result=`WRITE_NOT_APPLIED`
+  - Ceiling Type=`SUPPRESSION_TEMP`
+- W3-8FN7-FSP0
+  - Status=`SUPP_APPLIED`
+  - Current=`7.87`
+  - Ceiling=`7.87`
+  - Write Result=`APPLIED`
+  - Model Ceiling=`17.99`
+
+Result
+- Misleading green/write presentation removed for unresolved suppressed SKUs.
+- True suppression clamp is now the displayed active ceiling when suppression is active.
+- Capability remains visible but no longer masquerades as success.
+
+Verification status: Verified in live artifact rebuild and dashboard republish
+Changed at: 2026-03-07T16:45:22Z
+Latest health snapshot at: 2026-03-04T11:39:16Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 16:21:41 UTC - Ticket: Suppression Threshold Inference Automation
+
+Scope
+- Integrated generic suppression threshold inference into the live Phase 1/H suppression reactivation path.
+- Updated the canonical masterplan section for suppression threshold inference.
+
+Approved changes
+- Added runtime inference rule:
+  - if `buy_box_state = SUPPRESSED_ASIN`
+  - and competitor offers exist
+  - and no offer holds the Buy Box
+  - then `suppression_threshold_upper_bound = lowest_competitor_price`
+- Wired the inferred upper bound into the existing suppression probe start logic so probing begins from the inferred bound instead of current price.
+- Preserved existing hard floor, anchor floor, suppression ceiling clamp, and learning isolation behavior.
+- Extended write verification timing in the existing live writer path so delayed Amazon application is still verified through the normal runtime flow.
+
+Files changed
+- `scripts/phase1/phase1_ceilings.py`
+- `scripts/phase1/phase1_probe_engine.py`
+- `scripts/phase1/phase1_main_loop.py`
+- `tests/test_phase1_ceilings.py`
+- `tests/test_phase1_probe_engine.py`
+- `tests/test_phase1_main_loop.py`
+- `out/process_guides/repricing_tool/master plans/masterplan_v10.md`
+
+Evidence
+- Naturally occurring suppressed SKU `W3-8FN7-FSP0` met the automation conditions with no SKU-specific handling.
+- Live runtime evidence:
+  - previous price=`7.99`
+  - lowest competitor=`7.87`
+  - inferred upper bound=`7.87`
+  - probe start=`7.87`
+  - `write_status=APPLIED`
+  - readback price=`7.87`
+- Additional naturally occurring suppressed SKUs `HS-R5IP-7E1C` and `TJ-6LOP-OPEU` also showed the same inferred-start behavior at `5.70` and `8.68`.
+
+Verification
+- Targeted regression checks passed for the suppression inference path and related runtime behavior.
+- Verification status: Pending next cycle check
+- Changed at: 2026-03-07T16:10:00Z
+- Latest health snapshot at: 2026-03-04T10:22:05Z
+- Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+## 2026-03-07 12:16 UTC
+Ticket: Restore A-run stock receipt token collection and surface failures in health checks
+
+Approved change
+- Moved `process_stock_receipts_sheet.py` earlier in the A cycle so receipt token collection does not depend on the full A chain finishing.
+- Added `PYTHONPATH` bootstrap to `run_A_all.bat` and A subprocess env setup so A-launched token scripts can import `scripts.core`.
+- Tightened A receipt-step handling so real receipt failures are surfaced instead of being masked as a generic guardrail skip.
+- Added A015 check `a_stock_receipts_collection_health` to alert when the latest A manifest is missing, stale, skipped the receipts step, or the receipts step failed.
+- Added targeted tests for receipt-health success, failed-step, and no-op success cases.
+
+Evidence
+- Manual run `run_A_all.bat` reached `process_stock_receipts_sheet.py` and completed that step with `rc=0` in `out/manifests/A/2026-03-07/20260307T120228Z.json`.
+- `out/stock_receipt_summary.csv` updated on 2026-03-07 12:03 UTC with 9 applied rows and 129 tokens created.
+- Applied batch_ids:
+  - `SR-20260112-002`
+  - `SR-20260112-003`
+  - `SR-20250107-001`
+  - `SR-20250127-001`
+  - `SR-20251006-003`
+  - `SR-20260112-004`
+  - `SR-20260219-001`
+  - `SR-20260219-002`
+  - `SR-20260219-003`
+- Targeted verification passed:
+  - `python -m py_compile scripts/cycles/run_A_all.py`
+  - `python -m py_compile scripts/flows/A/A015_build_system_health_check.py tests/test_a015_health_check_runtime.py`
+  - `python -m unittest tests.test_a015_health_check_runtime.A015HealthCheckRuntimeTests.test_a_stock_receipts_step_health_uses_latest_manifest`
+  - `python -m unittest tests.test_a015_health_check_runtime.A015HealthCheckRuntimeTests.test_a_stock_receipts_step_health_flags_failed_step`
+  - `python -m unittest tests.test_a015_health_check_runtime.A015HealthCheckRuntimeTests.test_a_stock_receipts_step_health_keeps_noop_success_ok`
+
+Open issue
+- The manual A run was interrupted later during `A003_run_inventory_to_sheet.py`. Receipt collection was confirmed fixed, but full A-cycle completion remains a separate issue.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-07T12:14:10Z
+Latest health snapshot at: 2026-03-04T10:22:05Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-01 14:29 UTC]
+Ticket: TASK 13 - Resume H stage gating at (c) with H_GATING_MODE=1
+
+Stage gating table (continued)
+| stage | config (SNAPSHOT,ITEM_OFFERS,PILOT,INTEL,PUBLISH) | run_id | H rc | A015 global fail | A015 global warn | new failing keys | result |
+|---|---|---|---:|---:|---:|---|---|
+| (c) phase1_intel alignment | 1,1,0,1,0 | 20260301T142745Z | 0 | 0 | 0 | none | pass |
+
+Commands run:
+- H run (single): un_H_cycle.bat with
+  - H_GATING_MODE=1
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - H_STAGE_ITEM_OFFERS=1
+  - H_STAGE_PHASE1_PILOT=0
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PUBLISH=0
+  - H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1
+- Health check:
+  - python scripts/flows/A/A015_build_system_health_check.py --profile global --no-toast
+
+Stop condition check:
+- New FAIL introduced: no
+- Continue gating sequence to stage (d).
+---
+[2026-03-01 14:40 UTC]
+Ticket: TASK 14 - Diagnose and fix h_spapi_lock_present WARN (SP-API lock lifecycle)
+
+Diagnosis report
+- Added short report: docs/REPORT_H_SPAPI_LOCK_PRESENT.md
+- A015 check path and rule:
+  - file: out/locks/spapi.lock
+  - status rule: present => WARN, and FAIL when age > 2.0h
+  - refs: scripts/flows/A/A015_build_system_health_check.py:70,3598-3606
+- Lock writer/remover ownership:
+  - writer: scripts/api/spapi_owner.py (cquire_spapi_lock)
+  - called by: _spapi_request(...)
+  - remover: elease_spapi_lock() in _spapi_request finally
+
+Code changes (lock lifecycle only)
+- File: scripts/api/spapi_owner.py
+- Added stale lifecycle handling for out/locks/spapi.lock:
+  - stale/dead/invalid lock payloads are archived to out/locks/archive/spapi.lock.<timestamp>
+  - configurable stale threshold: SPAPI_LOCK_STALE_SECONDS (default 600s)
+- Ensured clean-exit removal:
+  - _spapi_request(...) now acquires lock at entry and releases in inally when acquired
+- Added invalid payload recovery:
+  - unreadable JSON lock payload now archives and retries instead of leaving persistent WARN artifact
+
+Proof
+1) Stale/dead lock simulation and auto-archive
+- Wrote simulated stale lock at out/locks/spapi.lock (dead pid, ancient timestamps, invalid/unreadable JSON scenario).
+- Verified recovery path by invoking lock acquire path directly:
+  - cquired=True
+  - stale lock archived at out/locks/archive/spapi.lock.20260301T143653Z
+  - release removed live lock (exists_post_release=False)
+
+2) Relevant SP-API job run once
+- Ran one SP-API job directly (inventory summaries):
+  - inline call to etch_inventory_summaries(...) via scripts/api/get_inventory_summaries.py
+  - output: ows=50 next_token=False
+- After job: out/locks/spapi.lock absent.
+
+3) A015 global check
+- Command: python scripts\\flows\\A\\A015_build_system_health_check.py --profile global --no-toast
+- h_spapi_lock_present row:
+  - status=ok, alue=0
+
+Caveat (unrelated to SP-API lock lifecycle)
+- Latest global A015 still has unrelated H issues after separate H runs during verification:
+  - FAIL: h_cycle_stale_lock
+  - WARN: h_seller_snapshot_landed_non_null_training, h_seller_snapshot_landed_ge_listing, h_seller_snapshot_shipping_non_negative
+- These are outside SP-API lock lifecycle scope for TASK 14.
+---
+[2026-03-01 14:43 UTC]
+Ticket: TASK 15 - Continue H stage gating at (d) ladder/decision build with H_GATING_MODE=1
+
+Stage gating table (continued)
+| stage | config (SNAPSHOT,ITEM_OFFERS,PILOT,INTEL,PUBLISH) | run_id | H rc | A015 global fail | A015 global warn | newly failing keys | newly warning keys | result |
+|---|---|---|---:|---:|---:|---|---|---|
+| (d) ladder/decision build | 1,1,1,1,0 | 20260301T144150Z | 0 | 0 | 3 | none | none | pass |
+
+Run details
+- H command profile:
+  - H_GATING_MODE=1
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - H_STAGE_ITEM_OFFERS=1
+  - H_STAGE_PHASE1_PILOT=1
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PUBLISH=0
+  - H_LIVE_WRITE=0
+- Health check:
+  - python scripts/flows/A/A015_build_system_health_check.py --profile global --no-toast
+
+Comparison vs pre-run baseline
+- Pre: fail=1 (h_cycle_stale_lock), warn=3 (h_seller_snapshot_landed_non_null_training|h_seller_snapshot_landed_ge_listing|h_seller_snapshot_shipping_non_negative)
+- Post: fail=0, warn=3 (same warning keys)
+- New FAIL keys: none
+- New WARN keys: none
+
+Stop condition
+- No new FAIL/WARN introduced at stage (d); stop condition not triggered.
+---
+[2026-03-01 14:56 UTC]
+Ticket: TASK 17 - Fix seller snapshot WARNs with run-scoped snapshot artifact preference
+
+Scope
+- No pricing logic/decision changes.
+- Implemented snapshot artifact pathing + A015 selection preference only.
+
+Code changes
+1) H run-scoped seller snapshot write
+- File: scripts/cycles/run_H_pricing_cycle.py
+- Added atomic CSV writer helper:
+  - _atomic_write_csv(path, frame) (StringIO -> _atomic_write_text tmp+replace)
+- In snapshot refresh, added run-scoped output write (always written):
+  - out/snapshots/H/<run_id>/listing_offer_seller_snapshot.csv
+- Added log line:
+  - snapshot_refresh run_scoped_seller_snapshot path=... rows=...
+
+2) A015 seller snapshot selection preference
+- File: scripts/flows/A/A015_build_system_health_check.py
+- Added _preferred_seller_snapshot_path():
+  - If H_RUN_ID env var is set and out/snapshots/H/<H_RUN_ID>/listing_offer_seller_snapshot.csv exists, A015 uses it.
+  - Otherwise falls back to existing behavior: latest mtime from out/listing_offer_seller_snapshot_*.csv.
+- Existing WARN behavior unchanged for truly empty selected snapshots.
+
+Proof (requested config from TASK 15 profile)
+1) H run
+- Env:
+  - H_GATING_MODE=1
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - H_STAGE_ITEM_OFFERS=1
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PILOT=1
+  - H_STAGE_PHASE1_PUBLISH=0
+  - H_LIVE_WRITE=0
+- Result:
+  - un_id=20260301T145104Z
+  - H rc=0
+
+2) Run-scoped snapshot artifact
+- Path:
+  - out/snapshots/H/20260301T145104Z/listing_offer_seller_snapshot.csv
+- Exists: yes
+- Row count: 106
+- Log evidence:
+  - snapshot_refresh run_scoped_seller_snapshot path=...\out\snapshots\H\20260301T145104Z\listing_offer_seller_snapshot.csv rows=106
+
+3) A015 global with run preference
+- Command:
+  - H_RUN_ID=20260301T145104Z python scripts/flows/A/A015_build_system_health_check.py --profile global --no-toast
+- Result summary:
+  - ail=0
+  - warn=0
+- Target checks:
+  - h_seller_snapshot_landed_non_null_training = ok (value=0, training_rows=5)
+  - h_seller_snapshot_landed_ge_listing = ok (value=0, comparable_rows=5)
+  - h_seller_snapshot_shipping_non_negative = ok (value=0, shipping_rows=5)
+
+Verification status: Verified in controlled run
+Changed at: 2026-03-01T14:55:00Z
+Latest health snapshot at: 2026-03-01T14:54:26.851205+00:00
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-01 15:05 UTC]
+Ticket: TASK 18 - Enable stage (e) publish outputs in gating mode (writes off)
+
+Run configuration
+- H_GATING_MODE=1
+- H_RUN_ONCE=1
+- H_STAGE_SNAPSHOT_REFRESH=1
+- H_STAGE_ITEM_OFFERS=1
+- H_STAGE_PHASE1_PILOT=1
+- H_STAGE_PHASE1_INTEL=1
+- H_STAGE_PHASE1_PUBLISH=1
+- H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1
+- H_LIVE_WRITE=0
+
+Run result
+- run_id=20260301T145840Z
+- H rc=0
+
+Publish evidence
+- H log: phase1 publish_done status=ok
+- H log: phase1 observation_publish status=ok view_tab=2026-03-01 rows=54
+- H log: phase1 staged_precommit_diag ... staged_file_count=13 ... missing_tables=none
+- H publish markers:
+  - out/systems/H/live/H_cycle_last_publish_run_id.txt = 20260301T145840Z
+  - out/systems/H/live/H_cycle_last_completed_run_id.txt = 20260301T145840Z
+  - out/systems/H/live/H_cycle_last_publish_info.txt status=ok rows=54 view_tab=2026-03-01
+- Staged artifacts (out/systems/H/staged/20260301T145840Z/data):
+  - daily_intel_refresh_attempts.csv rows=59
+  - decision_log.csv rows=30
+  - execution_log.csv rows=30
+  - oas_log.csv rows=0
+  - offer_snapshot_facts.csv rows=153
+  - offer_variants.csv rows=96
+  - probe_windows.csv rows=46
+  - scenario_rollup.csv rows=30
+  - sku_ceiling_events.csv rows=13463
+  - sku_daily_intel.csv rows=51
+  - sku_phase_state.csv rows=20
+  - sku_phase_transition_log.csv rows=20
+  - variant_delta_memory.csv rows=1
+
+A015 global evaluation
+- Command:
+  - H_RUN_ID=20260301T145840Z python scripts/flows/A/A015_build_system_health_check.py --profile global --no-toast
+- Result:
+  - fail=0
+  - warn=0
+
+Lock cleanup
+- out/systems/H/live/H_pricing_cycle.lock: absent
+- out/H_pricing_cycle.lock: absent
+
+Stage gating table update
+- Stage (e) publish outputs
+- run_id=20260301T145840Z
+- H rc=0
+- A015 global fail=0 warn=0
+- new failing keys: none
+
+Verification status: Verified in controlled run
+Changed at: 2026-03-01T15:03:22Z
+Latest health snapshot at: 2026-03-01T15:05:14.0000000Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-01 15:19 UTC]
+Ticket: TASK 20 - Make Floor portfolio-deterministic for observation sheet
+
+Scope
+- No pricing decision logic changes.
+- Added portfolio-wide floor artifact build and wired observation sheet to use it as primary Floor source.
+- Kept runtime floor fields as fallback.
+
+Code changes
+1) New A-cycle floor builder
+- File: scripts/flows/A/A018_build_phase1_floor_table.py
+- New artifact: out/phase1_floor_table_latest.csv
+- Required columns written:
+  - sku
+  - floor_gbp
+  - floor_source (calc_v1)
+  - floor_calc_ts_utc
+  - floor_reason_code
+- Universe definition matches A015 non-parked requirement logic:
+  - source: out/phase1_sku_scope.csv
+  - parked excluded via parked_flag + out/parking/parked_skus.csv
+  - dropped excluded via sale_status=dropped
+- One row is always written per required SKU.
+  - If floor unavailable, floor_gbp blank and floor_reason_code populated.
+
+2) H cycle wiring before publish
+- File: scripts/cycles/run_H_pricing_cycle.py
+- Added phase1 floor table build step before publish:
+  - runs A018_build_phase1_floor_table.py
+  - logs: phase1 floor_table_build status=... required=... rows=... populated=... reason_coded=...
+
+3) Observation sheet Floor source priority
+- File: scripts/flows/H/H130_build_phase1_observation_sheet.py
+- Added floor table input path:
+  - default: out/phase1_floor_table_latest.csv
+- Floor selection now:
+  1. floor_table_gbp (primary)
+  2. execution_hard_floor_gbp (runtime fallback)
+  3. trace_floor_total_gbp (runtime fallback)
+- If floor still unavailable, Floor displays visible reason text (RUNTIME_FLOOR_MISSING) instead of silent blank.
+
+Proof run (publish config equivalent to TASK 18)
+- Env:
+  - H_GATING_MODE=1
+  - H_RUN_ONCE=1
+  - H_STAGE_SNAPSHOT_REFRESH=1
+  - H_STAGE_ITEM_OFFERS=1
+  - H_STAGE_PHASE1_PILOT=1
+  - H_STAGE_PHASE1_INTEL=1
+  - H_STAGE_PHASE1_PUBLISH=1
+  - H_PHASE1_OBSERVATION_PUBLISH_ENABLED=1
+  - H_LIVE_WRITE=0
+- Result:
+  - run_id=20260301T151412Z
+  - H rc=0
+- H log evidence:
+  - phase1 floor_table_build status=ok required=51 rows=51 populated=51 reason_coded=0
+
+Artifact counts
+- out/phase1_floor_table_latest.csv:
+  - total required SKUs=51
+  - rows written=51
+  - floors populated=51
+  - floors missing but reason-coded=0
+- out/analysis_reports/phase1_observation_view_2026-03-01.csv (required SKU join):
+  - required SKUs=51
+  - required SKUs present in view=51
+  - Floor blank=0
+  - Floor numeric=51
+  - Floor reason-coded=0
+
+Sample rows (floor table)
+- 0G-JB6S-PN34 floor_gbp=6.22 floor_reason_code=
+- 6Q-9G2A-IKVV floor_gbp=15.39 floor_reason_code=
+- 714810 floor_gbp=4.66 floor_reason_code=
+- A1-KSU1-GZMS floor_gbp=3.92 floor_reason_code=
+- AX-NKNU-29C1 floor_gbp=2.91 floor_reason_code=
+
+Lock state after run
+- out/systems/H/live/H_pricing_cycle.lock absent
+- out/H_pricing_cycle.lock absent
+
+Verification status: Verified in controlled run
+Changed at: 2026-03-01T15:18:47Z
+Latest health snapshot at: unchanged in this ticket (A015 not run in this task)
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---

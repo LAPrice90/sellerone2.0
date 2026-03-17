@@ -1,4 +1,4 @@
-"""
+﻿"""
 Add placeholder purchase rows to Orders sheet for missing SKUs.
 Quantities are set to expected_token_total from Token_Stock_Recon_Mismatches.
 """
@@ -110,3 +110,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

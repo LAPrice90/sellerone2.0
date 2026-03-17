@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SellerOne System Flow Chart</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2a37;
+      --muted: #4b5563;
+      --border: #d1d9e6;
+      --sd: #dbeafe;
+      --pf: #e9d5ff;
+      --op: #dcfce7;
+      --di: #fef3c7;
+      --pm: #fee2e2;
+      --sg: #dbeafe;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px 20px 30px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.2;
+    }
+
+    .note {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .lane {
+      display: grid;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .governance-lane {
+      grid-template-columns: 1fr;
+    }
+
+    .main-lane {
+      grid-template-columns: minmax(180px, 1fr) 58px minmax(180px, 1fr) 58px minmax(180px, 1fr) 58px minmax(180px, 1fr);
+      margin-top: 10px;
+    }
+
+    .portfolio-lane {
+      grid-template-columns: minmax(180px, 1fr) 58px minmax(180px, 1fr) 58px minmax(180px, 1fr) 58px minmax(180px, 1fr);
+    }
+
+    .box {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      min-height: 140px;
+      box-shadow: 0 4px 14px rgba(17, 24, 39, 0.06);
+    }
+
+    .box h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .sub {
+      margin: 0;
+      font-size: 16px;
+      color: #243042;
+    }
+
+    .sg { background: var(--sg); }
+    .sd { background: var(--sd); }
+    .pf { background: var(--pf); }
+    .op { background: var(--op); }
+    .di { background: var(--di); }
+    .pm { background: var(--pm); }
+
+    .arrow {
+      text-align: center;
+      font-size: 42px;
+      font-weight: 700;
+      color: #334155;
+      user-select: none;
+    }
+
+    .down-arrows {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: -6px;
+      margin-bottom: 6px;
+      color: #475569;
+      font-weight: 700;
+      font-size: 22px;
+      text-align: center;
+    }
+
+    .portfolio-links {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: -8px;
+      color: #475569;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .portfolio-links div:nth-child(2),
+    .portfolio-links div:nth-child(3) {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .spacer { min-height: 1px; }
+
+    .legend {
+      margin-top: 8px;
+      background: #eef2f7;
+      border: 1px solid #d6deea;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    .footer {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #475569;
+    }
+
+    code {
+      background: #edf2f7;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+
+    @media (max-width: 1024px) {
+      .main-lane,
+      .portfolio-lane {
+        grid-template-columns: 1fr;
+      }
+      .arrow,
+      .portfolio-links,
+      .down-arrows {
+        display: none;
+      }
+      .box {
+        min-height: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SellerOne System Flow Chart</h1>
+    <p class="note">High-level system flow for navigation. This chart shows flow and relationships, not detailed feature completion.</p>
+
+    <div class="lane governance-lane">
+      <section class="box sg">
+        <h2>System Governance</h2>
+        <p class="sub">roadmap, expectations, progress, health monitoring</p>
+      </section>
+    </div>
+
+    <div class="down-arrows">
+      <div>&darr;</div>
+      <div>&darr;</div>
+      <div>&darr;</div>
+      <div>&darr;</div>
+    </div>
+
+    <div class="lane main-lane">
+      <section class="box sd">
+        <h2>Supplier Discovery</h2>
+        <p class="sub">finds suppliers and price lists</p>
+      </section>
+
+      <div class="arrow">&rarr;</div>
+
+      <section class="box pf">
+        <h2>Product Feeder</h2>
+        <p class="sub">turns price lists into approved product candidates</p>
+      </section>
+
+      <div class="arrow">&rarr;</div>
+
+      <section class="box op">
+        <h2>Operations Loop</h2>
+        <p class="sub">restock, order, receive, send to Amazon</p>
+      </section>
+
+      <div class="arrow">&rarr;</div>
+
+      <section class="box di">
+        <h2>Data / Intelligence Layer</h2>
+        <p class="sub">A, B, E, H cycles track performance and pricing</p>
+      </section>
+    </div>
+
+    <div class="portfolio-links">
+      <div></div>
+      <div>&darr;<br><span style="font-size:13px;font-weight:600;">from Product Feeder</span></div>
+      <div>&darr;<br><span style="font-size:13px;font-weight:600;">from Operations Loop</span></div>
+      <div></div>
+    </div>
+
+    <div class="lane portfolio-lane">
+      <div class="spacer"></div>
+      <div class="spacer"></div>
+      <section class="box pm">
+        <h2>Portfolio Management</h2>
+        <p class="sub">dropped, discontinued, recoverable product paths</p>
+      </section>
+      <div class="spacer"></div>
+      <div class="spacer"></div>
+      <div class="spacer"></div>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="legend">
+      <strong>Note:</strong> This chart shows system flow and zone relationships. Use roadmap and expectation documents for detailed completion and reliability tracking.
+    </div>
+
+    <div class="footer">
+      Related docs: <code>ROADMAP_SYSTEM_MAP.md</code> | <code>ZONE_INDEX.md</code> | <code>SYSTEM_PROGRESS_CHART.md</code>
+    </div>
+  </div>
+</body>
+</html>

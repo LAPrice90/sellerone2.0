@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fetch FBA inventory summaries with optional pagination.
 """
 
@@ -117,3 +117,4 @@ def fetch_inventory_summaries(
     records = summaries.get("inventorySummaries") or []
     nt = summaries.get("nextToken")
     return records, nt
+

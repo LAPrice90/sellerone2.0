@@ -1,7 +1,7 @@
-import unittest
+﻿import unittest
 from decimal import Decimal
 
-from scripts import phase1_dve
+from scripts.phase1 import phase1_dve
 
 
 class Phase1DveTests(unittest.TestCase):
@@ -52,3 +52,4 @@ class Phase1DveTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1,0 +1,14 @@
+{
+  "files.exclude": {
+    "out/*.csv": true,
+    "out/*.json": true,
+    "out/*.jsonl": true,
+    "out/*.txt": true,
+    "out/*.log": true,
+    "out/*.flag": true,
+    "out/*.yaml": true,
+    "out/*.yml": true
+  },
+  "explorer.compactFolders": false,
+  "git.ignoreLimitWarning": true
+}

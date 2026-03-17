@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from scripts.api.get_financial_events import get_lwa_access_token, load_dotenv_if_missing, require_env
 from scripts.api.spapi_owner import SpApiCallContext, spapi_get
@@ -99,6 +99,7 @@ def fetch_our_offer_prices(
     script_name: str = "",
     sleep_sec: float = 0.25,
     timeout: int = 30,
+    progress_callback: Callable[..., None] | None = None,
 ) -> Dict[str, Dict[str, str]]:
     """
     Fetch our offer prices for SKUs (one-by-one; Listings Items has no batch).
@@ -110,6 +111,8 @@ def fetch_our_offer_prices(
 
     uniq = [s for s in dict.fromkeys(skus) if s]
     for i, sku in enumerate(uniq, start=1):
+        if callable(progress_callback):
+            progress_callback(stage="listings_items", index=i, total=len(uniq), sku=sku)
         params = {
             "marketplaceIds": marketplace_id,
             "includedData": "offers",
@@ -155,6 +158,7 @@ def run_own_offer_price_lookup(
     marketplace_id: str,
     run_id: str = "",
     script_name: str = "",
+    progress_callback: Callable[..., None] | None = None,
 ) -> Dict[str, Dict[str, str]]:
     """
     Helper for scripts: loads env, gets LWA token, fetches our offer prices.
@@ -180,4 +184,6 @@ def run_own_offer_price_lookup(
         run_id=run_id,
         script_name=script_name,
         sleep_sec=sleep_sec,
+        progress_callback=progress_callback,
     )
+

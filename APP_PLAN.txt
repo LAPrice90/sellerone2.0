@@ -1,3 +1,8 @@
+REFERENCE-ONLY LEGACY PLANNING NOTES
+- This file contains legacy planning notes.
+- This file is reference-only.
+- This file is not authoritative project state.
+
 SellerOne App Bible (No Chaos, Full Transparency)
 ================================================
 

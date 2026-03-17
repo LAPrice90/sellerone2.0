@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import csv
 import os
+import shutil
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,16 +19,24 @@ from scripts.api.get_inventory_summaries import (
 from scripts.api.get_listing_item_price import run_own_offer_price_lookup
 from scripts.api.get_pricing import run_market_context_lookup_with_offers
 from scripts.api.spapi_owner import SpApiCallContext, acquire_spapi_lock, release_spapi_lock, spapi_get
-from scripts.f_training_set import load_training_set
-from scripts.H002_build_phase1_seller_history import build_phase1_seller_history
+try:
+    from scripts.tools.f_training_set import load_training_set
+except ModuleNotFoundError:
+    from scripts.f_training_set import load_training_set
+try:
+    from scripts.flows.H.H002_build_phase1_seller_history import build_phase1_seller_history
+except ModuleNotFoundError:
+    from scripts.H002_build_phase1_seller_history import build_phase1_seller_history
+from scripts.core.out_paths import resolve_compat_path, write_csv_with_compat
 
 OUT = Path("out")
-API_RUN_LOG = OUT / "api_run_log.csv"
-LISTING_OFFER_HISTORY_PATH = OUT / "listing_offer_history.csv"
-LISTING_OFFER_SELLER_HISTORY_PATH = OUT / "listing_offer_seller_observation_history.csv"
-INVENTORY_HISTORY_PATH = OUT / "inventory_history.csv"
-INBOUND_HISTORY_PATH = OUT / "inbound_history.csv"
-REFUND_ADJUSTMENT_HISTORY_PATH = OUT / "refund_adjustment_history.csv"
+API_RUN_LOG_REL = "api_run_log.csv"
+LISTING_OFFER_HISTORY_REL = "listing_offer_history.csv"
+LISTING_OFFER_SELLER_HISTORY_REL = "listing_offer_seller_observation_history.csv"
+INVENTORY_HISTORY_REL = "inventory_history.csv"
+INBOUND_HISTORY_REL = "inbound_history.csv"
+REFUND_ADJUSTMENT_HISTORY_REL = "refund_adjustment_history.csv"
+INVENTORY_DEDUP_REPORT_DIR = OUT / "cycle_alerts"
 
 LISTING_REQUIRED_COLUMNS: List[str] = [
     "timestamp_utc",
@@ -183,18 +192,49 @@ def _append_note(existing: str, note: str) -> str:
     return base + " | " + add
 
 
+def _update_latest_snapshot_pointer(snapshot_path: Path, latest_filename: str) -> None:
+    latest_path = snapshot_path.parent / latest_filename
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{latest_path.stem}.",
+            suffix=latest_path.suffix,
+            dir=str(latest_path.parent),
+            delete=False,
+        ) as tmp:
+            temp_path = Path(tmp.name)
+        shutil.copyfile(snapshot_path, temp_path)
+        temp_path.replace(latest_path)
+        print(f"Latest snapshot pointer updated: {latest_filename}")
+    except Exception as exc:
+        print(f"[API_COLLECTION] WARN latest snapshot pointer update failed for {latest_filename}: {exc}")
+        if temp_path is not None and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+
+
 def _upsert_history(
     *,
     snapshot: pd.DataFrame,
-    history_path: Path,
+    history_rel: str,
     required_columns: Sequence[str],
     key_columns: Sequence[str],
 ) -> pd.DataFrame:
+    resolved = resolve_compat_path(history_rel)
+    history_path = resolved.live_path
     if history_path.exists():
         try:
             history = pd.read_csv(history_path, dtype=str).fillna("")
         except Exception as exc:
             print(f"[API_COLLECTION] WARN failed to read {history_path}; rebuilding: {exc}")
+            history = pd.DataFrame(columns=list(required_columns))
+    elif resolved.legacy_path.exists():
+        try:
+            history = pd.read_csv(resolved.legacy_path, dtype=str).fillna("")
+        except Exception as exc:
+            print(f"[API_COLLECTION] WARN failed to read {resolved.legacy_path}; rebuilding: {exc}")
             history = pd.DataFrame(columns=list(required_columns))
     else:
         history = pd.DataFrame(columns=list(required_columns))
@@ -210,9 +250,127 @@ def _upsert_history(
         key = key + "||" + combined[col].astype(str)
     combined = combined.assign(_key=key).drop_duplicates(subset=["_key"], keep="last").drop(columns=["_key"])
     combined = _ensure_columns(combined, required_columns)
-    history_path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_csv(history_path, index=False)
+    write_csv_with_compat(combined, path_or_rel=history_rel, default_system=resolved.system, index=False, mirror_legacy=True)
     return combined
+
+
+def _rewrite_history_today_partition(
+    *,
+    snapshot: pd.DataFrame,
+    snapshot_date: str,
+    history_rel: str,
+    required_columns: Sequence[str],
+    key_columns: Sequence[str],
+    report_prefix: str,
+) -> Tuple[pd.DataFrame, Dict[str, str]]:
+    resolved = resolve_compat_path(history_rel)
+    history_path = resolved.live_path
+    if history_path.exists():
+        try:
+            history = pd.read_csv(history_path, dtype=str).fillna("")
+        except Exception as exc:
+            print(f"[API_COLLECTION] WARN failed to read {history_path}; rebuilding: {exc}")
+            history = pd.DataFrame(columns=list(required_columns))
+    elif resolved.legacy_path.exists():
+        try:
+            history = pd.read_csv(resolved.legacy_path, dtype=str).fillna("")
+        except Exception as exc:
+            print(f"[API_COLLECTION] WARN failed to read {resolved.legacy_path}; rebuilding: {exc}")
+            history = pd.DataFrame(columns=list(required_columns))
+    else:
+        history = pd.DataFrame(columns=list(required_columns))
+
+    history = _ensure_columns(history, required_columns)
+    snapshot = _ensure_columns(snapshot, required_columns).copy()
+    snapshot["asof_date"] = snapshot.get("asof_date", "").astype(str).str.strip()
+    snapshot_today = snapshot.loc[snapshot["asof_date"].eq(snapshot_date)].copy()
+    snapshot_today["_stable_order"] = list(range(len(snapshot_today.index)))
+    if "timestamp_utc" in snapshot_today.columns:
+        snapshot_today["_order_ts"] = pd.to_datetime(snapshot_today["timestamp_utc"], errors="coerce", utc=True)
+    else:
+        snapshot_today["_order_ts"] = pd.NaT
+
+    key_cols = [c for c in key_columns if c in snapshot_today.columns]
+    dup_mask = snapshot_today.duplicated(subset=key_cols, keep=False) if key_cols else pd.Series([], dtype=bool)
+    dup_rows = int(dup_mask.sum()) if len(dup_mask.index) else 0
+    dup_groups = int(snapshot_today.loc[dup_mask, key_cols].drop_duplicates().shape[0]) if dup_rows else 0
+
+    if key_cols:
+        sort_cols = key_cols + ["_order_ts", "_stable_order"]
+        sort_asc = [True] * len(key_cols) + [False, True]
+        snapshot_today = snapshot_today.sort_values(sort_cols, ascending=sort_asc, kind="stable")
+        dedup_today = snapshot_today.drop_duplicates(subset=key_cols, keep="first").copy()
+    else:
+        dedup_today = snapshot_today.copy()
+    dedup_today = dedup_today.drop(columns=["_stable_order", "_order_ts"], errors="ignore")
+
+    for col in key_columns:
+        if col not in history.columns:
+            history[col] = ""
+    history["asof_date"] = history.get("asof_date", "").astype(str).str.strip()
+    is_today = history["asof_date"].eq(snapshot_date)
+    if "marketplace" in history.columns and "marketplace" in dedup_today.columns:
+        marketplaces_today = {
+            str(v).strip().upper()
+            for v in dedup_today.get("marketplace", pd.Series([], dtype=str)).astype(str).tolist()
+            if str(v).strip()
+        }
+        history["marketplace"] = history["marketplace"].astype(str).str.strip().str.upper()
+        if marketplaces_today:
+            is_today = is_today & history["marketplace"].isin(marketplaces_today)
+        dedup_today["marketplace"] = dedup_today["marketplace"].astype(str).str.strip().str.upper()
+    history_keep = history.loc[~is_today].copy()
+
+    merged_cols = list(history_keep.columns)
+    for col in dedup_today.columns:
+        if col not in merged_cols:
+            merged_cols.append(col)
+    history_keep = history_keep.reindex(columns=merged_cols, fill_value="")
+    dedup_today = dedup_today.reindex(columns=merged_cols, fill_value="")
+    merged = pd.concat([history_keep, dedup_today], ignore_index=True)
+    merged = _ensure_columns(merged, required_columns)
+    write_csv_with_compat(merged, path_or_rel=history_rel, default_system=resolved.system, index=False, mirror_legacy=True)
+
+    merged_today = merged.loc[merged["asof_date"].astype(str).str.strip().eq(snapshot_date)].copy()
+    merged_key_cols = [c for c in key_columns if c in merged_today.columns]
+    merged_dup_mask = (
+        merged_today.duplicated(subset=merged_key_cols, keep=False)
+        if merged_key_cols
+        else pd.Series([], dtype=bool)
+    )
+    merged_dup_rows = int(merged_dup_mask.sum()) if len(merged_dup_mask.index) else 0
+    merged_dup_groups = (
+        int(merged_today.loc[merged_dup_mask, merged_key_cols].drop_duplicates().shape[0])
+        if merged_dup_rows
+        else 0
+    )
+
+    metrics = {
+        "snapshot_rows_today": str(len(snapshot_today.index)),
+        "snapshot_dup_groups_today": str(dup_groups),
+        "snapshot_dup_rows_today": str(dup_rows),
+        "history_rows_today": str(len(merged_today.index)),
+        "history_dup_groups_today": str(merged_dup_groups),
+        "history_dup_rows_today": str(merged_dup_rows),
+    }
+    dedup_report_path = INVENTORY_DEDUP_REPORT_DIR / f"{report_prefix}_{snapshot_date}.csv"
+    dedup_report = pd.DataFrame(
+        [
+            {
+                "asof_date": snapshot_date,
+                "history_path": str(resolved.live_path),
+                "snapshot_rows_today": metrics["snapshot_rows_today"],
+                "snapshot_dup_group_count": metrics["snapshot_dup_groups_today"],
+                "snapshot_dup_row_count": metrics["snapshot_dup_rows_today"],
+                "history_rows_today": metrics["history_rows_today"],
+                "history_dup_group_count": metrics["history_dup_groups_today"],
+                "history_dup_row_count": metrics["history_dup_rows_today"],
+            }
+        ]
+    )
+    dedup_report_path.parent.mkdir(parents=True, exist_ok=True)
+    dedup_report.to_csv(dedup_report_path, index=False)
+    return merged, metrics
 
 
 def _append_api_run_log(
@@ -237,24 +395,20 @@ def _append_api_run_log(
         "calls_finances_get_financial_events",
         "notes",
     ]
-    if API_RUN_LOG.exists():
+    resolved = resolve_compat_path(API_RUN_LOG_REL)
+    live_path = resolved.live_path
+    legacy_path = resolved.legacy_path
+    prior_path = live_path if live_path.exists() else legacy_path
+    if prior_path.exists():
         try:
-            prior = pd.read_csv(API_RUN_LOG, dtype=str).fillna("")
+            prior = pd.read_csv(prior_path, dtype=str).fillna("")
         except Exception:
             prior = pd.DataFrame(columns=fieldnames)
         prior = _ensure_columns(prior, fieldnames)
-        prior.to_csv(API_RUN_LOG, index=False)
-
-    API_RUN_LOG.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not API_RUN_LOG.exists()
-    with API_RUN_LOG.open("a", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(
-            fh,
-            fieldnames=fieldnames,
-        )
-        if write_header:
-            writer.writeheader()
-        writer.writerow(
+    else:
+        prior = pd.DataFrame(columns=fieldnames)
+    new_row = pd.DataFrame(
+        [
             {
                 "run_id": run_id,
                 "started_utc": started_utc,
@@ -265,7 +419,12 @@ def _append_api_run_log(
                 "calls_finances_get_financial_events": calls_finances_get_financial_events,
                 "notes": clean_notes,
             }
-        )
+        ],
+        dtype=str,
+    )
+    out_df = pd.concat([prior, new_row], ignore_index=True)
+    out_df = _ensure_columns(out_df, fieldnames)
+    write_csv_with_compat(out_df, path_or_rel=API_RUN_LOG_REL, default_system=resolved.system, index=False, mirror_legacy=True)
 
 
 def _build_base_from_training_set(timestamp_utc: str, snapshot_date: str) -> pd.DataFrame:
@@ -290,11 +449,56 @@ def _build_base_from_training_set(timestamp_utc: str, snapshot_date: str) -> pd.
     return base
 
 
+def _build_base_from_active_merchant(timestamp_utc: str, snapshot_date: str) -> pd.DataFrame:
+    merchant_path = OUT / "merchant_listings_latest.csv"
+    if not merchant_path.exists():
+        print("[API_COLLECTION] WARN merchant_listings_latest.csv missing; listing snapshot will be empty.")
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    try:
+        merchant = pd.read_csv(merchant_path, dtype=str).fillna("")
+    except Exception as exc:
+        print(f"[API_COLLECTION] WARN failed to read merchant listings: {exc}")
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    sku_col = "seller-sku" if "seller-sku" in merchant.columns else ("seller_sku" if "seller_sku" in merchant.columns else "")
+    asin_col = "asin1" if "asin1" in merchant.columns else ("asin" if "asin" in merchant.columns else "")
+    if not sku_col or not asin_col or "status" not in merchant.columns:
+        print("[API_COLLECTION] WARN merchant listings missing required columns; listing snapshot will be empty.")
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    status = merchant["status"].astype(str).str.strip().str.lower()
+    active = merchant.loc[status.eq("active"), [sku_col, asin_col]].copy()
+    active = active.rename(columns={sku_col: "sku", asin_col: "asin"})
+    active["sku"] = active["sku"].astype(str).str.strip()
+    active["asin"] = active["asin"].astype(str).str.strip()
+    active = active.loc[active["sku"].ne("") & active["asin"].ne("")].drop_duplicates(subset=["sku"], keep="first")
+
+    if active.empty:
+        print("[API_COLLECTION] WARN no active merchant SKUs found; listing snapshot will be empty.")
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    base = active.copy()
+    base["marketplace"] = "UK"
+    base["notes"] = "active_merchant_base"
+    base["timestamp_utc"] = timestamp_utc
+    base["asof_date"] = snapshot_date
+    base["source"] = "SPAPI"
+    base = _ensure_columns(base, LISTING_REQUIRED_COLUMNS)
+    return base
+
+
+def _build_listing_offer_base(timestamp_utc: str, snapshot_date: str) -> pd.DataFrame:
+    # Listing scan scope is system-derived from active merchant listings.
+    # Do not require a separately maintained scan whitelist.
+    return _build_base_from_active_merchant(timestamp_utc, snapshot_date)
+
+
 def _collect_listing_offer_snapshot(run_id: str, script_name: str) -> Dict[str, int]:
     timestamp_utc = _snapshot_timestamp()
     snapshot_date = timestamp_utc.split("T", 1)[0]
 
-    base = _build_base_from_training_set(timestamp_utc, snapshot_date)
+    base = _build_listing_offer_base(timestamp_utc, snapshot_date)
     rows = base.copy()
     rows["notes"] = rows["notes"].astype(str)
     seller_observation_rows: List[Dict[str, str]] = []
@@ -367,28 +571,33 @@ def _collect_listing_offer_snapshot(run_id: str, script_name: str) -> Dict[str, 
     rows = _ensure_columns(rows, LISTING_REQUIRED_COLUMNS)
     snapshot_path = OUT / f"listing_offer_snapshot_{snapshot_date}.csv"
     rows.to_csv(snapshot_path, index=False)
+    _update_latest_snapshot_pointer(snapshot_path, "listing_offer_snapshot_latest.csv")
     history = _upsert_history(
         snapshot=rows,
-        history_path=LISTING_OFFER_HISTORY_PATH,
+        history_rel=LISTING_OFFER_HISTORY_REL,
         required_columns=LISTING_REQUIRED_COLUMNS,
         key_columns=["asof_date", "sku", "marketplace"],
     )
 
     print(f"[API_COLLECTION] listing snapshot rows: {len(rows)} -> {snapshot_path}")
-    print(f"[API_COLLECTION] listing history rows: {len(history)} -> {LISTING_OFFER_HISTORY_PATH}")
+    print(f"[API_COLLECTION] listing history rows: {len(history)} -> {resolve_compat_path(LISTING_OFFER_HISTORY_REL).live_path}")
 
     seller_snapshot = pd.DataFrame(seller_observation_rows, dtype=str).fillna("")
     seller_snapshot = _ensure_columns(seller_snapshot, LISTING_SELLER_REQUIRED_COLUMNS)
     seller_snapshot_path = OUT / f"listing_offer_seller_snapshot_{snapshot_date}.csv"
     seller_snapshot.to_csv(seller_snapshot_path, index=False)
+    _update_latest_snapshot_pointer(
+        seller_snapshot_path,
+        "listing_offer_seller_snapshot_latest.csv",
+    )
     seller_history = _upsert_history(
         snapshot=seller_snapshot,
-        history_path=LISTING_OFFER_SELLER_HISTORY_PATH,
+        history_rel=LISTING_OFFER_SELLER_HISTORY_REL,
         required_columns=LISTING_SELLER_REQUIRED_COLUMNS,
         key_columns=["asof_date", "marketplace", "sku", "asin", "seller_id"],
     )
     print(f"[API_COLLECTION] listing seller snapshot rows: {len(seller_snapshot)} -> {seller_snapshot_path}")
-    print(f"[API_COLLECTION] listing seller history rows: {len(seller_history)} -> {LISTING_OFFER_SELLER_HISTORY_PATH}")
+    print(f"[API_COLLECTION] listing seller history rows: {len(seller_history)} -> {resolve_compat_path(LISTING_OFFER_SELLER_HISTORY_REL).live_path}")
 
     phase1_rows = build_phase1_seller_history()
     print(f"[API_COLLECTION] phase1 seller history rows: {phase1_rows}")
@@ -562,26 +771,41 @@ def _collect_inventory_and_inbound(run_id: str, script_name: str) -> Dict[str, i
 
     inventory_snapshot_path = OUT / f"inventory_snapshot_{snapshot_date}.csv"
     inbound_snapshot_path = OUT / f"inbound_snapshot_{snapshot_date}.csv"
+    inventory_snapshot_latest_path = OUT / "inventory_snapshot_latest.csv"
     inv_contract.to_csv(inventory_snapshot_path, index=False)
+    inv_contract.to_csv(inventory_snapshot_latest_path, index=False)
     inbound_contract.to_csv(inbound_snapshot_path, index=False)
 
-    inv_history = _upsert_history(
+    inv_history, inv_metrics = _rewrite_history_today_partition(
         snapshot=inv_contract,
-        history_path=INVENTORY_HISTORY_PATH,
+        snapshot_date=snapshot_date,
+        history_rel=INVENTORY_HISTORY_REL,
         required_columns=INVENTORY_REQUIRED_COLUMNS,
         key_columns=["asof_date", "sku", "marketplace"],
+        report_prefix="inventory_snapshot_dedup_report",
     )
     inbound_history = _upsert_history(
         snapshot=inbound_contract,
-        history_path=INBOUND_HISTORY_PATH,
+        history_rel=INBOUND_HISTORY_REL,
         required_columns=INBOUND_REQUIRED_COLUMNS,
         key_columns=["asof_date", "sku", "marketplace"],
     )
 
     print(f"[API_COLLECTION] inventory snapshot rows: {len(inv_contract)} -> {inventory_snapshot_path}")
+    print(f"[API_COLLECTION] inventory snapshot latest rows: {len(inv_contract)} -> {inventory_snapshot_latest_path}")
     print(f"[API_COLLECTION] inbound snapshot rows: {len(inbound_contract)} -> {inbound_snapshot_path}")
-    print(f"[API_COLLECTION] inventory history rows: {len(inv_history)} -> {INVENTORY_HISTORY_PATH}")
-    print(f"[API_COLLECTION] inbound history rows: {len(inbound_history)} -> {INBOUND_HISTORY_PATH}")
+    print(f"[API_COLLECTION] inventory history rows: {len(inv_history)} -> {resolve_compat_path(INVENTORY_HISTORY_REL).live_path}")
+    print(f"[API_COLLECTION] inbound history rows: {len(inbound_history)} -> {resolve_compat_path(INBOUND_HISTORY_REL).live_path}")
+    print(
+        "[API_COLLECTION] inventory_history_partition_rewrite "
+        f"asof_date={snapshot_date} "
+        f"snapshot_rows={inv_metrics.get('snapshot_rows_today', '0')} "
+        f"snapshot_dup_groups={inv_metrics.get('snapshot_dup_groups_today', '0')} "
+        f"snapshot_dup_rows={inv_metrics.get('snapshot_dup_rows_today', '0')} "
+        f"history_rows={inv_metrics.get('history_rows_today', '0')} "
+        f"history_dup_groups={inv_metrics.get('history_dup_groups_today', '0')} "
+        f"history_dup_rows={inv_metrics.get('history_dup_rows_today', '0')}"
+    )
 
     return {
         "calls_products_pricing_get_price": 0,
@@ -830,13 +1054,13 @@ def _collect_refunds_adjustments(run_id: str, script_name: str) -> Dict[str, int
     rows.to_csv(snapshot_path, index=False)
     history = _upsert_history(
         snapshot=rows,
-        history_path=REFUND_ADJUSTMENT_HISTORY_PATH,
+        history_rel=REFUND_ADJUSTMENT_HISTORY_REL,
         required_columns=REFUND_ADJUSTMENT_REQUIRED_COLUMNS,
         key_columns=["asof_date", "sku", "marketplace"],
     )
 
     print(f"[API_COLLECTION] refund/adjustment snapshot rows: {len(rows)} -> {snapshot_path}")
-    print(f"[API_COLLECTION] refund/adjustment history rows: {len(history)} -> {REFUND_ADJUSTMENT_HISTORY_PATH}")
+    print(f"[API_COLLECTION] refund/adjustment history rows: {len(history)} -> {resolve_compat_path(REFUND_ADJUSTMENT_HISTORY_REL).live_path}")
     return {
         "calls_products_pricing_get_price": 0,
         "calls_listings_items_get_item": 0,
@@ -956,3 +1180,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

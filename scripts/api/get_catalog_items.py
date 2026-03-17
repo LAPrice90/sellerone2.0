@@ -1,4 +1,4 @@
-"""
+﻿"""
 Helpers to call Catalog Items (2022-04-01).
 """
 
@@ -66,3 +66,4 @@ def fetch_catalog_item(asin: str, marketplace_id: str, access_token: str, timeou
         except Exception:
             out["error"] = resp.text
     return out
+

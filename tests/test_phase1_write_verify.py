@@ -1,9 +1,9 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import phase1_storage, phase1_write_verify
+from scripts.phase1 import phase1_storage, phase1_write_verify
 
 
 class Phase1WriteVerifyTests(unittest.TestCase):
@@ -165,3 +165,4 @@ class Phase1WriteVerifyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

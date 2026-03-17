@@ -1,4 +1,4 @@
-"""
+﻿"""
 Build order value discrepancy lists between Sellerboard export and Order_Master.
 
 One-off script only. Do not call from daily loops.
@@ -37,7 +37,7 @@ def _to_num(val: Optional[str]) -> float:
     if s in ("", "nan", "None"):
         return 0.0
     # strip currency symbols and commas
-    s = s.replace("£", "").replace("$", "").replace(",", "")
+    s = s.replace("Â£", "").replace("$", "").replace(",", "")
     try:
         return float(s)
     except Exception:
@@ -252,3 +252,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

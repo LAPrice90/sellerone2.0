@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -13,6 +13,9 @@ except ModuleNotFoundError:
     from api.spapi_owner import SpApiCallContext, spapi_post_json
 
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
+CPT_LWA_TIMEOUT_SECONDS = max(float(os.environ.get("CPT_LWA_TIMEOUT_SECONDS", "15") or "15"), 5.0)
+CPT_CONNECT_TIMEOUT_SECONDS = max(float(os.environ.get("CPT_CONNECT_TIMEOUT_SECONDS", "5") or "5"), 1.0)
+CPT_READ_TIMEOUT_SECONDS = max(float(os.environ.get("CPT_READ_TIMEOUT_SECONDS", "20") or "20"), 5.0)
 
 
 def _utc_now_iso() -> str:
@@ -109,6 +112,9 @@ def fetch_cpt_for_asin(
     marketplace_id: str,
     run_id: str,
     script_name: str,
+    lwa_timeout_seconds: float | None = None,
+    connect_timeout_seconds: float | None = None,
+    read_timeout_seconds: float | None = None,
 ) -> dict[str, object]:
     now_utc = _utc_now_iso()
     asin_clean = str(asin or "").strip()
@@ -123,7 +129,10 @@ def fetch_cpt_for_asin(
 
     try:
         load_dotenv_if_missing()
-        token = get_lwa_access_token()
+        token_timeout = max(float(lwa_timeout_seconds or CPT_LWA_TIMEOUT_SECONDS), 1.0)
+        connect_timeout = max(float(connect_timeout_seconds or CPT_CONNECT_TIMEOUT_SECONDS), 1.0)
+        read_timeout = max(float(read_timeout_seconds or CPT_READ_TIMEOUT_SECONDS), 1.0)
+        token = get_lwa_access_token(timeout=int(token_timeout))
         body_obj = {
             "requests": [
                 {
@@ -153,7 +162,7 @@ def fetch_cpt_for_asin(
             spapi_base_url=SPAPI_BASE_URL,
             headers=headers,
             body=json.dumps(body_obj, ensure_ascii=True, separators=(",", ":")),
-            timeout=45,
+            timeout=(connect_timeout, read_timeout),
             min_interval_sec=1.0,
             max_retries=2,
         )
@@ -224,3 +233,4 @@ def fetch_cpt_for_asin(
             "reason_codes": ["CPT_ERROR"],
             "error_summary": str(exc)[:200],
         }
+

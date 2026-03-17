@@ -11,7 +11,7 @@ live_sku_allowlist: 6V-EEC1-2S9Z
 scan_cooldown_minutes: 15
 use_active_merchant_skus: false
 max_skus_per_run: 1
-allow_h_intraday_intel_refresh: false
+allow_h_intraday_intel_refresh: true
 
 boundaries:
   hard_floor_gbp: 7.00

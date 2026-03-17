@@ -1,4 +1,4 @@
-"""
+﻿"""
 Full rebuild of Token_Ledger + Token_Allocations from orders_sheet_orders.csv.
 
 Rules:
@@ -31,7 +31,7 @@ ALLOC_OUT = Path("out/token_allocations_live.csv")
 def _parse_cost(value: str) -> float:
     if value is None:
         return 0.0
-    value = str(value).replace(",", "").replace("£", "").replace("Ł", "").strip()
+    value = str(value).replace(",", "").replace("Â£", "").replace("Å", "").strip()
     try:
         return float(value)
     except Exception:
@@ -186,3 +186,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

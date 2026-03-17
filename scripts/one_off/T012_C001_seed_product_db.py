@@ -1,4 +1,4 @@
-"""
+﻿"""
 Seed a Product_DB tab with manual + auto fields. Creates the tab with headers if missing; does not overwrite existing data.
 """
 
@@ -94,3 +94,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

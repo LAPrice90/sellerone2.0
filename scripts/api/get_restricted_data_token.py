@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fetch Restricted Data Token (RDT) for SP-API endpoints.
 """
 
@@ -64,3 +64,4 @@ def get_rdt(restricted_resources: List[Dict[str, object]]) -> str:
     if not token:
         raise RuntimeError(f"RDT missing in response: {payload}")
     return token
+

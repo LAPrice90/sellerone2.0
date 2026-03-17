@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fix Order_Master COGS for cancelled/zero-qty rows without rebuilding from Level 2.
 Sets COGS_Total/ExVAT/VAT to 0 where Quantity Ordered <= 0.
 """
@@ -71,3 +71,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

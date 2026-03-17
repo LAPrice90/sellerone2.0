@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.api.get_financial_events import get_lwa_access_token, load_dotenv_if_missing
-from scripts.phase1_write_verify import patch_listings_item_price
+from scripts.phase1.phase1_write_verify import patch_listings_item_price
 
 SOURCE = "H121_manual_price_drop_1p"
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
@@ -218,3 +218,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

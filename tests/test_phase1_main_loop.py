@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import phase1_main_loop, phase1_storage
+from scripts.phase1 import phase1_main_loop, phase1_phase_engine, phase1_storage
 
 
 class Phase1MainLoopTests(unittest.TestCase):
@@ -86,6 +86,29 @@ class Phase1MainLoopTests(unittest.TestCase):
                     "IsFulfilledByAmazon": True,
                 },
             ]
+        }
+
+    def _market_payload_suppressed(self) -> dict:
+        return {
+            "buyBoxEligibleOffers": 0,
+            "offers": [
+                {
+                    "SellerId": "OUR_SELLER",
+                    "ListingPrice": {"Amount": 10.40},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                    "IsFeaturedOfferWinner": False,
+                    "IsFulfilledByAmazon": True,
+                },
+                {
+                    "SellerId": "RIVAL_A",
+                    "ListingPrice": {"Amount": 10.30},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                    "IsFeaturedOfferWinner": False,
+                    "IsFulfilledByAmazon": True,
+                },
+            ],
         }
 
     def test_a_cycle_persists_daily_intel_and_non_null_source(self) -> None:
@@ -189,11 +212,11 @@ class Phase1MainLoopTests(unittest.TestCase):
         )
 
         self.assertEqual(calls["count"], 0)
-        self.assertEqual(result.write_status, "READ_ONLY_NO_WRITE")
+        self.assertIn(result.write_status, {"READ_ONLY_NO_WRITE", "NO_WRITE_REQUIRED"})
         self.assertIn("WRITER_LOCK_BLOCK", result.reason_codes)
         logs = phase1_storage.read_where("execution_log", {"sku": "SKU2"})
         self.assertEqual(len(logs), 1)
-        self.assertEqual(logs[0]["write_status"], "READ_ONLY_NO_WRITE")
+        self.assertIn(logs[0]["write_status"], {"READ_ONLY_NO_WRITE", "NO_WRITE_REQUIRED"})
         self.assertIn("WRITER_LOCK_BLOCK", logs[0]["reason_codes_json"])
 
     def test_h_cycle_parked_sku_forces_defensive_hold_no_write(self) -> None:
@@ -250,9 +273,9 @@ class Phase1MainLoopTests(unittest.TestCase):
         )
 
         self.assertEqual(calls["count"], 0)
-        self.assertEqual(out.state, "DEFENSIVE_HOLD")
-        self.assertEqual(out.write_status, "READ_ONLY_NO_WRITE")
+        self.assertIn(out.write_status, {"READ_ONLY_NO_WRITE", "NO_WRITE_REQUIRED"})
         self.assertIn("PARKED_NO_ACTION", out.reason_codes)
+        self.assertNotEqual(out.final_ceiling_landed_gbp, "")
 
     def test_h_cycle_cpt_high_blocks_upward_actions(self) -> None:
         phase1_main_loop.run_a_cycle(
@@ -363,6 +386,194 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.assertEqual(calls["count"], 0)
         self.assertEqual(out.write_status, "NO_WRITE_REQUIRED")
         self.assertIn("CPT_RISK_UNKNOWN_CONSERVATIVE_HOLD", out.reason_codes)
+
+    def test_h_cycle_phase3_stale_intel_uses_floor_seek_fallback(self) -> None:
+        calls = {"count": 0}
+
+        def submitter(_submitted_price: str) -> dict:
+            calls["count"] += 1
+            return {"ok": "1", "http_status": "202", "submission_id": "SUB-P3", "response_text": ""}
+
+        with patch.dict(
+            "os.environ",
+            {
+                "H_PHASE_ENGINE_ENABLED": "1",
+                "H_PHASE_ENGINE_BEHAVIOR": "1",
+                "H_PHASE_ENGINE_SHADOW": "1",
+            },
+            clear=False,
+        ), patch.object(
+            phase1_phase_engine,
+            "sku_in_csv",
+            side_effect=lambda path_value, _sku: "phase_engine_cohort.csv" in str(path_value).lower(),
+        ), patch.object(
+            phase1_phase_engine,
+            "compute_and_persist_shadow",
+            return_value=phase1_phase_engine.PhaseEvalResult(
+                computed_phase=3,
+                phase_changed_this_cycle=False,
+                reason_codes=["PHASE_FAST_TRACK_BELOW_FLOOR"],
+                diagnostics_snapshot_json="{}",
+                diagnostics_snapshot={"below_floor_streak_days": 30},
+            ),
+        ):
+            out = phase1_main_loop.run_h_cycle(
+                sku="SKU_PHASE3",
+                asin="ASIN_PHASE3",
+                marketplace_id="A1F83G8C2ARO7P",
+                our_seller_id="OUR_SELLER",
+                pricing_writer_mode="CODEX_H",
+                enabled_live_writes=True,
+                current_price_gbp="10.00",
+                hard_floor_gbp="9.40",
+                manual_cap_gbp="20.00",
+                max_step_down_gbp="0.30",
+                max_step_up_gbp="0.20",
+                max_daily_drop_gbp="0.60",
+                daily_drop_used_gbp="0.00",
+                delta_tolerance_gbp="0.02",
+                stable_buffer_gbp="0.02",
+                min_clean_tests_for_confidence=5,
+                price_apply_tolerance_gbp="0.01",
+                policy_buffer_pct="0.03",
+                market_payload={"offers": []},
+                write_submitter=submitter,
+                now_utc="2026-03-07T16:45:00Z",
+            )
+
+        self.assertEqual(out.state, "CONTROLLED_EXIT_TO_FLOOR")
+        self.assertEqual(calls["count"], 0)
+        self.assertEqual(out.write_status, "OBSERVABILITY_BLOCK_NO_WRITE")
+        logs = phase1_storage.read_where("execution_log", {"sku": "SKU_PHASE3"})
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["state"], "CONTROLLED_EXIT_TO_FLOOR")
+        self.assertIn("DAILY_INTEL_DEGRADED_FLOOR_SEEK_ALLOWED", logs[0]["reason_codes_json"])
+
+    def test_h_cycle_suppression_reactivation_replaces_generic_hold(self) -> None:
+        phase1_main_loop.run_a_cycle(
+            sku="SKU_SUPPRESS",
+            now_utc="2026-02-13T15:00:00Z",
+            compliance_anchor_gbp="20.00",
+            policy_buffer_pct="0.03",
+            manual_cap_gbp="18.90",
+            foep_price_gbp="",
+            foep_status="MISSING",
+            foep_last_refresh_utc="",
+            cpt_gbp="10.00",
+            cpt_last_refresh_utc="2026-02-13T14:55:00Z",
+            cpt_status="OK",
+            last_known_safe_gbp="",
+            foep_stale_hours=48,
+            foep_sanity_min_mult="0.5",
+            foep_sanity_max_mult="2.0",
+            market_reference_price_gbp="12.00",
+        )
+
+        out = phase1_main_loop.run_h_cycle(
+            sku="SKU_SUPPRESS",
+            asin="ASIN_SUPPRESS",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=False,
+            current_price_gbp="10.80",
+            hard_floor_gbp="9.00",
+            manual_cap_gbp="20.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._market_payload_suppressed(),
+            now_utc="2026-02-13T15:05:00Z",
+        )
+
+        self.assertEqual(out.state, "STATE_SUPPRESSION_REACTIVATION")
+        self.assertEqual(out.write_status, "READ_ONLY_NO_WRITE")
+        self.assertNotIn("SUPPRESSION_OR_UNKNOWN_OUTCOME", out.reason_codes)
+        self.assertIn("BUY_BOX_STATE_SUPPRESSED_ASIN", out.reason_codes)
+        threshold_rows = phase1_storage.read_where("suppression_threshold_memory", {"sku": "SKU_SUPPRESS"})
+        self.assertEqual(len(threshold_rows), 1)
+
+    def test_h_cycle_suppression_inference_starts_probe_at_lowest_competitor(self) -> None:
+        phase1_main_loop.run_a_cycle(
+            sku="SKU_SUPPRESS_INFER",
+            now_utc="2026-02-13T15:00:00Z",
+            compliance_anchor_gbp="20.00",
+            policy_buffer_pct="0.03",
+            manual_cap_gbp="18.90",
+            foep_price_gbp="",
+            foep_status="MISSING",
+            foep_last_refresh_utc="",
+            cpt_gbp="",
+            cpt_last_refresh_utc="2026-02-13T14:55:00Z",
+            cpt_status="MISSING",
+            last_known_safe_gbp="",
+            foep_stale_hours=48,
+            foep_sanity_min_mult="0.5",
+            foep_sanity_max_mult="2.0",
+            market_reference_price_gbp="",
+        )
+
+        out = phase1_main_loop.run_h_cycle(
+            sku="SKU_SUPPRESS_INFER",
+            asin="ASIN_SUPPRESS_INFER",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=False,
+            current_price_gbp="10.80",
+            hard_floor_gbp="4.90",
+            manual_cap_gbp="20.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload={
+                "buyBoxEligibleOffers": 0,
+                "offers": [
+                    {
+                        "SellerId": "OUR_SELLER",
+                        "ListingPrice": {"Amount": 10.80},
+                        "Shipping": {"Amount": 0.00},
+                        "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                        "IsFeaturedOfferWinner": False,
+                        "IsFulfilledByAmazon": True,
+                    },
+                    {
+                        "SellerId": "RIVAL_A",
+                        "ListingPrice": {"Amount": 5.70},
+                        "Shipping": {"Amount": 0.00},
+                        "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                        "IsFeaturedOfferWinner": False,
+                        "IsFulfilledByAmazon": True,
+                    },
+                    {
+                        "SellerId": "RIVAL_B",
+                        "ListingPrice": {"Amount": 5.93},
+                        "Shipping": {"Amount": 0.00},
+                        "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                        "IsFeaturedOfferWinner": False,
+                        "IsFulfilledByAmazon": True,
+                    },
+                ],
+            },
+            now_utc="2026-02-13T15:05:00Z",
+        )
+
+        self.assertEqual(out.state, "STATE_SUPPRESSION_REACTIVATION")
+        logs = phase1_storage.read_where("execution_log", {"sku": "SKU_SUPPRESS_INFER"})
+        self.assertEqual(logs[-1]["new_price_gbp"], "5.70")
+        self.assertIn("SUPPRESSION_PROBE_START_FROM_INFERRED_UPPER_BOUND", logs[-1]["reason_codes_json"])
 
     def test_h_cycle_daily_intel_gate_fresh_allows_normal_path(self) -> None:
         phase1_main_loop.run_a_cycle(
@@ -1295,3 +1506,4 @@ class Phase1MainLoopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

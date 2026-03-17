@@ -1,6 +1,6 @@
-import unittest
+﻿import unittest
 
-from scripts import phase1_market_snapshot_processor as snapshot
+from scripts.phase1 import phase1_market_snapshot_processor as snapshot
 
 
 class MarketSnapshotProcessorTests(unittest.TestCase):
@@ -124,3 +124,4 @@ class MarketSnapshotProcessorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

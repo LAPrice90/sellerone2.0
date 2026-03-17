@@ -9,10 +9,11 @@ pricing_writer_mode: CODEX_H
 enabled_live_writes: true
 live_sku_allowlist: L1-54EX-56YC
 scan_cooldown_minutes: 15
+trial_scan_cooldown_minutes: 1
 sku_call_spacing_seconds: 2.1
 use_active_merchant_skus: true
 max_skus_per_run: 0
-allow_h_intraday_intel_refresh: false
+allow_h_intraday_intel_refresh: true
 
 boundaries:
   hard_floor_gbp: 10.90

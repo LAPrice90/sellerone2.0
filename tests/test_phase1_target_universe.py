@@ -1,10 +1,10 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 
 import pandas as pd
 
-from scripts.phase1_target_universe import resolve_target_universe
+from scripts.phase1.phase1_target_universe import resolve_target_universe
 
 
 class Phase1TargetUniverseTests(unittest.TestCase):
@@ -116,3 +116,4 @@ class Phase1TargetUniverseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

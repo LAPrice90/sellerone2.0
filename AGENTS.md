@@ -133,3 +133,21 @@ These rules tell Codex how to work in this repo. They override speed and conveni
 - A flow gates on A-scoped profile only.
 - B flow gates on B-scoped profile only.
 - E flow gates on E-scoped profile only.
+
+### Roadmap awareness (scoped, not rigid)
+- Codex must consult roadmap/progress sources when a task touches mapped systems or loop components.
+- Mapped systems include: A cycle, B cycle, E cycle, H cycle, feeder cycle, and operations loop components.
+- Source of truth for map/progress:
+  - project_control/ROADMAP_SYSTEM_MAP.md
+  - project_control/EXPECTATIONS/*.md
+- If a task is unrelated to mapped systems, Codex must not force roadmap interaction.
+
+### Progress updates (semi-automatic)
+- For Implementation tasks affecting mapped systems, Codex should update roadmap/expectation progress in the same ticket when evidence supports the change.
+- Do not update roadmap/expectation files for unrelated work.
+- Do not inflate completion or reliability without evidence artifacts.
+
+### Prompt number footer (mandatory)
+- If the user message includes `PROMPT NUMBER: XXX`, Codex must end its final reply with the exact same line as the last line.
+- Codex must not ask for prompt number when already provided.
+- This applies to Inspection, Planning, Implementation, and Validation tasks.

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Build daily token validation checks and write to token sheet.
 """
 
@@ -292,3 +292,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

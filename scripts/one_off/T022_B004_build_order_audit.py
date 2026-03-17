@@ -1,4 +1,4 @@
-"""
+﻿"""
 Build a simple order audit CSV with the same schema as the legacy order_audit_split.csv.
 Uses the latest Orders_raw and OrderItems_raw snapshots from B001 (out/orders_raw.csv, out/order_items_raw.csv).
 Populates core identifiers and amounts; leaves non-derived fee fields blank for now.
@@ -244,3 +244,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -1,0 +1,42 @@
+@echo off
+setlocal
+
+set "PY=C:\Users\Luke\AppData\Local\Programs\Python\Python312\python.exe"
+if not exist "%PY%" set "PY=python"
+
+set "ROOT=%~dp0"
+if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
+cd /d "%ROOT%"
+
+set "CTRL_SCRIPT=%ROOT%\scripts\tools\controlled_restart_controller.py"
+if not exist "%CTRL_SCRIPT%" (
+  echo [controlled_restart] missing controller script: "%CTRL_SCRIPT%"
+  endlocal & exit /b 1
+)
+
+if not defined CONTROLLED_RESTART_WINDOW_START_HOUR set "CONTROLLED_RESTART_WINDOW_START_HOUR=2"
+if not defined CONTROLLED_RESTART_WINDOW_END_HOUR set "CONTROLLED_RESTART_WINDOW_END_HOUR=3"
+if not defined CONTROLLED_RESTART_WINDOW_MINUTE_SPAN set "CONTROLLED_RESTART_WINDOW_MINUTE_SPAN=60"
+if not defined CONTROLLED_RESTART_MAX_WAIT_SECONDS set "CONTROLLED_RESTART_MAX_WAIT_SECONDS=900"
+if not defined CONTROLLED_RESTART_POLL_SECONDS set "CONTROLLED_RESTART_POLL_SECONDS=30"
+if not defined CONTROLLED_RESTART_REQUEST_DRAIN set "CONTROLLED_RESTART_REQUEST_DRAIN=1"
+if not defined CONTROLLED_RESTART_CLEAR_DRAIN_ON_SKIP set "CONTROLLED_RESTART_CLEAR_DRAIN_ON_SKIP=1"
+if not defined CONTROLLED_RESTART_EXECUTE set "CONTROLLED_RESTART_EXECUTE=1"
+if not defined CONTROLLED_RESTART_ALLOW_REBOOT_ACTION set "CONTROLLED_RESTART_ALLOW_REBOOT_ACTION=1"
+if not defined CONTROLLED_RESTART_IGNORE_WINDOW set "CONTROLLED_RESTART_IGNORE_WINDOW=1"
+if not defined CONTROLLED_RESTART_FORCE_REBOOT_ON_SKIP set "CONTROLLED_RESTART_FORCE_REBOOT_ON_SKIP=1"
+
+set "ARGS=--window-start-hour %CONTROLLED_RESTART_WINDOW_START_HOUR% --window-end-hour %CONTROLLED_RESTART_WINDOW_END_HOUR% --window-minute-span %CONTROLLED_RESTART_WINDOW_MINUTE_SPAN% --max-wait-seconds %CONTROLLED_RESTART_MAX_WAIT_SECONDS% --poll-seconds %CONTROLLED_RESTART_POLL_SECONDS%"
+
+if /I "%CONTROLLED_RESTART_REQUEST_DRAIN%"=="1" set "ARGS=%ARGS% --request-drain"
+if /I "%CONTROLLED_RESTART_CLEAR_DRAIN_ON_SKIP%"=="1" set "ARGS=%ARGS% --clear-drain-on-skip"
+if /I "%CONTROLLED_RESTART_EXECUTE%"=="1" set "ARGS=%ARGS% --execute-reboot"
+if /I "%CONTROLLED_RESTART_ALLOW_REBOOT_ACTION%"=="1" set "ARGS=%ARGS% --allow-reboot-action"
+if /I "%CONTROLLED_RESTART_IGNORE_WINDOW%"=="1" set "ARGS=%ARGS% --ignore-window"
+if /I "%CONTROLLED_RESTART_FORCE_REBOOT_ON_SKIP%"=="1" set "ARGS=%ARGS% --force-reboot-on-skip"
+
+"%PY%" -u "%CTRL_SCRIPT%" %ARGS%
+set "RC=%ERRORLEVEL%"
+echo [controlled_restart] controller exit rc=%RC%
+
+endlocal & exit /b %RC%

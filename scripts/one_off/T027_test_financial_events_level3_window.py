@@ -1,4 +1,4 @@
-"""
+﻿"""
 One-click runner for a fixed posted window for Level 3 financial events.
 """
 
@@ -22,3 +22,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

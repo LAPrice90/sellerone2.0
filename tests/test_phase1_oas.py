@@ -1,6 +1,6 @@
-import unittest
+﻿import unittest
 
-from scripts import phase1_oas
+from scripts.phase1 import phase1_oas
 
 
 class Phase1OasTests(unittest.TestCase):
@@ -87,6 +87,7 @@ class Phase1OasTests(unittest.TestCase):
         )
         self.assertEqual(decision.admissible_flag, "0")
         self.assertEqual(decision.context_quality_score, "0")
+        self.assertEqual(decision.suppression_threshold_update_allowed_flag, "0")
         self.assertIn("OAS_FAIL_MARKET_STRUCTURE_CHANGED", decision.hard_fail_reason_codes)
         self.assertIn("OAS_FAIL_FEATURED_OUTCOME_MISSING", decision.hard_fail_reason_codes)
         self.assertIn("OAS_FAIL_WRITER_CONFLICT", decision.hard_fail_reason_codes)
@@ -108,8 +109,27 @@ class Phase1OasTests(unittest.TestCase):
         )
         self.assertEqual(decision.admissible_flag, "1")
         self.assertEqual(decision.context_quality_score, "1")
+        self.assertEqual(decision.suppression_threshold_update_allowed_flag, "0")
         self.assertEqual(decision.hard_fail_reason_codes, [])
+
+    def test_oas_suppression_window_blocks_general_learning_but_allows_threshold_updates_when_clean(self) -> None:
+        decision = phase1_oas.evaluate_oas_hard_fails(
+            market_structure_hash_start="HASH_A",
+            market_structure_hash_end="HASH_A",
+            featured_outcome="UNKNOWN",
+            writer_conflict_flag="0",
+            promo_suspected_flag="0",
+            pricing_health_suppressed_flag="0",
+            our_purchasable_flag="1",
+            our_purchasable_reliable_flag="1",
+            featured_winner_delivery_unknown_flag="0",
+            suppression_active_flag="1",
+        )
+        self.assertEqual(decision.admissible_flag, "0")
+        self.assertEqual(decision.suppression_threshold_update_allowed_flag, "1")
+        self.assertIn("OAS_BLOCK_GENERAL_LEARNING_SUPPRESSION_WINDOW", decision.hard_fail_reason_codes)
 
 
 if __name__ == "__main__":
     unittest.main()
+

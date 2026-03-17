@@ -1,4 +1,4 @@
-"""
+﻿"""
 Backfill tokens from the orders sheet using Sent to FBA quantities.
 
 Rules:
@@ -33,7 +33,7 @@ def _num(series: pd.Series) -> pd.Series:
 def _parse_cost(value: str) -> float:
     if value is None:
         return 0.0
-    value = str(value).replace(",", "").replace("£", "").replace("Ł", "").strip()
+    value = str(value).replace(",", "").replace("Â£", "").replace("Å", "").strip()
     try:
         return float(value)
     except Exception:
@@ -178,3 +178,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import os
 import sys
 from datetime import datetime
@@ -150,3 +150,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

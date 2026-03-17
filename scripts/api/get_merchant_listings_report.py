@@ -1,4 +1,4 @@
-"""
+﻿"""
 Fetch GET_MERCHANT_LISTINGS_ALL_DATA via SP-API, with a fast test mode.
 
 Workflow (live mode):
@@ -283,3 +283,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

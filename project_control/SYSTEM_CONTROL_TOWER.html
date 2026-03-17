@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SellerOne Control Tower</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #475569;
+      --border: #d7deea;
+      --bar-bg: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    }
+    .wrap {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 24px 18px 28px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 34px;
+      line-height: 1.2;
+    }
+    .top-note {
+      margin: 0 0 16px;
+      background: #e9eff8;
+      border: 1px solid #c7d5ea;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .planned { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+    .inprogress { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    .done { background: #dcfce7; color: #14532d; border-color: #86efac; }
+    .blocked { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(330px, 1fr));
+      gap: 14px;
+    }
+    .zone-group {
+      grid-column: 1 / -1;
+    }
+    .zone-banner {
+      background: #e8f0fb;
+      border: 1px solid #c9d8ed;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin: 2px 0 10px;
+    }
+    .zone-banner h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      color: #0f172a;
+    }
+    .zone-banner p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: #334155;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px 12px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .zone-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+    .purpose {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .status-chip {
+      font-size: 12px;
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .status-planned { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+    .status-progress { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    .status-done { background: #dcfce7; color: #14532d; border-color: #86efac; }
+    .status-blocked { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .metric {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 9px 10px;
+    }
+    .metric .label {
+      margin: 0;
+      font-size: 12px;
+      color: #475569;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .metric .value {
+      margin: 3px 0 0;
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .focus {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #334155;
+    }
+    .focus strong { color: #0f172a; }
+    .bars { margin-bottom: 10px; }
+    .bar-group { margin-bottom: 8px; }
+    .bar-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 3px;
+    }
+    .bar {
+      height: 16px;
+      border-radius: 10px;
+      background: var(--bar-bg);
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 9px;
+    }
+    .bar-red > span { background: #ef4444; }
+    .bar-orange > span { background: #f59e0b; }
+    .bar-yellow > span { background: #eab308; }
+    .bar-green > span { background: #22c55e; }
+    .bar-bluegrey > span {
+      background: repeating-linear-gradient(-45deg, #94a3b8, #94a3b8 8px, #cbd5e1 8px, #cbd5e1 16px);
+    }
+    .sub-header {
+      margin: 8px 0 6px;
+      font-size: 13px;
+      color: #334155;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .summary-line {
+      font-size: 12px;
+      color: #64748b;
+      margin: 0 0 8px;
+      font-weight: 700;
+    }
+    ul.checks {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+    }
+    ul.checks li {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid #e2e8f0;
+      background: #fbfdff;
+      border-radius: 8px;
+      padding: 8px 9px;
+      font-size: 14px;
+    }
+    .sub-name { color: #1f2937; }
+    .tag {
+      font-size: 11px;
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 4px 8px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .zone-note {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .footer {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #475569;
+      background: #eef2f7;
+      border: 1px solid #d7deea;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .footer code {
+      background: #e2e8f0;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    @media (max-width: 1120px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>SellerOne Control Tower</h1>
+    <p class="top-note">
+      This is the main management view for day-to-day tracking.
+      Use <code>SYSTEM_FLOWCHART.html</code> for the conceptual map.
+      Completion is now checklist-derived from <code>TASK_LIBRARY.json</code> and <code>CHECKLIST_PROGRESS.json</code>.
+      Reliability remains evidence-based and separate from completion scoring.
+    </p>
+
+    <div class="legend">
+      <span class="pill planned">Grey = Planned</span>
+      <span class="pill inprogress">Blue = In Progress</span>
+      <span class="pill done">Green = Done</span>
+      <span class="pill blocked">Red = Blocked / Needs Stabilising</span>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">Supplier Discovery</h2>
+            <p class="purpose">finds suppliers and price lists</p>
+          </div>
+          <span class="status-chip status-planned">Planned</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">0</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Define v1 discovery to price-list handoff path</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>0%</span></div>
+            <div class="bar bar-red"><span style="width:0%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 0 | Planned: 7 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">Market product discovery</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Amazon-direct exclusion</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Manufacturer-direct exclusion</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Distributor discovery workflow</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Supplier onboarding tracking</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Price-list acquisition</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Feeder handoff artifact</span><span class="tag planned">Planned</span></li>
+        </ul>
+        <p class="zone-note">Planning and expectation scaffolding exist; SellerOne runtime implementation is not started.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">Product Sourcing / Feeder</h2>
+            <p class="purpose">turns price lists into approved product candidates</p>
+          </div>
+          <span class="status-chip status-planned">Planned</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">0</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Build intake normalization and approval queue baseline</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>0%</span></div>
+            <div class="bar bar-red"><span style="width:0%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 0 | Planned: 7 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">Supplier list normalization</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Barcode / identity validation</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Marketplace viability checks</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Demand / profitability checks</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Test-buy recommendation</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Approval queue</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Purchase-order handoff</span><span class="tag planned">Planned</span></li>
+        </ul>
+        <p class="zone-note">Feeder design exists in control docs; runtime implementation is not started.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">Operations Loop</h2>
+            <p class="purpose">restock, order, receive, send to Amazon</p>
+          </div>
+          <span class="status-chip status-planned">Planned</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">0</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Stand up Restock -> PO -> Receiving -> Send flow</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>0%</span></div>
+            <div class="bar bar-red"><span style="width:0%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 0 | Planned: 6 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">Restock Advisor</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Purchase Orders</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Supplier order tracking</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Inventory receiving</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Send To Amazon</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Token-safe handoff</span><span class="tag planned">Planned</span></li>
+        </ul>
+        <p class="zone-note">Loop architecture is mapped, but connected runtime delivery is not started.</p>
+      </article> <section class="zone-group">
+        <div class="zone-banner">
+          <h2>Data / Intelligence</h2>
+          <p>A, B, E, H cycles track performance and pricing</p>
+          <p><strong>Zone Focus:</strong> Stabilise H while preserving A/B/E cadence quality</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">A cycle</h2>
+            <p class="purpose">daily orchestration and health-gate data foundation</p>
+          </div>
+          <span class="status-chip status-progress">In Progress</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">50</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Maintain clean cadence and strengthen reliability baseline</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>50%</span></div>
+            <div class="bar bar-orange"><span style="width:50%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 1 | Planned: 0 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">A cycle</span><span class="tag inprogress">In Progress</span></li>
+        </ul>
+        <p class="zone-note">Operational and in progress.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">B cycle</h2>
+            <p class="purpose">daytime orders, token accounting, and sales-side outputs</p>
+          </div>
+          <span class="status-chip status-progress">In Progress</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">50</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Maintain boundary-safe loop behavior and reduce warnings</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>50%</span></div>
+            <div class="bar bar-orange"><span style="width:50%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 1 | Planned: 0 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">B cycle</span><span class="tag inprogress">In Progress</span></li>
+        </ul>
+        <p class="zone-note">Operational and in progress.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">E cycle</h2>
+            <p class="purpose">analytics outputs for velocity, ROI, and restock support</p>
+          </div>
+          <span class="status-chip status-progress">In Progress</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">50</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Keep output freshness and reliability evidence consistent</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>50%</span></div>
+            <div class="bar bar-orange"><span style="width:50%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 1 | Planned: 0 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">E cycle</span><span class="tag inprogress">In Progress</span></li>
+        </ul>
+        <p class="zone-note">Operational and in progress.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">H cycle</h2>
+            <p class="purpose">repricing runtime for live price updates</p>
+          </div>
+          <span class="status-chip status-blocked">Needs Stabilising</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">46</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">Provisional (45)</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Resolve stability gates and finalize/runtime boundary issues</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>46%</span></div>
+            <div class="bar bar-orange"><span style="width:46%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>Provisional (45)</span></div>
+            <div class="bar bar-orange"><span style="width:45%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 6 | Planned: 0 | Blocked: 1</p>
+        <ul class="checks">
+          <li><span class="sub-name">H launcher and guard runtime</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Offer and market collection</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Repricing decision logic</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Publish updates</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Runtime lock safety</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Boundary truth handling</span><span class="tag blocked">Blocked</span></li><li><span class="sub-name">Health reporting</span><span class="tag inprogress">In Progress</span></li>
+        </ul>
+        <p class="zone-note">Active but not stable; remains needs-stabilising.</p>
+      </article>
+        </div>
+      </section> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">Portfolio Management</h2>
+            <p class="purpose">dropped, discontinued, recoverable product paths</p>
+          </div>
+          <span class="status-chip status-planned">Planned</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">0</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">To Baseline</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Define and enforce dropped vs discontinued lifecycle flow</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>0%</span></div>
+            <div class="bar bar-red"><span style="width:0%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>To Baseline</span></div>
+            <div class="bar bar-bluegrey"><span style="width:100%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 0 | In Progress: 0 | Planned: 4 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">Dropped path</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Discontinued path</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Recoverable re-entry path</span><span class="tag planned">Planned</span></li><li><span class="sub-name">Lifecycle enforcement</span><span class="tag planned">Planned</span></li>
+        </ul>
+        <p class="zone-note">Lifecycle intent is defined in plans; operational enforcement remains to be built.</p>
+      </article> <article class="card">
+        <div class="head">
+          <div>
+            <h2 class="zone-title">System Governance</h2>
+            <p class="purpose">roadmap, expectations, progress, health monitoring</p>
+          </div>
+          <span class="status-chip status-progress">In Progress</span>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><p class="label">Completion Score</p><p class="value">75</p></div>
+          <div class="metric"><p class="label">Reliability Score</p><p class="value">Provisional (75)</p></div>
+        </div>
+        <p class="focus"><strong>Main Focus:</strong> Keep roadmap, expectations, progress updates, and warning triage aligned</p>
+
+        <div class="bars">
+          <div class="bar-group">
+            <div class="bar-head"><span>Completion</span><span>75%</span></div>
+            <div class="bar bar-yellow"><span style="width:75%"></span></div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-head"><span>Reliability</span><span>Provisional (75)</span></div>
+            <div class="bar bar-yellow"><span style="width:75%"></span></div>
+          </div>
+        </div>
+
+        <h3 class="sub-header">Subsections</h3>
+        <p class="summary-line">Done: 3 | In Progress: 3 | Planned: 0 | Blocked: 0</p>
+        <ul class="checks">
+          <li><span class="sub-name">Roadmap system map</span><span class="tag done">Done</span></li><li><span class="sub-name">Expectation framework</span><span class="tag done">Done</span></li><li><span class="sub-name">Prompt workflow</span><span class="tag done">Done</span></li><li><span class="sub-name">Progress dashboard</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Health monitoring</span><span class="tag inprogress">In Progress</span></li><li><span class="sub-name">Warning triage process</span><span class="tag inprogress">In Progress</span></li>
+        </ul>
+        <p class="zone-note">Governance docs and controls are active; reliability remains provisional while health warnings persist.</p>
+      </article>
+    </section>
+
+    <div class="footer">
+      Related views and source docs:
+      <code>SYSTEM_FLOWCHART.html</code> |
+      <code>ROADMAP_SYSTEM_MAP.md</code> |
+      <code>ZONE_INDEX.md</code> |
+      <code>EXPECTATIONS/</code>
+      <br>
+      Generated at: <code>2026-03-13T15:58:07Z</code>
+    </div>
+  </div>
+</body>
+</html>

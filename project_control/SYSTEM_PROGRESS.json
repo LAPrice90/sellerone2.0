@@ -1,0 +1,1027 @@
+{
+  "version": "v1",
+  "generated_utc": "2026-03-13T15:58:07Z",
+  "source": {
+    "task_library": "project_control/TASK_LIBRARY.json",
+    "checklist_progress": "project_control/CHECKLIST_PROGRESS.json",
+    "generator": "scripts/tools/generate_progress_dashboard.py"
+  },
+  "zones": {
+    "supplier_discovery": {
+      "zone_id": "supplier_discovery",
+      "zone_name": "Supplier Discovery",
+      "purpose": "finds suppliers and price lists",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Define v1 discovery to price-list handoff path",
+      "notes": "Planning and expectation scaffolding exist; SellerOne runtime implementation is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null,
+        "basis": "run_evidence",
+        "evidence_note": "No comparable live run window yet."
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "sd_market_discovery",
+          "system": "supplier_discovery",
+          "title": "Market product discovery",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_amazon_direct_exclusion",
+          "system": "supplier_discovery",
+          "title": "Amazon-direct exclusion",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_manufacturer_direct_exclusion",
+          "system": "supplier_discovery",
+          "title": "Manufacturer-direct exclusion",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_distributor_discovery_workflow",
+          "system": "supplier_discovery",
+          "title": "Distributor discovery workflow",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/SUPPLIER_DISCOVERY_PLAN.md"
+        },
+        {
+          "id": "sd_supplier_onboarding_tracking",
+          "system": "supplier_discovery",
+          "title": "Supplier onboarding tracking",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_price_list_acquisition",
+          "system": "supplier_discovery",
+          "title": "Price-list acquisition",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_feeder_handoff_artifact",
+          "system": "supplier_discovery",
+          "title": "Feeder handoff artifact",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/SUPPLIER_DISCOVERY_PLAN.md"
+        }
+      ]
+    },
+    "product_feeder": {
+      "zone_id": "product_feeder",
+      "zone_name": "Product Sourcing / Feeder",
+      "purpose": "turns price lists into approved product candidates",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Build intake normalization and approval queue baseline",
+      "notes": "Feeder design exists in control docs; runtime implementation is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null,
+        "basis": "run_evidence",
+        "evidence_note": "No comparable live run window yet."
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "pf_list_normalization",
+          "system": "feeder_cycle",
+          "title": "Supplier list normalization",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_barcode_identity_validation",
+          "system": "feeder_cycle",
+          "title": "Barcode / identity validation",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_marketplace_viability_checks",
+          "system": "feeder_cycle",
+          "title": "Marketplace viability checks",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pf_demand_profit_checks",
+          "system": "feeder_cycle",
+          "title": "Demand / profitability checks",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_test_buy_recommendation",
+          "system": "feeder_cycle",
+          "title": "Test-buy recommendation",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_approval_queue",
+          "system": "feeder_cycle",
+          "title": "Approval queue",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pf_purchase_order_handoff",
+          "system": "feeder_cycle",
+          "title": "Purchase-order handoff",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        }
+      ]
+    },
+    "operations_loop": {
+      "zone_id": "operations_loop",
+      "zone_name": "Operations Loop",
+      "purpose": "restock, order, receive, send to Amazon",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Stand up Restock -> PO -> Receiving -> Send flow",
+      "notes": "Loop architecture is mapped, but connected runtime delivery is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null,
+        "basis": "run_evidence",
+        "evidence_note": "No comparable live run window yet."
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 6,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "op_restock_advisor",
+          "system": "operations_loop",
+          "title": "Restock Advisor",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_purchase_orders",
+          "system": "operations_loop",
+          "title": "Purchase Orders",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_supplier_order_tracking",
+          "system": "operations_loop",
+          "title": "Supplier order tracking",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_inventory_receiving",
+          "system": "operations_loop",
+          "title": "Inventory receiving",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_send_to_amazon",
+          "system": "operations_loop",
+          "title": "Send To Amazon",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_token_safe_handoff",
+          "system": "operations_loop",
+          "title": "Token-safe handoff",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        }
+      ]
+    },
+    "data_intelligence": {
+      "zone_id": "data_intelligence",
+      "zone_name": "Data / Intelligence",
+      "purpose": "A, B, E, H cycles track performance and pricing",
+      "completion_score": 48,
+      "status": "In Progress",
+      "main_focus": "Stabilise H while preserving A/B/E cadence quality",
+      "notes": "A/B/E are operational; H is active but stability-gated.",
+      "reliability": {
+        "label": "Mixed",
+        "score": null,
+        "basis": "run_evidence",
+        "evidence_note": "H remains provisional while other cycle reliability is still baselining."
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 9,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 1
+      },
+      "subsections": [
+        {
+          "id": "di_a_cycle",
+          "system": "A_cycle",
+          "title": "A cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/A_cycle_expectations.md"
+        },
+        {
+          "id": "di_b_cycle",
+          "system": "B_cycle",
+          "title": "B cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/B_cycle_expectations.md"
+        },
+        {
+          "id": "di_e_cycle",
+          "system": "E_cycle",
+          "title": "E cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/E_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_launcher_guard_runtime",
+          "system": "H_cycle",
+          "title": "H launcher and guard runtime",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_offer_market_collection",
+          "system": "H_cycle",
+          "title": "Offer and market collection",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_repricing_decision_logic",
+          "system": "H_cycle",
+          "title": "Repricing decision logic",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_publish_updates",
+          "system": "H_cycle",
+          "title": "Publish updates",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_runtime_lock_safety",
+          "system": "H_cycle",
+          "title": "Runtime lock safety",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_boundary_truth_handling",
+          "system": "H_cycle",
+          "title": "Boundary truth handling",
+          "status": "Blocked",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_health_reporting",
+          "system": "H_cycle",
+          "title": "Health reporting",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        }
+      ]
+    },
+    "portfolio_management": {
+      "zone_id": "portfolio_management",
+      "zone_name": "Portfolio Management",
+      "purpose": "dropped, discontinued, recoverable product paths",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Define and enforce dropped vs discontinued lifecycle flow",
+      "notes": "Lifecycle intent is defined in plans; operational enforcement remains to be built.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null,
+        "basis": "run_evidence",
+        "evidence_note": "No comparable operational run evidence for this zone yet."
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 4,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "pm_dropped_path",
+          "system": "portfolio_management",
+          "title": "Dropped path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_discontinued_path",
+          "system": "portfolio_management",
+          "title": "Discontinued path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_recoverable_reentry",
+          "system": "portfolio_management",
+          "title": "Recoverable re-entry path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_lifecycle_enforcement",
+          "system": "portfolio_management",
+          "title": "Lifecycle enforcement",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/ROADMAP_SYSTEM_MAP.md"
+        }
+      ]
+    },
+    "system_governance": {
+      "zone_id": "system_governance",
+      "zone_name": "System Governance",
+      "purpose": "roadmap, expectations, progress, health monitoring",
+      "completion_score": 75,
+      "status": "In Progress",
+      "main_focus": "Keep roadmap, expectations, progress updates, and warning triage aligned",
+      "notes": "Governance docs and controls are active; reliability remains provisional while health warnings persist.",
+      "reliability": {
+        "label": "Provisional",
+        "score": 75,
+        "basis": "control_process",
+        "evidence_note": "Governance process is in use, but WARN conditions are still active."
+      },
+      "subsection_counts": {
+        "Done": 3,
+        "In Progress": 3,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "sg_roadmap_system_map",
+          "system": "system_governance",
+          "title": "Roadmap system map",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/ROADMAP_SYSTEM_MAP.md"
+        },
+        {
+          "id": "sg_expectation_framework",
+          "system": "system_governance",
+          "title": "Expectation framework",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/"
+        },
+        {
+          "id": "sg_prompt_workflow",
+          "system": "system_governance",
+          "title": "Prompt workflow",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/PROMPT_WORKFLOW.md"
+        },
+        {
+          "id": "sg_progress_dashboard",
+          "system": "system_governance",
+          "title": "Progress dashboard",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/SYSTEM_CONTROL_TOWER.html"
+        },
+        {
+          "id": "sg_health_monitoring",
+          "system": "system_governance",
+          "title": "Health monitoring",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "out/system_health_checklist.csv"
+        },
+        {
+          "id": "sg_warning_triage_process",
+          "system": "system_governance",
+          "title": "Warning triage process",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "AGENTS.md"
+        }
+      ]
+    }
+  },
+  "systems": {
+    "supplier_discovery": {
+      "system_id": "supplier_discovery",
+      "zone_id": "supplier_discovery",
+      "system_name": "Supplier Discovery",
+      "purpose": "finds suppliers and price lists",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Define v1 discovery to price-list handoff path",
+      "notes": "Planning and expectation scaffolding exist; SellerOne runtime implementation is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "sd_market_discovery",
+          "title": "Market product discovery",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_amazon_direct_exclusion",
+          "title": "Amazon-direct exclusion",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_manufacturer_direct_exclusion",
+          "title": "Manufacturer-direct exclusion",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_distributor_discovery_workflow",
+          "title": "Distributor discovery workflow",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/SUPPLIER_DISCOVERY_PLAN.md"
+        },
+        {
+          "id": "sd_supplier_onboarding_tracking",
+          "title": "Supplier onboarding tracking",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_price_list_acquisition",
+          "title": "Price-list acquisition",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/supplier_discovery_expectations.md"
+        },
+        {
+          "id": "sd_feeder_handoff_artifact",
+          "title": "Feeder handoff artifact",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/SUPPLIER_DISCOVERY_PLAN.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "feeder_cycle": {
+      "system_id": "feeder_cycle",
+      "zone_id": "product_feeder",
+      "system_name": "Product Sourcing / Feeder",
+      "purpose": "turns price lists into approved product candidates",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Build intake normalization and approval queue baseline",
+      "notes": "Feeder design exists in control docs; runtime implementation is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "pf_list_normalization",
+          "title": "Supplier list normalization",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_barcode_identity_validation",
+          "title": "Barcode / identity validation",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_marketplace_viability_checks",
+          "title": "Marketplace viability checks",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pf_demand_profit_checks",
+          "title": "Demand / profitability checks",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_test_buy_recommendation",
+          "title": "Test-buy recommendation",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        },
+        {
+          "id": "pf_approval_queue",
+          "title": "Approval queue",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pf_purchase_order_handoff",
+          "title": "Purchase-order handoff",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/feeder_cycle_expectations.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 7,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "operations_loop": {
+      "system_id": "operations_loop",
+      "zone_id": "operations_loop",
+      "system_name": "Operations Loop",
+      "purpose": "restock, order, receive, send to Amazon",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Stand up Restock -> PO -> Receiving -> Send flow",
+      "notes": "Loop architecture is mapped, but connected runtime delivery is not started.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 6,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "op_restock_advisor",
+          "title": "Restock Advisor",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_purchase_orders",
+          "title": "Purchase Orders",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_supplier_order_tracking",
+          "title": "Supplier order tracking",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_inventory_receiving",
+          "title": "Inventory receiving",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_send_to_amazon",
+          "title": "Send To Amazon",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/operations_loop_expectations.md"
+        },
+        {
+          "id": "op_token_safe_handoff",
+          "title": "Token-safe handoff",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 6,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "A_cycle": {
+      "system_id": "A_cycle",
+      "zone_id": "data_intelligence",
+      "system_name": "A cycle",
+      "purpose": "daily orchestration and health-gate data foundation",
+      "completion_score": 50,
+      "status": "In Progress",
+      "main_focus": "Maintain clean cadence and strengthen reliability baseline",
+      "notes": "Operational and in progress.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "di_a_cycle",
+          "title": "A cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/A_cycle_expectations.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "B_cycle": {
+      "system_id": "B_cycle",
+      "zone_id": "data_intelligence",
+      "system_name": "B cycle",
+      "purpose": "daytime orders, token accounting, and sales-side outputs",
+      "completion_score": 50,
+      "status": "In Progress",
+      "main_focus": "Maintain boundary-safe loop behavior and reduce warnings",
+      "notes": "Operational and in progress.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "di_b_cycle",
+          "title": "B cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/B_cycle_expectations.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "E_cycle": {
+      "system_id": "E_cycle",
+      "zone_id": "data_intelligence",
+      "system_name": "E cycle",
+      "purpose": "analytics outputs for velocity, ROI, and restock support",
+      "completion_score": 50,
+      "status": "In Progress",
+      "main_focus": "Keep output freshness and reliability evidence consistent",
+      "notes": "Operational and in progress.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "di_e_cycle",
+          "title": "E cycle",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/E_cycle_expectations.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 1,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "H_cycle": {
+      "system_id": "H_cycle",
+      "zone_id": "data_intelligence",
+      "system_name": "H cycle",
+      "purpose": "repricing runtime for live price updates",
+      "completion_score": 46,
+      "status": "Needs Stabilising",
+      "main_focus": "Resolve stability gates and finalize/runtime boundary issues",
+      "notes": "Active but not stable; remains needs-stabilising.",
+      "reliability": {
+        "label": "Provisional",
+        "score": 45
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 6,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 1
+      },
+      "subsections": [
+        {
+          "id": "di_h_launcher_guard_runtime",
+          "title": "H launcher and guard runtime",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_offer_market_collection",
+          "title": "Offer and market collection",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_repricing_decision_logic",
+          "title": "Repricing decision logic",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_publish_updates",
+          "title": "Publish updates",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_runtime_lock_safety",
+          "title": "Runtime lock safety",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_boundary_truth_handling",
+          "title": "Boundary truth handling",
+          "status": "Blocked",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        },
+        {
+          "id": "di_h_health_reporting",
+          "title": "Health reporting",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/H_cycle_expectations.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 6,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 1
+      }
+    },
+    "portfolio_management": {
+      "system_id": "portfolio_management",
+      "zone_id": "portfolio_management",
+      "system_name": "Portfolio Management",
+      "purpose": "dropped, discontinued, recoverable product paths",
+      "completion_score": 0,
+      "status": "Planned",
+      "main_focus": "Define and enforce dropped vs discontinued lifecycle flow",
+      "notes": "Lifecycle intent is defined in plans; operational enforcement remains to be built.",
+      "reliability": {
+        "label": "To Baseline",
+        "score": null
+      },
+      "subsection_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 4,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "pm_dropped_path",
+          "title": "Dropped path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_discontinued_path",
+          "title": "Discontinued path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_recoverable_reentry",
+          "title": "Recoverable re-entry path",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/FEEDER_CYCLE_PLAN.md"
+        },
+        {
+          "id": "pm_lifecycle_enforcement",
+          "title": "Lifecycle enforcement",
+          "status": "Planned",
+          "weight": 1.0,
+          "source_ref": "project_control/ROADMAP_SYSTEM_MAP.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 0,
+        "In Progress": 0,
+        "Planned": 4,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    },
+    "system_governance": {
+      "system_id": "system_governance",
+      "zone_id": "system_governance",
+      "system_name": "System Governance",
+      "purpose": "roadmap, expectations, progress, health monitoring",
+      "completion_score": 75,
+      "status": "In Progress",
+      "main_focus": "Keep roadmap, expectations, progress updates, and warning triage aligned",
+      "notes": "Governance docs and controls are active; reliability remains provisional while health warnings persist.",
+      "reliability": {
+        "label": "Provisional",
+        "score": 75
+      },
+      "subsection_counts": {
+        "Done": 3,
+        "In Progress": 3,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      },
+      "subsections": [
+        {
+          "id": "sg_roadmap_system_map",
+          "title": "Roadmap system map",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/ROADMAP_SYSTEM_MAP.md"
+        },
+        {
+          "id": "sg_expectation_framework",
+          "title": "Expectation framework",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/EXPECTATIONS/"
+        },
+        {
+          "id": "sg_prompt_workflow",
+          "title": "Prompt workflow",
+          "status": "Done",
+          "weight": 1.0,
+          "source_ref": "project_control/PROMPT_WORKFLOW.md"
+        },
+        {
+          "id": "sg_progress_dashboard",
+          "title": "Progress dashboard",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "project_control/SYSTEM_CONTROL_TOWER.html"
+        },
+        {
+          "id": "sg_health_monitoring",
+          "title": "Health monitoring",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "out/system_health_checklist.csv"
+        },
+        {
+          "id": "sg_warning_triage_process",
+          "title": "Warning triage process",
+          "status": "In Progress",
+          "weight": 1.0,
+          "source_ref": "AGENTS.md"
+        }
+      ],
+      "item_counts": {
+        "Done": 3,
+        "In Progress": 3,
+        "Planned": 0,
+        "Not Started": 0,
+        "Blocked": 0
+      }
+    }
+  }
+}

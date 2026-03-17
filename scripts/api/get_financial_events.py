@@ -1,4 +1,4 @@
-"""
+﻿"""
 Helpers to fetch financial events from SP-API finances/v0/financialEvents.
 """
 
@@ -90,3 +90,4 @@ def list_financial_events(
     events = (payload.get("payload") or {}).get("FinancialEvents") or {}
     next_token = (payload.get("payload") or {}).get("NextToken")
     return events, next_token
+

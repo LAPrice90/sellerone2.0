@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 
 from scripts import A016_refresh_phase1_daily_intel as a016
 
@@ -119,3 +119,4 @@ class A016DailyIntelSchedulerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

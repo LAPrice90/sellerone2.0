@@ -1,4 +1,4 @@
-"""
+﻿"""
 Quick helper to fetch SP-API fee estimates for a single ASIN/SKU and print the raw amounts.
 
 Usage:
@@ -40,3 +40,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

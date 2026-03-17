@@ -1,9 +1,9 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts import phase1_storage
+from scripts.phase1 import phase1_storage
 
 
 class Phase1StorageTests(unittest.TestCase):
@@ -183,3 +183,4 @@ class Phase1StorageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

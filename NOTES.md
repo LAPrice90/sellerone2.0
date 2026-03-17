@@ -1,3 +1,8 @@
+REFERENCE-ONLY LEGACY PLANNING NOTES
+- This file contains legacy planning notes.
+- This file is reference-only.
+- This file is not authoritative project state.
+
 # Notes / Future Jobs
 
 - Add missing-SKUs warning to A003 Run_Status when inventory rows < active listings.

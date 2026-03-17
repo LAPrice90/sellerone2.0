@@ -1,0 +1,418 @@
+﻿"""
+Fetch FBA inventory adjustments/ledger reports and write raw data for observation.
+
+Report types:
+- GET_LEDGER_DETAIL_VIEW_DATA (preferred)
+- GET_FBA_FULFILLMENT_INVENTORY_ADJUSTMENTS_DATA (fallback)
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import time
+from datetime import datetime, timezone
+from io import BytesIO, StringIO
+from pathlib import Path
+from typing import Optional, Tuple
+
+import gzip
+import pandas as pd
+import requests
+import gspread
+
+SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
+LWA_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
+
+REPORT_TYPE_ADJUSTMENTS = "GET_FBA_FULFILLMENT_INVENTORY_ADJUSTMENTS_DATA"
+REPORT_TYPE_LEDGER = "GET_LEDGER_DETAIL_VIEW_DATA"
+DEFAULT_MARKETPLACE_ID = "A1F83G8C2ARO7P"
+DEFAULT_RECENT_HOURS = 24
+DEFAULT_LEDGER_LOOKBACK_DAYS = 90
+DEFAULT_LEDGER_LAG_DAYS = 1
+SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
+RAW_TAB_ADJUSTMENTS = "Inventory_Adjustments_raw"
+RAW_TAB_LEDGER = "Inventory_Ledger_raw"
+OUT_CSV_ADJUSTMENTS = Path("out/inventory_adjustments_raw.csv")
+OUT_CSV_LEDGER = Path("out/inventory_ledger_raw.csv")
+OUT_CSV_LATEST = Path("out/inventory_adjustments_latest.csv")
+
+
+class MissingEnvError(RuntimeError):
+    pass
+
+
+def require_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise MissingEnvError(f"Missing required environment variable: {name}")
+    return value
+
+
+def load_dotenv_if_missing(env_files: Optional[list[str]] = None) -> None:
+    env_files = env_files or ["secrets/.env", ".env"]
+    for env_file in env_files:
+        path = Path(env_file)
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if "#" in val:
+                val = val.split("#", 1)[0].strip()
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
+def get_lwa_access_token(refresh_token: str, client_id: str, client_secret: str) -> Tuple[str, int, str]:
+    headers = {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+    resp = requests.post(LWA_TOKEN_URL, data=data, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        raise RuntimeError(f"LWA token request failed: {resp.status_code} {resp.text}")
+    payload = resp.json()
+    access_token = payload.get("access_token")
+    expires_in = payload.get("expires_in")
+    token_type = payload.get("token_type")
+    if not access_token:
+        raise RuntimeError(f"LWA token missing in response: {payload}")
+    return access_token, int(expires_in or 0), token_type or ""
+
+
+def get_lwa_access_token_with_retry(
+    refresh_token: str, client_id: str, client_secret: str, attempts: int = 3, backoff: float = 2.0
+) -> Tuple[str, int, str]:
+    last_err: Exception | None = None
+    for i in range(1, attempts + 1):
+        try:
+            return get_lwa_access_token(refresh_token, client_id, client_secret)
+        except requests.RequestException as exc:
+            last_err = exc
+            if i < attempts:
+                time.sleep(backoff * i)
+        except Exception as exc:
+            last_err = exc
+            break
+    raise RuntimeError(f"LWA token request failed after {attempts} attempts: {last_err}")
+
+
+def create_report(
+    access_token: str,
+    report_type: str,
+    marketplace_ids: list[str] | None,
+    data_start: str | None,
+    data_end: str | None,
+    report_options: dict[str, str] | None,
+) -> str:
+    url = f"{SPAPI_BASE_URL}/reports/2021-06-30/reports"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "x-amz-access-token": access_token,
+        "Content-Type": "application/json",
+    }
+    body: dict[str, object] = {"reportType": report_type}
+    if marketplace_ids:
+        body["marketplaceIds"] = marketplace_ids
+    if data_start:
+        body["dataStartTime"] = data_start
+    if data_end:
+        body["dataEndTime"] = data_end
+    if report_options:
+        body["reportOptions"] = report_options
+    resp = requests.post(url, headers=headers, json=body, timeout=30)
+    if resp.status_code not in (200, 201, 202):
+        raise RuntimeError(f"Create report failed: {resp.status_code} {resp.text}")
+    payload = resp.json()
+    report_id = payload.get("reportId")
+    if not report_id:
+        raise RuntimeError(f"reportId missing in response: {payload}")
+    return report_id
+
+
+def poll_report(access_token: str, report_id: str, poll_interval: int, max_attempts: int) -> Tuple[str, int]:
+    url = f"{SPAPI_BASE_URL}/reports/2021-06-30/reports/{report_id}"
+    headers = {"Authorization": f"Bearer {access_token}", "x-amz-access-token": access_token}
+    for attempt in range(1, max_attempts + 1):
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Poll failed (attempt {attempt}): {resp.status_code} {resp.text}")
+        payload = resp.json()
+        status = payload.get("processingStatus")
+        if status == "DONE":
+            doc_id = payload.get("reportDocumentId")
+            if not doc_id:
+                raise RuntimeError(f"reportDocumentId missing when status DONE: {payload}")
+            return doc_id, attempt
+        if status == "FATAL":
+            raise RuntimeError(f"Report processing failed with FATAL status: {payload}")
+        if attempt < max_attempts:
+            time.sleep(poll_interval)
+    raise TimeoutError(f"Report not DONE after {max_attempts} attempts.")
+
+
+def list_reports(
+    access_token: str,
+    report_type: str,
+    created_since: str | None,
+    created_until: str | None,
+) -> list[dict]:
+    url = f"{SPAPI_BASE_URL}/reports/2021-06-30/reports"
+    headers = {"Authorization": f"Bearer {access_token}", "x-amz-access-token": access_token}
+    params: dict[str, str] = {
+        "reportTypes": report_type,
+        "processingStatuses": "DONE",
+    }
+    if created_since:
+        params["createdSince"] = created_since
+    if created_until:
+        params["createdUntil"] = created_until
+    resp = requests.get(url, headers=headers, params=params, timeout=30)
+    if resp.status_code != 200:
+        raise RuntimeError(f"List reports failed: {resp.status_code} {resp.text}")
+    payload = resp.json() or {}
+    return payload.get("reports") or []
+
+
+def fetch_report(access_token: str, report_id: str) -> dict:
+    url = f"{SPAPI_BASE_URL}/reports/2021-06-30/reports/{report_id}"
+    headers = {"Authorization": f"Bearer {access_token}", "x-amz-access-token": access_token}
+    resp = requests.get(url, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Fetch report failed: {resp.status_code} {resp.text}")
+    return resp.json()
+
+
+def fetch_report_document(access_token: str, report_document_id: str) -> Tuple[str, Optional[str]]:
+    url = f"{SPAPI_BASE_URL}/reports/2021-06-30/documents/{report_document_id}"
+    headers = {"Authorization": f"Bearer {access_token}", "x-amz-access-token": access_token}
+    resp = requests.get(url, headers=headers, timeout=30)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Fetch document metadata failed: {resp.status_code} {resp.text}")
+    payload = resp.json()
+    doc_url = payload.get("url")
+    compression = payload.get("compressionAlgorithm")
+    if not doc_url:
+        raise RuntimeError(f"Document URL missing in response: {payload}")
+    return doc_url, compression
+
+
+def download_report(doc_url: str, compression: Optional[str]) -> bytes:
+    resp = requests.get(doc_url, timeout=60)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Download failed: {resp.status_code}")
+    raw_bytes = resp.content
+    if compression and compression.upper() == "GZIP":
+        return gzip.GzipFile(fileobj=BytesIO(raw_bytes)).read()
+    if compression and compression.upper() != "GZIP":
+        raise RuntimeError(f"Unsupported compressionAlgorithm: {compression}")
+    return raw_bytes
+
+
+def parse_tsv(raw_bytes: bytes) -> pd.DataFrame:
+    last_err: Optional[Exception] = None
+    for enc in ("utf-8-sig", "latin-1"):
+        try:
+            text = raw_bytes.decode(enc)
+            df = pd.read_csv(StringIO(text), sep="\t", dtype=str, keep_default_na=False)
+            break
+        except Exception as exc:
+            last_err = exc
+            df = None
+    if df is None:
+        raise RuntimeError(f"Failed to parse TSV with utf-8-sig or latin-1: {last_err}")
+    return df.fillna("")
+
+
+def get_gspread_client() -> gspread.Client:
+    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if not cred_path:
+        cred_path = str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json")
+    return gspread.service_account(filename=cred_path)
+
+
+def resolve_marketplace_ids(explicit: str | None) -> list[str]:
+    if explicit and not explicit.startswith("$"):
+        return [explicit]
+
+    env_val = os.environ.get("MARKETPLACE_ID", "")
+    if env_val and not env_val.startswith("$"):
+        return [env_val]
+
+    mp_path = Path("out/marketplace_participations.csv")
+    if mp_path.exists():
+        df = pd.read_csv(mp_path, dtype=str).fillna("")
+        if "marketplace_id" in df.columns:
+            if "is_participating" in df.columns:
+                participating = df[df["is_participating"].astype(str).str.lower().isin(["true", "1", "yes"])]
+                if not participating.empty:
+                    return [v for v in participating["marketplace_id"].tolist() if v]
+            first = df[df["marketplace_id"].astype(str).str.len() > 0]
+            if not first.empty:
+                return [v for v in first["marketplace_id"].tolist() if v]
+
+    return [DEFAULT_MARKETPLACE_ID]
+
+
+def write_raw_sheet(df: pd.DataFrame, tab_name: str) -> None:
+    client = get_gspread_client()
+    sheet = client.open_by_key(SHEET_ID)
+    payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
+    try:
+        ws = sheet.worksheet(tab_name)
+    except gspread.WorksheetNotFound:
+        ws = sheet.add_worksheet(title=tab_name, rows=max(len(payload) + 10, 2000), cols=max(len(df.columns) + 5, 40))
+    else:
+        ws.clear()
+    ws.update(range_name="A1", values=payload)
+
+
+def build_report_options(report_type: str) -> dict[str, str] | None:
+    if report_type != REPORT_TYPE_LEDGER:
+        return None
+    return {
+        "aggregateByLocation": "COUNTRY",
+        "aggregatedByTimePeriod": "DAILY",
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Fetch FBA inventory adjustments report and write raw data.")
+    parser.add_argument("--marketplace-id", default=os.environ.get("MARKETPLACE_ID"), help="Marketplace ID (default: env MARKETPLACE_ID).")
+    parser.add_argument("--poll-interval", type=int, default=20, help="Seconds between poll attempts.")
+    parser.add_argument("--max-attempts", type=int, default=40, help="Max poll attempts before timeout.")
+    parser.add_argument("--create-attempts", type=int, default=5, help="Create report attempts before giving up.")
+    parser.add_argument("--create-backoff-sec", type=int, default=120, help="Seconds to wait between create attempts.")
+    parser.add_argument("--recent-hours", type=int, default=DEFAULT_RECENT_HOURS, help="Reuse latest DONE report within this window.")
+    parser.add_argument("--data-start-time", default=None, help="ISO 8601 start time for report window.")
+    parser.add_argument("--data-end-time", default=None, help="ISO 8601 end time for report window.")
+    args = parser.parse_args()
+
+    load_dotenv_if_missing()
+    refresh_token = require_env("LWA_REFRESH_TOKEN")
+    client_id = require_env("LWA_CLIENT_ID")
+    client_secret = require_env("LWA_CLIENT_SECRET")
+
+    access_token, _, _ = get_lwa_access_token_with_retry(refresh_token, client_id, client_secret)
+    marketplace_ids = resolve_marketplace_ids(args.marketplace_id)
+    report_types = [
+        (REPORT_TYPE_LEDGER, OUT_CSV_LEDGER, RAW_TAB_LEDGER),
+        (REPORT_TYPE_ADJUSTMENTS, OUT_CSV_ADJUSTMENTS, RAW_TAB_ADJUSTMENTS),
+    ]
+
+    recent_since = (datetime.now(timezone.utc) - pd.Timedelta(hours=args.recent_hours)).isoformat()
+    recent_until = datetime.now(timezone.utc).isoformat()
+
+    last_err = None
+    for report_type, out_csv, tab_name in report_types:
+        # 1) Try reusing a recent DONE report (skip reuse for ledger to force fresh data).
+        try:
+            reports = list_reports(access_token, report_type, recent_since, recent_until)
+        except Exception as exc:
+            reports = []
+            last_err = exc
+        if report_type == REPORT_TYPE_LEDGER:
+            reports = []
+        if reports:
+            reports = sorted(reports, key=lambda r: r.get("createdTime") or "", reverse=True)
+            picked = reports[0]
+            report_id = picked.get("reportId")
+            report_document_id = picked.get("reportDocumentId")
+            if not report_document_id and report_id:
+                full = fetch_report(access_token, report_id)
+                report_document_id = full.get("reportDocumentId")
+            if report_document_id:
+                doc_url, compression = fetch_report_document(access_token, report_document_id)
+                raw_bytes = download_report(doc_url, compression)
+                df = parse_tsv(raw_bytes)
+                if report_type == REPORT_TYPE_LEDGER and df.empty:
+                    # Skip reusing empty ledger reports; try fresh report/fallback.
+                    reports = []
+                else:
+                    out_csv.parent.mkdir(parents=True, exist_ok=True)
+                    df.to_csv(out_csv, index=False)
+                    # Compatibility alias expected by A-cycle output verification.
+                    df.to_csv(OUT_CSV_LATEST, index=False)
+                    write_raw_sheet(df, tab_name)
+                    print(
+                        {
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "status": "success",
+                            "report_type": report_type,
+                            "row_count": len(df),
+                            "columns": len(df.columns),
+                            "attempts_used": 0,
+                            "snapshot": str(out_csv),
+                            "sheet_tab": tab_name,
+                            "reuse": True,
+                        }
+                    )
+                    return
+
+        # 2) Create a new report if no recent report found.
+        report_id = None
+        report_options = build_report_options(report_type)
+        data_start = args.data_start_time
+        data_end = args.data_end_time
+        if report_type == REPORT_TYPE_LEDGER and not data_start and not data_end:
+            end_ts = datetime.now(timezone.utc) - pd.Timedelta(days=DEFAULT_LEDGER_LAG_DAYS)
+            start_ts = end_ts - pd.Timedelta(days=DEFAULT_LEDGER_LOOKBACK_DAYS)
+            data_start = start_ts.isoformat()
+            data_end = end_ts.isoformat()
+        for attempt in range(1, args.create_attempts + 1):
+            try:
+                report_id = create_report(access_token, report_type, marketplace_ids, data_start, data_end, report_options)
+                break
+            except RuntimeError as exc:
+                last_err = exc
+                msg = str(exc)
+                if "not allowed at this time" in msg.lower() and attempt < args.create_attempts:
+                    print(f"[A005] create_report blocked for {report_type} (attempt {attempt}/{args.create_attempts}), retrying in {args.create_backoff_sec}s")
+                    time.sleep(args.create_backoff_sec)
+                    continue
+                break
+        if not report_id:
+            continue
+
+        report_document_id, attempts_used = poll_report(access_token, report_id, poll_interval=args.poll_interval, max_attempts=args.max_attempts)
+        doc_url, compression = fetch_report_document(access_token, report_document_id)
+        raw_bytes = download_report(doc_url, compression)
+        df = parse_tsv(raw_bytes)
+
+        out_csv.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(out_csv, index=False)
+        # Compatibility alias expected by A-cycle output verification.
+        df.to_csv(OUT_CSV_LATEST, index=False)
+        write_raw_sheet(df, tab_name)
+
+        print(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "report_type": report_type,
+                "row_count": len(df),
+                "columns": len(df.columns),
+                "attempts_used": attempts_used,
+                "snapshot": str(out_csv),
+                "sheet_tab": tab_name,
+                "reuse": False,
+            }
+        )
+        return
+
+    raise RuntimeError(f"Create report failed for all report types. Last error: {last_err}")
+
+
+if __name__ == "__main__":
+    main()
+

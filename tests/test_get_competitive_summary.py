@@ -1,4 +1,4 @@
-import json
+﻿import json
 import unittest
 from unittest.mock import patch
 
@@ -105,3 +105,4 @@ class GetCompetitiveSummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

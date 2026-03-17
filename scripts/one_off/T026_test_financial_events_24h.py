@@ -1,4 +1,4 @@
-"""
+﻿"""
 One-off 24h pull of posted financial events for inspection.
 
 - No markers, no sheet writes.
@@ -180,3 +180,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

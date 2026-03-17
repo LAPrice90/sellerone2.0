@@ -1,6 +1,6 @@
 ﻿import unittest
 
-from scripts import phase1_ceilings
+from scripts.phase1 import phase1_ceilings
 
 
 class Phase1CeilingsTests(unittest.TestCase):
@@ -172,6 +172,31 @@ class Phase1CeilingsTests(unittest.TestCase):
         self.assertEqual(result.binding_ceiling_type, "ELIGIBILITY")
         self.assertIn("BINDING_CEILING_ELIGIBILITY", result.reason_codes)
 
+    def test_suppression_reactivation_infers_upper_bound_from_lowest_competitor(self) -> None:
+        result = phase1_ceilings.resolve_suppression_reactivation_target(
+            buy_box_state="SUPPRESSED_ASIN",
+            now_utc="2026-03-07T15:42:04Z",
+            competitive_price_threshold_gbp="",
+            competitive_price_gbp="",
+            average_selling_price_gbp="",
+            foep_price_gbp="",
+            probe_threshold_estimate_gbp="",
+            existing_final_ceiling_landed_gbp="12.00",
+            anchor_floor_price_gbp="4.90",
+            hard_floor_gbp="4.50",
+            probe_ceiling_candidate_gbp="",
+            best_competitor_price_gbp="5.70",
+            no_buy_box_offer_present="1",
+            current_suppression_ceiling_landed_temp="",
+            current_suppression_ceiling_expiry_utc="",
+        )
+        self.assertEqual(result.suppression_reactivation_target_landed_gbp, "")
+        self.assertEqual(result.suppression_threshold_upper_bound_gbp, "5.70")
+        self.assertEqual(result.suppression_ceiling_landed_temp, "5.70")
+        self.assertEqual(result.suppression_ceiling_source, "LOWEST_COMPETITOR_INFERENCE")
+        self.assertIn("SUPPRESSION_THRESHOLD_UPPER_BOUND_INFERRED_LOWEST_COMPETITOR", result.reason_codes)
+
 
 if __name__ == "__main__":
     unittest.main()
+

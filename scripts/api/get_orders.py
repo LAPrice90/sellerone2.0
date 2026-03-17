@@ -1,4 +1,4 @@
-"""
+﻿"""
 Helpers to fetch Orders and Order Items from SP-API.
 """
 
@@ -124,3 +124,4 @@ def list_order_items(
     items = (payload.get("payload") or {}).get("OrderItems") or []
     next_token = (payload.get("payload") or {}).get("NextToken")
     return items, next_token
+
