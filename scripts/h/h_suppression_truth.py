@@ -10,7 +10,7 @@ import pandas as pd
 
 
 SUPPRESSED_STATES = {"SUPPRESSED_ASIN", "DISQUALIFIED_SELF_PRICE"}
-NON_ATTEMPT_WRITE_STATUSES = {"", "NO_WRITE_REQUIRED"}
+NON_ATTEMPT_WRITE_STATUSES = {"", "NO_WRITE_REQUIRED", "READ_ONLY_NO_WRITE"}
 APPLIED_WRITE_STATUSES = {"APPLIED", "APPLIED_OBSERVED"}
 SUPPRESSION_ACTIVE_REASON_CODES = {
     "BUY_BOX_STATE_SUPPRESSED_ASIN",
@@ -284,6 +284,7 @@ def resolve_unified_truth(
     exec_write_status = _clean_text(execution_write_status)
     suppression_write = _clean_text(suppression_write_status)
     exec_reason_codes = _json_list(execution_reason_codes_json)
+    execution_state_text = _clean_text(execution_state, upper=True)
     execution_old_price = _safe_float(execution_old_price_gbp)
     execution_new_price = _safe_float(execution_new_price_gbp)
     execution_hard_floor = _safe_float(execution_hard_floor_gbp)
@@ -320,9 +321,38 @@ def resolve_unified_truth(
     true_binding_ceiling_gbp = _clean_text(execution_final_ceiling_landed_gbp)
     true_binding_ceiling_type = _clean_text(execution_binding_ceiling_type, upper=True)
     suppression_ceiling = _clean_text(suppression_ceiling_landed_temp)
+    suppression_ceiling_num = _safe_float(suppression_ceiling)
     if effective_suppression_active and suppression_ceiling != "":
-        true_binding_ceiling_gbp = suppression_ceiling
-        true_binding_ceiling_type = "SUPPRESSION_TEMP"
+        if (
+            execution_hard_floor is not None
+            and suppression_ceiling_num is not None
+            and suppression_ceiling_num < execution_hard_floor
+        ):
+            true_binding_ceiling_gbp = f"{execution_hard_floor:.2f}"
+            true_binding_ceiling_type = "SUPPRESSION_TEMP_CLAMPED"
+        else:
+            true_binding_ceiling_gbp = suppression_ceiling
+            true_binding_ceiling_type = "SUPPRESSION_TEMP"
+
+    hard_floor_clamp_active = bool(
+        execution_hard_floor is not None
+        and (
+            "CEILING_EFFECTIVE_CLAMPED_TO_HARD_FLOOR" in exec_reason_set
+            or (
+                "FLOOR_PRIORITY_CEILING_CONFLICT" in exec_reason_set
+                and (
+                    "FLOOR_PRIORITY_ENFORCED" in exec_reason_set
+                    or "FAIL_CEILING_BELOW_HARD_FLOOR" in exec_reason_set
+                )
+            )
+        )
+    )
+    if hard_floor_clamp_active:
+        true_binding_ceiling_gbp = f"{execution_hard_floor:.2f}"
+        if true_binding_ceiling_type == "SUPPRESSION_TEMP":
+            true_binding_ceiling_type = "SUPPRESSION_TEMP_CLAMPED"
+        elif true_binding_ceiling_type == "":
+            true_binding_ceiling_type = "HARD_FLOOR_CLAMP"
 
     floor_conflict_active = "FLOOR_PRIORITY_CEILING_CONFLICT" in exec_reason_codes
     observed_floor_seek_applied = bool(
@@ -350,13 +380,28 @@ def resolve_unified_truth(
                 true_binding_ceiling_gbp = f"{execution_hard_floor:.2f}"
             true_binding_ceiling_type = "PHASE_FLOOR"
 
-    write_attempted = unified_writer_outcome not in NON_ATTEMPT_WRITE_STATUSES
-    write_applied = unified_writer_outcome in APPLIED_WRITE_STATUSES
+    if parked:
+        # Parked SKUs are intentionally excluded from write flow in this cycle.
+        # Force a non-write outcome so stale historic execution states do not
+        # leak into live truth/status views.
+        unified_writer_outcome = "NO_WRITE_REQUIRED"
+        write_attempted = False
+        write_applied = False
+    else:
+        write_attempted = unified_writer_outcome not in NON_ATTEMPT_WRITE_STATUSES
+        write_applied = unified_writer_outcome in APPLIED_WRITE_STATUSES
 
     if parked:
         truth_status = "PARKED"
     elif effective_suppression_active and write_applied:
         truth_status = "SUPP_APPLIED"
+    elif (
+        effective_suppression_active
+        and not write_attempted
+        and unified_writer_outcome == "READ_ONLY_NO_WRITE"
+        and execution_state_text == "SELLER_DETAIL_HOLD"
+    ):
+        truth_status = "SUPP_GATED_DETAIL"
     elif effective_suppression_active and write_attempted:
         truth_status = "SUPP_BLOCKED"
     elif effective_suppression_active:

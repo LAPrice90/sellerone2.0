@@ -205,6 +205,7 @@ def execute_write_verify_and_start_probe(
     http_status = str(write_result.get("http_status", "") or "")
     submission_id = str(write_result.get("submission_id", "") or "")
     write_error = str(write_result.get("response_text", "") or "")
+    submission_accepted = write_ok and submission_id != ""
 
     if not write_ok:
         return WriteVerifyResult(
@@ -247,7 +248,7 @@ def execute_write_verify_and_start_probe(
             if sleep_seconds > 0:
                 sleep_fn(sleep_seconds)
 
-    if not applied:
+    if not applied and not submission_accepted:
         return WriteVerifyResult(
             write_status="WRITE_NOT_APPLIED",
             write_error="WRITE_NOT_APPLIED",
@@ -261,6 +262,10 @@ def execute_write_verify_and_start_probe(
             submission_id=submission_id,
             reason_codes=reason_codes,
         )
+
+    if not applied and submission_accepted:
+        verification_source = "SPAPI_ACCEPTED"
+        reason_codes.append("WRITE_VERIFY_PENDING_SPAPI_ACCEPTED")
 
     probe_id = str(uuid.uuid4())
     storage_append(

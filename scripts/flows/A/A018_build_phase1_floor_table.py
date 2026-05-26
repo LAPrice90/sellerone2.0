@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.h.h_floor_truth import compute_h_floor_for_sku, has_blocking_reason_codes, load_h_floor_context
+from scripts.core.storage import write_dataframe_with_sql_compat
 
 OUT = ROOT / "out"
 DATA = ROOT / "data"
@@ -22,6 +23,7 @@ PARKED_SKUS_PATH = OUT / "parking" / "parked_skus.csv"
 INVENTORY_SUMMARIES_PATH = OUT / "inventory_summaries.csv"
 STOCK_SNAPSHOT_LATEST_PATH = OUT / "parking" / "stock_snapshot_latest.csv"
 DEFAULT_OUTPUT_PATH = OUT / "phase1_floor_table_latest.csv"
+SQL_TABLE_PHASE1_FLOOR_TABLE_LATEST = "a_phase1_floor_table_latest"
 
 
 def _norm(value: Any) -> str:
@@ -288,7 +290,7 @@ def build_floor_table(
         ],
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(output_path, index=False)
+    write_dataframe_with_sql_compat(frame, output_path, SQL_TABLE_PHASE1_FLOOR_TABLE_LATEST)
     stats = {
         "required_skus": len(required_skus),
         "rows_written": int(len(frame.index)),

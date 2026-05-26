@@ -1,0 +1,2 @@
+supplier_id,supplier_name,supplier_sku,supplier_title,barcode,unit_cost,currency,vat_rate,source_url,source_file_path,source_seen_at_utc,row_hash,is_valid_source_row,normalized_utc
+shure_cosmetics,Shure Cosmetics,SCS19348,007 Pour Homme (Mens 50ml EDT),3614228239318,6.95,GBP,20,https://aux.shure-cosmetics.co.uk/pricelist/,out/systems/F/inbox/suppliers/shure_cosmetics/raw_current.csv,2026-04-07T15:57:12Z,3cdac353f6201a188d103388cd58bca33408a2d6,1,2026-04-07T15:57:13Z

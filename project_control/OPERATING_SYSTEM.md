@@ -19,6 +19,7 @@ idea -> inspection -> planning -> implementation -> validation
 
 - Relevant code, control files, logs, and existing artifacts are inspected first.
 - Existing authority sources are checked before new content or changes are proposed.
+- Routine estate-wide alert review belongs in the morning MOT workflow unless the current ticket is directly about health or the alert materially changed.
 
 ### Planning
 
@@ -34,6 +35,8 @@ idea -> inspection -> planning -> implementation -> validation
 ### Validation
 
 - The changed scope is checked with the narrowest relevant validation available.
+- When a safe forced proof window exists, use that owned boundary instead of waiting for the next scheduled cycle.
+- Do not read runtime health in the middle of a loop when the loop has not yet reached its own finalization point.
 - Outputs, reports, or scope checks are confirmed before work is treated as complete.
 
 ## Task Types

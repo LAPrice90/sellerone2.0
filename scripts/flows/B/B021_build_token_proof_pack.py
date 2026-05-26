@@ -6,16 +6,35 @@ Writes a compact table of row counts, columns, and latest timestamps.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import gspread
 import pandas as pd
 from scripts.core.out_paths import resolve_compat_path
+
+try:
+    import gspread
+except Exception:
+    gspread = None
+
+if TYPE_CHECKING:
+    import gspread as gspread_types
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 PROOF_TAB = "Token_Proof_Pack"
 
 OUT_PROOF = Path("out/token_proof_pack.csv")
+WRITE_SHEETS = (
+    os.environ.get(
+        "TOKEN_PROOF_PACK_WRITE_SHEETS",
+        os.environ.get(
+            "TOKEN_EVENTS_WRITE_SHEETS",
+            os.environ.get("STOCK_EVENTS_WRITE_SHEETS", "0"),
+        ),
+    ).strip()
+    == "1"
+)
 
 CSV_FILES = [
     "token_ledger_live.csv",
@@ -43,7 +62,9 @@ TIMESTAMP_COLUMNS = [
 ]
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread_types.Client":
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=str(cred_path))
 
@@ -133,6 +154,7 @@ def _append_test_summary(rows: list[dict[str, str]]) -> None:
 
 
 def main() -> None:
+    use_sheets = bool(WRITE_SHEETS and gspread is not None)
     rows = []
     for path_str in CSV_FILES:
         rows.append(_file_stats(_resolve_csv_path(path_str)))
@@ -142,18 +164,27 @@ def main() -> None:
     OUT_PROOF.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT_PROOF, index=False)
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(TOKENS_SHEET_ID)
-    payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
-    try:
-        ws = sheet.worksheet(PROOF_TAB)
-    except gspread.WorksheetNotFound:
-        ws = sheet.add_worksheet(title=PROOF_TAB, rows=max(len(payload) + 10, 2000), cols=max(len(payload[0]) + 5, 20))
-    else:
-        ws.clear()
-    ws.update(range_name="A1", values=payload)
+    if use_sheets:
+        client = get_gspread_client()
+        sheet = client.open_by_key(TOKENS_SHEET_ID)
+        payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
+        try:
+            ws = sheet.worksheet(PROOF_TAB)
+        except gspread.WorksheetNotFound:
+            ws = sheet.add_worksheet(title=PROOF_TAB, rows=max(len(payload) + 10, 2000), cols=max(len(payload[0]) + 5, 20))
+        else:
+            ws.clear()
+        ws.update(range_name="A1", values=payload)
 
-    print({"status": "success", "rows": len(df), "tab": PROOF_TAB, "snapshot": str(OUT_PROOF)})
+    print(
+        {
+            "status": "success",
+            "rows": len(df),
+            "tab": PROOF_TAB if use_sheets else "",
+            "snapshot": str(OUT_PROOF),
+            "write_sheets": use_sheets,
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -10,16 +10,25 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import time
 from datetime import datetime, timezone
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import gzip
 import pandas as pd
 import requests
-import gspread
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
+except ImportError:  # pragma: no cover - direct script fallback
+    from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
 LWA_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
@@ -36,6 +45,13 @@ RAW_TAB_LEDGER = "Inventory_Ledger_raw"
 OUT_CSV_ADJUSTMENTS = Path("out/inventory_adjustments_raw.csv")
 OUT_CSV_LEDGER = Path("out/inventory_ledger_raw.csv")
 OUT_CSV_LATEST = Path("out/inventory_adjustments_latest.csv")
+SQL_TABLE_ADJUSTMENTS = "a_inventory_adjustments_raw"
+SQL_TABLE_LEDGER = "a_inventory_ledger_raw"
+SQL_TABLE_LATEST = "a_inventory_adjustments_latest"
+WRITE_SHEETS = os.environ.get("A005_WRITE_SHEETS", "0").strip() == "1"
+
+if TYPE_CHECKING:
+    import gspread
 
 
 class MissingEnvError(RuntimeError):
@@ -234,7 +250,9 @@ def parse_tsv(raw_bytes: bytes) -> pd.DataFrame:
     return df.fillna("")
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread.Client":
+    import gspread
+
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not cred_path:
         cred_path = str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json")
@@ -265,6 +283,8 @@ def resolve_marketplace_ids(explicit: str | None) -> list[str]:
 
 
 def write_raw_sheet(df: pd.DataFrame, tab_name: str) -> None:
+    import gspread
+
     client = get_gspread_client()
     sheet = client.open_by_key(SHEET_ID)
     payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
@@ -275,6 +295,41 @@ def write_raw_sheet(df: pd.DataFrame, tab_name: str) -> None:
     else:
         ws.clear()
     ws.update(range_name="A1", values=payload)
+
+
+def _sql_table_for_output(path: Path) -> str:
+    normalized = Path(path).as_posix()
+    mapping = {
+        OUT_CSV_ADJUSTMENTS.as_posix(): SQL_TABLE_ADJUSTMENTS,
+        OUT_CSV_LEDGER.as_posix(): SQL_TABLE_LEDGER,
+        OUT_CSV_LATEST.as_posix(): SQL_TABLE_LATEST,
+    }
+    table = mapping.get(normalized)
+    if not table:
+        raise ValueError(f"No SQL table mapping for output path: {path}")
+    return table
+
+
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str | None = None) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE"))
+    table = sql_table or _sql_table_for_output(path)
+    sql_rows = 0
+    if mode in {"sql_shadow", "sql_primary_csv_export"}:
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, table, df)
+            sql_rows = int(result["rows"])
+        finally:
+            store.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return {
+        "mode": mode,
+        "path": str(path),
+        "csv_rows": int(len(df.index)),
+        "sql_table": table if mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
 
 
 def build_report_options(report_type: str) -> dict[str, str] | None:
@@ -340,10 +395,11 @@ def main() -> None:
                     reports = []
                 else:
                     out_csv.parent.mkdir(parents=True, exist_ok=True)
-                    df.to_csv(out_csv, index=False)
+                    _write_output_frame(df, out_csv)
                     # Compatibility alias expected by A-cycle output verification.
-                    df.to_csv(OUT_CSV_LATEST, index=False)
-                    write_raw_sheet(df, tab_name)
+                    _write_output_frame(df, OUT_CSV_LATEST)
+                    if WRITE_SHEETS:
+                        write_raw_sheet(df, tab_name)
                     print(
                         {
                             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -353,7 +409,8 @@ def main() -> None:
                             "columns": len(df.columns),
                             "attempts_used": 0,
                             "snapshot": str(out_csv),
-                            "sheet_tab": tab_name,
+                            "sheet_tab": tab_name if WRITE_SHEETS else "",
+                            "sheet_write": WRITE_SHEETS,
                             "reuse": True,
                         }
                     )
@@ -390,10 +447,11 @@ def main() -> None:
         df = parse_tsv(raw_bytes)
 
         out_csv.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out_csv, index=False)
+        _write_output_frame(df, out_csv)
         # Compatibility alias expected by A-cycle output verification.
-        df.to_csv(OUT_CSV_LATEST, index=False)
-        write_raw_sheet(df, tab_name)
+        _write_output_frame(df, OUT_CSV_LATEST)
+        if WRITE_SHEETS:
+            write_raw_sheet(df, tab_name)
 
         print(
             {
@@ -404,7 +462,8 @@ def main() -> None:
                 "columns": len(df.columns),
                 "attempts_used": attempts_used,
                 "snapshot": str(out_csv),
-                "sheet_tab": tab_name,
+                "sheet_tab": tab_name if WRITE_SHEETS else "",
+                "sheet_write": WRITE_SHEETS,
                 "reuse": False,
             }
         )

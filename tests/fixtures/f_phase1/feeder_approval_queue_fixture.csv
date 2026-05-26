@@ -1,0 +1,2 @@
+queue_utc,candidate_id,feeder_candidate_id,supplier_id,supplier_name,supplier_sku,supplier_title,recommendation_status,recommended_test_qty,queue_status,decision_status,approval_required_flag,owner,snooze_until_utc,source_row_hash,source_file_path,source_seen_at_utc
+2026-04-07T18:30:00Z,F-SHURE-1,F-SHURE-1,shure_cosmetics,Shure Cosmetics,SCS-100,Fixture Product,approve_test_buy,5,needs_review,pending_review,1,feeder_operator,,hash-1,tests/raw.csv,2026-04-07T18:20:00Z

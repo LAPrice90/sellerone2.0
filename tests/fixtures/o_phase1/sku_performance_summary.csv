@@ -1,0 +1,8 @@
+sku,expected_refund_cost_per_unit_gbp,roi_at_our_price_pct,roi_at_buy_box_price_pct,break_even_price_gbp,current_token_cost_gbp,asof_date,market_price_gbp,buy_box_price_gbp,our_price_gbp
+SKU-FULL,0.10,55.0,58.0,6.20,4.90,2026-04-03,,
+SKU-TEST,0.20,12.0,13.0,10.50,9.90,2026-04-03,,
+SKU-WAIT,0.70,4.0,5.0,11.20,10.40,2026-04-03,,
+SKU-FALLBACK,0.15,18.0,19.0,7.40,6.00,2026-04-03,,
+SKU-STALE,0.10,50.0,50.0,6.00,4.90,2026-04-03,8.00,8.00,7.80
+SKU-BULK,0.30,30.0,31.0,21.00,18.10,2026-04-03,,
+SKU-MISSINGCOST,0.10,12.0,12.0,6.00,5.00,2026-04-03,,

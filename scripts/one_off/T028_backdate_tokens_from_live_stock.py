@@ -10,7 +10,11 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from scripts.api.get_inventory_summaries import fetch_inventory_summaries, get_lwa_access_token, load_dotenv_if_missing
-from scripts.A003_run_inventory_to_sheet import records_to_df, load_active_skus, get_gspread_client
+from scripts.core.out_paths import write_csv_with_compat
+try:
+    from scripts.A003_run_inventory_to_sheet import records_to_df, load_active_skus, get_gspread_client
+except ModuleNotFoundError:
+    from scripts.flows.A.A003_run_inventory_to_sheet import records_to_df, load_active_skus, get_gspread_client
 
 ORDERS_PATH = Path(os.environ.get('BACKDATE_ORDERS_CSV', 'out/orders_sheet_orders.csv'))
 ORDER_MASTER_PATH = Path('out/order_master.csv')
@@ -35,7 +39,13 @@ RUN_B001_FIRST = os.environ.get('BACKDATE_RUN_B001', '0').strip() == '1'
 BACKDATE_CUTOFF_MINUTES = int(os.environ.get('BACKDATE_CUTOFF_MINUTES', '10'))
 BACKDATE_ORDER_BUFFER_MINUTES = int(os.environ.get('BACKDATE_ORDER_BUFFER_MINUTES', '0'))
 BACKDATE_SKIP_SHEETS = os.environ.get('BACKDATE_SKIP_SHEETS', '0').strip() == '1'
-SKU_FILTER = os.environ.get('BACKDATE_SKU_FILTER', '').strip()
+SKU_FILTER = (os.environ.get('BACKDATE_SKU_FILTER') or os.environ.get('SKU_FILTER', '')).strip()
+
+
+def _parse_sku_filter_set(raw_value: str) -> set[str]:
+    if not raw_value:
+        return set()
+    return {part.strip() for part in str(raw_value).split(",") if part.strip()}
 
 
 def _parse_cost(value: str) -> float:
@@ -69,6 +79,29 @@ def _parse_dt(value: str) -> datetime | None:
 def _lot_id(sku: str, order_date: str, row_idx: int) -> str:
     date = order_date.replace('/', '').replace('-', '')
     return f"{sku}-{date}-row{row_idx}"
+
+
+def _merge_allocations_for_filtered_skus(
+    existing_alloc_df: pd.DataFrame | None,
+    rebuilt_alloc_df: pd.DataFrame,
+    sku_filter_set: set[str],
+) -> pd.DataFrame:
+    if existing_alloc_df is None or existing_alloc_df.empty:
+        return rebuilt_alloc_df.copy()
+    if not sku_filter_set or "seller_sku" not in existing_alloc_df.columns:
+        return rebuilt_alloc_df.copy()
+
+    kept = existing_alloc_df.loc[~existing_alloc_df["seller_sku"].isin(sku_filter_set)].copy()
+    if rebuilt_alloc_df is None or rebuilt_alloc_df.empty:
+        return kept.reset_index(drop=True)
+
+    all_cols = list(dict.fromkeys(list(kept.columns) + list(rebuilt_alloc_df.columns)))
+    kept = kept.reindex(columns=all_cols, fill_value="")
+    rebuilt = rebuilt_alloc_df.reindex(columns=all_cols, fill_value="")
+    combined = pd.concat([kept, rebuilt], ignore_index=True)
+    if "token_id" in combined.columns:
+        combined = combined.drop_duplicates(subset=["token_id"], keep="last")
+    return combined.reset_index(drop=True)
 
 
 def _fetch_live_inventory() -> pd.DataFrame:
@@ -153,6 +186,8 @@ def main() -> None:
         buffer_start_dt = now_dt - timedelta(minutes=BACKDATE_ORDER_BUFFER_MINUTES)
         print({'order_buffer_start': buffer_start_dt.isoformat()})
 
+    sku_filter_set = _parse_sku_filter_set(SKU_FILTER)
+
     if USE_INVENTORY_SNAPSHOT and Path(INVENTORY_SNAPSHOT_PATH).exists():
         inv = pd.read_csv(INVENTORY_SNAPSHOT_PATH)
         print({"inventory_snapshot": INVENTORY_SNAPSHOT_PATH, "inventory_rows": int(len(inv)), "inventory_skus": int(inv["seller_sku"].nunique())})
@@ -160,8 +195,8 @@ def main() -> None:
         inv = _fetch_live_inventory()
         print({"inventory_rows": int(len(inv)), "inventory_skus": int(inv["seller_sku"].nunique())})
     inv['seller_sku'] = inv['seller_sku'].astype(str)
-    if SKU_FILTER:
-        inv = inv[inv['seller_sku'] == SKU_FILTER]
+    if sku_filter_set:
+        inv = inv[inv['seller_sku'].isin(sku_filter_set)]
     # Stock-token rules:
     # include Available + reserved_transfers + reserved_processing
     # optionally include inbound (shipped + receiving)
@@ -189,8 +224,8 @@ def main() -> None:
         om = om_all[om_all['_dt'].notna() & (om_all['_dt'] <= cutoff_dt)].copy()
     else:
         om = om_all.copy()
-    if SKU_FILTER and 'SKU' in om.columns:
-        om = om[om['SKU'].astype(str) == SKU_FILTER]
+    if sku_filter_set and 'SKU' in om.columns:
+        om = om[om['SKU'].astype(str).isin(sku_filter_set)]
     sold_qty = om.groupby('SKU')['Quantity Ordered'].sum().astype(int).to_dict()
     buffer_qty = {}
     if buffer_start_dt is not None:
@@ -199,8 +234,8 @@ def main() -> None:
         if cutoff_dt is not None:
             buffer_mask &= om_all['_dt'] > cutoff_dt
         om_buffer = om_all[buffer_mask].copy()
-        if SKU_FILTER and 'SKU' in om_buffer.columns:
-            om_buffer = om_buffer[om_buffer['SKU'].astype(str) == SKU_FILTER]
+        if sku_filter_set and 'SKU' in om_buffer.columns:
+            om_buffer = om_buffer[om_buffer['SKU'].astype(str).isin(sku_filter_set)]
         if not om_buffer.empty:
             buffer_qty = om_buffer.groupby('SKU')['Quantity Ordered'].sum().astype(int).to_dict()
 
@@ -239,8 +274,8 @@ def main() -> None:
         raise SystemExit(f'orders_sheet_orders.csv missing required columns: SKU={sku_col} Cost PU={cost_col} Sent to FBA={sent_col} Order Date={date_col}')
 
     # quick visibility into purchase coverage
-    if SKU_FILTER:
-        orders = orders[orders[sku_col].astype(str) == SKU_FILTER]
+    if sku_filter_set:
+        orders = orders[orders[sku_col].astype(str).isin(sku_filter_set)]
     sent_vals = pd.to_numeric(orders[sent_col], errors="coerce").fillna(0)
     cost_vals = orders[cost_col].apply(_parse_cost)
     print(
@@ -479,7 +514,7 @@ def main() -> None:
     # If running SKU-only backdate, merge into existing ledger instead of overwriting it.
     sku_filter_raw = (SKU_FILTER or "").strip()
     if sku_filter_raw:
-        sku_filter_set = {s.strip() for s in sku_filter_raw.split(",") if s.strip()}
+        sku_filter_set = _parse_sku_filter_set(sku_filter_raw)
         existing_df = None
         if OUT_LEDGER.exists():
             try:
@@ -498,13 +533,33 @@ def main() -> None:
 
             token_df = pd.concat([existing_df, token_df], ignore_index=True)
 
-    token_df.to_csv(OUT_LEDGER, index=False)
+    write_csv_with_compat(
+        token_df,
+        path_or_rel="token_ledger_live.csv",
+        default_system="B",
+        index=False,
+        mirror_legacy=True,
+    )
 
     alloc_df = pd.DataFrame(alloc_rows, columns=[
         'order_id','order_date','seller_sku','quantity','token_id','token_cost','currency','allocation_date','source_level','notes'
     ])
+    if sku_filter_raw:
+        existing_alloc_df = None
+        if OUT_ALLOC.exists():
+            try:
+                existing_alloc_df = pd.read_csv(OUT_ALLOC, dtype=str).fillna("")
+            except Exception:
+                existing_alloc_df = None
+        alloc_df = _merge_allocations_for_filtered_skus(existing_alloc_df, alloc_df, sku_filter_set)
     OUT_ALLOC.parent.mkdir(parents=True, exist_ok=True)
-    alloc_df.to_csv(OUT_ALLOC, index=False)
+    write_csv_with_compat(
+        alloc_df,
+        path_or_rel="token_allocations_live.csv",
+        default_system="B",
+        index=False,
+        mirror_legacy=True,
+    )
 
     pd.DataFrame(summary).to_csv(OUT_SUMMARY, index=False)
 
@@ -535,7 +590,7 @@ def main() -> None:
 
     # End-to-end backdate: rebuild COGS ledger and Order_Master after token write
     print({'status': 'info', 'action': 'rebuild_token_cogs_ledger'})
-    result = subprocess.run([sys.executable, str(repo_root / 'scripts' / 'B025_build_token_cogs_ledger.py')])
+    result = subprocess.run([sys.executable, str(repo_root / 'scripts' / 'flows' / 'B' / 'B025_build_token_cogs_ledger.py')])
     if result.returncode != 0:
         raise SystemExit(f'B025_build_token_cogs_ledger.py failed with rc={result.returncode}')
 
@@ -545,7 +600,7 @@ def main() -> None:
         env["ORDER_MASTER_SKU_FILTER"] = SKU_FILTER
     if BACKDATE_SKIP_SHEETS:
         env["ORDER_MASTER_SKIP_SHEETS"] = "1"
-    result = subprocess.run([sys.executable, str(repo_root / 'scripts' / 'B004_build_order_master.py')], env=env)
+    result = subprocess.run([sys.executable, str(repo_root / 'scripts' / 'flows' / 'B' / 'B004_build_order_master.py')], env=env)
     if result.returncode != 0:
         raise SystemExit(f'B004_build_order_master.py failed with rc={result.returncode}')
 

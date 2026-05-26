@@ -1,11 +1,15 @@
-﻿import sys
+import sqlite3
+import sys
 import types
 import unittest
+from pathlib import Path
+
+import pandas as pd
 
 if "gspread" not in sys.modules:
     sys.modules["gspread"] = types.SimpleNamespace(service_account=lambda *args, **kwargs: None)
 
-from scripts import A004_run_fees_to_sheet as a004
+from scripts.flows.A import A004_run_fees_to_sheet as a004
 
 
 class A004FeeRequeueTests(unittest.TestCase):
@@ -89,6 +93,52 @@ class A004FeeRequeueTests(unittest.TestCase):
         self.assertEqual(out["unresolved_points"], [10.0])
 
 
+def test_write_output_frame_sql_primary_exports_csv_and_sql(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SELLERONE_STORAGE_MODE", "sql_primary_csv_export")
+    monkeypatch.setenv("SELLERONE_SQLITE_PATH", str(tmp_path / "sellerone.sqlite3"))
+    out_csv = tmp_path / "fees_latest.csv"
+    df = pd.DataFrame(
+        [
+            {
+                "seller_sku": "SKU-1",
+                "fba_fee_10": "1.23",
+                "fba_fee_100": "5.67",
+                "error_10": "",
+                "error_100": "",
+            }
+        ]
+    )
+
+    result = a004._write_output_frame(df, out_csv, a004.SQL_TABLE_FEES_LATEST)
+
+    assert result["mode"] == "sql_primary_csv_export"
+    assert result["csv_rows"] == 1
+    assert result["sql_rows"] == 1
+    assert len(pd.read_csv(out_csv, dtype=str)) == 1
+    conn = sqlite3.connect(tmp_path / "sellerone.sqlite3")
+    try:
+        count = conn.execute(f"select count(*) from {a004.SQL_TABLE_FEES_LATEST}").fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 1
+
+
+def test_write_output_frame_csv_mode_does_not_create_sql(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "sellerone.sqlite3"
+    monkeypatch.setenv("SELLERONE_STORAGE_MODE", "csv")
+    monkeypatch.setenv("SELLERONE_SQLITE_PATH", str(db_path))
+    out_csv = tmp_path / "fees_failed.csv"
+    df = pd.DataFrame(columns=["seller_sku", "error_10", "error_100"])
+
+    result = a004._write_output_frame(df, out_csv, a004.SQL_TABLE_FEES_FAILED)
+
+    assert result["mode"] == "csv"
+    assert result["csv_rows"] == 0
+    assert result["sql_rows"] == 0
+    assert result["sql_table"] == ""
+    assert out_csv.exists()
+    assert not db_path.exists()
+
+
 if __name__ == "__main__":
     unittest.main()
-

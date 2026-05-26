@@ -435,3 +435,32 @@ def compute_final_ceiling(
         reason_codes=reason_codes,
     )
 
+
+def enforce_effective_ceiling_floor(
+    *,
+    final_ceiling: FinalCeilingResult,
+    hard_floor_gbp: object,
+) -> FinalCeilingResult:
+    floor_value = _to_decimal(hard_floor_gbp)
+    effective_value = _to_decimal(final_ceiling.final_ceiling_landed_gbp)
+    if floor_value is None or floor_value <= 0 or effective_value is None:
+        return final_ceiling
+    if effective_value >= floor_value:
+        return final_ceiling
+
+    reason_codes = [str(code or "").strip() for code in final_ceiling.reason_codes if str(code or "").strip()]
+    if "CEILING_RAW_BELOW_HARD_FLOOR" not in reason_codes:
+        reason_codes.append("CEILING_RAW_BELOW_HARD_FLOOR")
+    if "CEILING_EFFECTIVE_CLAMPED_TO_HARD_FLOOR" not in reason_codes:
+        reason_codes.append("CEILING_EFFECTIVE_CLAMPED_TO_HARD_FLOOR")
+
+    return FinalCeilingResult(
+        compliance_ceiling_landed_gbp=final_ceiling.compliance_ceiling_landed_gbp,
+        eligibility_ceiling_landed_gbp=final_ceiling.eligibility_ceiling_landed_gbp,
+        suppression_ceiling_landed_temp=final_ceiling.suppression_ceiling_landed_temp,
+        demand_ceiling_landed_gbp=final_ceiling.demand_ceiling_landed_gbp,
+        final_ceiling_landed_gbp=_to_money(floor_value),
+        binding_ceiling_type=final_ceiling.binding_ceiling_type,
+        reason_codes=reason_codes,
+    )
+

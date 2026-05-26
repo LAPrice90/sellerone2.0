@@ -11,14 +11,37 @@ class Phase1StorageTests(unittest.TestCase):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tmpdir.name)
         self.data_dir = self.root / "data"
+        self.out_dir = self.root / "out"
         self.lock_path = self.root / "out" / "phase1.lock"
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.out_dir.mkdir(parents=True, exist_ok=True)
         self.data_patch = patch.object(phase1_storage, "DATA_DIR", self.data_dir)
         self.lock_patch = patch.object(phase1_storage, "LOCK_PATH", self.lock_path)
+        self.suppression_cases_patch = patch.object(
+            phase1_storage,
+            "H_SUPPRESSION_CASES_PATH",
+            self.out_dir / "h_suppression_cases.csv",
+        )
+        self.suppression_reactivation_patch = patch.object(
+            phase1_storage,
+            "H_SUPPRESSION_REACTIVATION_LOG_PATH",
+            self.out_dir / "h_suppression_reactivation_log.csv",
+        )
+        self.strategy_daily_patch = patch.object(
+            phase1_storage,
+            "H_STRATEGY_OUTCOME_DAILY_PATH",
+            self.out_dir / "h_strategy_outcome_daily.csv",
+        )
         self.data_patch.start()
         self.lock_patch.start()
+        self.suppression_cases_patch.start()
+        self.suppression_reactivation_patch.start()
+        self.strategy_daily_patch.start()
 
     def tearDown(self) -> None:
+        self.strategy_daily_patch.stop()
+        self.suppression_reactivation_patch.stop()
+        self.suppression_cases_patch.stop()
         self.data_patch.stop()
         self.lock_patch.stop()
         self.tmpdir.cleanup()
@@ -179,6 +202,83 @@ class Phase1StorageTests(unittest.TestCase):
                     }
                 ],
             )
+
+    def test_append_suppression_cases_fills_required_fields_when_blank(self) -> None:
+        phase1_storage.append_suppression_cases(
+            [
+                {
+                    "event_ts_utc": "2026-04-16T10:00:00Z",
+                    "sku": "SKU_SUPP",
+                    "asin": "ASIN_SUPP",
+                    "suppression_case_id": "CASE1",
+                    "buy_box_state": "SUPPRESSED_ASIN",
+                    "suppression_target_source": "",
+                    "suppression_reactivation_target_landed_gbp": "",
+                    "suppression_ceiling_landed_temp": "",
+                    "anchor_floor_price": "",
+                }
+            ]
+        )
+        rows = phase1_storage.read_table(phase1_storage.H_SUPPRESSION_CASES_PATH)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["suppression_target_source"], "NONE_UNAVAILABLE")
+        self.assertEqual(rows[0]["suppression_ceiling_landed_temp"], "UNAVAILABLE")
+        self.assertEqual(rows[0]["suppression_reactivation_target_landed_gbp"], "UNAVAILABLE")
+
+    def test_append_suppression_reactivation_fills_required_fields_when_blank(self) -> None:
+        phase1_storage.append_suppression_reactivation_log(
+            [
+                {
+                    "event_ts_utc": "2026-04-16T10:01:00Z",
+                    "sku": "SKU_SUPP",
+                    "asin": "ASIN_SUPP",
+                    "state": "STATE_SUPPRESSION_REACTIVATION",
+                    "target_price_gbp": "9.99",
+                    "suppression_target_source": "",
+                    "suppression_reactivation_target_landed_gbp": "",
+                    "suppression_ceiling_landed_temp": "",
+                    "anchor_floor_price": "",
+                }
+            ]
+        )
+        rows = phase1_storage.read_table(phase1_storage.H_SUPPRESSION_REACTIVATION_LOG_PATH)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["suppression_target_source"], "NONE_UNAVAILABLE")
+        self.assertEqual(rows[0]["suppression_ceiling_landed_temp"], "9.99")
+        self.assertEqual(rows[0]["suppression_reactivation_target_landed_gbp"], "9.99")
+
+    def test_strategy_outcome_daily_clamps_side_counts_to_decision(self) -> None:
+        phase1_storage.upsert_h_strategy_outcome_daily(
+            [
+                {
+                    "asof_date": "2026-04-16",
+                    "scenario_type": "multi_seller_ladder_cap",
+                    "chosen_tactic": "REGAIN_LADDER_CAP",
+                    "decision_rows": "2",
+                    "applied_rows": "1",
+                    "no_write_rows": "1",
+                    "resolved_rows": "2",
+                    "pending_rows": "0",
+                    "success_rows": "1",
+                    "failed_rows": "0",
+                    "expired_rows": "1",
+                    "aborted_rows": "0",
+                    "success_rate_pct": "100.00",
+                    "failed_rate_pct": "0.00",
+                    "sample_min_rows": "150",
+                    "provisional_sample_flag": "1",
+                    "avg_seller_count": "2.00",
+                    "avg_price_gap_to_lowest_gbp": "0.05",
+                    "below_break_even_rows": "5",
+                    "at_floor_rows": "9",
+                    "notes": "",
+                }
+            ]
+        )
+        row = phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_DAILY_PATH)[0]
+        self.assertEqual(row["decision_rows"], "2")
+        self.assertEqual(row["below_break_even_rows"], "2")
+        self.assertEqual(row["at_floor_rows"], "2")
 
 
 if __name__ == "__main__":

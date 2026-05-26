@@ -1,0 +1,4 @@
+supplier_code,supplier_name,supplier_sku,seller_sku,asin,current_unit_cost,currency,availability_status,supplier_stock,moq,pack_size,source_type,source_reference,captured_at_utc,is_current
+SUP-T1,Test Supplier One,T-SKU-FULL,SKU-TFULL,ASIN-TFULL,8.00,GBP,in_stock,500,1,1,test_fixture,tests/fixtures/o_phase1/supplier_cost_snapshot_test_input.csv,2026-04-03T11:00:00Z,1
+SUP-T2,Test Supplier Two,T-SKU-TEST,SKU-TTEST,ASIN-TTEST,10.00,GBP,in_stock,200,5,5,test_fixture,tests/fixtures/o_phase1/supplier_cost_snapshot_test_input.csv,2026-04-03T11:00:00Z,1
+SUP-T3,Test Supplier Three,T-SKU-WAIT,SKU-TWAIT,ASIN-TWAIT,20.00,GBP,in_stock,300,1,1,test_fixture,tests/fixtures/o_phase1/supplier_cost_snapshot_test_input.csv,2026-04-03T11:00:00Z,1

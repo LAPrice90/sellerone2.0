@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
+try:
+    from scripts.core.storage import write_dataframe_with_sql_compat
+except ModuleNotFoundError:
+    from core.storage import write_dataframe_with_sql_compat
+
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "out"
 CONFIG = ROOT / "config"
@@ -17,6 +22,7 @@ STOCK_SNAPSHOT_LATEST_PATH = OUT / "parking" / "stock_snapshot_latest.csv"
 SKU_SWITCHES_PATH = CONFIG / "h_sku_switches.csv"
 LEGACY_WRITER_MODES_PATH = CONFIG / "phase1_writer_modes.csv"
 SCOPE_OUTPUT_PATH = OUT / "phase1_sku_scope.csv"
+SQL_TABLE_SCOPE = "b_phase1_sku_scope"
 
 TRUTHY = {"1", "true", "yes", "y", "on"}
 
@@ -112,6 +118,43 @@ def _load_inventory_qty_map() -> dict[str, float]:
         if qty_by_sku:
             return qty_by_sku
     return {}
+
+
+def _load_inventory_identity_map() -> dict[str, dict[str, str]]:
+    candidates: list[Path] = []
+    latest_inventory = _latest_inventory_snapshot_path()
+    if latest_inventory is not None:
+        candidates.append(latest_inventory)
+    if INVENTORY_SUMMARIES_PATH.exists():
+        candidates.append(INVENTORY_SUMMARIES_PATH)
+    if STOCK_SNAPSHOT_LATEST_PATH.exists():
+        candidates.append(STOCK_SNAPSHOT_LATEST_PATH)
+
+    sku_cols = ["seller_sku", "sku", "seller-sku", "SKU", "SellerSKU"]
+    asin_cols = ["asin", "ASIN", "asin1"]
+    out: dict[str, dict[str, str]] = {}
+
+    for path in candidates:
+        try:
+            df = pd.read_csv(path, dtype=str).fillna("")
+        except Exception:
+            continue
+        if df.empty:
+            continue
+
+        sku_col = next((candidate for candidate in sku_cols if candidate in df.columns), "")
+        asin_col = next((candidate for candidate in asin_cols if candidate in df.columns), "")
+        if not sku_col or not asin_col:
+            continue
+
+        for _, src in df.iterrows():
+            sku = _norm(src.get(sku_col, "")).upper()
+            asin = _norm(src.get(asin_col, ""))
+            if not sku or not asin:
+                continue
+            if sku not in out:
+                out[sku] = {"asin": asin, "identity_source": str(path)}
+    return out
 
 
 def _load_product_db_map(path: Path = PRODUCT_DB_PATH) -> dict[str, dict[str, str]]:
@@ -265,6 +308,7 @@ def _build_scope_rows(
     merchant: dict[str, dict[str, str]],
     listing: dict[str, dict[str, str]],
     stock_qty_by_sku: dict[str, float],
+    inventory_identity_by_sku: dict[str, dict[str, str]],
     sku_switches: dict[str, dict[str, str]],
 ) -> list[dict[str, str]]:
     universe = sorted(set(product_db.keys()) | set(merchant.keys()) | set(listing.keys()))
@@ -273,8 +317,14 @@ def _build_scope_rows(
         pdb = product_db.get(sku)
         mrec = merchant.get(sku)
         lrec = listing.get(sku)
+        irec = inventory_identity_by_sku.get(sku)
 
-        asin = _norm((lrec or {}).get("asin", "")) or _norm((mrec or {}).get("asin1", "")) or _norm((pdb or {}).get("asin", ""))
+        asin = (
+            _norm((lrec or {}).get("asin", ""))
+            or _norm((mrec or {}).get("asin1", ""))
+            or _norm((pdb or {}).get("asin", ""))
+            or _norm((irec or {}).get("asin", ""))
+        )
         sale_status = _sale_status(pdb)
         merchant_status = _merchant_status(mrec)
         switches = sku_switches.get(sku, {})
@@ -288,7 +338,10 @@ def _build_scope_rows(
         parked_reasons.extend(stock_reasons)
         parked_flag = "1" if parked_reasons else "0"
         repricing_reasons: list[str] = []
-        if merchant_status != "active":
+        # Merchant listing status can lag behind operational stock signals.
+        # For stock-positive SKUs, keep repricing eligible and let write switches
+        # control live-write authority.
+        if merchant_status != "active" and in_stock_flag != "1":
             repricing_reasons.append("inactive")
         if manual_disable == "1":
             repricing_reasons.append("manual_disable")
@@ -348,6 +401,7 @@ def build_scope_df(
     merchant = _load_merchant_map(merchant_path)
     listing = _load_listing_map(listing_snapshot_path)
     stock_qty_by_sku = _load_inventory_qty_map()
+    inventory_identity_by_sku = _load_inventory_identity_map()
     switches_path = writer_modes_path if writer_modes_path is not None else sku_switches_path
     sku_switches = _load_switch_map(switches_path)
     rows = _build_scope_rows(
@@ -356,6 +410,7 @@ def build_scope_df(
         merchant=merchant,
         listing=listing,
         stock_qty_by_sku=stock_qty_by_sku,
+        inventory_identity_by_sku=inventory_identity_by_sku,
         sku_switches=sku_switches,
     )
     cols = [
@@ -382,8 +437,7 @@ def build_scope_df(
 
 
 def write_scope_csv(df: pd.DataFrame, output_path: Path = SCOPE_OUTPUT_PATH) -> Path:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, index=False)
+    write_dataframe_with_sql_compat(df, output_path, SQL_TABLE_SCOPE)
     return output_path
 
 

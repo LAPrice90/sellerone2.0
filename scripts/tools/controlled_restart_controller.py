@@ -33,8 +33,10 @@ DEFAULT_MAX_WAIT_SECONDS = 900
 DEFAULT_POLL_SECONDS = 30
 DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS = 180
 DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS = 180
+DEFAULT_F_HEARTBEAT_MAX_AGE_SECONDS = 180
 DEFAULT_H_TASK_NAME = os.environ.get("CONTROLLED_RESTART_H_TASK_NAME", "AMZ H Cycle")
 DEFAULT_B_TASK_NAME = os.environ.get("CONTROLLED_RESTART_B_TASK_NAME", "AMZ Orders")
+DEFAULT_F_TASK_NAME = os.environ.get("CONTROLLED_RESTART_F_TASK_NAME", "AMZ Price List Manager")
 DEFAULT_CONTROLLER_TASK_NAME = os.environ.get("CONTROLLED_RESTART_CONTROLLER_TASK_NAME", "AMZ Controlled Restart")
 DEFAULT_POST_HEAL_RECHECK_DELAY_SECONDS = 5
 DEFAULT_POST_HEAL_SETTLE_SECONDS = 45
@@ -42,8 +44,10 @@ DEFAULT_POST_HEAL_SETTLE_POLL_SECONDS = 5
 DEFAULT_DRAINABLE_LOCK_IDLE_SECONDS = 120
 H_LIVE = OUT / "systems" / "H" / "live"
 B_LIVE = OUT / "systems" / "B" / "live"
+F_LIVE = OUT / "systems" / "F" / "price_list_manager" / "live"
 HOME_TIME_ACTIVE_PATH = H_LIVE / "H_home_time_mode.active.json"
 DEFAULT_ESCALATION_MODE_ENV = "H_RESTART_ESCALATION_MODE"
+DEFAULT_REQUIRE_EXPLICIT_ESCALATION_ENV = "CONTROLLED_RESTART_REQUIRE_ESCALATION_FLAG"
 OWNERSHIP_TRANSFER_PATH = RESTART_DIR / "h_restart_ownership_transfer.json"
 TRANSIENT_POST_HEAL_BLOCKERS = {
     "H_RUN_IN_PROGRESS_NOT_FINALIZED",
@@ -54,10 +58,58 @@ TRANSIENT_POST_HEAL_BLOCKERS = {
     "H_CYCLE_STALE_LOCK_PRESENT",
     "B_ACTIVE_LOCK",
 }
+STALE_H_RESTART_OVERRIDE_BLOCKERS = {
+    "H_RUN_IN_PROGRESS_NOT_FINALIZED",
+    "H_LAUNCHER_PID_STALE",
+    "H_LAUNCHER_HEARTBEAT_STALE",
+    "H_CYCLE_STALE_LOCK_PRESENT",
+}
+SIMPLIFICATION_FREEZE_PATH = LOCKS_DIR / "simplification.freeze"
+SIMPLIFICATION_FREEZE_OVERRIDE_ENV = "SIMPLIFICATION_FREEZE_OVERRIDE"
+
+
+def _post_heal_recheck_can_drive_restart_decision(
+    *,
+    execute_reboot: bool,
+    allow_reboot_action: bool,
+    pre_heal_decision: str,
+) -> bool:
+    """Post-heal owner restoration must not become the reboot approval gate."""
+    reboot_enabled = bool(execute_reboot and allow_reboot_action)
+    return (not reboot_enabled) or _norm(pre_heal_decision) == "approved"
+
+
+def _stale_h_restart_override(
+    *,
+    active_actions_permitted: bool,
+    restart_window_active: bool,
+    final_decision: str,
+    final_blockers: list[str],
+) -> tuple[str, list[str], bool, str, list[str]]:
+    clean_blockers = [_norm(item) for item in final_blockers if _norm(item)]
+    if (
+        active_actions_permitted
+        and restart_window_active
+        and _norm(final_decision) != "approved"
+        and clean_blockers
+        and set(clean_blockers).issubset(STALE_H_RESTART_OVERRIDE_BLOCKERS)
+    ):
+        return (
+            "approved",
+            [],
+            True,
+            "stale_h_marker_only_restart_override",
+            clean_blockers,
+        )
+    return _norm(final_decision) or "skipped", clean_blockers, False, "", []
 
 
 def _norm(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _truthy(value: Any) -> bool:
+    return _norm(value).lower() in {"1", "true", "yes", "on"}
 
 
 def _utc_now() -> datetime:
@@ -225,6 +277,17 @@ def _escalation_mode_enabled(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "escalation_mode", False)) or env_flag == "1"
 
 
+def _require_explicit_escalation_flag() -> bool:
+    raw = _norm(os.environ.get(DEFAULT_REQUIRE_EXPLICIT_ESCALATION_ENV, "1")).lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _simplification_freeze_active() -> bool:
+    if _truthy(os.environ.get(SIMPLIFICATION_FREEZE_OVERRIDE_ENV, "0")):
+        return False
+    return SIMPLIFICATION_FREEZE_PATH.exists()
+
+
 def _write_ownership_transfer(*, active: bool, reason: str, run_id: str) -> tuple[bool, str]:
     payload = {
         "owner": "controlled_restart",
@@ -313,8 +376,10 @@ def _run_gate(
     ignore_window: bool,
     execute_reboot: bool,
     allow_reboot_action: bool,
+    escalation_mode: bool,
     b_heartbeat_max_age_s: int,
     h_heartbeat_max_age_s: int,
+    f_heartbeat_max_age_s: int,
 ) -> dict[str, Any]:
     cmd = [sys.executable, str(GATE_SCRIPT)]
     if request_drain:
@@ -325,8 +390,11 @@ def _run_gate(
         cmd.append("--execute-reboot")
     if allow_reboot_action:
         cmd.append("--allow-reboot-action")
+    if escalation_mode:
+        cmd.append("--escalation-mode")
     cmd.extend(["--b-heartbeat-max-age-s", str(int(b_heartbeat_max_age_s))])
     cmd.extend(["--h-heartbeat-max-age-s", str(int(h_heartbeat_max_age_s))])
+    cmd.extend(["--f-heartbeat-max-age-s", str(int(f_heartbeat_max_age_s))])
     completed = subprocess.run(
         cmd,
         cwd=str(ROOT),
@@ -611,6 +679,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--drainable-lock-idle-seconds", type=int, default=DEFAULT_DRAINABLE_LOCK_IDLE_SECONDS)
     parser.add_argument("--b-heartbeat-max-age-s", type=int, default=DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS)
     parser.add_argument("--h-heartbeat-max-age-s", type=int, default=DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS)
+    parser.add_argument("--f-heartbeat-max-age-s", type=int, default=DEFAULT_F_HEARTBEAT_MAX_AGE_SECONDS)
     return parser
 
 
@@ -618,6 +687,7 @@ def main() -> int:
     args = _parser().parse_args()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + f".pid{os.getpid()}"
     started_utc = _utc_ts()
+    simplification_freeze_active = _simplification_freeze_active()
     in_window, window_artifacts = _window_check(
         start_hour=args.window_start_hour,
         end_hour=args.window_end_hour,
@@ -625,11 +695,17 @@ def main() -> int:
     )
     caller_task_name = _norm(args.caller_task_name)
     task_match = caller_task_name.lower() == DEFAULT_CONTROLLER_TASK_NAME.lower()
-    restart_window_active = bool(in_window and task_match)
+    # The scheduler trigger is the authority for when restart is allowed.
+    # Keep the clock window as diagnostics only.
+    restart_window_active = bool(task_match)
+    if simplification_freeze_active:
+        restart_window_active = False
     window_artifacts["caller_task_name"] = caller_task_name
     window_artifacts["expected_task_name"] = DEFAULT_CONTROLLER_TASK_NAME
     window_artifacts["task_match"] = task_match
+    window_artifacts["trigger_time_in_window"] = in_window
     window_artifacts["restart_window_active"] = restart_window_active
+    window_artifacts["simplification_freeze_active"] = simplification_freeze_active
     if args.ignore_window:
         window_artifacts["override_flag"] = "ignore_window=1"
 
@@ -653,6 +729,8 @@ def main() -> int:
     h_cycle_task_relaunch_reason = "not_attempted"
     b_cycle_task_relaunch_ok = False
     b_cycle_task_relaunch_reason = "not_attempted"
+    f_cycle_task_relaunch_ok = False
+    f_cycle_task_relaunch_reason = "not_attempted"
     post_heal_gate_recheck_performed = False
     post_heal_gate_recheck_decision = ""
     post_heal_gate_recheck_blockers: list[str] = []
@@ -660,13 +738,23 @@ def main() -> int:
     post_heal_gate_rc = -1
     post_heal_settle_attempts: list[dict[str, Any]] = []
     post_heal_transient_reconciled = False
+    post_heal_recheck_can_drive_decision = True
     force_reboot_on_skip_requested = bool(args.force_reboot_on_skip)
     force_reboot_on_skip_used = False
+    stale_h_restart_override_applied = False
+    stale_h_restart_override_reason = ""
+    stale_h_restart_override_blockers: list[str] = []
     home_time_mode_active = _home_time_mode_active()
-    outcome = "skipped_outside_window"
-    escalation_mode = restart_window_active
+    outcome = "skipped_not_triggered"
     requested_escalation_override = _escalation_mode_enabled(args)
-    active_actions_permitted = restart_window_active
+    require_explicit_escalation = _require_explicit_escalation_flag()
+    if simplification_freeze_active:
+        requested_escalation_override = False
+    if require_explicit_escalation:
+        escalation_mode = bool(restart_window_active and requested_escalation_override)
+    else:
+        escalation_mode = restart_window_active
+    active_actions_permitted = escalation_mode
     ownership_transfer_active = False
     ownership_transfer_status = "observer_only_mode"
 
@@ -683,9 +771,11 @@ def main() -> int:
             "escalation_mode": escalation_mode,
             "restart_window_active": restart_window_active,
             "requested_escalation_override": requested_escalation_override,
+            "require_explicit_escalation": require_explicit_escalation,
+            "simplification_freeze_active": simplification_freeze_active,
         },
     )
-    if restart_window_active:
+    if escalation_mode:
         _append_jsonl(
             event_log_path,
             {
@@ -695,6 +785,16 @@ def main() -> int:
                 "window": window_artifacts,
             },
         )
+    elif restart_window_active and require_explicit_escalation and not requested_escalation_override:
+        _append_jsonl(
+            event_log_path,
+            {
+                "event": "observer_only_mode",
+                "utc": _utc_ts(),
+                "run_id": run_id,
+                "action": "explicit_escalation_required",
+            },
+        )
     elif requested_escalation_override:
         _append_jsonl(
             event_log_path,
@@ -702,14 +802,24 @@ def main() -> int:
                 "event": "observer_only_mode",
                 "utc": _utc_ts(),
                 "run_id": run_id,
-                "action": "requested_escalation_ignored_outside_restart_window",
+                "action": "requested_escalation_ignored_task_name_mismatch",
+            },
+        )
+    if simplification_freeze_active:
+        _append_jsonl(
+            event_log_path,
+            {
+                "event": "observer_only_mode",
+                "utc": _utc_ts(),
+                "run_id": run_id,
+                "action": "simplification_freeze_active",
             },
         )
 
-    if restart_window_active:
+    if escalation_mode:
         ownership_transfer_active, ownership_transfer_status = _write_ownership_transfer(
             active=True,
-            reason="controlled_restart_escalation_window",
+            reason="controlled_restart_escalation_trigger",
             run_id=run_id,
         )
         if not ownership_transfer_active:
@@ -738,6 +848,7 @@ def main() -> int:
             "run_id": run_id,
             "window_gate_disabled": False,
             "restart_window_active": restart_window_active,
+            "simplification_freeze_active": simplification_freeze_active,
         },
     )
     drain_request_performed = bool(args.request_drain) and active_actions_permitted
@@ -758,8 +869,10 @@ def main() -> int:
         ignore_window=True,
         execute_reboot=False,
         allow_reboot_action=False,
+        escalation_mode=active_actions_permitted,
         b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
         h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+        f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
     )
     eval_payload = _load_gate_eval(initial.get("gate_result", {}))
     blockers = eval_payload.get("blockers", []) if isinstance(eval_payload.get("blockers", []), list) else []
@@ -775,14 +888,14 @@ def main() -> int:
                 "reason": "launcher_owner_active_during_escalation",
             },
         )
-    elif "H_LAUNCHER_ACTIVE" in blockers and restart_window_active:
+    elif "H_LAUNCHER_ACTIVE" in blockers and active_actions_permitted and restart_window_active:
         _append_jsonl(
             event_log_path,
             {
                 "event": "ownership_transfer_to_controller",
                 "utc": _utc_ts(),
                 "run_id": run_id,
-                "reason": "restart_window_override_launcher_owner_observed",
+                "reason": "restart_trigger_override_launcher_owner_observed",
             },
         )
     if not active_actions_permitted and escalation_mode:
@@ -809,8 +922,10 @@ def main() -> int:
             ignore_window=True,
             execute_reboot=False,
             allow_reboot_action=False,
+            escalation_mode=active_actions_permitted,
             b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
             h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+            f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
         )
         eval_payload = _load_gate_eval(poll.get("gate_result", {}))
         blockers = eval_payload.get("blockers", []) if isinstance(eval_payload.get("blockers", []), list) else []
@@ -841,7 +956,7 @@ def main() -> int:
     pre_heal_decision = final_decision
     pre_heal_blockers = list(final_blockers)
 
-    if restart_window_active and ("H_CYCLE_ACTIVE_LOCK" in final_blockers):
+    if active_actions_permitted and ("H_CYCLE_ACTIVE_LOCK" in final_blockers):
         lock_idle_seconds = max(int(args.drainable_lock_idle_seconds), 1)
         has_recent_h_activity, h_lock_info = _lock_has_recent_activity(
             H_LIVE / "H_pricing_cycle.lock",
@@ -867,6 +982,30 @@ def main() -> int:
                 },
             )
 
+    (
+        final_decision,
+        final_blockers,
+        stale_h_restart_override_applied,
+        stale_h_restart_override_reason,
+        stale_h_restart_override_blockers,
+    ) = _stale_h_restart_override(
+        active_actions_permitted=active_actions_permitted,
+        restart_window_active=restart_window_active,
+        final_decision=final_decision,
+        final_blockers=final_blockers,
+    )
+    if stale_h_restart_override_applied:
+        _append_jsonl(
+            event_log_path,
+            {
+                "event": "restart_override_conditions_applied",
+                "utc": _utc_ts(),
+                "run_id": run_id,
+                "reason": stale_h_restart_override_reason,
+                "overridden_blockers": stale_h_restart_override_blockers,
+            },
+        )
+
     if final_decision == "approved":
         if active_actions_permitted and args.execute_reboot and args.allow_reboot_action:
             execute = _run_gate(
@@ -874,8 +1013,10 @@ def main() -> int:
                 ignore_window=True,
                 execute_reboot=True,
                 allow_reboot_action=True,
+                escalation_mode=active_actions_permitted,
                 b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
                 h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+                f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
             )
             execute_eval = _load_gate_eval(execute.get("gate_result", {}))
             final_decision = _norm(execute_eval.get("decision", "")) or _norm(execute.get("gate_result", {}).get("decision", ""))
@@ -910,6 +1051,9 @@ def main() -> int:
                 )
                 if reboot_attempted:
                     outcome = "reboot_command_submitted"
+                    if stale_h_restart_override_applied:
+                        final_decision = "approved"
+                        final_blockers = []
                 else:
                     outcome = "approved_but_reboot_not_submitted"
             _append_jsonl(
@@ -966,6 +1110,14 @@ def main() -> int:
 
     # If reboot was not attempted, ensure H launcher can return to normal mode and relaunch.
     if active_actions_permitted and not reboot_attempted:
+        post_heal_recheck_can_drive_decision = _post_heal_recheck_can_drive_restart_decision(
+            execute_reboot=bool(args.execute_reboot),
+            allow_reboot_action=bool(args.allow_reboot_action),
+            pre_heal_decision=pre_heal_decision,
+        )
+        terminal_skip_decision = final_decision
+        terminal_skip_blockers = list(final_blockers)
+        terminal_skip_outcome = outcome
         if not h_controlled_mode_cleared:
             h_controlled_mode_cleared, h_controlled_mode_clear_reason = _safe_clear_h_controlled_mode_flag()
         h_cycle_task_relaunch_ok, h_cycle_task_relaunch_reason = _heal_and_start_task(
@@ -980,6 +1132,12 @@ def main() -> int:
             flow_lock_path=B_LIVE / "B_cycle.lock",
             heartbeat_max_age_s=args.b_heartbeat_max_age_s,
         )
+        f_cycle_task_relaunch_ok, f_cycle_task_relaunch_reason = _heal_and_start_task(
+            DEFAULT_F_TASK_NAME,
+            ["run_F_price_list_manager_cycle.bat", "FPM130_run_live_cycle.py"],
+            flow_lock_path=F_LIVE / "live_cycle.lock",
+            heartbeat_max_age_s=args.f_heartbeat_max_age_s,
+        )
         _append_jsonl(
             event_log_path,
             {
@@ -992,6 +1150,8 @@ def main() -> int:
                 "h_cycle_task_relaunch_reason": h_cycle_task_relaunch_reason,
                 "b_cycle_task_relaunch_ok": b_cycle_task_relaunch_ok,
                 "b_cycle_task_relaunch_reason": b_cycle_task_relaunch_reason,
+                "f_cycle_task_relaunch_ok": f_cycle_task_relaunch_ok,
+                "f_cycle_task_relaunch_reason": f_cycle_task_relaunch_reason,
             },
         )
         time.sleep(float(DEFAULT_POST_HEAL_RECHECK_DELAY_SECONDS))
@@ -1001,8 +1161,10 @@ def main() -> int:
             ignore_window=True,
             execute_reboot=False,
             allow_reboot_action=False,
+            escalation_mode=active_actions_permitted,
             b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
             h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+            f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
         )
         post_heal_gate_rc = int(post_heal_eval.get("rc", -1))
         post_heal_gate_payload = _load_gate_eval(post_heal_eval.get("gate_result", {}))
@@ -1018,9 +1180,18 @@ def main() -> int:
         post_heal_gate_recheck_blockers = (
             post_heal_blockers_raw if isinstance(post_heal_blockers_raw, list) else []
         )
-        final_decision = post_heal_gate_recheck_decision
-        final_blockers = list(post_heal_gate_recheck_blockers)
-        transient_only = bool(final_blockers) and set(final_blockers).issubset(TRANSIENT_POST_HEAL_BLOCKERS)
+        if post_heal_recheck_can_drive_decision:
+            final_decision = post_heal_gate_recheck_decision
+            final_blockers = list(post_heal_gate_recheck_blockers)
+        else:
+            final_decision = terminal_skip_decision
+            final_blockers = list(terminal_skip_blockers)
+            outcome = terminal_skip_outcome + "_ownership_restored"
+        transient_only = (
+            post_heal_recheck_can_drive_decision
+            and bool(final_blockers)
+            and set(final_blockers).issubset(TRANSIENT_POST_HEAL_BLOCKERS)
+        )
         if final_decision != "approved" and transient_only:
             _append_jsonl(
                 event_log_path,
@@ -1061,8 +1232,10 @@ def main() -> int:
                     ignore_window=True,
                     execute_reboot=False,
                     allow_reboot_action=False,
+                    escalation_mode=active_actions_permitted,
                     b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
                     h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+                    f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
                 )
                 post_heal_gate_rc = int(settle_eval.get("rc", -1))
                 settle_payload = _load_gate_eval(settle_eval.get("gate_result", {}))
@@ -1088,10 +1261,11 @@ def main() -> int:
                 post_heal_settle_attempts.append(settle_record)
                 if final_decision == "approved":
                     break
-        if final_decision == "approved":
-            outcome = "approved_post_heal_transient_reconciled" if post_heal_transient_reconciled else "approved_post_heal_recheck"
-        else:
-            outcome = "skipped_post_heal_blocked"
+        if post_heal_recheck_can_drive_decision:
+            if final_decision == "approved":
+                outcome = "approved_post_heal_transient_reconciled" if post_heal_transient_reconciled else "approved_post_heal_recheck"
+            else:
+                outcome = "skipped_post_heal_blocked"
         _append_jsonl(
             event_log_path,
             {
@@ -1106,6 +1280,7 @@ def main() -> int:
                 "final_blockers": final_blockers,
                 "post_heal_transient_reconciled": post_heal_transient_reconciled,
                 "post_heal_settle_attempts": post_heal_settle_attempts,
+                "post_heal_recheck_can_drive_decision": post_heal_recheck_can_drive_decision,
                 "outcome": outcome,
             },
         )
@@ -1120,8 +1295,10 @@ def main() -> int:
                 ignore_window=True,
                 execute_reboot=True,
                 allow_reboot_action=True,
+                escalation_mode=active_actions_permitted,
                 b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
                 h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+                f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
             )
             execute_eval = _load_gate_eval(execute.get("gate_result", {}))
             execute_decision = _norm(execute_eval.get("decision", "")) or _norm(execute.get("gate_result", {}).get("decision", ""))
@@ -1241,6 +1418,9 @@ def main() -> int:
         "b_cycle_task_relaunch_ok": b_cycle_task_relaunch_ok,
         "b_cycle_task_relaunch_reason": b_cycle_task_relaunch_reason,
         "b_cycle_task_name": DEFAULT_B_TASK_NAME,
+        "f_cycle_task_relaunch_ok": f_cycle_task_relaunch_ok,
+        "f_cycle_task_relaunch_reason": f_cycle_task_relaunch_reason,
+        "f_cycle_task_name": DEFAULT_F_TASK_NAME,
         "poll_attempts": len(attempts),
         "attempts": attempts,
         "pre_heal_decision": pre_heal_decision,
@@ -1254,9 +1434,13 @@ def main() -> int:
         "post_heal_gate_rc": post_heal_gate_rc,
         "post_heal_transient_reconciled": post_heal_transient_reconciled,
         "post_heal_settle_attempts": post_heal_settle_attempts,
+        "post_heal_recheck_can_drive_decision": post_heal_recheck_can_drive_decision,
         "home_time_mode_active": home_time_mode_active,
         "force_reboot_on_skip_requested": force_reboot_on_skip_requested,
         "force_reboot_on_skip_used": force_reboot_on_skip_used,
+        "stale_h_restart_override_applied": stale_h_restart_override_applied,
+        "stale_h_restart_override_reason": stale_h_restart_override_reason,
+        "stale_h_restart_override_blockers": stale_h_restart_override_blockers,
         "reboot_requested_flags": {
             "execute_reboot": bool(args.execute_reboot),
             "allow_reboot_action": bool(args.allow_reboot_action),
@@ -1266,7 +1450,9 @@ def main() -> int:
         "reboot_status": reboot_status,
         "escalation_mode": escalation_mode,
         "requested_escalation_override": requested_escalation_override,
+        "require_explicit_escalation": require_explicit_escalation,
         "active_actions_permitted": active_actions_permitted,
+        "simplification_freeze_active": simplification_freeze_active,
         "ownership_transfer_active": ownership_transfer_active,
         "ownership_transfer_status": ownership_transfer_status,
         "outcome": outcome,
@@ -1274,7 +1460,7 @@ def main() -> int:
     if escalation_mode:
         released, release_status = _write_ownership_transfer(
             active=False,
-            reason="controlled_restart_window_complete",
+            reason="controlled_restart_trigger_complete",
             run_id=run_id,
         )
         payload["ownership_transfer_released"] = released
@@ -1306,6 +1492,8 @@ def main() -> int:
         "h_cycle_task_relaunch_reason": h_cycle_task_relaunch_reason,
         "b_cycle_task_relaunch_ok": b_cycle_task_relaunch_ok,
         "b_cycle_task_relaunch_reason": b_cycle_task_relaunch_reason,
+        "f_cycle_task_relaunch_ok": f_cycle_task_relaunch_ok,
+        "f_cycle_task_relaunch_reason": f_cycle_task_relaunch_reason,
         "post_heal_gate_recheck_performed": post_heal_gate_recheck_performed,
         "post_heal_gate_recheck_decision": post_heal_gate_recheck_decision,
         "post_heal_gate_recheck_blockers": post_heal_gate_recheck_blockers,
@@ -1313,16 +1501,22 @@ def main() -> int:
         "post_heal_gate_rc": post_heal_gate_rc,
         "post_heal_transient_reconciled": post_heal_transient_reconciled,
         "post_heal_settle_attempts": post_heal_settle_attempts,
+        "post_heal_recheck_can_drive_decision": post_heal_recheck_can_drive_decision,
         "home_time_mode_active": home_time_mode_active,
         "force_reboot_on_skip_requested": force_reboot_on_skip_requested,
         "force_reboot_on_skip_used": force_reboot_on_skip_used,
+        "stale_h_restart_override_applied": stale_h_restart_override_applied,
+        "stale_h_restart_override_reason": stale_h_restart_override_reason,
+        "stale_h_restart_override_blockers": stale_h_restart_override_blockers,
         "reboot_attempted": reboot_attempted,
         "reboot_status": reboot_status,
         "escalation_mode": escalation_mode,
         "requested_escalation_override": requested_escalation_override,
+        "require_explicit_escalation": require_explicit_escalation,
         "caller_task_name": caller_task_name,
         "restart_window_active": restart_window_active,
         "active_actions_permitted": active_actions_permitted,
+        "simplification_freeze_active": simplification_freeze_active,
         "ownership_transfer_active": ownership_transfer_active,
         "ownership_transfer_status": ownership_transfer_status,
         "evidence_paths": paths,

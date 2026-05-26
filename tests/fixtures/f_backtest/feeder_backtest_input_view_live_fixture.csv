@@ -1,0 +1,2 @@
+observed_utc,policy_id,seller_sku,asin,mapping_status,input_status,input_reason_codes,history_days,paired_buy_box_bsr_days,buy_box_coverage_share,base_velocity_30d_units_per_day,current_supplier_buy_cost_gbp,break_even_price_gbp,market_price_gbp,history_confidence,manual_review_flag
+2026-04-10T08:00:00Z,f_backtest_policy_v1,SKU-BT-001,B000TEST01,unique_asin_match,ready,,365,180,0.84,1.5,8.5,10.1,12.49,high,0

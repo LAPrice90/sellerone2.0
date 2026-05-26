@@ -15,10 +15,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import os
+from typing import TYPE_CHECKING
 
 import pandas as pd
-import gspread
 from scripts.core.out_paths import resolve_compat_path
+
+if TYPE_CHECKING:
+    import gspread
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 TOKEN_LEDGER_TAB = "Token_Ledger"
@@ -34,12 +37,14 @@ BOOTSTRAP = os.environ.get("RESEARCH_BOOTSTRAP", "0").strip() == "1"
 MODE = os.environ.get("INV_DELTA_MODE", "researching").strip().lower()
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread.Client":
+    import gspread
+
     cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=str(cred_path))
 
 
-def load_sheet_df(ws: gspread.Worksheet) -> pd.DataFrame:
+def load_sheet_df(ws: "gspread.Worksheet") -> pd.DataFrame:
     values = ws.get_all_values()
     if not values:
         return pd.DataFrame()
@@ -114,6 +119,8 @@ def main() -> None:
     token_paths = resolve_compat_path(TOKEN_LEDGER_REL, default_system="B")
     token_path = token_paths.live_path if token_paths.live_path.exists() else token_paths.legacy_path
     if WRITE_SHEETS:
+        import gspread
+
         client = get_gspread_client()
         sheet = client.open_by_key(TOKENS_SHEET_ID)
         ledger_ws = sheet.worksheet(TOKEN_LEDGER_TAB)

@@ -4,6 +4,77 @@
 
 This file records durable project and system decisions that are already supported by repo artifacts or explicit prior control reports. It should not be used for speculative ideas.
 
+## Architecture Reset Decisions (SELLERONE-ARCH-RESET-001, 2026-03-20 UTC)
+
+### Primary Database Decision
+
+- Decision: PostgreSQL is the production primary store for SellerOne runtime control and results.
+- Why: it supports concurrent worker claims, transactional state transitions, and growth beyond current volume without file explosion or SQLite write-lock bottlenecks.
+- Constraint: SQLite is local-dev/test only and is not production authority.
+
+### Checkpoint Authority Decision
+
+- Decision: run checkpoints and worker checkpoints belong in DB only.
+- Why: file checkpoint sprawl caused inconsistent control truth and high disk churn.
+- Boundary: files may keep business artifacts and publish snapshots, but not control-lifecycle truth.
+
+### Worker Execution Model Decision
+
+- Decision: queue-driven supervisor with bounded Python process workers (`multiprocessing`/spawn semantics).
+- Why: this keeps implementation Python-native, supports CPU-bound isolation, and gives strict worker lifecycle control with heartbeat and lease recovery.
+- Contract: each claimed item must end in one terminal state with reason code; silent exits are treated as failure and recovered or failed closed.
+
+### Run State Model Decision
+
+- Decision: run state machine is explicit and DB-authoritative: `created -> running -> finalizing -> succeeded|failed|aborted`.
+- Why: missing-finalizer and silent-exit classes require one authoritative control path.
+- Rule: no publish success without terminal run state and complete terminalization of all claimed work items.
+
+### Logging Format And Sink Decision
+
+- Decision: structured JSON line logs with production default level `INFO`; `DEBUG` is explicit, scoped, and temporary.
+- Sink strategy:
+- stdout as primary runtime sink
+- rotating local files under `out/logs/<flow>/` for retention and operator access
+- Why: preserve operational visibility while removing high-volume unstructured log noise.
+
+### Log Volume Guard Decision
+
+- Decision: no per-item INFO logs at scale, no table dumps, no secret/token payload logging.
+- Why: uncontrolled log volume is a direct instability cause and a disk-I/O cost driver.
+- Rule: INFO is lifecycle and batched progress only; deep diagnostics live in debug mode only.
+
+### Artifact Storage Decision
+
+- Decision: keep artifacts on disk by retention class, but reduce to required business outputs, publish snapshots, and forensic bundles.
+- Mandatory retention: keep last 3 publish snapshots per flow for rollback.
+- Why: preserves rollback safety and audit evidence without reintroducing checkpoint file explosion.
+
+### Observability Decision
+
+- Decision: operational status comes from DB-backed counters/views and concise run summaries, not trace-log volume.
+- Required visibility: run progress, queue depth, retry counts, worker heartbeat age, failure codes.
+- Why: observability must be truthful and low-noise to support small-team operations.
+
+### Performance/Stability Decision
+
+- Decision: reduce disk writes by moving control truth into DB, writing events/results in bounded batches, and checkpointing only on real state transitions.
+- Why: repeated file writes and marker churn were major contributors to instability.
+- Rule: staged publish remains mandatory, fail-closed on incomplete finalization.
+
+### Migration Decision
+
+- Decision: migration is phased with explicit rollback gates:
+- Phase 1: DB foundation and dual-write
+- Phase 2: worker contract cut-in
+- Phase 3: logging and observability cut-in
+- Phase 4: DB authority cutover for lifecycle truth
+- Phase 5: legacy cleanup and retention hardening
+- Why: smallest safe sequence to replace architecture without big-bang risk.
+- Coexistence policy:
+- temporary coexistence allowed for business output artifacts and compatibility readers
+- clean cutover required for run state, worker state, checkpoint truth, and publish/finalization gating
+
 ## Confirmed Decisions
 
 ### Governance
@@ -14,6 +85,8 @@ This file records durable project and system decisions that are already supporte
 
 ### Data Source Authority
 
+- Product DB target authority is SQL, edited through the UI. Google Sheet `Product_DB` and Product DB CSV files are legacy/export surfaces after cutover, not the target write authority.
+- The repricer tracker Sheet is allowed as a temporary operator-facing output only. Target direction is a UI repricer tracker backed by SQL/read-only pricing outputs.
 - B token live files under `out/systems/B/live/` are the intended canonical live source for the token datasets already classified in the authority report.
 - Legacy `out/token_ledger_live.csv` and `out/token_allocations_live.csv` should be treated as mirror or fallback paths under the compat model rather than as the preferred live read target.
 - Compat-mapped readers should resolve paths through the approved mechanism in `scripts/core/out_paths.py` instead of hardcoding legacy mirror reads for those datasets.
@@ -24,6 +97,35 @@ This file records durable project and system decisions that are already supporte
 - `project_control/SOURCE_AUTHORITY_REPORT.md` is the canonical reference for current source authority classification.
 - `project_control/CANONICAL_ENFORCEMENT_PLAN.md` is the canonical phased plan for source enforcement work.
 - `project_control/GOVERNANCE_AUDIT.md` is the canonical audit of repo governance overlap and control-file ambiguity.
+
+### Reliability Tolerance Decision (PROMPT 069)
+
+- Reliability interpretation is scope-first, not perfection-first.
+- Planning for flow X is blocked only by hard-block conditions in flow X or declared shared dependencies used by flow X.
+- Hard-block conditions are:
+- active scoped FAIL
+- required runtime down
+- required publish path down
+- scoped core outputs stale beyond cadence
+- duplicate ownership, crash loop, unresolved scheduler ghost, or unresolved active ownership/finalization mismatch
+- Soft-block conditions are:
+- accepted non-blocking WARN
+- provisional or baselining reliability labels
+- stale aggregate/roadmap labels when newer live evidence exists
+- intermittent recoverable runtime faults that do not stop required operation
+- Soft-block conditions must be called out and tracked, but do not automatically block planning or optimisation.
+- Exception-list policy for non-blocking WARNs is approved:
+- named WARN key
+- concrete reason
+- owner
+- review cadence
+- review/expiry checkpoint
+- Evidence priority for reliability decisions is approved:
+- newest live runtime artifacts
+- current scoped checklist
+- latest publish/output success evidence
+- older aggregate snapshots and roadmap labels
+- Weekly planning, optimisation planning, expectation work, and business improvement planning are allowed when scoped hard-blocks are clear even if soft-block WARNs remain.
 
 ## Working Decisions Adopted From Governance Audit
 
@@ -229,6 +331,24 @@ This file records durable project and system decisions that are already supporte
 - run-scoped boundary and/or result artifacts exist for that run
 - The archive action must preserve boundary/result/wait evidence.
 - The archive action must not be allowed to hide an active run.
+
+### H Owner Wait-Read Elimination Decision (PROMPT 158, 2026-03-19 UTC)
+
+- Repeated owner-side helper spawn/wait/read hardening is now classified as diminishing-return for active H pilot reliability.
+- Evidence basis:
+- runs `20260319T191718Z`, `20260319T192552Z`, `20260319T192759Z` consistently show helper artifacts surviving while owner exits before owner-side contract-read checkpoints.
+- Active-path decision:
+- remove supervisor owner dependency on post-spawn wait/read contract chains
+- promote deepest surviving continuation process to direct artifact owner for active path
+- keep legacy supervisor wait/read chain rollback-gated only
+
+### H Artifact Authority Decision (Prompt 158)
+
+- Single writer authority for active path:
+- `phase1_pilot_step.result.*.json` -> continuation owner only
+- `phase1_pilot_step.complete.*.json` -> continuation owner only
+- terminal failed marker reasoning -> continuation owner only
+- supervisor and detached monitors remain observability-only and must not race artifact writes.
 
 ### Home Time Mode Decision
 
@@ -544,6 +664,99 @@ This file records durable project and system decisions that are already supporte
 - required outputs verified
 - current-cycle A015 evidence verified
 
+### H Single-Authority Runtime Reduction Decision (PROMPT 077)
+
+- H requires architectural reduction from multi-owner runtime truth to single-owner runtime truth.
+- Runtime lifecycle authority for H runs should be the H core runtime (`scripts/cycles/run_H_pricing_cycle.py`).
+- Launcher and guarded wrapper remain required operational layers, but they are not authoritative for run completion truth.
+- A single authoritative run-state file is approved:
+- `out/systems/H/live/H_run_state.json`
+
+### H Authoritative State Machine Decision
+
+- The approved lifecycle states are:
+- `started`
+- `snapshot_done`
+- `pilot_started`
+- `pilot_done`
+- `publish_started`
+- `publish_done`
+- `finalized`
+- `failed`
+- Restart and publish gating decisions must use this state machine as primary truth.
+- Missing or contradictory state transitions are fail-closed.
+
+### H Marker Demotion Decision
+
+- Existing H marker families are retained for observability, not primary control authority:
+- launcher/wrapper markers
+- completion and boundary markers
+- publish marker side files
+- lock/heartbeat side files
+- redundant run-identity files duplicating authoritative run-state
+- During migration, these artifacts may be read for diagnostics, but cannot overrule authoritative run-state.
+
+### H Migration Strategy Decision
+
+- H simplification should be incremental:
+- Stage 1: write authoritative run-state in parallel with current markers
+- Stage 2: move launcher/wrapper control reads to authoritative run-state
+- Stage 3: demote old marker contracts from gating to observability
+- Stage 4: remove redundant authority paths after stability evidence
+- Full rewrite is explicitly rejected for this phase.
+
+### H First Implementation Slice Decision
+
+- The smallest approved first slice is:
+- add authoritative run-state write/update in H core for each lifecycle transition
+- keep existing wrappers and markers unchanged
+- do not switch control reads in this first slice
+- This first slice is approved because it reduces ambiguity immediately without destabilizing startup/restart behavior.
+
+### H Pilot Parent-Supervision De-Activation Decision (PROMPT 125)
+
+- Parent-side pilot supervision in active path is no longer considered reliable.
+- Evidence basis:
+- repeated clean pilot-reaching runs where child-ready contracts are valid
+- supervising process exits before consuming those contracts
+- Decision:
+- move to single pilot owner execution model where one worker owns end-to-end pilot runtime and artifact convergence.
+- Parent/supervisor role is launch-only or observability-only and is not part of post-spawn artifact read/join control path.
+
+### H Pilot Single Artifact Authority Decision
+
+- Pilot run artifact authority is single-writer:
+- pilot result payload: owner worker only
+- pilot completion marker: owner worker only
+- pilot checkpoint/terminal failure state: owner worker only
+- wrapper/launcher may record exit classification only.
+- Wrapper/launcher are not allowed to write competing pilot payload/marker success or failure truth.
+
+### H Pilot Migration Decision (Owner Reduction)
+
+- Stage A:
+- promote current full-worker path to sole pilot artifact authority in active path
+- Stage B:
+- bypass parent-side ready-reader/worker-contract read path in active flow
+- Stage C:
+- keep old supervision chain behind explicit rollback flag only
+- Stage D:
+- remove obsolete nested supervision/helper branches after stability proof
+
+### H Final Owner Decision (PROMPT 129)
+
+- Decision date: 2026-03-19 UTC
+- The active pilot blocker is now classified as structural owner fragility at owner post-spawn wait/read.
+- Evidence basis:
+- clean runs `20260319T083455Z`, `20260319T083707Z`, `20260319T083910Z`
+- payload worker contract files are valid in all three runs
+- owner exits before `owner_worker_payload_contract_read` in all three runs
+- Approved direction:
+- end active-path owner wait/read contract handling
+- move to a single execution owner as the only pilot runtime and artifact authority
+- Parent/supervisor is launch-only and observability-only in active path.
+- Parent must not be a required reader for success-path contract convergence.
+
 ## Open Decisions Needed
 
 - Confirm ownership of unresolved duplicate-truth datasets before broader rewiring outside the already-approved safe compat-mapped files.
@@ -575,3 +788,158 @@ This file records durable project and system decisions that are already supporte
 - preserve existing logs, result paths, and staged-output locations
 - keep fail-closed behavior for unresolved boundary states
 - avoid silent cleanup of unresolved markers so recovery remains evidence-backed
+
+### Logging Housekeeping Policy Decision (PROMPT 006, 2026-03-20 UTC)
+
+- Decision scope is operational log housekeeping only.
+- H runtime stability, finalizer, publish, and health-threshold logic are out of scope for this policy.
+- The approved class model is:
+- L1 operational runtime logs and lifecycle markers
+- L2 health and monitoring evidence
+- L3 error and fault forensic evidence
+- L4 diagnostic and debug traces
+- L5 historical audit and governance history
+- L6 temporary subprocess stdout/stderr artifacts
+
+### Logging Retention And Action Matrix
+
+- L1: keep as protected operational evidence; housekeeping reports only.
+- L2: keep as protected health evidence; housekeeping reports only.
+- L3: keep as protected fault/boundary evidence; housekeeping reports only.
+- L4: cleanup-eligible with safety gates; TTL/count/size policy applies.
+- L5: keep as protected audit history; housekeeping reports only.
+- L6: cleanup-eligible with safety gates; TTL/count/size policy applies.
+
+### Logging Safety Gate Decision
+
+- Housekeeping must fail closed.
+- Housekeeping must never delete or archive protected L2 or L5 artifacts.
+- Housekeeping must never act on unknown or unclassified files.
+- Housekeeping must treat blocker-state read failure as `blocked_by_safety`.
+- Housekeeping must block L4/L6 live actions while H run is active or unfinalized.
+- Current-cycle health evidence remains protected and non-destructive.
+
+### Registry And Tooling Decision
+
+- Central machine-readable registry file is authoritative for housekeeping classification and retention:
+- `project_control/log_housekeeping_registry.json`
+- Registry defines for each log family:
+- path patterns
+- class
+- owner
+- retention controls
+- expiry action intent
+- protected flag
+- live cleanup eligibility
+- safety blocker conditions
+- Housekeeping tool is:
+- `scripts/tools/log_housekeeping.py`
+- Default mode is dry-run.
+- Optional live mode requires explicit `--apply` flag.
+- Live mode is restricted to classes L4 and L6 only and still obeys all safety blockers.
+
+### Housekeeping Output Decision
+
+- Housekeeping outputs are written only under:
+- `out/housekeeping/`
+- Required artifacts per run:
+- timestamped CSV report
+- latest CSV pointer copy
+- timestamped JSON summary
+- latest JSON summary copy
+- concise text summary
+- The tool must not emit per-file trace spam beyond the single report CSV.
+
+### Logging Registry Coverage Expansion Decision (PROMPT 008, 2026-03-20 UTC)
+
+- Registry coverage was expanded for high-volume H-live unknown families to improve housekeeping report trustworthiness.
+- Newly covered families are:
+- `H_home_time_monitor_diagnostic.<ts>.json`
+- `phase1_pilot_step.complete.<ts>...json`
+- `H_core_parent_exit_capture.monitor_start...txt`
+- `H_core_parent_exit_capture...json`
+- `phase1_pilot_step.result.<ts>...json`
+- `snapshot_refresh_worker.contract.<ts>...json`
+- `phase1_pilot_step.checkpoint.<ts>...json`
+- `H_launcher_gate_trace...log`
+
+### Policy Treatment For Expanded Families
+
+- `H_home_time_monitor_diagnostic.*.json`:
+- class: L4
+- owner: H home time monitor
+- live cleanup: disabled (report-only classification in this phase)
+- blockers: `h_run_unfinalized`, `block_if_state_unknown`
+
+- `phase1_pilot_step.complete/result/checkpoint` artifacts (including `.json.tmp.*` variants):
+- class: L6
+- owner: H phase1 pilot subprocess
+- live cleanup: disabled (report-only classification in this phase)
+- blockers: `h_run_unfinalized`, `block_if_state_unknown`
+
+- `H_core_parent_exit_capture.monitor_start.*.txt` and `H_core_parent_exit_capture.*.json`:
+- class: L3
+- owner: H core parent exit capture
+- treated as protected forensic evidence
+- live cleanup: disabled
+
+- `snapshot_refresh_worker.contract.*.json`:
+- class: L6
+- owner: H snapshot refresh worker
+- live cleanup: disabled (report-only classification in this phase)
+- blockers: `h_run_unfinalized`, `block_if_state_unknown`
+
+- `H_launcher_gate_trace.*.log`:
+- class: L4
+- owner: H launcher gate
+- live cleanup: disabled (report-only classification in this phase)
+- blockers: `h_run_unfinalized`, `block_if_state_unknown`
+
+### Safety Posture Confirmation
+
+- Dry-run remains default.
+- Unknown items remain non-actionable.
+- Protected classes remain non-destructive.
+- No new family in this expansion is live-cleanup-eligible.
+
+## H Item Offers Retry-Budget Watchdog Decision (2026-05-01 UTC)
+
+- When H one-cycle seller-detail retry expands the item-offers ASIN budget, the child `H_item_offers_lookup.py` watchdog must use the remaining retry-aware snapshot budget.
+- The fixed base helper timeout remains the default when no expanded snapshot budget is active.
+- This changes only how long the already-selected item-offers helper may run; it does not widen product selection, write to Google Sheets, or change scheduler ownership.
+- Live repricer sign-off still requires terminal H proof followed by P013 and O050.
+
+## Repricer Tracker Runtime Source Decision (2026-05-01 UTC)
+
+- The repricer tracker UI read model should use the latest H runtime source, `out/phase1_runtime_floor_snapshot_latest.csv`, plus terminal/publish markers for proof.
+- Stale compact `out/pricing_output.csv` warnings do not block tracker read-model sign-off when the latest H terminal run is finalized, publish is ok, terminal rows match publish rows, runtime blank write-status rows are 0, and runtime invalid write-status rows are 0.
+- The repricer tracker Google Sheet remains a temporary operator output until an explicit operator cutover decision is made.
+
+## Product DB Local SQL Authority Rehearsal Decision (2026-05-01 UTC)
+
+- Local O Product DB work should prefer SQL table `product_db_products` when the table exists and has rows.
+- `out/product_db_preview.csv` is a compatibility mirror/export during this migration slice and may be stale while legacy A/B owners still rewrite it.
+- O030 Product DB operator view, P014 Product DB edit-event apply, and P015 authority rehearsal are allowed to use local SQL as Product DB authority for local proof.
+- P014 must default to dry-run and require explicit local apply flags before writing local SQL and mirror exports.
+- Unsafe Product DB identity changes, including nonblank ASIN changes and duplicate-ASIN creation without classification, must be held rather than applied.
+
+## Repricer Tracker UI Cutover Gate Decision (2026-05-01 UTC)
+
+- Repricer tracker UI cutover is blocked when the latest H terminal run is failed, even if the previous runtime proof run has clean write-status rows.
+- The tracker Sheet remains temporary/fallback until a later H terminal run finalizes with publish `ok` and P013/O050 current-runtime checks are clean except approved stale-audit warnings.
+
+## SQL Product DB / Repricer Tracker UI Phase 2 Local Completion Decision (2026-05-01 UTC)
+
+- Phase 2 local completion is allowed when P017, P018, P019, P020, and P021 have `fail_count=0` and any remaining warning is explicitly classified as stale audit, stale mirror, or approval-gated work.
+- Local completion does not retire the repricer tracker Sheet.
+- Local completion does not mark the Product DB Sheet legacy/export-only.
+- Local completion does not approve A/B/H runtime reader changes.
+- Local completion does not approve production PostgreSQL promotion.
+- P021 at 2026-05-01T22:09:01Z reached `complete_locally_pending_explicit_cutover_approvals` with `fail_count=0` and `warn_count=0`.
+
+## Repricer Tracker UI Observation Decision (2026-05-02 UTC)
+
+- User accepted the recommended path: use the repricer tracker UI as the main tracker for one normal operating day while keeping the Google Sheet as fallback.
+- This is operator acceptance for an observation window, not approval to retire or disable the Sheet immediately.
+- After the observation window, retirement can proceed only if P017/P016 remain fail-free and no missing UI field or usability blocker is recorded.
+- If any blocker appears, keep the Sheet fallback and record the missing UI item before cutover.

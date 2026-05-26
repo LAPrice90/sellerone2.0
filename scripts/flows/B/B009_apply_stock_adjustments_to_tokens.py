@@ -7,11 +7,35 @@ Uses out/stock_events_raw.csv (from A006) and updates Token_Ledger.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
-
-import gspread
-import pandas as pd
 import os
+from pathlib import Path
+import re
+import sys
+from typing import TYPE_CHECKING
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.out_paths import resolve_compat_path, write_csv_with_compat
+except ModuleNotFoundError:
+    from core.out_paths import resolve_compat_path, write_csv_with_compat
+
+try:
+    from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
+except ModuleNotFoundError:
+    from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
+
+try:
+    import gspread
+except Exception:
+    gspread = None
+
+if TYPE_CHECKING:
+    import gspread as gspread_types
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 TOKEN_LEDGER_TAB = "Token_Ledger"
@@ -24,14 +48,29 @@ OUT_EVENTS = Path("out/stock_adjustment_token_events.csv")
 OUT_COMPLETENESS = Path("out/ledger_completeness_summary.csv")
 OUT_RETURN_LEDGER = Path("out/token_return_ledger.csv")
 OUT_LEDGER = Path("out/token_ledger_live.csv")
+SQL_TABLE_STOCK_ADJUSTMENT_EVENTS = "b_stock_adjustment_token_events"
+EVENT_COLUMNS = [
+    "event_id",
+    "sku",
+    "event_date",
+    "event_type",
+    "disposition",
+    "quantity",
+    "applied_qty",
+    "status",
+    "note",
+    "event_ts",
+]
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread_types.Client":
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=str(cred_path))
 
 
-def load_sheet_df(ws: gspread.Worksheet) -> pd.DataFrame:
+def load_sheet_df(ws: "gspread_types.Worksheet") -> pd.DataFrame:
     values = ws.get_all_values()
     if not values:
         return pd.DataFrame()
@@ -44,6 +83,60 @@ def parse_int(value: str) -> int:
         return int(float(value))
     except Exception:
         return 0
+
+
+def _normalize_events(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=EVENT_COLUMNS)
+    out = df.copy()
+    for col in EVENT_COLUMNS:
+        if col not in out.columns:
+            out[col] = ""
+    return out[EVENT_COLUMNS].copy()
+
+
+def _write_stock_adjustment_events_output(
+    prior: pd.DataFrame,
+    events: pd.DataFrame,
+    *,
+    use_sheets: bool,
+) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    prior = _normalize_events(prior)
+    events = _normalize_events(events)
+    combined = pd.concat([prior, events], ignore_index=True)
+    sql_rows = 0
+
+    def write_csv() -> None:
+        OUT_EVENTS.parent.mkdir(parents=True, exist_ok=True)
+        combined.to_csv(OUT_EVENTS, index=False)
+
+    def write_sql() -> None:
+        nonlocal sql_rows
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, SQL_TABLE_STOCK_ADJUSTMENT_EVENTS, combined)
+        finally:
+            store.close()
+        sql_rows = int(result["rows"])
+
+    if use_sheets:
+        write_csv()
+    elif mode == "sql_primary_csv_export":
+        write_sql()
+        write_csv()
+    elif mode == "sql_shadow":
+        write_csv()
+        write_sql()
+    else:
+        write_csv()
+
+    return {
+        "mode": "csv" if use_sheets else mode,
+        "sql_table": "" if use_sheets or mode == "csv" else SQL_TABLE_STOCK_ADJUSTMENT_EVENTS,
+        "sql_rows": sql_rows,
+        "total_events": int(len(combined)),
+    }
 
 
 def to_event_day(value: str) -> str:
@@ -68,6 +161,135 @@ def parse_date(value: str) -> datetime | None:
     return dt.to_pydatetime()
 
 
+def _parse_float(value: object) -> float:
+    try:
+        return float(str(value).strip())
+    except Exception:
+        return 0.0
+
+
+def _latest_cost_basis(ledger: pd.DataFrame, sku: str) -> dict[str, str] | None:
+    if ledger.empty or "seller_sku" not in ledger.columns:
+        return None
+    sku_rows = ledger[ledger["seller_sku"].astype(str).str.strip() == str(sku).strip()].copy()
+    if sku_rows.empty:
+        return None
+    if "cost_per_unit" not in sku_rows.columns:
+        return None
+    sku_rows["__cost"] = sku_rows["cost_per_unit"].apply(_parse_float)
+    sku_rows = sku_rows[sku_rows["__cost"] > 0].copy()
+    if sku_rows.empty:
+        return None
+    if "received_date" in sku_rows.columns:
+        sku_rows["__received"] = pd.to_datetime(sku_rows["received_date"], errors="coerce", utc=True)
+    else:
+        sku_rows["__received"] = pd.NaT
+    if "created_at" in sku_rows.columns:
+        sku_rows["__created"] = pd.to_datetime(sku_rows["created_at"], errors="coerce", utc=True)
+    else:
+        sku_rows["__created"] = pd.NaT
+    sku_rows["__row"] = range(len(sku_rows))
+    sku_rows = sku_rows.sort_values(by=["__received", "__created", "__row"])
+    latest = sku_rows.iloc[-1]
+    return {
+        "cost_per_unit": f"{float(latest['__cost']):.2f}",
+        "currency": str(latest.get("currency", "GBP") or "GBP"),
+        "notes": str(latest.get("notes", "") or ""),
+    }
+
+
+def _append_adjustment_fallback_tokens(
+    ledger: pd.DataFrame,
+    *,
+    sku: str,
+    qty: int,
+    event_id: str,
+    disposition: str,
+    now_iso: str,
+    event_date: str,
+) -> tuple[pd.DataFrame, int]:
+    if qty <= 0:
+        return ledger, 0
+    basis = _latest_cost_basis(ledger, sku)
+    if not basis:
+        return ledger, 0
+
+    required_cols = [
+        "token_id",
+        "seller_sku",
+        "cost_per_unit",
+        "currency",
+        "status",
+        "received_date",
+        "notes",
+        "source",
+        "source_batch_id",
+        "source_order_key",
+        "created_at",
+        "allocated_order_id",
+        "allocated_date",
+        "return_order_id",
+        "return_date",
+        "return_event_id",
+        "last_return_order_id",
+        "last_return_date",
+        "last_return_event_id",
+        "disposed_event_id",
+        "disposed_date",
+        "disposed_reason",
+    ]
+    for col in required_cols:
+        if col not in ledger.columns:
+            ledger[col] = ""
+
+    status_map = {
+        "SELLABLE": "available",
+        "RESEARCHING": "research_pending",
+    }
+    target_status = status_map.get(disposition.upper(), "unsellable")
+    safe_sku = re.sub(r"[^A-Za-z0-9._-]", "_", str(sku).strip())
+    safe_event = re.sub(r"[^A-Za-z0-9._-]", "_", str(event_id).strip())
+    existing_ids = set(ledger["token_id"].astype(str).tolist()) if "token_id" in ledger.columns else set()
+    event_day = to_event_day(event_date) or now_iso[:10]
+    created_rows = []
+    seq = 1
+    while len(created_rows) < qty:
+        token_id = f"ADJ-{safe_sku}-{safe_event}-{seq:04d}"
+        seq += 1
+        if token_id in existing_ids:
+            continue
+        existing_ids.add(token_id)
+        created_rows.append(
+            {
+                "token_id": token_id,
+                "seller_sku": sku,
+                "cost_per_unit": basis["cost_per_unit"],
+                "currency": basis["currency"],
+                "status": target_status,
+                "received_date": event_day,
+                "notes": f"adjustment_fallback_create:{event_id}",
+                "source": "stock_adjustment_fallback",
+                "source_batch_id": event_id,
+                "source_order_key": "",
+                "created_at": now_iso,
+                "allocated_order_id": "",
+                "allocated_date": "",
+                "return_order_id": "",
+                "return_date": "",
+                "return_event_id": "",
+                "last_return_order_id": "",
+                "last_return_date": "",
+                "last_return_event_id": "",
+                "disposed_event_id": "",
+                "disposed_date": "",
+                "disposed_reason": "",
+            }
+        )
+    if created_rows:
+        ledger = pd.concat([ledger, pd.DataFrame(created_rows)], ignore_index=True)
+    return ledger, len(created_rows)
+
+
 def main() -> None:
     if not STOCK_EVENTS.exists():
         print({"status": "skip", "reason": "missing_stock_events"})
@@ -80,10 +302,21 @@ def main() -> None:
         print({"status": "skip", "reason": "no_stock_events"})
         return
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(TOKENS_SHEET_ID)
-    ledger_ws = sheet.worksheet(TOKEN_LEDGER_TAB)
-    ledger = load_sheet_df(ledger_ws)
+    use_sheets = bool(WRITE_SHEETS and gspread is not None)
+    sheet = None
+    ledger_ws = None
+    if use_sheets:
+        client = get_gspread_client()
+        sheet = client.open_by_key(TOKENS_SHEET_ID)
+        ledger_ws = sheet.worksheet(TOKEN_LEDGER_TAB)
+        ledger = load_sheet_df(ledger_ws)
+    else:
+        ledger_paths = resolve_compat_path("token_ledger_live.csv", default_system="B")
+        ledger_path = ledger_paths.live_path if ledger_paths.live_path.exists() else ledger_paths.legacy_path
+        if not ledger_path.exists():
+            print({"status": "skip", "reason": "empty_token_ledger"})
+            return
+        ledger = pd.read_csv(ledger_path, dtype=str).fillna("")
     # gspread can return duplicate header names from sheet tabs.
     # Keep the first occurrence so boolean masks resolve to Series, not DataFrame.
     if not ledger.columns.is_unique:
@@ -114,13 +347,23 @@ def main() -> None:
         ledger["disposed_reason"] = ""
 
     # Idempotency: skip events already applied (allow partial reapply)
-    try:
-        ev_ws = sheet.worksheet(EVENTS_TAB)
-        prior = load_sheet_df(ev_ws)
+    if use_sheets:
+        try:
+            ev_ws = sheet.worksheet(EVENTS_TAB)
+            prior = load_sheet_df(ev_ws)
+            applied_ids = set(prior["event_id"].tolist()) if "event_id" in prior.columns else set()
+        except gspread.WorksheetNotFound:
+            applied_ids = set()
+            prior = pd.DataFrame()
+    else:
+        if OUT_EVENTS.exists():
+            try:
+                prior = pd.read_csv(OUT_EVENTS, dtype=str).fillna("")
+            except Exception:
+                prior = pd.DataFrame()
+        else:
+            prior = pd.DataFrame()
         applied_ids = set(prior["event_id"].tolist()) if "event_id" in prior.columns else set()
-    except gspread.WorksheetNotFound:
-        applied_ids = set()
-        prior = pd.DataFrame()
 
     prior_map = {}
     if not prior.empty and "event_id" in prior.columns:
@@ -164,11 +407,15 @@ def main() -> None:
             return None
         return int(matches[0])
 
+    processed_base_event_ids: set[str] = set()
     for _, row in events.iterrows():
         note = ""
         base_event_id = str(row.get("event_id", "")).strip()
         if not base_event_id:
             continue
+        if base_event_id in processed_base_event_ids:
+            continue
+        processed_base_event_ids.add(base_event_id)
         if base_event_id in applied_ids:
             prior_info = prior_map.get(base_event_id)
             if not prior_info:
@@ -249,8 +496,22 @@ def main() -> None:
                     )
                     applied += 1
                 if applied < qty:
+                    missing = qty - applied
+                    ledger, created = _append_adjustment_fallback_tokens(
+                        ledger,
+                        sku=sku,
+                        qty=missing,
+                        event_id=event_id,
+                        disposition=disposition,
+                        now_iso=now_iso,
+                        event_date=str(row.get("event_date", "")),
+                    )
+                    applied += created
+                    if created > 0:
+                        note = "fallback_created_from_adjustment_basis"
+                if applied < qty:
                     status = "partial"
-                    note = "insufficient_returned_pending"
+                    note = note or "insufficient_returned_pending"
             else:
                 # remove from available then warehouse
                 remove = abs(qty)
@@ -291,8 +552,22 @@ def main() -> None:
                     ledger.at[idx, "return_event_id"] = ""
                     applied += 1
                 if applied < qty:
+                    missing = qty - applied
+                    ledger, created = _append_adjustment_fallback_tokens(
+                        ledger,
+                        sku=sku,
+                        qty=missing,
+                        event_id=event_id,
+                        disposition=disposition,
+                        now_iso=now_iso,
+                        event_date=str(row.get("event_date", "")),
+                    )
+                    applied += created
+                    if created > 0:
+                        note = "fallback_created_from_adjustment_basis"
+                if applied < qty:
                     status = "partial"
-                    note = "insufficient_returned_pending"
+                    note = note or "insufficient_returned_pending"
             else:
                 remove = abs(qty)
                 pending = ledger[(ledger["seller_sku"] == sku) & (ledger["status"] == "research_pending")].copy()
@@ -327,8 +602,22 @@ def main() -> None:
                     ledger.at[idx, "return_event_id"] = ""
                     applied += 1
                 if applied < qty:
+                    missing = qty - applied
+                    ledger, created = _append_adjustment_fallback_tokens(
+                        ledger,
+                        sku=sku,
+                        qty=missing,
+                        event_id=event_id,
+                        disposition=disposition,
+                        now_iso=now_iso,
+                        event_date=str(row.get("event_date", "")),
+                    )
+                    applied += created
+                    if created > 0:
+                        note = "fallback_created_from_adjustment_basis"
+                if applied < qty:
                     status = "partial"
-                    note = "insufficient_returned_pending"
+                    note = note or "insufficient_returned_pending"
             else:
                 remove = abs(qty)
                 uns = ledger[(ledger["seller_sku"] == sku) & (ledger["status"] == "unsellable")].copy()
@@ -355,17 +644,14 @@ def main() -> None:
                 "event_ts": now_iso,
             }
         )
+        applied_ids.add(event_id)
 
     if not log_rows:
         print({"status": "skip", "reason": "no_new_events"})
         return
 
-    OUT_EVENTS.parent.mkdir(parents=True, exist_ok=True)
     log_df = pd.DataFrame(log_rows)
-    if OUT_EVENTS.exists():
-        log_df.to_csv(OUT_EVENTS, mode="a", index=False, header=False)
-    else:
-        log_df.to_csv(OUT_EVENTS, index=False)
+    output = _write_stock_adjustment_events_output(prior, log_df, use_sheets=use_sheets)
 
     if return_rows:
         OUT_RETURN_LEDGER.parent.mkdir(parents=True, exist_ok=True)
@@ -375,7 +661,7 @@ def main() -> None:
         else:
             return_df.to_csv(OUT_RETURN_LEDGER, index=False)
 
-    if WRITE_SHEETS:
+    if use_sheets:
         # Write updated ledger to sheet
         rows = [ledger.columns.tolist()] + ledger.astype(object).where(pd.notnull(ledger), "").values.tolist()
         ledger_ws.clear()
@@ -390,8 +676,7 @@ def main() -> None:
         if log_rows:
             ev_ws.append_rows([list(r.values()) for r in log_rows], value_input_option="RAW")
     else:
-        OUT_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-        ledger.to_csv(OUT_LEDGER, index=False)
+        write_csv_with_compat(ledger, path_or_rel="token_ledger_live.csv", index=False, default_system="B")
 
     # Ledger completeness summary (daily per SKU/status)
     log_df["event_day"] = log_df["event_date"].apply(to_event_day)
@@ -408,7 +693,7 @@ def main() -> None:
     OUT_COMPLETENESS.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(OUT_COMPLETENESS, index=False)
 
-    if WRITE_SHEETS:
+    if use_sheets:
         try:
             comp_ws = sheet.worksheet(COMPLETENESS_TAB)
         except gspread.WorksheetNotFound:
@@ -422,11 +707,12 @@ def main() -> None:
             "status": "success",
             "events": len(log_rows),
             "snapshot": str(OUT_EVENTS),
-            "sheet_tab": EVENTS_TAB,
+            "sheet_tab": EVENTS_TAB if use_sheets else "",
             "completeness_snapshot": str(OUT_COMPLETENESS),
-            "completeness_tab": COMPLETENESS_TAB,
+            "completeness_tab": COMPLETENESS_TAB if use_sheets else "",
             "return_ledger": str(OUT_RETURN_LEDGER),
-            "write_sheets": WRITE_SHEETS,
+            "write_sheets": use_sheets,
+            **output,
         }
     )
 

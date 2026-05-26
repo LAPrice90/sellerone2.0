@@ -33,8 +33,6 @@ def evaluate_live_write_gate(
     elif phase_engine_live_writes:
         if not phase_engine_enabled or not phase_engine_behavior:
             reason = "PHASE_LIVE_WRITE_BLOCKED_FLAG_OFF"
-        elif not in_cohort:
-            reason = "PHASE_LIVE_WRITE_BLOCKED_NOT_IN_COHORT"
         else:
             reason = ALLOWED_REASON
             allowed = True

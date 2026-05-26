@@ -17,10 +17,13 @@ from typing import Dict, List, Tuple
 
 import pandas as pd
 
+from scripts.core.storage import write_dataframe_with_sql_compat
+
 
 ORDERS_PATH = Path("out/orders_sheet_orders.csv")
 TOKEN_LEDGER_OUT = Path("out/token_ledger_live.csv")
 REPORT_OUT = Path("out/token_backfill_from_orders_sheet.csv")
+SQL_TABLE_TOKEN_LEDGER_LIVE = "b_token_ledger_live"
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 TOKENS_TAB = "Token_Ledger"
@@ -64,7 +67,7 @@ def main() -> None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from scripts.A003_run_inventory_to_sheet import get_gspread_client
+    from scripts.flows.A.A003_run_inventory_to_sheet import get_gspread_client
 
     orders = pd.read_csv(ORDERS_PATH, dtype=str).fillna("")
     if orders.empty:
@@ -160,7 +163,7 @@ def main() -> None:
 
     token_df = pd.concat([token_df, pd.DataFrame(new_rows, columns=token_df.columns)], ignore_index=True)
     TOKEN_LEDGER_OUT.parent.mkdir(parents=True, exist_ok=True)
-    token_df.to_csv(TOKEN_LEDGER_OUT, index=False)
+    write_dataframe_with_sql_compat(token_df, TOKEN_LEDGER_OUT, SQL_TABLE_TOKEN_LEDGER_LIVE)
 
     REPORT_OUT.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(report_rows).to_csv(REPORT_OUT, index=False)

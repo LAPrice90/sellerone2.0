@@ -6,6 +6,8 @@ from datetime import datetime, UTC
 import pandas as pd
 import gspread
 
+from scripts.core.storage import read_dataframe_with_sql_fallback
+
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 TOKENS_TAB = "Token_Ledger"
@@ -25,16 +27,20 @@ def main() -> None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from scripts.A003_run_inventory_to_sheet import get_gspread_client
+    from scripts.flows.A.A003_run_inventory_to_sheet import get_gspread_client
 
     if not os.path.exists("out/order_master.csv"):
         raise RuntimeError("Missing out/order_master.csv")
-    if not os.path.exists("out/inventory_summaries.csv"):
-        raise RuntimeError("Missing out/inventory_summaries.csv")
-
     order_master = pd.read_csv("out/order_master.csv")
     order_master = order_master[order_master["Quantity Ordered"] > 0]
-    inventory = pd.read_csv("out/inventory_summaries.csv")
+    try:
+        inventory = read_dataframe_with_sql_fallback(
+            "out/inventory_summaries.csv",
+            "a_inventory_summaries",
+            dtype=str,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Missing out/inventory_summaries.csv") from exc
 
     client = get_gspread_client()
     sheet = client.open_by_key(TOKENS_SHEET_ID)

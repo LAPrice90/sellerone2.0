@@ -1,0 +1,11 @@
+{
+  "supplier_id": "td_synnex",
+  "supplier_name": "TD Synnex",
+  "source_url": "https://tdsynnex.example/pricelist/enhanced-gb.tsv",
+  "source_type": "tsv",
+  "default_vat_rate": "20",
+  "currency": "GBP",
+  "refresh_hours": 24,
+  "skip_sku_suffixes": [],
+  "source_path_override": "tests/fixtures/f_phase1/td_synnex_raw_fixture.tsv"
+}

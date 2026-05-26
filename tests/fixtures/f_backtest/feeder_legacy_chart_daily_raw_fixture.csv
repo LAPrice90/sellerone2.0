@@ -1,0 +1,2 @@
+observed_utc,asin,day,amazon_price_raw,fba_price_raw,fbm_price_raw,buy_box_price_raw,bsr_raw,price_chosen_processed,phase_processed
+2026-04-10T08:00:00Z,B000TEST01,2026-04-01,12.99,12.49,12.79,12.49,15432,12.49,normal

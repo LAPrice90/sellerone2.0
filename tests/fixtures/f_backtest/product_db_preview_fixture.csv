@@ -1,0 +1,2 @@
+seller_sku,asin,supplier_code,supplier_name,supplier_catalog_price,last_purchase_price,sale_status
+SKU-BT-001,B000TEST01,SUP-A,Alpha Supply,8.50,8.20,active

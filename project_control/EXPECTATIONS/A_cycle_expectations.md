@@ -32,6 +32,8 @@ Suggested scoring baseline:
 ## SECTION 3 - Acceptance Criteria
 - Replacement Complete:
 - A run order covers required daily data refresh and health gate scope.
+- Inventory refresh must run even when legacy Google Sheet output steps are disabled.
+- Inventory summaries and inventory history must persist through SQL-compatible writers after stale-token-floor correction, so CSV and SQL fallback tables stay aligned.
 - Required outputs are produced and evidenced in manifests.
 - Stable:
 - No blocking fail in last 10 runs.
@@ -47,3 +49,17 @@ These do not affect Completion Score:
 - Better operator dashboards for A-only diagnostics.
 - Additional observability detail beyond current manifest requirements.
 - Non-critical report polish and formatting improvements.
+
+## SECTION 5 - Planning Tolerance Gate
+- This expectations file defines reliability quality targets. It is not an automatic planning-stop rule by itself.
+- Planning and optimisation work may proceed when A scoped hard-block conditions are clear.
+- Hard-block examples for A planning:
+- active FAIL in A scoped gate
+- required A runtime path not operational
+- required A outputs stale beyond cadence
+- unresolved ownership or crash-loop conditions affecting A operation
+- Soft-block examples for A planning:
+- accepted non-blocking WARN with clear reason
+- "To Baseline" reliability label while runs are still being accumulated
+- older aggregate labels that lag newer live A evidence
+- Soft-blocks must be reported and tracked, but do not by themselves stop planning.

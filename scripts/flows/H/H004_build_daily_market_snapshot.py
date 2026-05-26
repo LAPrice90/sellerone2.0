@@ -2,13 +2,24 @@
 
 import os
 import shutil
+import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
-from scripts.core.out_paths import resolve_compat_path
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.out_paths import resolve_compat_path
+    from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_tables_from_dataframes
+except ModuleNotFoundError:
+    from core.out_paths import resolve_compat_path
+    from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_tables_from_dataframes
 
 OUT = Path("out")
 PERF_PATH = OUT / "sku_performance_summary.csv"
@@ -17,6 +28,8 @@ LISTING_HISTORY_PATH = (
     LISTING_HISTORY_COMPAT.live_path if LISTING_HISTORY_COMPAT.live_path.exists() else LISTING_HISTORY_COMPAT.legacy_path
 )
 HISTORY_OUTPUT_PATH = OUT / "hos_daily_market_history.csv"
+SQL_TABLE_SNAPSHOT = "h_hos_daily_market_snapshot"
+SQL_TABLE_HISTORY = "h_hos_daily_market_history"
 
 REQUIRED_COLUMNS: List[str] = [
     "asof_date",
@@ -241,6 +254,53 @@ def _update_latest_snapshot_pointer(snapshot_path: Path, latest_filename: str) -
                 temp_path.unlink()
             except Exception:
                 pass
+
+
+def _write_market_outputs(snapshot_path: Path, snapshot: pd.DataFrame, history: pd.DataFrame) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    sql_rows = {"snapshot": 0, "history": 0}
+
+    def write_csv_outputs() -> None:
+        OUT.mkdir(parents=True, exist_ok=True)
+        snapshot.to_csv(snapshot_path, index=False)
+        _update_latest_snapshot_pointer(snapshot_path, "hos_daily_market_snapshot_latest.csv")
+        history.to_csv(HISTORY_OUTPUT_PATH, index=False)
+
+    def write_sql_outputs() -> None:
+        config = StorageConfig.from_env()
+        store = connect_store(config)
+        try:
+            results = replace_tables_from_dataframes(
+                store,
+                {
+                    SQL_TABLE_SNAPSHOT: snapshot,
+                    SQL_TABLE_HISTORY: history,
+                },
+            )
+        finally:
+            store.close()
+        for result in results:
+            table = str(result["table"])
+            if table == SQL_TABLE_SNAPSHOT:
+                sql_rows["snapshot"] = int(result["rows"])
+            elif table == SQL_TABLE_HISTORY:
+                sql_rows["history"] = int(result["rows"])
+
+    if mode == "sql_primary_csv_export":
+        write_sql_outputs()
+        write_csv_outputs()
+    elif mode == "sql_shadow":
+        write_csv_outputs()
+        write_sql_outputs()
+    else:
+        write_csv_outputs()
+
+    return {
+        "mode": mode,
+        "sql_tables": [SQL_TABLE_SNAPSHOT, SQL_TABLE_HISTORY] if any(sql_rows.values()) else [],
+        "sql_snapshot_rows": sql_rows["snapshot"],
+        "sql_history_rows": sql_rows["history"],
+    }
 
 
 def main() -> None:
@@ -554,9 +614,6 @@ def main() -> None:
     snapshot = snapshot.sort_values(["marketplace", "sku", "asin"], kind="stable")
 
     snapshot_path = OUT / f"hos_daily_market_snapshot_{asof_date}.csv"
-    OUT.mkdir(parents=True, exist_ok=True)
-    snapshot.to_csv(snapshot_path, index=False)
-    _update_latest_snapshot_pointer(snapshot_path, "hos_daily_market_snapshot_latest.csv")
 
     existing = _read_csv(HISTORY_OUTPUT_PATH)
     existing = _ensure_columns(existing, REQUIRED_COLUMNS) if not existing.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
@@ -573,7 +630,7 @@ def main() -> None:
     combined = combined.assign(_k=key).drop_duplicates(subset=["_k"], keep="last").drop(columns=["_k"])
     combined = _ensure_columns(combined, REQUIRED_COLUMNS)
     combined = combined.sort_values(["asof_date", "marketplace", "sku", "asin"], kind="stable")
-    combined.to_csv(HISTORY_OUTPUT_PATH, index=False)
+    output = _write_market_outputs(snapshot_path, snapshot, combined)
 
     print(f"created_snapshot={snapshot_path.as_posix()}")
     print(f"snapshot_rows={len(snapshot)}")
@@ -582,6 +639,9 @@ def main() -> None:
     print(f"buy_box_fallback_used_count={fallback_count}")
     print(f"buy_box_missing_count={missing_buy_box_count}")
     print(f"inferred_our_seller_id={our_seller_id}")
+    print(f"storage_mode={output['mode']}")
+    print(f"sql_snapshot_rows={output['sql_snapshot_rows']}")
+    print(f"sql_history_rows={output['sql_history_rows']}")
 
 
 if __name__ == "__main__":

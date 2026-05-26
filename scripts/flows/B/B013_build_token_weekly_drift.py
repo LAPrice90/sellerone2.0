@@ -5,10 +5,20 @@ Build weekly drift and exception summaries for token system.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import gspread
 import pandas as pd
+from scripts.core.out_paths import resolve_compat_path
+
+try:
+    import gspread
+except Exception:
+    gspread = None
+
+if TYPE_CHECKING:
+    import gspread as gspread_types
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 DRIFT_TAB = "Token_Drift_Weekly"
@@ -17,17 +27,33 @@ EXCEPTIONS_TAB = "Token_Exceptions_Weekly"
 EVENTS_CSV = Path("out/token_events.csv")
 RECON_TAB = "Token_Stock_Recon"
 LEDGER_TAB = "Token_Ledger"
+RECON_CSV = Path("out/token_stock_recon.csv")
+TOKEN_LEDGER_REL = "token_ledger_live.csv"
 
 OUT_DRIFT = Path("out/token_drift_weekly.csv")
 OUT_EXCEPTIONS = Path("out/token_exceptions_weekly.csv")
+WRITE_SHEETS = (
+    os.environ.get(
+        "TOKEN_WEEKLY_WRITE_SHEETS",
+        os.environ.get(
+            "TOKEN_EVENTS_WRITE_SHEETS",
+            os.environ.get("STOCK_EVENTS_WRITE_SHEETS", "0"),
+        ),
+    ).strip()
+    == "1"
+)
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread_types.Client":
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=str(cred_path))
 
 
 def load_sheet_df(tab_name: str) -> pd.DataFrame:
+    if not WRITE_SHEETS or gspread is None:
+        return pd.DataFrame()
     client = get_gspread_client()
     sheet = client.open_by_key(TOKENS_SHEET_ID)
     try:
@@ -43,6 +69,7 @@ def load_sheet_df(tab_name: str) -> pd.DataFrame:
 def main() -> None:
     now = datetime.now(timezone.utc)
     week_ago = now - pd.Timedelta(days=7)
+    use_sheets = bool(WRITE_SHEETS and gspread is not None)
 
     if not EVENTS_CSV.exists():
         print({"status": "skip", "reason": "missing_token_events"})
@@ -77,6 +104,8 @@ def main() -> None:
 
     # Exceptions: top mismatches and returned_pending aging
     recon = load_sheet_df(RECON_TAB)
+    if recon.empty and RECON_CSV.exists():
+        recon = pd.read_csv(RECON_CSV, dtype=str).fillna("")
     exceptions = []
     if not recon.empty:
         for col in ["delta_available", "delta_unsellable", "delta_total"]:
@@ -96,6 +125,11 @@ def main() -> None:
             )
 
     ledger = load_sheet_df(LEDGER_TAB)
+    if ledger.empty:
+        ledger_paths = resolve_compat_path(TOKEN_LEDGER_REL, default_system="B")
+        ledger_path = ledger_paths.live_path if ledger_paths.live_path.exists() else ledger_paths.legacy_path
+        if ledger_path.exists():
+            ledger = pd.read_csv(ledger_path, dtype=str).fillna("")
     if not ledger.empty and "status" in ledger.columns:
         pending = ledger[ledger["status"] == "returned_pending"].copy()
         if not pending.empty and "return_date" in pending.columns:
@@ -116,22 +150,24 @@ def main() -> None:
     OUT_EXCEPTIONS.parent.mkdir(parents=True, exist_ok=True)
     exc_df.to_csv(OUT_EXCEPTIONS, index=False)
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(TOKENS_SHEET_ID)
-    _write_tab(sheet, DRIFT_TAB, drift_rows)
-    _write_tab(sheet, EXCEPTIONS_TAB, exc_df)
+    if use_sheets:
+        client = get_gspread_client()
+        sheet = client.open_by_key(TOKENS_SHEET_ID)
+        _write_tab(sheet, DRIFT_TAB, drift_rows)
+        _write_tab(sheet, EXCEPTIONS_TAB, exc_df)
 
     print(
         {
             "status": "success",
             "drift_rows": len(drift_rows),
             "exception_rows": len(exc_df),
-            "tabs": [DRIFT_TAB, EXCEPTIONS_TAB],
+            "tabs": [DRIFT_TAB, EXCEPTIONS_TAB] if use_sheets else [],
+            "write_sheets": use_sheets,
         }
     )
 
 
-def _write_tab(sheet: gspread.Spreadsheet, tab: str, df: pd.DataFrame) -> None:
+def _write_tab(sheet: "gspread_types.Spreadsheet", tab: str, df: pd.DataFrame) -> None:
     payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
     try:
         ws = sheet.worksheet(tab)

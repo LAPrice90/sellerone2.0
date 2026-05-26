@@ -46,3 +46,17 @@ These do not affect Completion Score:
 - Richer country-level and channel-level analytics.
 - Additional visualization and dashboard formatting.
 - Non-critical publish and reporting enhancements.
+
+## SECTION 5 - Planning Tolerance Gate
+- This expectations file defines reliability quality targets. It is not an automatic planning-stop rule by itself.
+- Planning and optimisation work may proceed when E scoped hard-block conditions are clear.
+- Hard-block examples for E planning:
+- active FAIL in E scoped gate
+- required E run path not operational
+- required E outputs stale beyond cadence
+- required publish path down when publish is in scope
+- Soft-block examples for E planning:
+- accepted non-blocking WARN with reviewed reason
+- "To Baseline" reliability label while run baseline is still building
+- stale aggregate labels that lag newer E run evidence
+- Soft-blocks must be reported and tracked, but do not by themselves stop planning.

@@ -1,8 +1,31 @@
 ﻿from __future__ import annotations
 
+import os
 from pathlib import Path
+import sys
 import pandas as pd
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+    )
+except ModuleNotFoundError:
+    from core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+    )
 
 OUT = Path("out")
 VELOCITY = OUT / "sku_sales_velocity.csv"
@@ -13,9 +36,16 @@ TOKEN_COGS = OUT / "token_cogs_ledger.csv"
 REFUND_HISTORY = OUT / "refund_adjustment_history.csv"
 FIN_L3 = OUT / "financial_events_level3_official.csv"
 LISTING_HISTORY = OUT / "listing_offer_history.csv"
+SQL_TABLE = "e_sku_performance_summary"
+SQL_TABLE_LISTING_OFFER_HISTORY = "h_listing_offer_history"
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
+    if path == LISTING_HISTORY:
+        try:
+            return read_dataframe_with_sql_fallback(path, SQL_TABLE_LISTING_OFFER_HISTORY, dtype=str).fillna("")
+        except FileNotFoundError:
+            return pd.DataFrame()
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, dtype=str).fillna("")
@@ -33,6 +63,35 @@ def _series_or_default(df: pd.DataFrame, col: str, default: float = 0.0) -> pd.S
 
 def _norm_sku(value: object) -> str:
     return str(value or "").strip().upper()
+
+
+def _write_summary_output(df: pd.DataFrame) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    sql_rows = 0
+
+    def write_csv() -> None:
+        OUT_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(OUT_SUMMARY, index=False)
+
+    def write_sql() -> None:
+        nonlocal sql_rows
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, SQL_TABLE, df)
+        finally:
+            store.close()
+        sql_rows = int(result["rows"])
+
+    if mode == "sql_primary_csv_export":
+        write_sql()
+        write_csv()
+    elif mode == "sql_shadow":
+        write_csv()
+        write_sql()
+    else:
+        write_csv()
+
+    return {"mode": mode, "sql_table": SQL_TABLE if sql_rows or mode != "csv" else "", "sql_rows": sql_rows}
 
 
 def _latest_listing_snapshot_path() -> Path | None:
@@ -163,15 +222,34 @@ def _select_refund_window(df: pd.DataFrame, sku: str, asof_dt: pd.Timestamp) -> 
     return sku_df
 
 
+def _with_aligned_unit_truth(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty:
+        return summary
+    velocity_units = _to_num(_series_or_default(summary, "units_sold", np.nan))
+    roi_units = _to_num(_series_or_default(summary, "units_sold_roi", np.nan))
+    use_roi = roi_units.notna()
+    truth_units = roi_units.where(use_roi, velocity_units)
+    source = pd.Series(
+        np.where(use_roi, "roi", np.where(velocity_units.notna(), "velocity", "")),
+        index=summary.index,
+        dtype=object,
+    )
+
+    summary["units_sold_velocity_30d"] = velocity_units.round(4)
+    summary["units_sold_truth_30d"] = truth_units.round(4)
+    summary["units_sold_source"] = source
+    summary["units_sold"] = truth_units.round(4)
+    return summary
+
+
 def main() -> None:
     vel = _read_csv(VELOCITY)
     roi = _read_csv(ROI)
     restock = _read_csv(RESTOCK)
 
     if vel.empty and roi.empty and restock.empty:
-        OUT_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame().to_csv(OUT_SUMMARY, index=False)
-        print({"status": "success", "rows": 0, "snapshot": str(OUT_SUMMARY)})
+        output = _write_summary_output(pd.DataFrame(columns=["sku"]))
+        print({"status": "success", "rows": 0, "snapshot": str(OUT_SUMMARY), **output})
         return
 
     if not vel.empty:
@@ -182,6 +260,8 @@ def main() -> None:
         summary = summary.merge(roi, on="sku", how="outer", suffixes=("", "_roi"))
     if not restock.empty:
         summary = summary.merge(restock, on="sku", how="outer", suffixes=("", "_restock"))
+
+    summary = _with_aligned_unit_truth(summary)
 
     buy_box_fallback_used = 0
 
@@ -324,13 +404,13 @@ def main() -> None:
         summary["value_velocity_gbp_per_day"] = value_velocity.round(6)
         summary = summary.drop(columns=["sku_norm", "asof_dt"], errors="ignore")
 
-    OUT_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUT_SUMMARY, index=False)
+    output = _write_summary_output(summary)
     print({
         "status": "success",
         "rows": len(summary),
         "snapshot": str(OUT_SUMMARY),
         "buy_box_fallback_used": int(buy_box_fallback_used),
+        **output,
     })
 
 

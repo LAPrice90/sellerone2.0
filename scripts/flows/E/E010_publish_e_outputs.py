@@ -7,6 +7,15 @@ import gspread
 import pandas as pd
 
 OUT = Path("out")
+TAB_SPECS = [
+    ("E_Sales_Velocity", OUT / "sku_sales_velocity.csv"),
+    ("E_ROI_Snapshot", OUT / "sku_roi_snapshot.csv"),
+    ("E_Restock_Signals", OUT / "sku_restock_signals.csv"),
+    ("E_Performance_Summary", OUT / "sku_performance_summary.csv"),
+    ("E_Study_Report", OUT / "e_study_report.csv"),
+    ("E_Sales_Truth_Reconciliation", OUT / "sales_truth_reconciliation_latest.csv"),
+    ("E_Daily_Sales_Truth", OUT / "sku_daily_sales_truth_latest.csv"),
+]
 
 
 def get_gspread_client() -> gspread.Client:
@@ -49,15 +58,8 @@ def main() -> None:
     client = get_gspread_client()
     sheet = client.open_by_key(sheet_id)
 
-    tabs = [
-        ("E_Sales_Velocity", OUT / "sku_sales_velocity.csv"),
-        ("E_ROI_Snapshot", OUT / "sku_roi_snapshot.csv"),
-        ("E_Restock_Signals", OUT / "sku_restock_signals.csv"),
-        ("E_Performance_Summary", OUT / "sku_performance_summary.csv"),
-    ]
-
     written = []
-    for title, path in tabs:
+    for title, path in TAB_SPECS:
         df = _read_csv(path)
         if df.empty:
             continue

@@ -1,0 +1,5 @@
+SKU,Barcode,Price,Title
+SC-1001,"EAN 5012345678901",5.50,Shure Velvet Lipstick
+SC-2002DD,5012345678902,4.10,Shure Sample Pack
+SC-3003,ABC123,3.99,Shure Mist Spray
+,5012345678903,2.50,Missing SKU Row

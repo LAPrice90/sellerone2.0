@@ -1,0 +1,7 @@
+scenario_id,seller_sku,asin,supplier_code,supplier_name,v30,available_now,amazon_inbound_working,current_supplier_buy_cost_gbp,market_price_gbp,lead_time_days,moq,supplier_pack_size,expected_refund_cost_per_unit_gbp,scenario_note
+normal_fast_mover,SKU-FAST-001,ASINFAST001,SUP-A,Alpha Supply,1.40,22,10,7.20,15.99,7,1,1,0.15,Healthy velocity with normal lead time.
+tight_margin_sku,SKU-MARGIN-001,ASINMARG001,SUP-B,Beta Wholesale,0.65,18,0,9.95,10.60,9,1,1,0.20,Low spread between current cost and market price.
+stale_out_of_stock_sku,SKU-STALE-001,ASINSTAL001,SUP-C,Cappa Trade,0.25,0,0,4.10,8.20,14,1,1,0.05,No stock and stale demand signal needs cautious handling.
+bulk_long_lead_sku,SKU-BULK-001,ASINBULK001,SUP-D,Delta Bulk,0.85,40,120,18.50,36.00,60,40,20,0.40,Bulk-long-lead profile with MOQ and pack pressure.
+backorder_heavy_sku,SKU-BACKORDER-001,ASINBACK001,SUP-E,Echo Global,0.55,3,90,5.70,12.40,35,10,5,0.18,Most pipeline units are supplier or Amazon inbound.
+supplier_threshold_free_shipping,SKU-THRESH-001,ASINTHR001,SUP-F,Foxtrot Imports,0.95,11,6,6.30,13.90,12,6,3,0.12,Supplier free-shipping threshold scenario for basket review.

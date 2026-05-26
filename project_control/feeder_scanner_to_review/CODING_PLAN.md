@@ -1,0 +1,1937 @@
+﻿# Scanner To Review Coding Plan
+
+## Current Phase
+Phase 7 - F scanner production-line split v1 implemented as a non-disruptive staged snapshot; live routing proof waits for a safe F owner boundary.
+
+## F Scanner Production-Line Split V1 - 2026-05-22T09:17:12Z
+- Scope: add durable stage handoff files under `out/systems/F/price_list_manager/pipeline_runs/<supplier_id>/<run_id>/` without changing the active F061 queue, browser worker count, Google Sheets, or local DB authority.
+- Implementation status: code fix applied and isolated tests passed.
+- Backup snapshot: `out/backups/f_scanner_production_line_split_20260522T090826Z`.
+- Current live owner evidence at implementation start: `FPM130_live_cycle` was already running TD Synnex, so this phase does not manually run or mutate the live scanner queue.
+- Allowed files for this phase: `scripts/flows/F/price_list_manager/FPM180_build_production_line_run.py`, `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`, `tests/test_fpm180_production_line_run.py`, this plan file, `project_control/FEEDER_V1_PRICE_LIST_PROCESS_MANAGER_GUIDEBOOK.md`, and `project_control/EXPECTATIONS/feeder_cycle_expectations.md`.
+- Not allowed in this phase: no Google Sheets writes, no direct `supplier_price_list_active_run.csv` rewrite, no extra live F scanner owner, no browser concurrency increase, and no operator visibility from raw FPM150 files before the AI gate.
+- Stage contract: each stage writes `rows.csv`, `next_stage_input.csv`, `status.csv`, and `manifest.csv` with temp-write then publish-on-complete behavior.
+- Stage sequence: `intake_enrichment`, `catalog_identity`, `pricing_api`, `fee_hazmat_api`, and `browser_webscrape`.
+- Handshake rule: downstream stages consume only completed prior manifests; incomplete, missing, malformed, or unreconciled manifests block the next stage.
+- FPM130 behavior: after a successful scanner chunk, the manager builds a production-line snapshot and writes `production_line_health.csv` plus a `production_line_snapshot` event. This is observability-only in v1 and does not select browser rows yet.
+- AI gate rule: FPM157 remains hidden during scanning, FPM150 remains raw review-pack creation only, and FPM155 remains the final operator-ready gate.
+- Isolated proof: `python -m py_compile scripts\flows\F\price_list_manager\FPM180_build_production_line_run.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py` passed.
+- Isolated proof: `python -m pytest tests\test_fpm180_production_line_run.py -q` passed: 3 tests.
+- Regression proof: `python -m pytest tests\test_fpm130_live_cycle.py -q` passed: 70 tests.
+- Live proof completed at `2026-05-22T09:39:23Z` after controlled FPM130 reload:
+  - stopped old F061 child PID `7336` and old FPM130 PID `7092`
+  - removed stale `live_cycle.lock` and `f061_child_status.txt` only after those PIDs were dead
+  - supervisor restored FPM130 under PID `31704`
+  - restarted chunk completed with `pending_rows` dropping from `44324` to `44299`
+  - `production_line_health.csv` wrote `f_production_line_stage_contract_runtime,status=ok,value=completed`
+  - `live_cycle_events.csv` wrote `production_line_snapshot` for `td_synnex / fpm_td_synnex_20260519T095000Z`
+  - `pipeline_run_status.csv` wrote `status=completed`, `stage_count=5`, `input_rows=58385`, `final_pass_rows=19`, `final_blocked_rows=0`, `final_retry_rows=0`
+  - stage reconciliation proof: `intake_enrichment 58385 = 44315 + 14070 + 0`; `catalog_identity 44315 = 19 + 0 + 44296`; `pricing_api 19 = 19 + 0 + 0`; `fee_hazmat_api 19 = 19 + 0 + 0`; `browser_webscrape 19 = 19 + 0 + 0`
+
+## Phase 7 Live Proof Target
+- Trigger: next safe FPM130 owner reload or normal chunk boundary after this code is loaded by the live owner.
+- Target artifact: `out/systems/F/price_list_manager/live/production_line_health.csv`.
+- Target artifact: `out/systems/F/price_list_manager/pipeline_runs/<supplier_id>/<run_id>/pipeline_run_status.csv`.
+- Success condition: latest `f_production_line_stage_contract_runtime` row is `status = ok`, the run status is `completed`, all five stage manifests exist, stage reconciliation is true, no new scoped F FAIL appears, and no new unclassified WARN appears.
+- Failure path: keep current scanner routing unchanged, inspect the latest `production_line_snapshot` event notes, fix the failing stage contract at source, rerun isolated tests, and wait for the next safe F owner boundary before treating live proof as confirmed.
+- Current status: live proof confirmed for the staged snapshot layer. Next implementation phase is browser-last routing from the production-line survivor file, still under `FPM130` ownership only.
+
+## Phase 8 Browser-Last Routing Foundation - 2026-05-22T10:11:25Z
+- Scope: add production-line browser routing files and F061 allowlist support without changing Google Sheets, local DB authority, browser concurrency, or AI gate visibility rules.
+- Backup snapshot: `out/backups/f_scanner_browser_last_routing_20260522T100138Z`.
+- Code fix applied:
+  - `FPM180_build_production_line_run.py` now writes `browser_input.csv` and `browser_routing_manifest.csv` from rows that pass `fee_hazmat_api`.
+  - `F061_run_legacy_first_checks_local.py` accepts `--allowlist-path` / `F061_ALLOWLIST_PATH` and processes only matching `candidate_id` or `row_key` rows when not in Login Mode.
+  - Login Mode bypasses the normal allowlist so script-owned login recovery remains protected.
+  - `FPM130_run_live_cycle.py` supports `FPM_PRODUCTION_LINE_ROUTING_MODE=shadow|enforced|off`.
+  - Default routing mode is `shadow`; enforced mode validates the completed browser routing manifest before launching F061 and blocks the chunk with a warning if routing is unsafe.
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM180_build_production_line_run.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\flows\F\F061_run_legacy_first_checks_local.py` passed.
+  - `python -m pytest tests\test_fpm180_production_line_run.py tests\test_fpm130_live_cycle.py::test_fpm130_enforced_production_line_routing_blocks_without_completed_manifest tests\test_f061_run_legacy_first_checks_local.py::test_f061_allowlist_processes_only_selected_candidate_rows -q` passed: 5 tests.
+  - `python -m pytest tests\test_fpm130_live_cycle.py tests\test_fpm180_production_line_run.py -q` passed: 74 tests.
+  - `python -m pytest tests\test_f061_run_legacy_first_checks_local.py -q` passed: 62 tests.
+  - `python -m pytest tests\test_fpm150_build_completed_review_pack.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_o_ui_operator_view.py -q` passed: 92 tests.
+- Live proof status: blocked before scanner launch by existing FPM130 storage drift guard.
+- Live blocker artifact: `out/systems/F/price_list_manager/live/storage_drift_report.csv`.
+- Blocker detail: `supplier_price_list_active_run` has SQL newer than CSV; CSV rows `44274`, SQL rows `44385`, row delta `-111`, status `unsafe_sql_newer_drift`.
+- Authority rule: do not align CSV and SQL silently. This needs explicit local storage authority approval before shadow or enforced live routing proof can continue.
+- Next live proof trigger after approval: clear the storage drift through the approved storage reconciliation path, restart/allow FPM130, prove one `shadow` routing chunk first, then prove one capped `enforced` chunk.
+- Success condition for next proof: no duplicate FPM130 owner, routing health `ok`, F061 allowlist rows selected only from `browser_input.csv`, production-line health `ok`, and no raw review pack visible to New Product Review before FPM155.
+
+## Allowed Files For This Phase
+- `scripts/flows/F/price_list_manager/FPM140_check_review_handoff_ready.py`
+- `scripts/flows/F/price_list_manager/FPM150_build_completed_review_pack.py`
+- `scripts/flows/F/_contract_io.py`
+- `scripts/flows/F/price_list_manager/_schemas.py`
+- `scripts/flows/O/O400_operator_ui.py`
+- `scripts/one_off/F019_build_live_price_file_near_miss_pack.py`
+- `scripts/one_off/F038_apply_page_evidence_backfill_to_review_packs.py`
+- `scripts/one_off/F039_build_legacy_pass_ai_candidate_queues.py`
+- `tests/test_f019_build_live_price_file_near_miss_pack.py`
+- `tests/test_f038_apply_page_evidence_backfill_to_review_packs.py`
+- `tests/test_f039_build_legacy_pass_ai_candidate_queues.py`
+- `tests/test_fpm140_review_handoff_ready.py`
+- `tests/test_fpm150_build_completed_review_pack.py`
+- `tests/test_o_ui_operator_view.py`
+- `project_control/FEEDER_SCANNER_TO_REVIEW_LINK_PLAN.md`
+- `project_control/feeder_scanner_to_review/CODING_PLAN.md`
+- `scripts/ONE_OFF_SCRIPTS.md`
+
+## Not Allowed In This Phase
+- No review-pack publishing.
+- No live F061 handoff writes.
+- No Google Sheets changes.
+- No Purchase Order handoff changes.
+- No direct rewrite of `out/systems/F/live/feeder_legacy_scrape_evidence_live.csv` while the F scanner is running.
+
+## Isolated Proof
+- `python -m py_compile scripts\flows\F\price_list_manager\FPM140_check_review_handoff_ready.py` passed.
+- `python -m pytest tests\test_fpm140_review_handoff_ready.py -q` passed: 5 tests.
+- Live Entertainment Trading check wrote `ready_to_publish_flag = 0` while the scan was still running.
+- `python -m py_compile scripts\flows\F\price_list_manager\FPM150_build_completed_review_pack.py scripts\one_off\F019_build_live_price_file_near_miss_pack.py` passed.
+- `python -m pytest tests\test_fpm140_review_handoff_ready.py tests\test_fpm150_build_completed_review_pack.py tests\test_f019_build_live_price_file_near_miss_pack.py -q` passed: 47 tests.
+- Live Entertainment Trading build attempt returned `status = blocked` and wrote no manifest because the scan is still running.
+- `python -m py_compile scripts\flows\O\O400_operator_ui.py scripts\flows\F\price_list_manager\FPM140_check_review_handoff_ready.py scripts\flows\F\price_list_manager\FPM150_build_completed_review_pack.py scripts\one_off\F019_build_live_price_file_near_miss_pack.py` passed.
+- `python -m pytest tests\test_fpm140_review_handoff_ready.py tests\test_fpm150_build_completed_review_pack.py tests\test_f019_build_live_price_file_near_miss_pack.py tests\test_o_ui_operator_view.py -q` passed: 96 tests.
+- `python -m py_compile scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\flows\F\price_list_manager\FPM150_build_completed_review_pack.py scripts\flows\F\price_list_manager\FPM140_check_review_handoff_ready.py scripts\flows\O\O400_operator_ui.py scripts\one_off\F019_build_live_price_file_near_miss_pack.py` passed.
+- `python -m pytest tests\test_fpm130_live_cycle.py tests\test_fpm140_review_handoff_ready.py tests\test_fpm150_build_completed_review_pack.py tests\test_f019_build_live_price_file_near_miss_pack.py tests\test_o_ui_operator_view.py -q` passed: 100 tests.
+- `python -m py_compile scripts\flows\F\_contract_io.py scripts\one_off\F038_apply_page_evidence_backfill_to_review_packs.py scripts\one_off\F019_build_live_price_file_near_miss_pack.py scripts\flows\F\price_list_manager\FPM150_build_completed_review_pack.py` passed.
+- `python -m pytest tests\test_f038_apply_page_evidence_backfill_to_review_packs.py tests\test_f019_build_live_price_file_near_miss_pack.py tests\test_fpm150_build_completed_review_pack.py tests\test_fpm155_apply_review_intelligence_gate.py -q` passed: 54 tests.
+- `python -m pytest tests\test_o_ui_operator_view.py tests\test_f038_apply_page_evidence_backfill_to_review_packs.py tests\test_f019_build_live_price_file_near_miss_pack.py tests\test_fpm150_build_completed_review_pack.py tests\test_fpm155_apply_review_intelligence_gate.py -q` passed: 126 tests.
+- F038 dry run proved `source_rows = 289`, `usable_source_rows = 82`, `updated_rows = 6`, `updated_cells = 18`.
+- F038 execute updated current review pack page-evidence fields with backups in `out/backups/f038_review_pack_page_evidence_refresh_20260520T205709Z`.
+- Current Pass review file now has `pass_rows = 3`, `pass_rows_with_description = 3`.
+- UI guard proof: current raw latest has `pass_rows_with_f032_action = 0`, so `load_feeder_review_source_df("passes")` returns `0` visible rows until an AI-gated manifest exists.
+- Legacy latest AI seed created `out/systems/F/price_list_manager/review_handoffs/stocklist_supplier/legacy_latest_pass_page_evidence_20260520T210352Z`.
+- FPM155 first gate run queued `3` current pass rows and returned `pending_ai_decision`.
+- Codex manager decisions were written to `codex_ai_review_decisions.csv` for those `3` rows.
+- FPM155 final gate run returned `status = gated`, `ai_gate_status = passed`, `pass_review_rows = 3`, `near_miss_review_rows = 0`, `operator_ready_flag = 1`.
+- F035 refresh proof returned `candidate_manifest_count = 1`, `status_counts.already_gated = 1`.
+- AI gate health proof: `f032_health_fail_rows = 0`, `decision_rows_match_raw_rows = 3/3`, `routed_rows_match_raw_rows = 3/3`, `raw_paths_not_operator_paths = ok`.
+- UI live proof: `load_feeder_review_source_df("passes")` now returns `3` rows from the AI-gated operator file, each with `f032_action` and `codex_ai_action`.
+- Codex app automation `daily-f-ai-review-queue-manager` created active for daily 06:00 local manager checks of pending F AI review queues.
+- Manual AI queue manager run at `2026-05-20T21:17:11Z` found `candidate_manifest_count = 1`, `status_counts.already_gated = 1`, and no new pending AI queue.
+- Post-run UI proof: `visible_pass_rows = 3`, `visible_near_miss_rows = 0`, `pass_rows_with_ai_action = 3`.
+- Morning check at `2026-05-21T06:03:07Z` reran F035 and found `candidate_manifest_count = 1`, `status_counts.already_gated = 1`; no new AI review queue was pending.
+- Morning UI/AI state remained safe: live review manifest had `ai_gate_status = passed`, `operator_ready_flag = 1`, `pass_review_rows = 3`, `near_miss_review_rows = 0`, `ai_gate_fail_rows = 0`, `ai_gate_warn_rows = 0`.
+- Morning scanner state had a separate operational alert: F live manager was running TD SYNNEX with `pending_rows = 48336`, but `f061_child_status.txt` showed `manager_mode = Login Required`; events showed `amazon_dashboard_login_required` and the script-owned browser was visible.
+- AI Product Check Gate UI page added between `Price List Queue` and `New Product Review` in `scripts/flows/O/O400_operator_ui.py`.
+- Gate page reads `candidate_manifest.csv`, `ai_review_queue.csv`, `codex_ai_review_decisions.csv`, and `manifest.csv` from each F review handoff folder and shows the decision before the row reaches normal user review.
+- `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed.
+- `python -m pytest tests\test_o_ui_operator_view.py -q` passed: 74 tests.
+- Live gate reader proof returned `rows = 3`, `ai_cleared = 3`, `pending_ai_check = 0`, `needs_user_guidance = 0`, `rescan_needed = 0`, `ai_rejected = 0`.
+- Rendered UI proof passed on `http://localhost:8501/?page=ai_product_check_gate`: page identity loaded as `O Flow Operator`, the page was not blank, no browser console errors/warnings appeared, search narrowed the page to `Showing 1 of 3 AI check rows`, and Decision detail opened with the AI note/evidence for SKU `1144846`.
+- Legacy guard fix: non-AI historical snapshots are now blocked from New Product Review when the AI gate is active, and legacy manifest-only handoffs are shown on the AI Product Check Gate as `legacy_needs_ai_gate` instead of being allowed into normal review.
+- `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed after the legacy guard fix.
+- SQL override guard fix: when a live AI-gated manifest points at an operator CSV, the UI reader now uses the manifest identity instead of the generic SQL `latest` key so stale SQL latest rows cannot override the AI-gated handoff.
+- `python -m pytest tests\test_o_ui_operator_view.py -q` passed after the legacy and SQL override guard fixes: 77 tests.
+- Live leak proof for ASIN `B09HKZWBDN`: AI gate reader returned `gate_rows = 1304`, `b09_in_gate = 1`, `queue_state = legacy_needs_ai_gate`, `operator_visible_flag = 0`; explicit legacy handoff load returned `0` New Product Review rows; the legacy handoff option is not listed for New Product Review.
+- SQL-mode proof with `SELLERONE_STORAGE_MODE=sql_primary_csv_export` and `SELLERONE_SQLITE_PATH=out/sql/sellerone_dev.sqlite3`: `latest_has_b09 = 0`, latest pass rows = `3` from the AI-gated Stocklist/Entertainment Trading handoff, and `gate_b09 = 1`.
+- Rendered UI proof after SQL override guard: `http://localhost:8501/?page=new_product_review` no longer shows ASIN `B09HKZWBDN`, no longer shows the old `bliss_distribution - 18 May 09:43` pack, and shows the AI-gated `Entertainment Trading - 20 May 21:03` pack with 3 clean pass rows.
+- AI Product Check Gate clarity fix: the metric cards now split old `Legacy Pass`, old `Legacy Manual/Near`, normal `Queue Pending`, `Waiting Queue`, cleared, user-guidance, rescan, and rejected rows so the total no longer hides legacy backlog in an uncounted bucket.
+- Live gate breakdown proof: `total = 1304`, `legacy_needs_ai_gate = 88`, `legacy_manual_near_backlog = 1212`, `ai_cleared = 3`, `waiting_for_ai_queue = 1`; old legacy pass rows are the only old clean-pass rows, while old manual/near rows are not clean passes.
+- Legacy clean-pass converter added: `F039_build_legacy_pass_ai_candidate_queues.py` converts only old clean Pass rows into current AI candidate manifests, writes `manifest.pre_ai_legacy_backup.csv`, and holds old manual/near rows out of the clean-pass AI path.
+- FPM155 guard corrected: an old pre-AI `manifest.csv` no longer blocks a newly-created `candidate_manifest.csv`; only manifests with `ai_gate_status = passed` and `operator_ready_flag = 1` are treated as already gated.
+- `python -m py_compile scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py scripts\one_off\F039_build_legacy_pass_ai_candidate_queues.py scripts\flows\O\O400_operator_ui.py` passed.
+- `python -m pytest tests\test_o_ui_operator_view.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_f039_build_legacy_pass_ai_candidate_queues.py -q` passed: 82 tests.
+- F039 dry-run proof found `88` old clean Pass rows to convert and `1212` old manual/near rows to hold out.
+- F039 execute proof converted `13` legacy handoff folders, created AI queues for `88` clean Pass rows, wrote conversion report `out/systems/F/price_list_manager/live/legacy_pass_ai_candidate_conversion.csv`, and preserved backup manifests.
+- F035 refresh proof after conversion returned `candidate_manifest_count = 14`, `status_counts.pending_ai_decision = 13`, `status_counts.already_gated = 1`; queue totals are now `91` rows: `88` pending AI decisions and `3` already cleared.
+- Rendered UI proof after conversion: `http://localhost:8501/?page=ai_product_check_gate` shows `Total = 91`, `Queue Pending = 88`, `Cleared = 3`, `Legacy Pass = 0`, `Legacy Manual/Near = 0`, and `Waiting Queue = 0`.
+
+## Live Monitoring Target
+- `out/systems/F/price_list_manager/live/review_handoff_status.csv`
+- `out/systems/F/page_evidence_backfill/review_pack_page_evidence_refresh_health.csv`
+- `out/systems/F/page_evidence_backfill/review_pack_page_evidence_refresh_manifest.csv`
+- `out/systems/F/price_list_manager/review_handoffs/*/*/ai_review_queue.csv`
+- `out/systems/F/price_list_manager/review_handoffs/*/*/codex_ai_review_decisions.csv`
+- Success for this phase is not that Entertainment Trading is ready.
+- Success is that the checker blocks publishing until the run is genuinely complete.
+- Phase 5 success is that captured Amazon page evidence is available to review-pack/AI-gate inputs and raw non-AI latest rows are not visible to the operator.
+- Phase 6 success is that the operator UI exposes the AI decision handover before New Product Review and shows each row's queue status, AI note, source titles, description snippet, ROI, and source file paths.
+- Phase 6 leak-guard success is that legacy pre-AI review packs cannot be loaded through New Product Review and are visible in the AI Product Check Gate as blocked work.
+
+## Phase 6 Health Check Item And Alert Condition
+- Health item: AI Product Check Gate reader must resolve each handoff queue and decision file, and no row may have `operator_visible_flag = 1` unless the AI action is `allow_if_other_checks_pass` or `manual_review`.
+- Alert condition: raise a feeder handoff warning if the gate page has `invalid_ai_decision`, has `waiting_for_ai_queue` after a candidate manifest exists, or shows any operator-visible row without a valid AI decision.
+- Health item: when a live AI-gated manifest is ready, New Product Review must resolve rows from the manifest's operator files, not from stale SQL `latest` rows.
+- Alert condition: raise a feeder handoff warning if New Product Review `latest` contains an ASIN/run from SQL `latest` that is not present in the ready live AI-gated manifest output.
+- Current proof: targeted O400 tests cover pending queue rows, cleared rows, user-guidance rows, rescan rows, rejected rows, missing queue rows, legacy pre-AI handoff blocking, legacy timestamped snapshot hiding, and stale SQL latest override blocking.
+- Current converter proof: targeted F039 tests cover dry-run, execute mode, clean-pass-only conversion, manual/near holdout, report writing, and backup creation. Targeted FPM155 tests cover old manifest handoff folders no longer blocking candidate queue creation.
+
+## Automatic Next Step After Proof
+- Live proof can complete when Entertainment Trading reaches `pending_rows = 0`; expected result is an immutable review manifest and a New Product Review option for that supplier/run.
+- Phase 5 next step: use the normal FPM150/FPM155 handoff path for future supplier runs; the daily Codex manager automation now checks pending AI queues each morning.
+- Phase 6 next step: when the next scanner handoff creates fresh pending AI rows, use the AI Product Check Gate page to confirm they are held there until Codex decisions exist, then confirm only AI-cleared or user-guidance rows appear in New Product Review.
+- Phase 6 immediate next step: review `http://localhost:8501/?page=ai_product_check_gate` for legacy `Needs AI Gate` rows if the operator wants to process older review packs; otherwise leave them blocked until a deliberate backfill/AI decision run is chosen.
+
+## Daily Queue Manager Run - 2026-05-21T09:59:54Z
+- Safe refresh path run: `python scripts/one_off/F035_refresh_f032_ai_review_queues.py`.
+- Queue status after refresh: `candidate_manifest_count = 14`, `already_gated = 2`, `pending_ai_decision = 12`.
+- Codex decisions completed this run for `shure_cosmetics / fpm_shure_cosmetics_20260516T144814Z` with `6` reviewed rows (`allow_if_other_checks_pass = 5`, `manual_review = 1`).
+- FPM155 proof for that decided handoff: `status = gated`, `ai_gate_status = passed`, `pass_review_rows = 5`, `manual_review_rows = 1`, `near_miss_review_rows = 1`, `operator_ready_flag = 1`.
+- Blocker for remaining pending rows: `82/82` pending rows have blank `amazon_product_detail_text`, blank `amazon_product_description`, and blank `amazon_feature_bullets`; `20/82` also have blank `supplier_title`, so identity proof is incomplete for safe Codex actions.
+- Next safe action for blocked rows: run `python scripts/one_off/F038_apply_page_evidence_backfill_to_review_packs.py --dry-run` and then execute if coverage is non-zero, rerun `python scripts/one_off/F035_refresh_f032_ai_review_queues.py`, and only then issue new Codex AI decisions for rows where page evidence is populated.
+- If the backfill still leaves all three page evidence fields blank, keep rows pending and route to `manual_review` only after explicit user approval for evidence-poor gating.
+
+## Daily Queue Manager Run - 2026-05-21T10:15:46Z
+- User approved evidence-thin queue clearing path for this run.
+- Safe refresh path run first: `python scripts/one_off/F035_refresh_f032_ai_review_queues.py` showed `candidate_manifest_count = 14`, `already_gated = 2`, `pending_ai_decision = 12`.
+- Remaining pending rows were fully decisioned: `82` rows across `12` handoffs, all written with valid action + reason + evidence in each `codex_ai_review_decisions.csv`.
+- Applied decision policy for this run:
+  - `rescan_needed` when core page evidence was missing and identity confidence was not strong enough for clean pass.
+  - no evidence-thin row was forced into `allow_if_other_checks_pass`.
+- FPM155 proof after decision write:
+  - `12` pending handoffs moved to `status = gated`, `ai_gate_status = passed`, `operator_ready_flag = 1`.
+  - routed counts from this run: `rescan_needed_rows = 82`, `manual_review_rows = 0`, `pass_review_rows = 0` for those previously pending handoffs.
+- Final queue refresh proof: `python scripts/one_off/F035_refresh_f032_ai_review_queues.py` at `2026-05-21T10:15:46Z` returned `status_counts.already_gated = 14` and `pending_ai_decision = 0`.
+- Long-term corrective path remains active: run `F038` dry-run/execute to recover missing page evidence, then run `F035` and switch future rows back to evidence-backed `allow_if_other_checks_pass` or `manual_review` where appropriate.
+
+## Recovery After Accidental Queue Clear - 2026-05-21T10:20Z
+- Root cause checked: the separate Codex scanner run did not force weak missing-description rows into clean Pass. It routed evidence-thin rows to `rescan_needed`, which kept them out of normal New Product Review.
+- F038 dry-run was run against the raw pass review files that had AI rescan rows. It found `usable_source_rows = 82`, `updated_rows = 18`, and `updated_cells = 54`.
+- F038 execute refreshed page evidence for `18` Entertainment Trading raw pass rows only. Backup folder: `out/backups/f038_review_pack_page_evidence_refresh_20260521T102027Z`.
+- Recovery action: the `18` Entertainment Trading rows with newly recovered page evidence were reopened for AI review by removing their old `rescan_needed` decisions from `codex_ai_review_decisions.csv`.
+- Recovery backups:
+  - `out/systems/F/price_list_manager/review_handoffs/entertainment_trading/fpm_entertainment_trading_20260430T151417Z/codex_ai_review_decisions.pre_f038_reopen_20260521T102048Z.csv`
+  - `out/systems/F/price_list_manager/review_handoffs/entertainment_trading/fpm_entertainment_trading_20260430T151417Z/manifest.pre_f038_reopen_20260521T102048Z.csv`
+- F035 refresh after reopening returned `candidate_manifest_count = 14`, `already_gated = 13`, and `pending_ai_decision = 1`.
+- Current AI Product Check Gate state after recovery:
+  - `Total = 91`
+  - `Queue Pending = 18`
+  - `Cleared = 8`
+  - `User Guidance = 1`
+  - `Rescan = 64`
+  - `Rejected = 0`
+- Current supplier split:
+  - `entertainment_trading`: `18` pending AI checks, `44` still `rescan_needed`
+  - `shure_cosmetics`: `5` cleared, `1` user guidance
+  - `stocklist_supplier`: `3` cleared
+  - `bliss_distribution`, `dhb`, `heo`, and `stax`: remaining rows stay `rescan_needed` until new page evidence exists
+- UI proof: `http://localhost:8501/?page=ai_product_check_gate` now shows `Total 91`, `Queue Pending 18`, `Cleared 8`, `User Guidance 1`, `Rescan 64`, and `Rejected 0`.
+- New Product Review proof: the reopened Entertainment Trading handoff is not operator-ready because `operator_ready_flag = 0`; those `18` rows must pass through the AI Product Check Gate before reaching the user.
+
+## Next Controlled AI Decision Trigger
+- Trigger: run the daily AI queue manager or press Start for the AI queue manager after this recovery.
+- Target artifact: `out/systems/F/price_list_manager/review_handoffs/entertainment_trading/fpm_entertainment_trading_20260430T151417Z/codex_ai_review_decisions.csv`.
+- Expected success: exactly the `18` reopened Entertainment Trading rows receive fresh AI decisions using recovered page evidence, then F035 reports `pending_ai_decision = 0`.
+- Remediation if it fails: do not manually pass the rows. Inspect the Entertainment Trading AI queue and recovered page-evidence fields, then either rerun the AI queue manager for only the still-pending rows or keep them blocked for rescan/manual user guidance.
+
+## Live F061 Rescan Priority Fix - 2026-05-21T10:30Z
+- Problem found: TD SYNNEX has active rescan retry rows in `out/systems/F/inbox/supplier_price_list_active_run.csv`, but they sort behind fresh untouched rows because fresh rows have blank `last_attempt_utc`.
+- Evidence before fix:
+  - active run rows with `scan_reason = rescan_retry_required`: `34`
+  - first rescan row position in active run file: `46707`
+  - active F061 child summaries still showed `rescan_retry_pending_rows = 0` while new rows continued to be processed.
+- Root cause: the queue priority treated rescan retries as ordinary pending rows, so the secondary sort by blank `last_attempt_utc` kept new rows ahead of rescan rows.
+- Allowed files for this fix:
+  - `scripts/flows/F/_scanner_state.py`
+  - `scripts/flows/F/F061_run_legacy_first_checks_local.py`
+  - `tests/test_f_scanner_state.py`
+  - `tests/test_f061_run_legacy_first_checks_local.py`
+- Success criteria:
+  - rescan retry rows sort ahead of fresh pending rows in normal hidden scanner mode
+  - login-required rows still use the existing visible-login priority path
+  - isolated tests pass
+  - after the next F061 boundary, the active run order shows rescan retry rows at the front before new untouched rows
+- Code fix applied:
+  - `scripts/flows/F/_scanner_state.py` now identifies pending rows with `scan_reason = rescan_retry_required` or `completion_block_reason = rescan_retry_pending` and gives them higher queue priority than fresh pending rows.
+  - `scripts/flows/F/F061_run_legacy_first_checks_local.py` now selects rescan retries before fresh pending rows during normal hidden scanning.
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\_scanner_state.py scripts\flows\F\F061_run_legacy_first_checks_local.py` passed.
+  - `python -m pytest tests\test_f_scanner_state.py tests\test_f061_run_legacy_first_checks_local.py -q` passed: `64` tests.
+- Live proof:
+  - before fix: `34` active rescan retry rows, first rescan index `46707`
+  - after next F061 child: `9` active rescan retry rows, first rescan index `0`
+  - latest post-fix child summary: `processed_rows = 25`, `pending_rows = 46691`, `status_counts = {'NOASIN': 25}`
+- Current status: live loop verification confirmed for queue priority. The remaining `9` rescan retry rows are now at the front of the active run and should be picked before fresh rows on the next scanner child.
+
+## Daily Queue Manager Run - 2026-05-21T10:42:32Z
+- Safe refresh path run first: `python scripts/one_off/F035_refresh_f032_ai_review_queues.py` returned `candidate_manifest_count = 14`, `already_gated = 13`, `pending_ai_decision = 1`.
+- Pending handoff reviewed: `entertainment_trading / fpm_entertainment_trading_20260430T151417Z` with `18` undecided rows in `ai_review_queue.csv`.
+- New Codex AI decisions appended to `codex_ai_review_decisions.csv`: `allow_if_other_checks_pass = 14`, `manual_review = 2`, `rescan_needed = 1`, `remove_from_clean_pass = 1`.
+- Decision integrity proof after write: total decision rows `62`, `missing_reason = 0`, `missing_evidence = 0`, `invalid_action = 0`.
+- FPM155 proof for this handoff: `status = gated`, `ai_gate_status = passed`, `operator_ready_flag = 1`, `pass_review_rows = 14`, `manual_review_rows = 2`, `near_miss_review_rows = 2`, `rescan_needed_rows = 45`, `remove_from_clean_pass_rows = 1`.
+- Final queue refresh proof at `2026-05-21T10:42:32Z`: no pending AI decision handoff remains (`status_counts` contains only `already_gated = 13` and `gated = 1`).
+- No blocker remained for this queue cycle; normal next cycle can continue with the same safe refresh path.
+
+## Product Description Secondary Evidence Fix - 2026-05-21
+- Problem found: product description/page text was treated too strongly by the Codex AI decision layer. Example: Entertainment Trading `1082250 / B079CB4YGT` was routed to `rescan_needed` even though the supplier title `ONE PIECE: World Seeker /PS4` and Amazon title `One Piece World Seeker (PS4)` were clearly aligned.
+- User rule: product description is a luxury/secondary factor. Titles can sometimes tell the whole story. Missing product description must not force `rescan_needed` when title identity evidence is clear and the normal F032 rule result is `allow_if_other_checks_pass`.
+- Related issue: DHB older review packs carry the available product title in the legacy `title` field, while the AI evidence pack expects `supplier_title`. This makes DHB supplier titles look missing even when the source row has a title.
+- Allowed files for this fix:
+  - `scripts/flows/F/_review_intelligence.py`
+  - `scripts/flows/F/price_list_manager/FPM155_apply_review_intelligence_gate.py`
+  - `tests/test_f032_build_review_intelligence_cycle.py`
+  - `tests/test_fpm155_apply_review_intelligence_gate.py`
+  - affected local handoff decision files under `out/systems/F/price_list_manager/review_handoffs`
+- Success criteria:
+  - F032 carries the best available legacy `title` into supplier title evidence when no better supplier title exists.
+  - Codex AI `rescan_needed` decisions based only on missing page evidence cannot override a clear F032 title pass.
+  - `1082250 / B079CB4YGT` routes out of `rescan_needed`.
+  - focused F032/FPM155 tests pass.
+  - local FPM155 proof completes without Google Sheets or product DB writes.
+- Code fix applied:
+  - F032 now recovers missing supplier titles from the original source file listed in the handoff `candidate_manifest.csv` when the scanner review pack dropped them.
+  - FPM155 now treats product description/page text as secondary evidence when the F032 title check has already cleared the row.
+  - FPM155 now writes that corrected decision back into `codex_ai_review_decisions.csv` so the stored AI decision is not left as stale rescan training memory.
+  - FPM155 now carries the recovered supplier title and Amazon title into the operator-facing AI-gated files.
+  - The AI Product Check Gate UI now displays the effective decision, so stale `missing_page_evidence` rescan notes do not keep showing when F032 has cleared the product.
+- Backup created before local handoff rebuild:
+  - `out/backups/f_product_description_secondary_fix_20260521T110037Z`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\_review_intelligence.py scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_o_ui_operator_view.py::test_ai_product_check_gate_builds_statuses_from_queue_and_decisions -q` passed: `9` tests.
+- Local handoff proof:
+  - Rebuilt `entertainment_trading / fpm_entertainment_trading_20260430T151417Z` with `--force-rebuild`: `status = gated`, `ai_gate_status = passed`, `pass_review_rows = 35`, `manual_review_rows = 2`, `rescan_needed_rows = 24`, `remove_from_clean_pass_rows = 1`, `ai_gate_fail_rows = 0`, `ai_gate_warn_rows = 0`.
+  - `1082250 / B079CB4YGT` is now in `ai_operator_pass_review.csv` with `f032_action = allow_if_other_checks_pass`; it has `0` matching rows in `ai_rescan_queue.csv`.
+  - Rebuilt DHB handoffs from source files; DHB AI queues now have `missing_supplier_title = 0`.
+  - Restored live handoff pointer back to `entertainment_trading / fpm_entertainment_trading_20260430T151417Z`.
+  - Corrected stored Codex decision for `1082250 / B079CB4YGT`: `codex_ai_action = allow_if_other_checks_pass`, `codex_ai_rescan_needed = 0`, `codex_ai_reviewer = fpm155_secondary_evidence_guard`.
+  - Ran `python scripts\one_off\F035_refresh_f032_ai_review_queues.py` at `2026-05-21T11:11:57Z`: `candidate_manifest_count = 14`, `status_counts.already_gated = 14`.
+  - AI Product Check Gate data proof: `rows = 91`, `ai_cleared = 50`, `rescan_needed = 37`, `needs_user_guidance = 3`, `ai_rejected = 1`; `B079CB4YGT` shows `queue_state = ai_cleared`, `operator_visible_flag = 1`; DHB missing supplier titles = `0`.
+
+## Wider AI Gate Title And Confidence Cleanup - 2026-05-21
+- User challenged the prior close-out because the AI Product Check Gate still had missing supplier titles and many `low` confidence rows.
+- Expanded evidence check found:
+  - total AI Product Check Gate rows: `91`
+  - missing supplier title rows: `7`
+  - missing supplier title suppliers: `bliss_distribution = 4`, `heo = 1`, `stax = 2`
+  - low-confidence rows: `36`, all in `rescan_needed`
+- Root cause: the previous fix was proven only for Entertainment Trading and DHB. Bliss, HEO, and Stax had not been rebuilt through the new supplier-title recovery logic. Some low-confidence rows also still carry generic old `missing_page_evidence` decisions rather than a specific title/profit/pack-size judgement.
+- Allowed actions:
+  - backup affected handoff folders before rebuild
+  - rebuild affected local handoffs with FPM155 only
+  - refresh AI gate queue with F035
+  - update stored Codex decision rows only when the current F032 evidence proves the old generic low-confidence rescan is stale
+- Success criteria:
+  - AI Product Check Gate missing supplier title rows reduce to `0`, or any remaining rows have source-file-not-available evidence recorded
+  - low-confidence rows are not generic stale decisions where current F032 evidence already gives a clearer decision
+  - no Google Sheets writes
+  - no product DB writes
+  - focused tests still pass
+- Code fix applied:
+  - Source-title recovery now supports Bliss `Inventory ID / Description`, HEO `productNumber / supplierTitle`, and Stax files where product headers start on the second CSV row.
+  - Source-title recovery can combine Stax `Brand + Title + Variant` into a usable supplier title.
+  - Generic old `missing_page_evidence` Codex decisions now defer to the current F032 result when F032 has a clearer pass, manual-review, reject, or profit/ROI rescan decision.
+- Backup created before wider rebuild:
+  - `out/backups/f_ai_gate_wider_title_confidence_cleanup_20260521T111534Z`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\_review_intelligence.py scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_o_ui_operator_view.py::test_ai_product_check_gate_builds_statuses_from_queue_and_decisions -q` passed: `10` tests.
+- Local handoff proof after rebuilding all `14` candidate handoffs and restoring the live handoff pointer to Entertainment Trading:
+  - F035 refresh at `2026-05-21T11:24:54Z`: `candidate_manifest_count = 14`, `status_counts.already_gated = 14`.
+  - AI Product Check Gate rows: `91`.
+  - Queue states: `ai_cleared = 54`, `needs_user_guidance = 19`, `rescan_needed = 13`, `ai_rejected = 5`.
+  - Confidence states: `medium = 83`, `high = 8`, `low = 0`.
+  - Missing supplier titles: `0`.
+  - Missing Amazon titles: `0`.
+  - Visible low-confidence rows: `0`.
+  - AI gate health warnings/failures across rebuilt handoffs: `0`.
+
+## AI Gate Maturity Plan - Real Review System - 2026-05-21
+- User challenge: the AI gate should not be treated as complete just because missing titles and low confidence were cleaned. The system must tell the operator what is wrong, not wait for the operator to spot weak decisions.
+- Audit snapshot after the cleanup:
+  - AI Product Check Gate rows: `91`
+  - queue states: `ai_cleared = 54`, `needs_user_guidance = 19`, `rescan_needed = 13`, `ai_rejected = 5`
+  - confidence states: `medium = 83`, `high = 8`, `low = 0`
+  - missing supplier titles: `0`
+  - missing Amazon titles: `0`
+  - missing all Amazon page text/detail/bullets: `70`
+  - rows with any Amazon page text/detail/bullets: `21`
+  - missing ROI percentage: `20`
+  - duplicate visible product groups: `2`
+  - duplicate visible rows: `13` (`dhb / PDL504 / B001AI8AKI` appears `7` times; `dhb / TEP084 / B0853KGR7X` appears `6` times)
+  - stored decisions written by real Codex queue manager: `27`
+  - stored decisions written by FPM155 fallback guard: `64`
+  - generic secondary-evidence reason rows: `64`
+- Current root problems:
+  - The screen is not yet a complete AI review system. It still contains many fallback decisions that say a clean generic reason instead of a row-specific judgement.
+  - Product descriptions are correctly secondary, but page/detail/bullet evidence is still missing for `70/91` rows. This limits pack-size, accessory/device, and quantity confidence.
+  - Duplicate historical handoffs are visible as separate current decisions. The UI should show one current decision per supplier SKU/ASIN and keep old handoffs as history.
+  - Rescan and user-guidance reasons are not specific enough. They need to say the real blocker, such as pack-size mismatch, profit/ROI risk, size mismatch, title breach, seller-control risk, or evidence unavailable.
+  - Tests currently prove selected fixes, but do not enforce a full AI gate quality contract.
+  - The daily automation is active at `06:00`, but the guarantee is still mostly prompt-based. The code needs a hard pre-flight and post-run quality report so weak decisions cannot silently pass.
+
+### Phase 1 - Hard Quality Contract
+- Goal: make the AI gate fail loudly when the review output is incomplete or lazy.
+- Build `AI gate quality report` over the final UI data.
+- Required checks:
+  - supplier title blank = `0`
+  - Amazon title blank = `0`
+  - visible low-confidence rows = `0`
+  - invalid actions = `0`
+  - blank reasons/evidence = `0`
+  - generic fallback reason rows visible to operator = `0`
+  - duplicate current supplier SKU/ASIN visible groups = `0`
+  - page evidence missing count is reported by supplier/action, even when not blocking
+- Pass criteria:
+  - quality report writes a machine-readable CSV and a plain-English summary
+  - FPM155 refuses operator-ready output when hard checks fail
+  - the AI Product Check Gate shows the quality status at the top
+
+### Phase 2 - Current-Only Deduplication
+- Goal: the operator sees one current decision per real product, not every historical handoff.
+- Add a current-row selector using supplier, supplier SKU, ASIN, source timestamp, and handoff run time.
+- Keep historical decisions available as audit history, but not as repeated active rows.
+- Pass criteria:
+  - DHB duplicate groups collapse from `13` active rows to `2` active rows
+  - historical handoff rows remain searchable in audit/history view
+  - tests prove old handoffs do not reappear as current work
+
+### Phase 3 - Evidence Completion
+- Goal: page/detail/bullet evidence should be captured where available, but not used as a lazy blocker when titles are enough.
+- After BBP pass, pull Amazon product description/detail/bullets from Amazon page or API where available.
+- Backfill missing page evidence for current active AI rows first, then historical rows only if needed.
+- Record evidence status per row:
+  - `full_page_evidence`
+  - `title_only_sufficient`
+  - `page_evidence_unavailable`
+  - `needs_rescan_for_evidence`
+- Pass criteria:
+  - current active rows have either page evidence or a clear explanation why title-only is sufficient
+  - no row says only "missing page evidence" without also saying what decision can or cannot be made from title/profit/ROI
+  - page-evidence coverage trend is visible by supplier
+
+### Phase 4 - Real AI Decision Record
+- Goal: every row gets a genuine structured judgement, not just a copied F032 result.
+- Replace generic fallback notes with a structured AI decision record:
+  - title identity decision
+  - pack-size/quantity decision
+  - accessory/device/refill decision
+  - ROI/profit suspicion decision
+  - seller-control decision
+  - evidence quality decision
+  - final action
+  - confidence
+  - one short operator note
+  - suggested rule tightening, if any
+- Pass criteria:
+  - fallback guard can still protect the system, but fallback rows are marked as `system_fallback`, not presented as complete AI judgement
+  - `system_fallback` rows cannot reach operator as clean AI-cleared rows
+  - each decision has row-specific evidence, not a generic phrase
+
+### Phase 5 - Blind Validation And Gold Set
+- Goal: prove the AI gets the same answer consistently without seeing the expected answer.
+- Build a gold sample set from:
+  - known user fails
+  - known user passes
+  - pack-size examples
+  - accessory/device examples
+  - high-ROI suspicious examples
+  - title-only clear passes
+- Run blind review multiple times and compare action/category consistency.
+- Pass criteria:
+  - action agreement target: `>= 90%`
+  - dangerous false clear rate: `0` on known fail set
+  - each disagreement writes a category and rule-improvement suggestion
+
+### Phase 6 - Automation Hardening
+- Goal: the daily AI worker should manage this without the user prompting it.
+- Keep the current daily `06:00` automation, but make it run against code-enforced gates:
+  - refresh pending queue
+  - run AI decision pass only for pending/current rows
+  - run quality report
+  - apply FPM155 only if quality passes
+  - write memory and plan proof
+  - leave blockers in a clear backlog with exact reason
+- Pass criteria:
+  - automation output says how many rows were pending, decided, blocked, and operator-visible
+  - if any hard quality check fails, no clean-pass output is published
+  - failures appear in the morning MOT/health output, not hidden in chat
+
+### Six-Week Target State
+- In six weeks, the system should look like this:
+  - Price file scan finishes.
+  - API and web scrape checks pass/fail rows.
+  - Before New Product Review, the AI gate reviews only current, deduped products.
+  - Every current row has supplier title, Amazon title, ROI/profit context, title match evidence, seller/demand signals, and page-evidence status.
+  - AI decisions are row-specific, with a short operator note such as `check 50-pack sleeve count`, `probable device/accessory mismatch`, `clear title match`, or `profit evidence needs rescan`.
+  - The user sees only AI-cleared rows and clear guidance rows, not raw scanner passes.
+  - The system records user decisions and feeds them back into category counts and future rule suggestions.
+  - The daily automation runs without prompting and tells the system what is wrong before the user has to notice.
+  - Quality gates stop lazy output before it reaches the operator.
+
+## AI Gate Completion Pass - 2026-05-21T11:52:47Z
+- User instruction: complete the AI gate cleanup now, not just plan it.
+- What changed:
+  - Added current-only AI Product Check Gate dedupe so repeated historical DHB handoffs stay in audit history but do not appear as repeated current work.
+  - Added `FPM156_build_ai_gate_quality_report.py` to write a machine-readable quality report and plain-English summary.
+  - Wired `F035_refresh_f032_ai_review_queues.py` to run the quality report every normal refresh.
+  - Added an AI gate quality banner to the operator UI page.
+  - Replaced generic secondary-evidence notes with row-specific title/ROI/pack-size evidence.
+  - Updated both daily Codex AI automations so secondary-guard rows are treated as needing fresh Codex review.
+  - Ran two blind Codex reviews over the remaining guard-reviewed visible rows and wrote `37` fresh `codex_blind_review_20260521` decisions.
+- Safer decision changes made from blind review:
+  - `Days Gone /PS4` vs `E3 2016 Dummy ASIN Sony Game 2 PS4` moved to rejected.
+  - Exo Terra terrarium vs canopy top moved to rejected.
+  - Fluval cartridges vs broader filter set moved to rejected.
+  - Energizer 4-pack vs 8-pack moved to rejected.
+  - Kuriboh 50-pack sleeves, Serial Mom Blu-ray/format, Neutradol 300ml, The Division 2 edition, Cable Guys unclear product-type rows, and HORI Switch/Switch 2 risk moved to manual review where appropriate.
+- Backup:
+  - `out/backups/f_ai_gate_quality_completion_20260521T113649Z`
+- Rebuild proof:
+  - `python scripts\one_off\F035_refresh_f032_ai_review_queues.py --force-rebuild`
+  - `candidate_manifest_count = 14`
+  - `status_counts.gated = 14`
+  - all rebuilt handoffs had `ai_gate_fail_rows = 0`
+  - Entertainment Trading after blind review: `pass_review_rows = 33`, `manual_review_rows = 7`, `rescan_needed_rows = 13`, `remove_from_clean_pass_rows = 9`
+- Final quality proof:
+  - `python scripts\one_off\F035_refresh_f032_ai_review_queues.py`
+  - `quality_summary.status = warn`
+  - `fail_checks = 0`
+  - `warn_checks = 4`
+  - `current_rows = 80`
+  - `history_rows = 91`
+  - `current_visible_secondary_guard_rows = 0`
+  - `current_pending_ai_check_rows = 0`
+  - `history_duplicate_product_groups = 2`
+  - quality files:
+    - `out/systems/F/price_list_manager/live/ai_gate_quality_report.csv`
+    - `out/systems/F/price_list_manager/live/ai_gate_quality_summary.md`
+- Remaining warnings are not hard blockers:
+  - historical duplicates are retained only as audit history
+  - some current rows still lack page text, but page text is secondary evidence
+  - some current rows lack ROI
+  - low-confidence rows are routed to manual review, not clean pass
+- Verification:
+  - `python -m py_compile scripts\one_off\F035_refresh_f032_ai_review_queues.py scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_fpm156_ai_gate_quality_report.py tests\test_o_ui_operator_view.py::test_ai_product_check_gate_builds_statuses_from_queue_and_decisions tests\test_o_ui_operator_view.py::test_ai_product_check_gate_shows_waiting_row_when_queue_is_missing tests\test_o_ui_operator_view.py::test_legacy_handoff_is_blocked_from_new_product_review_and_shown_in_ai_gate -q` passed: `13` tests.
+  - Operator UI launch proof: local Streamlit returned HTTP `200` at `http://localhost:8504`.
+- Current answer to "will this still work in 6 weeks?":
+  - Yes for the guarded path now implemented: queue refresh runs the quality report, the UI shows the quality status, fallback guard rows are no longer silently treated as complete AI, and the morning automations know to re-review guard rows.
+  - The known improvement backlog is evidence coverage: page text and ROI should keep improving, but missing page text no longer blocks clear title-based decisions by itself.
+
+## AI Rescan Queue Priority Fix - 2026-05-21T12:10:00Z
+- User issue:
+  - AI `rescan_needed` rows must jump ahead of normal new scanner rows.
+  - Current live evidence showed `13` Entertainment Trading AI rescan rows parked in `ai_rescan_queue.csv`, while F061 was scanning normal TD Synnex rows.
+- Root cause:
+  - F061 already prioritises rows marked `rescan_retry_required`.
+  - Missing handoff was AI rescan queue -> active F061 scanner queue.
+  - The queue file does not itself contain all scanner-required fields, so promotion must recover barcode/cost/title from original batch/source evidence before writing to the active queue.
+- Implementation plan:
+  - Add a production promoter inside `FPM130_run_live_cycle.py`, modelled on the existing login-backtrack promoter.
+  - Recover scanner fields from current manager `batch_rows.csv` first, then source converter fallback if needed.
+  - Write promoted rows into `supplier_price_list_active_run.csv` with `scan_status=pending`, `scan_reason=rescan_retry_required`, and `completion_block_reason=rescan_retry_pending`.
+  - Write an idempotent `ai_rescan_promotion_audit.csv` so the same AI row is not repeatedly requeued.
+  - Make supplier-run review pack rebuild trigger when that supplier/run finishes, even if another supplier still has normal pending rows behind it.
+  - Add tests proving AI rescans are promoted ahead of normal rows and duplicate promotion is blocked.
+- Pass criteria:
+  - Existing current rescan queue rows are promoted with no missing barcode/title/cost fields.
+  - FPM130 chooses the rescan supplier before normal TD Synnex pending rows at the next live-manager boundary.
+  - Promotion audit records promoted/blocked/skipped rows.
+  - Targeted tests pass.
+  - Live status or promotion audit proves the rescan rows are no longer parked only in `ai_rescan_queue.csv`.
+- Implementation proof:
+  - Backup before live queue mutation: `out/backups/f_ai_rescan_priority_20260521T121504Z`.
+  - Added AI rescan promotion into `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`.
+  - Added tests in `tests/test_fpm130_live_cycle.py`.
+  - Validation passed:
+    - `python -m py_compile scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py`
+    - `python -m pytest tests\test_f_scanner_state.py tests\test_fpm130_live_cycle.py tests\test_f061_run_legacy_first_checks_local.py::test_f061_normal_mode_prioritises_rescan_retry_before_fresh_pending tests\test_f061_run_legacy_first_checks_local.py::test_f061_incomplete_price_history_capture_maps_to_rescan tests\test_f061_run_legacy_first_checks_local.py::test_f061_rescan_retry_exhausts_after_configured_active_attempts -q`
+  - Live promotion proof:
+    - `ai_rescan_promotion_status.csv` reported `status=promoted`, `queue_rows=13`, `promoted_rows=13`, `blocked_rows=0`, `skipped_rows=0`.
+    - Entertainment Trading active queue showed `13` rows as `pending, rescan_retry_required`.
+    - FPM live manager switched from normal `td_synnex` scanning to `entertainment_trading`.
+    - F061 child started with `--supplier-id entertainment_trading --max-rows 25`.
+- Monitored validation:
+  - Current phase: live write-back proof.
+  - Last check: `2026-05-21T12:33:51Z`.
+  - Current child evidence: `out/systems/F/price_list_manager/live/f061_child_status.txt` showed heartbeat at `2026-05-21T12:33:23Z`.
+  - Current active queue evidence: `out/systems/F/inbox/supplier_price_list_active_run.csv` still showed `13` Entertainment Trading rows as `pending, rescan_retry_required`.
+  - Why this is not complete yet: F061 writes row results back after the child chunk completes, so pending rows can stay unchanged while scraping is active.
+  - Success condition: Entertainment Trading rescan rows are no longer stuck as pending rescans, and the live summary or scanner ledger shows the child completed or wrote terminal row outcomes.
+  - If it fails: inspect `f061_child_stdout.log`, `f061_child_stderr.log`, and the active queue rows; fix the F061 write-back or retry handling at source before allowing normal rows to continue ahead of unresolved rescans.
+- Completion proof:
+  - F061 completed the Entertainment Trading AI rescan chunk at `2026-05-21T12:38:34Z`.
+  - F061 summary: `processed_rows=13`, `expanded_candidate_rows=15`, `pending_rows=0`, `pass_rows=7`, `fail_rows=8`, `retry_rows=0`.
+  - Live queue proof after completion: Entertainment Trading had `0` rows left in `supplier_price_list_active_run.csv`.
+  - FPM resumed normal TD Synnex work only after the Entertainment Trading rescans cleared.
+  - New issue found and fixed: after fresh rescan evidence existed, the review pack still said `already_built`, which would leave stale `rescan_needed` paperwork.
+  - Added force-rebuild behavior in `FPM130_run_live_cycle.py`: when an AI-rescan batch drains to `0` pending rows, FPM130 forces `FPM150` and `FPM155` to rebuild from fresh evidence.
+  - Added test proof: `test_fpm130_force_rebuilds_review_pack_when_ai_rescan_completes`.
+  - Validation passed: `python -m pytest tests\test_f_scanner_state.py tests\test_fpm130_live_cycle.py tests\test_f061_run_legacy_first_checks_local.py::test_f061_normal_mode_prioritises_rescan_retry_before_fresh_pending tests\test_f061_run_legacy_first_checks_local.py::test_f061_incomplete_price_history_capture_maps_to_rescan tests\test_f061_run_legacy_first_checks_local.py::test_f061_rescan_retry_exhausts_after_configured_active_attempts -q` returned `73 passed`.
+  - Backup before post-rescan rebuild: `out/backups/f_ai_rescan_post_rebuild_20260521T124519Z`.
+  - Forced raw rebuild proof for Entertainment Trading: `pass_review_rows=0`, `near_miss_review_rows=9`, `hard_reject_rows=8`.
+  - Post-rescan Codex AI decisions written: `allow_if_other_checks_pass=2`, `manual_review=4`, `remove_from_clean_pass=3`, `rescan_needed=0`.
+  - Final FPM155 proof: `status=gated`, `ai_gate_status=passed`, `operator_ready_flag=1`, `pass_review_rows=0`, `near_miss_review_rows=6`, `manual_review_rows=4`, `rescan_needed_rows=0`, `remove_from_clean_pass_rows=3`, `ai_gate_fail_rows=0`, `ai_gate_warn_rows=0`.
+  - Final quality refresh proof: `current_pending_ai_check_rows=0`, `fail_checks=0`, `current_duplicate_product_groups=0`, `current_clean_pass_low_confidence_rows=0`, `current_visible_secondary_guard_rows=0`.
+  - F manager reload proof: supervisor `FPM170` is running and restarted `FPM130` under a new owner process; live status returned to `state=running` on TD Synnex after the rescan/rebuild fix.
+
+## Kuriboh Page Evidence Fix - 2026-05-21T13:06:31Z
+- User issue:
+  - `KONKKS / B09HKZWBDN` was still shown as `Needs User Guidance` because the Amazon title did not say `50 pack`.
+  - This should have been cleared by Amazon product description evidence, because the description says each pack contains 50 card sleeves.
+- Root cause:
+  - The original F061 scrape stored blank `product_description`, blank `product_detail_text`, and blank `product_feature_bullets`.
+  - The backfill queue did not include this ASIN, so F038 had no evidence to merge.
+  - F032 treated pack-size risk as title-only, so a one-sided title quantity warning could not be cleared by recovered Amazon description text.
+- Fixes made:
+  - `WebscraperS2.read_text_with_fallback` now tries Selenium `.text`, `innerText`, `textContent`, and a JavaScript text read after scrolling the element into view.
+  - Amazon description selectors now include nested `#productDescription` spans and A+ feature containers, with two attempts instead of one.
+  - F032 now clears a manual pack-size warning when Amazon page text explicitly confirms the supplier quantity.
+  - Recovered page evidence for `B09HKZWBDN` through a targeted F037 run.
+  - Merged the recovered description into both Bliss pass review files through F038 with backup.
+  - Updated the recorded Codex AI decision from manual review to `allow_if_other_checks_pass`.
+  - Rebuilt the Bliss AI gate with FPM155.
+- Runtime proof:
+  - F037 targeted backfill: `processed_rows=1`, `succeeded_rows=1`, `captured_rows=1`, `failed_rows=0`.
+  - Captured description includes `Each pack contains 50 card sleeves`.
+  - F038 execute: `updated_rows=2`, `updated_cells=6`, backup at `out/backups/f038_review_pack_page_evidence_refresh_20260521T130455Z`.
+  - FPM155 rebuild: `status=gated`, `ai_gate_status=passed`, `operator_ready_flag=1`, `pass_review_rows=1`, `manual_review_rows=0`, `rescan_needed_rows=0`, `remove_from_clean_pass_rows=0`.
+  - F035 refresh: `current_pending_ai_check_rows=0`, `fail_checks=0`, `current_rows=27`, `status_counts.already_gated=14`.
+  - F manager ownership restored: live status returned to `state=running` on TD Synnex under owner pid `20908`.
+- Test proof:
+  - `python -m py_compile scripts\flows\F\legacy_scanner_2_1\WebscraperS2.py`
+  - `python -m py_compile scripts\flows\F\_review_intelligence.py`
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_f061_run_legacy_first_checks_local.py::test_webscraper_s2_prefers_exact_product_description_xpath tests\test_f061_run_legacy_first_checks_local.py::test_webscraper_s2_reads_textcontent_when_element_text_is_blank -q` returned `12 passed`.
+- Current decision:
+  - `KONKKS / B09HKZWBDN` is now AI-cleared pass.
+  - AI reason: Amazon description confirms each pack contains 50 card sleeves, matching the supplier 50 Pack title.
+- Remaining non-blocking warnings:
+  - `current_missing_page_text_rows=15`
+  - `current_missing_roi_rows=9`
+  - `current_visible_low_confidence_rows=1`
+  - `history_duplicate_product_groups=2`
+
+## Combined Amazon Evidence Rule - 2026-05-21T13:12:55Z
+- User correction:
+  - The AI gate should not demand that every proof phrase appears in the Amazon title alone.
+  - The practical question is: supplier price-list title on one side, Amazon title plus description plus bullets on the other side; do they sound like the same product?
+- Implementation:
+  - Added combined Amazon identity evidence in F032 using:
+    - Amazon title
+    - Amazon product description
+    - Amazon feature bullets
+    - Amazon product detail text
+  - Manual title-only doubts can now clear automatically when the combined Amazon evidence strongly matches the supplier title.
+  - Pack/quantity rows still need the quantity confirmed before clearing, because that is part of the product identity.
+  - Existing hard rejects are not automatically rescued by description text; clear mismatch/high-risk rows still stay blocked.
+- Test proof:
+  - `python -m py_compile scripts\flows\F\_review_intelligence.py` passed.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py::test_f032_uses_combined_amazon_text_to_clear_title_only_doubt tests\test_f032_build_review_intelligence_cycle.py::test_f032_uses_amazon_description_to_clear_one_sided_pack_quantity tests\test_f032_build_review_intelligence_cycle.py::test_f032_builds_evidence_pack_and_decisions -q` returned `3 passed`.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py -q` returned `11 passed`.
+- Live ownership check:
+  - F manager remained running on TD Synnex under owner pid `20908`; no maintenance lock was left behind.
+
+## Current Missing Page Text Backfill - 2026-05-21T13:16:24Z
+- User instruction:
+  - Proceed with the remaining current AI-gate rows missing page text.
+- Current target:
+  - `15` current AI Product Check Gate rows have blank `amazon_description_snippet`.
+  - All `15` have scanner-required fields recovered: ASIN, barcode, cost, VAT, supplier title, and Amazon title.
+- Execution approach:
+  - Build supplier-specific F037 queue files under `out/systems/F/page_evidence_backfill`.
+  - Run F037 controlled backfill per supplier, because F037/F061 execute one supplier context at a time.
+  - Use `--force-maintenance` so the live F manager drains to a safe boundary before each backfill run.
+  - Merge successful evidence back into the affected handoff review packs with F038.
+  - Rebuild affected FPM155 gates and refresh F035 quality.
+- Target suppliers:
+  - Bliss Distribution: `3`
+  - DHB: `2`
+  - Entertainment Trading: `1`
+  - Heo: `1`
+  - Shure Cosmetics: `6`
+  - Stax: `2`
+- Success criteria:
+  - F037 state has no pending rows.
+  - Successful captures are merged into review handoff raw pass/near-miss files.
+  - Affected FPM155 gates rebuild with `ai_gate_fail_rows=0`.
+  - F035 quality refresh reduces `current_missing_page_text_rows` as far as the live Amazon scrape allows.
+  - F manager ownership is restored after maintenance.
+- If a row still fails page-text capture:
+  - Keep the row in state with the exact failure reason.
+  - Do not fake or hand-type description evidence.
+  - Use the failure reason to decide whether the row needs visible login, retry, or should remain title/description-light.
+- Completion proof - 2026-05-21T13:46:28Z:
+  - Built targeted queues for `15` current AI-gate rows missing page text.
+  - First F037 pass:
+    - Bliss Distribution: `3/3` captured.
+    - Shure Cosmetics: `5/6` captured, `1` skipped by current scanner.
+    - DHB: `0/2` captured on first attempt.
+    - Heo: `0/1` captured on first attempt.
+    - Stax: `0/2` captured on first attempt.
+    - Entertainment Trading: `0/1`, skipped by current scanner; row is already AI-rejected and not operator-visible.
+  - Retry pass:
+    - DHB: `2/2` captured.
+    - Heo: `0/1` captured; F061 exited without scrape evidence after reaching the Amazon page.
+    - Stax: `0/2`; both rows are now current scanner `LOWROI` skips.
+  - Total captured: `10/15`.
+  - Merged successful captures with F038:
+    - Bliss/Shure backup: `out/backups/f038_review_pack_page_evidence_refresh_20260521T133440Z`.
+    - DHB backup: `out/backups/f038_review_pack_page_evidence_refresh_20260521T134420Z`.
+  - Rebuilt affected AI gates:
+    - Bliss `fpm_bliss_distribution_20260517T061507Z`: `ai_gate_status=passed`, `pass_review_rows=3`, `manual_review_rows=0`.
+    - Shure `fpm_shure_cosmetics_20260516T144814Z`: `ai_gate_status=passed`, `pass_review_rows=5`, `manual_review_rows=1`.
+    - DHB `fpm_dhb_20260507T055804Z`: `ai_gate_status=passed`, `pass_review_rows=2`, `manual_review_rows=0`.
+  - Final F035 quality refresh:
+    - `current_missing_page_text_rows` reduced from `15` to `5`.
+    - `current_pending_ai_check_rows=0`.
+    - `fail_checks=0`.
+    - `current_visible_secondary_guard_rows=0`.
+  - F manager ownership restored:
+    - latest live status returned to `state=running` on TD Synnex under owner pid `27604`.
+- Remaining `5` rows:
+  - `heo / DSG106549 / B083TLCKWB`: F061 page-evidence retry still exits without scrape evidence; remediation is a separate HEO page-load diagnostic, not manual description entry.
+  - `stax / 6LS / B0045YGMV8`: current scanner says `LOWROI`; row remains user guidance/low confidence.
+  - `stax / 309148 / B005Q7B8E4`: current scanner says `LOWROI`; row should not be treated as a page-text-only problem.
+  - `shure_cosmetics / SCS14325 / B07BC5PZ7K`: current scanner says `OVER50K`; row should be reviewed as a current viability change.
+  - `entertainment_trading / 1243976 / B0000DC4EL`: already AI-rejected; current scanner also says `LOWROI`, and it is not operator-visible.
+
+## Current Scanner Fail Guard Completion - 2026-05-21T14:07:17Z
+- User issue:
+  - Rows found by the page-evidence backfill as current scanner failures were still able to remain visible in the AI Product Check Gate if the older AI title decision was clean.
+  - This was wrong because the real flow is `Full price list -> API pass -> web scrape pass -> AI pass -> human pass`; a current scanner fail means the row has fallen back before AI/human review.
+- Root cause:
+  - F037 recorded `skipped_current_scanner_fail` in the backfill state file, but FPM155 did not read that evidence when rebuilding the AI gate.
+  - Result: the gate could use a stale `allow_if_other_checks_pass` or `manual_review` decision even after F037 had proved `LOWROI` or `OVER50K`.
+- Fixes made:
+  - F037 now writes/upserts `out/systems/F/page_evidence_backfill/current_scanner_fail_evidence.csv` whenever a page-evidence backfill row is skipped by the current scanner or needs ASIN recheck.
+  - FPM155 now reads that scanner-fail evidence for the same supplier run before publishing operator files.
+  - If the current scanner says `skipped_current_scanner_fail`, FPM155 overrides the Codex decision to `remove_from_clean_pass`.
+  - If the current scanner says `needs_asin_recheck`, FPM155 overrides the Codex decision to `rescan_needed`.
+  - FPM155 writes a health row `current_scanner_fail_guard_rows` so this protection is visible in gate health instead of hidden in chat.
+- Live correction proof:
+  - Backfilled scanner-fail audit rows from today's F037 state files: `4` rows.
+  - Affected rows:
+    - `entertainment_trading / 1243976 / B0000DC4EL`: `LOWROI`, resolved ASIN changed to `B00004YK10`.
+    - `shure_cosmetics / SCS14325 / B07BC5PZ7K`: `OVER50K`.
+    - `stax / 6LS / B0045YGMV8`: `LOWROI`, resolved ASIN changed to `B005FBMU0C`.
+    - `stax / 309148 / B005Q7B8E4`: `LOWROI`.
+  - Rebuilt gates:
+    - Stax: `pass_review_rows=0`, `near_miss_review_rows=0`, `remove_from_clean_pass_rows=2`, `current_scanner_fail_guard_rows=2`.
+    - Shure Cosmetics: `pass_review_rows=4`, `near_miss_review_rows=1`, `remove_from_clean_pass_rows=1`, `current_scanner_fail_guard_rows=1`.
+    - Entertainment Trading: `pass_review_rows=0`, `near_miss_review_rows=6`, `remove_from_clean_pass_rows=3`, `current_scanner_fail_guard_rows=1`.
+  - UI proof after refresh:
+    - The four scanner-fail rows have `operator_visible_flag=0`.
+    - `visible_count_for_four_scanner_fail=0`.
+- HEO page evidence completion:
+  - Fresh HEO retry `f037_current_page_text_heo_retry2_20260521T140400Z` succeeded: `processed_rows=1`, `succeeded_rows=1`, `captured_rows=1`, `f061_rc=0`.
+  - F038 execute merged HEO page evidence into the HEO raw pass review file: `updated_rows=1`, `updated_cells=3`, backup `out/backups/f038_review_pack_page_evidence_refresh_20260521T140700Z`.
+  - FPM155 rebuilt HEO: `ai_gate_status=passed`, `pass_review_rows=1`, `ai_gate_fail_rows=0`, `ai_gate_warn_rows=0`.
+- Final proof:
+  - F035 refresh at `2026-05-21T14:07:17Z`: `candidate_manifest_count=14`, `current_pending_ai_check_rows=0`, `fail_checks=0`, `current_visible_secondary_guard_rows=0`.
+  - AI Product Check Gate data proof: `visible_rows=21`, `visible_missing_description_rows=0`, `scanner_fail_visible_rows=0`.
+  - F manager ownership proof: supervisor state `state=ok`, manager pid `15132`, no maintenance lock left behind.
+- Test proof:
+  - `python -m pytest tests\test_f037_run_passed_product_page_evidence_backfill_batch.py tests\test_fpm155_apply_review_intelligence_gate.py -q` returned `12 passed`.
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py tests\test_f061_run_legacy_first_checks_local.py -q` returned `68 passed`.
+- Health item:
+  - FPM155 gate health must include `current_scanner_fail_guard_rows`.
+- Alert condition:
+  - Raise a feeder handoff warning if any row with matching current scanner fail evidence appears with `operator_visible_flag=1`.
+- Current answer to "will this still work in 6 weeks?":
+  - Yes for this path: future F037 backfill runs now write the scanner-fail audit file automatically, and future FPM155 gate rebuilds consume that file before anything can reach New Product Review.
+
+## Stale AI Decision File Cleanup - 2026-05-21T14:24:08Z
+- User issue:
+  - The AI Product Check Gate showed `27` current rows, but the user remembered `60+` ET decisions.
+  - The numbers were confusing because the active queue and the stored decision file were not the same thing.
+- Root cause:
+  - Entertainment Trading had `9` current AI queue rows but `71` rows in `codex_ai_review_decisions.csv`.
+  - `62` decision rows were old decisions from before the rescan/rebuild and no longer matched the current `ai_review_queue.csv`.
+  - FPM155 ignored those stale rows for routing, but it left them in the active decision file, which made counts look inflated.
+- Fixes made:
+  - FPM155 now archives Codex AI decision rows that are not present in the current AI queue.
+  - Active decisions stay in `codex_ai_review_decisions.csv`.
+  - Stale decisions move to `codex_ai_review_decisions_stale_archive.csv`.
+  - FPM155 writes health row `stale_codex_ai_decision_rows_archived`.
+  - Added regression test proving stale decisions are archived and removed from the active file.
+- Backup:
+  - `out/backups/fpm155_stale_codex_decision_cleanup_20260521T141500Z/entertainment_trading_fpm_20260430T151417Z`.
+- Execution proof:
+  - First ET rebuild archived `62` stale decisions.
+  - Second ET rebuild proved idempotence: `stale_codex_decision_rows_archived=0`.
+  - Final ET active file:
+    - `ai_review_queue.csv = 9` rows.
+    - `codex_ai_review_decisions.csv = 9` rows.
+    - `codex_ai_review_decisions_stale_archive.csv = 62` rows.
+    - stale decisions left in active file: `0`.
+    - active queue rows missing decisions: `0`.
+- Whole-gate proof:
+  - Active AI queues total: `38` rows.
+  - Active decision files total: `38` rows.
+  - Archived stale decisions total: `62` rows.
+  - Current AI Product Check Gate rows: `27`.
+  - Full AI audit rows: `38`.
+  - Current states: `ai_cleared=16`, `ai_rejected=6`, `needs_user_guidance=5`.
+  - F035 refresh at `2026-05-21T14:24:08Z`: `current_pending_ai_check_rows=0`, `fail_checks=0`, `current_rows=27`, `history_rows=38`.
+- Test proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py` passed.
+  - `python -m pytest tests\test_fpm155_apply_review_intelligence_gate.py -q` returned `6 passed`.
+- Current answer to "where are the 60+?":
+  - They are preserved in the Entertainment Trading stale archive, not active work.
+  - They are no longer counted as current queue decisions.
+
+## New Product Review AI Compare Watch Note - 2026-05-21
+- User issue:
+  - The AI Product Check Gate showed AI confidence, but once a row reached New Product Review the operator could not easily see how confident the AI was about the product match.
+  - The operator wanted the AI comparison note inside the normal `What to watch` hover note.
+- Fix made:
+  - New Product Review now appends `ai_match_confidence=<level>` and `ai_compare=<plain English reason>` into the `What to watch` helper text for AI-gated rows.
+  - This applies to clean pass rows and user-guidance rows.
+  - Existing scanner/commercial watch notes are kept and the AI note is appended, not overwritten.
+- Proof:
+  - Focused tests passed:
+    - `python -m py_compile scripts\flows\O\O400_operator_ui.py`
+    - `python -m pytest tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_normalizes_pass_and_near_miss_reports tests\test_o_ui_operator_view.py::test_feeder_review_pass_row_adds_ai_compare_note_to_what_to_watch tests\test_o_ui_operator_view.py::test_feeder_review_manual_row_prefers_ai_check_note -q` returned `3 passed`.
+  - Live row proof:
+    - Bliss pass rows now show `What to watch` containing `ai_match_confidence=high` and `ai_compare=Same card sleeves and same 100 count`.
+    - Shure manual row `SCS16995 / B07GFTX7TY` now shows `What to watch` containing `ai_match_confidence=medium` and the AI warning that pack-size or quantity is not confirmed.
+- Operator meaning:
+  - `high` means the AI thinks the supplier and Amazon product match clearly.
+  - `medium` means it looks like the same product but one detail still needs attention.
+  - `low` means it should not be trusted without review/rescan/rejection routing.
+
+## Operator UI Daily Flow Separation - 2026-05-21
+- User issue:
+  - The operator does not want to inspect the AI breakdown day to day.
+  - The AI breakdown is for backend tuning, while daily work should stay on the final list.
+- Fix made:
+  - The normal navigation now keeps `Price List Queue` directly followed by `New Product Review`.
+  - The AI diagnostics page is renamed from `AI Product Check Gate` to `AI Gate QA`.
+  - `AI Gate QA` is moved below the main working pages and described as backend diagnostics for tuning the AI checker.
+  - The route `?page=ai_product_check_gate` still works for debugging and tuning.
+- Day-to-day operator meaning:
+  - Use `New Product Review` as the final working list.
+  - Only open `AI Gate QA` when checking why the backend AI made a decision or when tuning rules.
+  - AI confidence and the short AI compare note remain inside `What to watch` on the final review row.
+- Proof:
+  - `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_operator_nav_keeps_ai_gate_as_backend_qa_after_final_review tests\test_o_ui_operator_view.py::test_feeder_review_pass_row_adds_ai_compare_note_to_what_to_watch tests\test_o_ui_operator_view.py::test_feeder_review_manual_row_prefers_ai_check_note -q` returned `3 passed`.
+  - Live navigation proof: `Price List Queue` is position `2`, `New Product Review` is position `3`, and `AI Gate QA` is position `10`.
+
+## AI Review Control Plan - 2026-05-21T15:45:04+01:00
+- Purpose:
+  - Make the AI review stage behave like backend plumbing.
+  - The operator should normally look only at `New Product Review`.
+  - `AI Gate QA` exists for diagnostics, tuning, and proof, not day-to-day product review.
+
+- What we want:
+  - Price list line passes API checks.
+  - Price list line passes web scrape checks.
+  - AI reviews the supplier title, Amazon title, Amazon page text when available, and ROI suspicion signal when available.
+  - Only rows with an AI decision of `allow_if_other_checks_pass` or `manual_review` can appear in `New Product Review`.
+  - Rows needing rescan, rejection, or missing AI decision stay out of the operator's final list.
+  - The final row carries a short `What to watch` note with AI confidence and the AI comparison reason.
+  - The operator does not need to open the AI breakdown unless something is being tuned or investigated.
+
+- Where we are now:
+  - Current AI gate rows: `27`.
+  - Current AI states: `ai_cleared=16`, `needs_user_guidance=5`, `ai_rejected=6`.
+  - Operator-visible rows: `21`.
+  - Pending AI rows: `0`.
+  - Waiting-for-AI-queue rows: `0`.
+  - Active AI queue rows across handoffs: `38`.
+  - Active Codex decision rows across handoffs: `38`.
+  - Missing active decisions: `0`.
+  - Stale active decisions: `0`.
+  - Missing supplier titles in AI gate: `0`.
+  - Missing Amazon titles in AI gate: `0`.
+  - Visible rows missing AI confidence: `0`.
+  - Visible rows missing AI reason: `0`.
+  - Current `New Product Review` navigation is correct: `Price List Queue` position `2`, `New Product Review` position `3`, `AI Gate QA` position `10`.
+  - Current quality warnings:
+    - `history_duplicate_product_groups=2`: historical duplicates are retained for audit, but only latest current rows should matter.
+    - `current_missing_page_text_rows=4`: page text is useful supporting evidence but not always required when titles clearly match.
+    - `current_missing_roi_rows=9`: ROI is a useful suspicion signal and should be captured when available.
+
+- How we get there:
+  - Phase 1 - Protect the handoff:
+    - Keep the hard rule that no row enters `New Product Review` without an AI routing decision.
+    - Keep stale AI decisions archived out of the active decision file.
+    - Keep scanner-fail rows hidden from the final list.
+  - Phase 2 - Make the final list enough for the operator:
+    - Keep AI confidence and AI comparison reason inside `What to watch`.
+    - Keep `AI Gate QA` available only as a backend tuning/proof screen.
+    - Do not require the operator to inspect raw AI breakdown during normal review.
+  - Phase 3 - Tighten evidence quality:
+    - Reduce missing ROI rows where ROI was available upstream.
+    - Reduce missing page text where a page scrape should have captured it.
+    - Keep title-only decisions valid when title match is genuinely clear.
+    - Treat product description as supporting evidence, not a mandatory blocker.
+  - Phase 4 - Add self-checking so Codex spots problems first:
+    - Add or extend a repeatable AI gate health check that reads the active queue, active decision files, review outputs, and final UI rows.
+    - The check should fail if a visible row has no AI confidence, no AI reason, no supplier title, no Amazon title, or no matching active AI decision.
+    - The check should warn, not fail, when page text or ROI is missing but the title match decision remains defensible.
+    - The check should report counts and named example rows so Codex can act without waiting for the operator to notice.
+
+- How we know it worked:
+  - Routing proof:
+    - `pending_ai_check=0` after the AI worker cycle completes.
+    - `waiting_for_ai_queue=0` after handoff queue creation completes.
+    - Active queue row count equals active decision row count.
+    - Missing active decisions equals `0`.
+    - Stale active decisions equals `0`.
+  - Final-list proof:
+    - Every visible `New Product Review` row has `ai_match_confidence=` in `What to watch`.
+    - Every visible `New Product Review` row has `ai_compare=` in `What to watch`.
+    - Rows with `rescan_needed`, `remove_from_clean_pass`, invalid AI decision, or missing AI decision are not visible in the final list.
+  - Evidence proof:
+    - Missing supplier title rows equals `0`.
+    - Missing Amazon title rows equals `0`.
+    - Missing page text is tracked as a warning with examples.
+    - Missing ROI is tracked as a warning with examples.
+  - UI proof:
+    - `Price List Queue` remains before `New Product Review`.
+    - `AI Gate QA` remains outside the main daily review path.
+  - Test proof:
+    - O UI tests prove the final list carries AI compare notes.
+    - F gate tests prove stale decisions are archived and hidden.
+    - F review-intelligence tests prove the AI queue shape remains valid.
+
+- How Codex knows without waiting for the operator:
+  - Codex must use machine-readable outputs first:
+    - `out/systems/F/price_list_manager/live/ai_gate_quality_report.csv`
+    - `out/systems/F/price_list_manager/review_handoffs/**/ai_review_queue.csv`
+    - `out/systems/F/price_list_manager/review_handoffs/**/codex_ai_review_decisions.csv`
+    - `out/analysis_reports/f_live_price_file_pass_review_latest.csv`
+    - `out/analysis_reports/f_live_price_file_near_miss_review_latest.csv`
+  - Codex should treat the operator's comment as a symptom report, not the first detector.
+  - If the files show a fail condition, Codex should identify the exact affected supplier, run ID, SKU, ASIN, and reason before asking the operator anything.
+  - If the files show only warnings, Codex should classify them as backend cleanup unless they are blocking the final list.
+
+- Next implementation target:
+  - Build or extend a single read-only AI gate proof command that prints:
+    - current gate row counts by state
+    - active queue rows vs active decision rows
+    - missing and stale decision counts
+    - visible rows missing AI confidence or AI compare note
+    - missing supplier title count
+    - missing Amazon title count
+    - missing page text warning examples
+    - missing ROI warning examples
+  - Then wire that proof into the backend QA process so Codex can run it after every AI worker cycle and morning check.
+
+## AI Gate Backend Proof Command Implemented - 2026-05-21T14:55:09Z
+- What changed:
+  - Extended `scripts/flows/F/price_list_manager/FPM156_build_ai_gate_quality_report.py`.
+  - The command now proves the active AI queue and active Codex decision files match before rows can be trusted.
+  - The command now proves final `New Product Review` rows carry the short AI confidence and AI compare note in `What to watch`.
+  - Warning rows now include example supplier/run/SKU/ASIN values for missing page text and missing ROI.
+  - `F035_refresh_f032_ai_review_queues.py` already calls FPM156 after refreshing handoffs, so the stronger proof is now part of the backend queue refresh path.
+- New hard-fail checks:
+  - active queue row count differs from active decision row count
+  - queue row missing active AI decision
+  - active decision file contains stale decisions
+  - queue or decision row missing F032 decision ID
+  - duplicate active decision ID
+  - visible/final row missing AI reason, evidence, confidence, or compare note
+  - missing supplier title or Amazon title
+- Warning checks:
+  - missing page text stays a warning because titles can be enough
+  - missing ROI stays a warning because ROI is a suspicion signal, not the identity check itself
+  - historical duplicates stay a warning when only audit history is duplicated
+- Test proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py scripts\one_off\F035_refresh_f032_ai_review_queues.py` passed.
+  - `python -m pytest tests\test_fpm156_ai_gate_quality_report.py -q` returned `3 passed`.
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_feeder_review_pass_row_adds_ai_compare_note_to_what_to_watch tests\test_o_ui_operator_view.py::test_feeder_review_manual_row_prefers_ai_check_note -q` returned `2 passed`.
+- Live proof command:
+  - `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py`
+- Live proof result:
+  - `status=warn`
+  - `fail_checks=0`
+  - `warn_checks=3`
+  - `active_ai_queue_rows=38`
+  - `active_ai_decision_rows=38`
+  - `active_queue_decision_row_balance_delta=0`
+  - `active_queue_missing_decision_rows=0`
+  - `active_stale_decision_rows=0`
+  - `current_pending_ai_check_rows=0`
+  - `current_missing_supplier_title_rows=0`
+  - `current_missing_amazon_title_rows=0`
+  - `final_review_rows=6`
+  - `final_review_missing_ai_compare_note_rows=0`
+  - warnings remain for `history_duplicate_product_groups=2`, `current_missing_page_text_rows=4`, and `current_missing_roi_rows=9`
+- Current operator meaning:
+  - The backend gate is working for routing.
+  - The final list is not missing AI compare notes.
+  - Remaining warnings are cleanup targets, not current hard blockers.
+
+## AI Gate Warning Scope Cleanup - 2026-05-21T15:05:31Z
+- User issue:
+  - The proof still showed warning counts even though the affected page-text rows were rejected/hidden and several ROI rows had usable profit evidence.
+  - That made the backend look less healthy than it really was.
+- Root cause:
+  - `current_missing_page_text_rows` counted all current AI gate rows, including rows already rejected and hidden from `New Product Review`.
+  - `current_missing_roi_rows` looked only for ROI percentage and ignored available profit fallback evidence such as `profit_per_unit_gbp` and `expected_profit_gbp`.
+  - Historical duplicate groups were being reported as warnings even though they exist only in audit history and not in the current deduped view.
+- Fix made:
+  - `current_missing_page_text_rows` now counts operator-visible rows only.
+  - Added `current_hidden_missing_page_text_rows` as an OK/informational count.
+  - `current_missing_roi_rows` now means a visible row has neither ROI percentage nor profit fallback signal.
+  - Added `current_visible_profit_fallback_rows` as an OK/informational count.
+  - `history_duplicate_product_groups` is now OK when the current deduped view is clean.
+- Test proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py` passed.
+  - `python -m pytest tests\test_fpm156_ai_gate_quality_report.py -q` returned `4 passed`.
+- Live proof command:
+  - `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py`
+- Live proof result:
+  - `status=ok`
+  - `fail_checks=0`
+  - `warn_checks=0`
+  - `active_ai_queue_rows=38`
+  - `active_ai_decision_rows=38`
+  - `active_queue_missing_decision_rows=0`
+  - `active_stale_decision_rows=0`
+  - `current_missing_supplier_title_rows=0`
+  - `current_missing_amazon_title_rows=0`
+  - `current_missing_page_text_rows=0`
+  - `current_hidden_missing_page_text_rows=4`
+  - `current_missing_roi_rows=0`
+  - `current_visible_profit_fallback_rows=7`
+  - `final_review_missing_ai_compare_note_rows=0`
+- Backup:
+  - `out/backups/f_ai_gate_quality_warning_scope_20260521T160552/ai_gate_quality_report.csv`
+  - `out/backups/f_ai_gate_quality_warning_scope_20260521T160552/ai_gate_quality_summary.md`
+- Current operator meaning:
+  - The final list is protected.
+  - The AI proof is now quiet unless there is a real operator-visible issue.
+  - Hidden rejected rows and profit fallback rows are still recorded for backend truth, but they no longer create false warning noise.
+
+## New Product Review ROI Visibility - 2026-05-21T15:14:48Z
+- User issue:
+  - Human review did not clearly show ROI.
+  - The review card showed profit, but not a visible ROI percentage.
+- Root cause:
+  - `New Product Review` rendered a `Profit` column only.
+  - Some review pack files did not carry `profit_on_cost_pct`, even when the AI queue had it.
+  - Some rows genuinely have no ROI percentage because cost/sell-price fields were not available, but they still have profit fallback evidence.
+- Fix made:
+  - Renamed the human review column from `Profit` to `ROI / Profit`.
+  - The review card now shows `ROI <percent>` above the low/medium/high profit range.
+  - If ROI percent is missing, the card shows `ROI -` and keeps the profit evidence underneath.
+  - The review loader now merges commercial fields from the handoff `ai_review_queue.csv` into the human review rows when the review pack is missing them.
+  - This allows rows like Shure Cosmetics `SCS61701` to show the actual ROI percentage in human review.
+- Test proof:
+  - `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_normalizes_pass_and_near_miss_reports tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_merges_roi_from_ai_queue_for_human_review tests\test_o_ui_operator_view.py::test_feeder_review_pass_row_adds_ai_compare_note_to_what_to_watch tests\test_o_ui_operator_view.py::test_feeder_review_manual_row_prefers_ai_check_note -q` returned `4 passed`.
+  - `python -m pytest tests\test_fpm156_ai_gate_quality_report.py -q` returned `4 passed`.
+- Live proof:
+  - Shure Cosmetics human review rows now show ROI values from the AI queue:
+    - `SCS61701 / B01FIL601I`: `145.3%`
+    - `SCS21545 / B09XF8ZZG6`: `202.1%`
+    - `SCS22096 / B0915M1DLF`: `73.3%`
+    - `SCS19791 / B08MVG2TDJ`: `44.2%`
+  - Bliss, HEO, and several DHB rows still show `ROI -` because no ROI percent is present in the active review/AI queue data, but the card shows unit profit and 30-day profit as fallback.
+  - FPM156 still reports `status=ok`, `fail_checks=0`, `warn_checks=0`.
+- Backup:
+  - `out/backups/o_new_product_review_roi_display_20260521T161448/ai_gate_quality_report.csv`
+  - `out/backups/o_new_product_review_roi_display_20260521T161448/ai_gate_quality_summary.md`
+- Current operator meaning:
+  - If ROI exists upstream, it is now visible directly in `New Product Review`.
+  - If ROI is missing, the row visibly says `ROI -` instead of hiding the absence.
+  - Profit is still visible so the row is not commercially blank.
+
+## New Product Review ROI Own Column - 2026-05-21T19:29:09Z
+- User issue:
+  - ROI was mixed into the same card column as profit.
+  - The user wanted ROI to read like the score column: simple whole percent, no decimals.
+- Fix made:
+  - Split the combined `ROI / Profit` column into two columns: `ROI` and `Profit`.
+  - `ROI` now renders as a plain rounded whole percent such as `187%`.
+  - Missing ROI still shows `-`.
+  - The profit column now only shows low/medium/high profit.
+- Test proof:
+  - `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_feeder_review_headers_keep_roi_in_own_column tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_normalizes_pass_and_near_miss_reports tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_merges_roi_from_ai_queue_for_human_review -q` returned `3 passed`.
+- Rendered UI proof:
+  - Temporary Streamlit server returned HTTP `200` at `http://localhost:8506/?page=new_product_review`.
+  - Browser opened the manual review lane.
+  - Rendered headers showed `ROI` and `Profit` as separate columns.
+  - Rendered page did not show the old `ROI / Profit` header.
+  - Rendered ROI examples were whole percentages: `187%`, `178%`, `116%`, `164%`.
+- Backup:
+  - `out/backups/o_new_product_review_roi_own_column_20260521T192909Z/O400_operator_ui.py`
+  - `out/backups/o_new_product_review_roi_own_column_20260521T192909Z/test_o_ui_operator_view.py`
+- Current operator meaning:
+  - Day-to-day human review now has a quick ROI column beside the sales/profit signals.
+  - Profit remains visible but no longer has ROI mixed into its stack.
+
+## New Product Review Page Restoration - 2026-05-21T15:24:33Z
+- User issue:
+  - The daily `New Product Review` page looked like it had been replaced by a plain backend table.
+- Root cause:
+  - The backend AI QA route was still present in the normal operator page navigation.
+  - A stale `?page=ai_product_check_gate` URL could therefore open the backend table where the operator expected the card review page.
+  - `New Product Review` was also rendering the Amazon listing draft lane underneath the human review cards, mixing two different jobs on one page.
+- Fix made:
+  - Removed `AI Gate QA` from the normal operator navigation.
+  - Added a hidden route redirect so old `ai_product_check_gate` links now land on `new_product_review`.
+  - Stopped `New Product Review` from rendering the Amazon listing draft lane.
+  - Kept `Product Listing Profile Review` as the place for the Amazon listing draft lane.
+- Test proof:
+  - `python -m py_compile scripts\flows\O\O400_operator_ui.py` passed.
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_operator_nav_keeps_ai_gate_out_of_daily_navigation tests\test_o_ui_operator_view.py::test_feeder_review_source_loader_merges_roi_from_ai_queue_for_human_review tests\test_o_ui_operator_view.py::test_feeder_review_pass_row_adds_ai_compare_note_to_what_to_watch -q` returned `3 passed`.
+- Rendered UI proof:
+  - Temporary Streamlit server returned HTTP `200` at `http://localhost:8506/?page=new_product_review`.
+  - Browser opened old backend URL `http://localhost:8506/?page=ai_product_check_gate`.
+  - The page redirected to `http://localhost:8506/?page=new_product_review`.
+  - Rendered page showed `New Product Review`.
+  - Rendered page did not show `AI Gate QA` or `AI Product Check Gate`.
+- Backup:
+  - `out/backups/o_new_product_review_page_restore_20260521T152433Z/O400_operator_ui.py`
+  - `out/backups/o_new_product_review_page_restore_20260521T152433Z/test_o_ui_operator_view.py`
+- Current operator meaning:
+  - The card-based `New Product Review` page was not deleted.
+  - The backend AI table is now removed from normal day-to-day navigation.
+  - Old backend URLs now return the operator to the card review page instead of the QA table.
+
+## ROI Catch-Up And To-Do-Only Review Pack List - 2026-05-21T22:05:47Z
+- User issue:
+  - HEO, DHB, and Bliss rows had profit evidence but missing ROI because F032 was not reading the real cost columns from their original supplier files.
+  - `New Product Review` review packs behaved like a history list, so packs with no work in the selected lane still appeared.
+  - The AI gate quality report still warned on title-only clears even when the title match was high confidence.
+- Root cause:
+  - F032 only carried supplier title from source files and left source `unit_cost` blank.
+  - The review-pack selector was built before the lane was applied, so it could not hide packs with 0 undecided rows for that lane.
+  - FPM156 treated missing Amazon description text as a warning even when title evidence already proved the match.
+- Fix made:
+  - Added upstream cost extraction in `scripts/flows/F/_review_intelligence.py`.
+  - Recognised cost columns now include `unit_cost`, `supplier_unit_cost`, `cost`, `price`, `trade price`, `clearance price`, `basepriceperunit`, and `base price per unit`.
+  - Rebuilt affected Bliss, DHB, and HEO handoffs through the safe AI gate path, with backups first.
+  - Moved lane selection before review-pack selection in `New Product Review`.
+  - Review-pack dropdown now shows only packs with undecided work for the selected lane.
+  - Pack labels now show work counts, for example `Bliss Distribution - 3 passes to review`.
+  - FPM156 now accepts high-confidence same-product title clears when page description text is blank, while keeping warnings for genuinely weak visible rows.
+- Backup:
+  - `out/backups/f_ai_roi_cost_backfill_before_rebuild_20260521T215913Z`
+- Rebuild proof:
+  - 10 handoffs rebuilt:
+    - Bliss Distribution: 2 runs
+    - DHB: 7 runs
+    - HEO: 1 run
+  - All returned `status=gated`, `ai_gate_status=passed`, `operator_ready_flag=1`, `ai_gate_fail_rows=0`, `ai_gate_warn_rows=0`.
+- Live ROI proof:
+  - Bliss `KONYKSL / B0CGX83HHK`: `77%`, cost `3.69`.
+  - Bliss `ATMDSH12124 / B0DBVJSGJC`: `78%`, cost `6.25`.
+  - HEO `DSG106549 / B083TLCKWB`: `50%`, cost `5.38`.
+  - DHB `PDL504 / B001AI8AKI`: `50%`, cost `1.6`.
+  - DHB `TEP084 / B0853KGR7X`: `139%`, cost `1.092652`.
+- Review-pack dropdown proof:
+  - `Passes` lane shows Bliss, Shure, HEO, and DHB packs with pass rows to review.
+  - `Passes` lane does not show Entertainment Trading because it has 0 pass rows to review.
+  - `Manual review` lane shows Entertainment Trading with `4 manual review`.
+- Rendered UI proof:
+  - Temporary Streamlit server returned HTTP `200` at `http://localhost:8506/?page=new_product_review`.
+  - Browser opened `New Product Review`.
+  - Rendered page showed `Bliss Distribution - 3 passes to review`.
+  - Rendered page showed separate `ROI` and `Profit` columns with rounded values such as `77%`, `78%`, and `68%`.
+  - Rendered page did not show `AI Product Check Gate`.
+  - Screenshot proof: `out/backups/f_ai_roi_cost_backfill_ui_proof_20260521T220547Z.png`.
+- Quality report proof:
+  - `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py`
+  - `status=ok`
+  - `fail_checks=0`
+  - `warn_checks=0`
+  - `active_ai_queue_rows=38`
+  - `active_ai_decision_rows=38`
+  - `current_missing_roi_rows=0`
+  - `current_missing_page_text_rows=0`
+  - `current_visible_secondary_guard_rows=0`
+- Test proof:
+  - `python -m py_compile scripts\flows\F\_review_intelligence.py scripts\flows\O\O400_operator_ui.py`
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py`
+  - `python -m pytest tests\test_f032_build_review_intelligence_cycle.py::test_f032_recovers_supplier_cost_from_handoff_source_file_aliases tests\test_f032_build_review_intelligence_cycle.py::test_f032_recovers_supplier_title_from_handoff_source_file tests\test_o_ui_operator_view.py::test_feeder_review_pack_options_are_lane_todo_lists tests\test_o_ui_operator_view.py::test_feeder_review_can_load_completed_handoff_pack tests\test_o_ui_operator_view.py::test_feeder_review_headers_keep_roi_in_own_column tests\test_fpm156_ai_gate_quality_report.py -q`
+  - Final focused result: `9 passed`.
+- Operator meaning:
+  - New scans should now carry ROI into AI review when the supplier file has a recognised cost column.
+  - The normal `New Product Review` dropdown is now a to-do list, not a history archive.
+  - Historical packs stay reachable only through the older snapshot control.
+  - Description is still useful evidence, but title-only clears are allowed when the AI/title evidence is strong.
+
+## Daily Queue Manager Run - 2026-05-22T05:01:40Z
+- Safe refresh path run: `python scripts/one_off/F035_refresh_f032_ai_review_queues.py`.
+- Queue status after refresh: `candidate_manifest_count = 14`, `already_gated = 14`, `pending_ai_decision = 0`.
+- AI gate quality proof (`python scripts/flows/F/price_list_manager/FPM156_build_ai_gate_quality_report.py` from F035 refresh): `status = ok`, `fail_checks = 0`, `warn_checks = 0`.
+- Secondary-guard check: `current_visible_secondary_guard_rows = 0`, so no forced re-review rows existed this cycle.
+- Queue/decision file proof across handoff folders: `ai_review_queue_rows = 38`, `codex_ai_review_decision_rows = 38`, `pending_rows = 0`, `invalid_action_rows = 0`.
+- Decision work this run: no rows required fresh Codex decisions, so no `FPM155` rerun was required.
+- Next safe action: continue daily safe refresh and only open row-level decisions when a handoff returns `pending_ai_decision > 0` or `current_visible_secondary_guard_rows > 0`.
+
+## F Throughput Restore And Drift Guard - 2026-05-22T07:56:30Z
+- User issue:
+  - Daily AI queue manager was green, but no new products were making it through because the upstream F scanner was stuck in `blocked_state_regression`.
+- Root cause:
+  - F live cycle was reading SQL first in `sql_primary_csv_export` mode.
+  - Several critical F runtime SQL tables were stale versus their fresher CSV contracts.
+  - The live cycle believed TD Synnex still had `46067` pending rows while the fresher CSV contract had `44684`, so the state regression guard kept blocking the same run.
+- Fix made:
+  - Added `scripts/flows/F/price_list_manager/FPM129_storage_drift_guard.py`.
+  - Added one-off reconciler `scripts/one_off/F041_reconcile_price_list_storage_drift.py`.
+  - Added live preflight drift checking to `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`.
+  - Live preflight now auto-reconciles SQL from CSV for critical F runtime contracts when CSV is safe authority.
+  - Unsafe storage drift now blocks as `blocked_storage_drift` instead of generic state regression.
+  - Added repeated stable regression reset logic so one repeated stale baseline can be bypassed only when pending count is stable and source-shape checks pass.
+  - Extended `scripts/one_off/F035_refresh_f032_ai_review_queues.py` so queue-manager output includes upstream live state, latest scanner chunk time, active supplier/run, and handoff marker.
+- Config added:
+  - `FPM_STORAGE_DRIFT_AUTO_RECONCILE=1|0`
+  - `FPM_STORAGE_DRIFT_CRITICAL_CONTRACTS=<comma-list>`
+  - `FPM_STATE_REGRESSION_REPEAT_RESET_THRESHOLD=<int>`
+- New proof artifact:
+  - `out/systems/F/price_list_manager/live/storage_drift_report.csv`
+- Backup proof:
+  - `out/backups/f_storage_drift_reconcile_20260522T074745Z`
+  - `out/backups/f_storage_drift_reconcile_20260522T075203Z`
+- Reconcile proof:
+  - Initial dry-run: `checked_contracts=7`, `drift_rows=7`.
+  - Apply run: `status=reconciled`, `checked_contracts=7`, `reconciled_rows=7`, `blocked_rows=0`.
+  - Final dry-run: `status=ok`, `checked_contracts=7`, `drift_rows=0`, `blocked_rows=0`.
+  - Latest report rows show `row_delta_before=0` and `status_after=ok` for all 7 critical contracts.
+- Live proof:
+  - Maintenance drain reached `drain_exit` at `2026-05-22T07:47:02Z`.
+  - First recovery scanner chunk emitted at `2026-05-22T07:49:19Z`: TD Synnex processed `25`, pending moved to `44659`.
+  - Corrected SQL-primary relaunch emitted scanner chunk at `2026-05-22T07:52:03Z`: TD Synnex processed `25`, pending moved to `44634`.
+  - Continued live proof at `2026-05-22T07:55:10Z`: TD Synnex processed another `25`, pending moved to `44609`, `state=running`, `last_action_status=success`.
+- Queue-manager proof:
+  - `python scripts/one_off/F035_refresh_f032_ai_review_queues.py`
+  - `candidate_manifest_count=14`
+  - `status_counts.already_gated=14`
+  - `quality_status=ok`
+  - `fail_checks=0`
+  - `warn_checks=0`
+  - Upstream summary now reports `upstream_status=ok`, `live_cycle_state=running`, `latest_scanner_chunk_utc=2026-05-22T07:55:10Z`, `latest_scanner_chunk_pending_after=44609`.
+- Test proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM129_storage_drift_guard.py scripts\one_off\F041_reconcile_price_list_storage_drift.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\one_off\F035_refresh_f032_ai_review_queues.py`
+  - `python -m pytest tests\test_fpm129_storage_drift_guard.py tests\test_fpm130_live_cycle.py tests\test_f035_refresh_f032_ai_review_queues.py -q`
+  - Final focused result: `72 passed`.
+- Bound follow-up:
+  - Trigger: TD Synnex active run `fpm_td_synnex_20260519T095000Z` reaches `pending_rows=0` or emits a completed-run event.
+  - Inspect: `out/systems/F/price_list_manager/live/review_handoff_manifest.csv` and `out/systems/F/price_list_manager/review_handoffs/td_synnex/fpm_td_synnex_20260519T095000Z/manifest.csv`.
+  - Success condition: a fresh TD Synnex completed handoff manifest exists and FPM155/F035 can gate or expose any AI decision rows.
+  - If it fails: inspect latest `live_cycle_events.csv` for completion/build-pack blockers, then run the safe FPM150/FPM155 handoff path for that supplier/run only.
+
+## Incremental TD Synnex AI Precheck Lane - 2026-05-22T08:58:30Z
+- User goal:
+  - Start AI checks for TD Synnex webscrape/API pass rows while the supplier scan is still running.
+  - Keep those rows hidden from the human `New Product Review` page until TD Synnex finishes completely.
+- Fix made:
+  - Added hidden precheck common helpers in `scripts/flows/F/price_list_manager/FPM158_ai_precheck_common.py`.
+  - Added hidden precheck builder in `scripts/flows/F/price_list_manager/FPM157_build_incremental_ai_precheck.py`.
+  - Added FPM130 after-chunk precheck trigger for enabled suppliers.
+  - Added FPM155 final-handoff reuse of matching precheck decisions when the `f032_decision_id` and evidence hash still match.
+  - Added F035 daily catch-up and summary fields for hidden precheck rows.
+  - Added a `write_sql_snapshots=False` path to F019 so hidden prechecks do not overwrite normal review-pack SQL snapshots.
+- Config defaults:
+  - `FPM_INCREMENTAL_AI_PRECHECK_ENABLED=1`
+  - `FPM_INCREMENTAL_AI_PRECHECK_SUPPLIERS=td_synnex`
+  - `FPM_INCREMENTAL_AI_PRECHECK_AFTER_CHUNK=1`
+  - `FPM_INCREMENTAL_AI_PRECHECK_DAILY_CATCHUP=1`
+- Hidden output root:
+  - `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/`
+- Live proof:
+  - Manual hidden precheck run at `2026-05-22T08:41:47Z` produced `eligible_pass_rows=2`, `ai_queue_rows=2`, `pending_ai_decision_rows=2`, `hidden_until_completed_flag=1`.
+  - FPM130 after-chunk trigger emitted `incremental_ai_precheck` at `2026-05-22T08:43:17Z` with `status=pending_ai_decision`, `rows=2`, `pending_ai_decision_rows=2`.
+  - F035 daily catch-up proof reported `catchup_status=pending_ai_decision`, `precheck_pending_ai_decision_rows=2`, `precheck_decided_rows=0`, `precheck_stale_decision_rows=0`, `final_handoff_pending_ai_decision_rows=0`.
+  - F035 AI gate quality remained green: `quality_status=ok`, `fail_checks=0`, `warn_checks=0`.
+- Hidden queue rows currently pending AI decisions:
+  - `77-95260 / B0D3JBV3MY`
+  - `60-589-060 / B000W0ETD2`
+- Test proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM157_build_incremental_ai_precheck.py scripts\flows\F\price_list_manager\FPM158_ai_precheck_common.py scripts\flows\F\price_list_manager\FPM155_apply_review_intelligence_gate.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\one_off\F035_refresh_f032_ai_review_queues.py scripts\one_off\F019_build_live_price_file_near_miss_pack.py`
+  - `python -m pytest tests\test_f019_build_live_price_file_near_miss_pack.py tests\test_fpm130_live_cycle.py tests\test_fpm155_apply_review_intelligence_gate.py tests\test_fpm157_incremental_ai_precheck.py tests\test_f035_refresh_f032_ai_review_queues.py -q`
+  - Final focused result: `129 passed`.
+- Safety proof:
+  - No Google Sheets writes were made.
+  - No product DB writes were made.
+  - No raw scanner evidence files were rewritten.
+  - Hidden precheck rows are outside `review_handoffs`, so they are not human-visible until the completed handoff is built.
+- Bound follow-up:
+  - Trigger: next daily AI queue manager cycle or any manual AI precheck decision pass.
+  - Inspect: `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_review_queue.csv` and `codex_ai_review_decisions.csv`.
+  - Success condition: `pending_ai_decision_rows=0` for hidden precheck rows, with valid Codex actions and reasons.
+  - If it fails: leave unsafe rows pending with blocker notes, then let final FPM155 request fresh AI decisions when TD Synnex completes.
+
+## F Scanner Phase 8 Storage Repair And Routing Proof - 2026-05-22T11:15:00Z
+- User-approved boundary:
+  - Repaired only `supplier_price_list_active_run`.
+  - Direction was SQL to CSV because SQL was newer.
+  - No Google Sheets writes were made.
+  - No product DB authority alignment was made.
+  - No supplier queue rows were deleted manually.
+- Pre-repair evidence:
+  - CSV rows before repair: `44274`.
+  - SQL rows before repair: `44385`.
+  - SQL-only rows: `111`.
+  - CSV-only rows: `0`.
+  - All SQL-only rows belonged to `td_synnex` and run `fpm_td_synnex_20260519T095000Z`.
+- Backup:
+  - `out/backups/f_phase8_sql_to_csv_active_run_20260522T103127Z`.
+  - Backup includes SQLite, active-run CSV, live status/events, storage drift report, production-line health, and SQL-only sample evidence.
+- Repair result:
+  - `supplier_price_list_active_run.csv` was rebuilt from SQL through the registered F contract schema.
+  - CSV rows after repair: `44385`.
+  - SQL rows after repair: `44385`.
+  - Storage drift dry check after repair: `status=ok`, `checked_contracts=7`, `drift_rows=0`, `blocked_rows=0`.
+- Test proof:
+  - Compile passed for `FPM180`, `FPM130`, and `F061`.
+  - Targeted fix tests: `6 passed`.
+  - Broader focused regression after the routing fix: `230 passed`.
+- Shadow live proof:
+  - FPM130 restarted in `shadow` mode.
+  - Stable state-regression reset fired only after the restored pending count repeated 3 times.
+  - Script-owned Login Mode drained normally: `login_mode_backlog_drained`, `merged_rows=1`.
+  - Shadow chunk 1: `scanner_chunk`, `rows=25`, `pending_after=44360`.
+  - Shadow snapshot 1: `production_line_snapshot`, `status=completed`, `browser_input_rows=22`.
+  - Shadow chunk 2: `scanner_chunk`, `rows=25`, `pending_after=44335`.
+  - Shadow snapshot 2: `production_line_snapshot`, `status=completed`, `browser_input_rows=19`.
+- Enforced live proof:
+  - First enforced capped run started F061 with `--allowlist-path ...browser_input.csv` and `--max-rows 10`.
+  - F061 loaded the allowlist but selected `0` rows, proving it did not fall back to the old queue.
+  - Root cause found: browser routing could include stale survivor rows no longer present in the active pending queue.
+  - Fix made: `browser_input.csv` now filters fee/hazmat pass rows to active pending candidate IDs only.
+  - Fixed routing probe produced `source_browser_rows=19`, `active_pending_rows=44332`, `browser_input_rows=0`.
+  - Second enforced run blocked safely with `f_production_line_routing_runtime = warn`, `value=blocked`, `notes=routing_mode=enforced;browser_input_empty`.
+  - FPM130 was returned to `shadow` mode afterward.
+- Current live state:
+  - FPM130 shadow owner restored as PID `5284`.
+  - Latest storage drift dry check: `status=ok`, `checked_contracts=7`, `drift_rows=0`, `blocked_rows=0`.
+  - Latest live status after restore: `state=running`, active supplier `td_synnex`, run `fpm_td_synnex_20260519T095000Z`.
+- Parked positive enforced sample:
+  - Trigger: a future production-line snapshot for TD Synnex, or another supplier, writes `browser_input_rows > 0` after active-pending filtering.
+  - Inspect: `out/systems/F/price_list_manager/pipeline_runs/<supplier_id>/<run_id>/browser_routing_manifest.csv` and `out/systems/F/price_list_manager/live/production_line_health.csv`.
+  - Success condition: enforced capped FPM130 run starts F061 with `--allowlist-path`, F061 reports `allowlist_status=loaded`, `allowlist_selected_rows > 0`, and `processed_rows <= chunk_rows`.
+  - If it fails: keep routing in `shadow`, inspect allowlist identity matching between `browser_input.csv` and `supplier_price_list_active_run.csv`, then fix the earliest mismatched identity source.
+
+## F Scanner Phase 9 API/Browser Split - 2026-05-22T12:28:46Z
+- Current phase:
+  - Implement Phase 9 behind disabled defaults.
+  - Keep existing live behavior unless `F061_STAGE_MODE` or `FPM_PRODUCTION_LINE_EXECUTION_MODE` is explicitly changed.
+- Allowed implementation files:
+  - `scripts/flows/F/F061_run_legacy_first_checks_local.py`.
+  - `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`.
+  - `scripts/flows/F/price_list_manager/FPM180_build_production_line_run.py`.
+  - Focused F tests for F061, FPM130, FPM180, AI gate, and review visibility.
+- Required behavior:
+  - `F061_STAGE_MODE=legacy_full` remains the default.
+  - `F061_STAGE_MODE=api_only` must stop before browser work and leave API-passed rows as `scan_reason=browser_stage_ready`.
+  - `F061_STAGE_MODE=browser_only` must require a completed allowlist route and use existing API evidence.
+  - `FPM_PRODUCTION_LINE_EXECUTION_MODE=legacy_full` remains the default.
+  - Browser routing must include only active pending rows already marked `browser_stage_ready`.
+- Proof plan:
+  - Compile changed F scripts.
+  - Run focused F061, FPM130, FPM180, FPM150, FPM155, FPM156, FPM157, and O400 tests.
+  - Do not restart live FPM130 for this code-only phase unless a positive browser route sample exists and a capped proof is explicitly needed.
+- Live monitoring target:
+  - Current FPM130 owner should continue in default shadow behavior.
+  - Check `out/systems/F/price_list_manager/live/live_cycle_status.csv` and `out/systems/F/price_list_manager/live/production_line_health.csv` after isolated tests.
+- Success threshold:
+  - New tests pass.
+  - Existing focused regression passes.
+  - No default behavior change is observed in the live owner command line.
+- Timeout rule:
+  - If focused regression cannot complete in this turn, record exact failing test or timeout in this plan before ending.
+- Automatic next step:
+  - After isolated proof passes, keep live mode at defaults and park the positive capped enforced proof until `browser_input_rows > 0` exists after the new `browser_stage_ready` filter.
+- Isolated proof update - 2026-05-22:
+  - Code fix applied:
+    - `F061_STAGE_MODE=legacy_full|api_only|browser_only` was added with `legacy_full` as the default.
+    - `FPM_PRODUCTION_LINE_EXECUTION_MODE=legacy_full|split_enforced` was added with `legacy_full` as the default.
+    - API-only rows that pass API checks now stay pending with `scan_reason=browser_stage_ready`.
+    - Browser-only requires a completed allowlist route and existing API evidence before it will process rows.
+    - `FPM180` browser routing now includes only active pending rows marked `browser_stage_ready`.
+    - Same-run API cache files and `production_line_speed_ledger.csv` were added under the production-line run folder.
+  - Isolated verification passed:
+    - Compile passed for `F061`, `FPM130`, and `FPM180`.
+    - New focused Phase 9 tests passed: `5 passed`.
+    - Focused F regression passed: `242 passed`.
+  - Live loop verification:
+    - Not yet proven for `split_enforced` because the new defaults intentionally keep the live owner on old behavior.
+    - Current live FPM130 owner remains PID `5284` under the normal live command.
+    - Last observed live status was `state=running`, supplier `td_synnex`, run `fpm_td_synnex_20260519T095000Z`.
+  - Next proof trigger:
+    - Trigger: `browser_routing_manifest.csv` reports `browser_input_rows > 0` after the `browser_stage_ready` filter.
+    - Inspect: `out/systems/F/price_list_manager/pipeline_runs/<supplier_id>/<run_id>/browser_routing_manifest.csv`.
+    - Success condition: capped `split_enforced` proof starts F061 in browser-only mode with `allowlist_status=loaded`, selected rows greater than `0`, and processed rows less than or equal to the cap.
+    - If it fails: return FPM130 to `legacy_full` or routing `shadow`, preserve active rows, and inspect allowlist identity matching before trying again.
+
+## F Scanner Phase 10 Capped Split Proof - 2026-05-22T11:56:34Z
+- Current phase:
+  - Prove the two-step live path on a capped TD Synnex sample.
+  - Step 1 is API-only. Step 2 is browser-only only if API-only creates `browser_stage_ready` survivors.
+- Allowed runtime action:
+  - Stop the current script-owned F061 child and FPM130 owner if they are still active.
+  - Start one controlled FPM130 run with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced` and `--chunk-rows 10`.
+  - Return live ownership to the normal default command after the proof or blocker is recorded.
+- Rollback snapshot:
+  - Capture active-run CSV, F live status files, production-line files, and SQLite database before the controlled proof run.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_events.csv`.
+  - `out/systems/F/price_list_manager/live/f061_child_stdout.log`.
+  - `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/browser_routing_manifest.csv`.
+- Success threshold:
+  - API-only runs without opening browser work.
+  - `browser_input_rows > 0` is written from rows marked `browser_stage_ready`, or the run records that no API survivors existed.
+  - If browser rows exist, browser-only starts with an allowlist and processes no more than 10 rows.
+  - Login, CAPTCHA, BBP block, or API throttling stays retry/login work, not false product failure.
+- Timeout rule:
+  - Stop monitored proof after 60 minutes.
+  - If no browser-ready route appears, record the blocker as `parked pending next proof window` with the latest manifest and event evidence.
+- Automatic next step:
+  - If capped split proof passes, keep split mode disabled by default and prepare Phase 11 AI gate/review lock verification.
+  - If capped split proof blocks, restore normal FPM130 ownership and inspect the earliest failed stage before another live attempt.
+- Live proof update - 2026-05-22:
+  - Rollback snapshot:
+    - `out/backups/f_phase10_split_proof_before_20260522T115737Z`.
+  - Runtime control:
+    - Existing F061/FPM130 owner was stopped for the proof window.
+    - A stale protected F owner required WMIC termination after normal stop methods were denied.
+    - Stale owner markers were cleared only after the referenced PIDs were no longer active.
+  - First capped split sample:
+    - Cycle run: `fpm_live_20260522T120609Z`.
+    - API-only processed `10` TD Synnex rows.
+    - Result: `8` `OVER50K`, `2` `NOASIN`, `0` browser-ready rows.
+    - Browser work was not opened because every row stopped at the API station.
+  - Positive capped split sample:
+    - Cycle run: `fpm_live_20260522T121303Z`.
+    - API-only started at `2026-05-22T12:14:20Z`.
+    - API-only processed `10` rows with `2` `BROWSER_READY`, `2` `OVER50K`, and `6` `ROIFAIL`.
+    - API-only wrote `browser_stage_ready_rows=2` and `scrape_attempted_rows=0`.
+    - Production-line snapshot recorded `browser_input_rows=2` before browser-only consumed the route.
+    - Browser-only started at `2026-05-22T12:17:17Z`.
+    - Browser-only loaded `browser_input.csv` with `allowlist_rows=2`, `allowlist_selected_rows=2`, and `processed_rows=2`.
+    - Browser-only reused API evidence: catalog, hazmat, pricing, and fees calls were all `0`.
+    - Browser-only attempted browser scrape for `2` rows and completed both as scanner outcomes, not product false-fail retries.
+    - Final post-browser production-line snapshot returned `browser_input_rows=0` because the two routed rows had been consumed.
+  - Post-proof ownership:
+    - Normal FPM supervisor was restored through `run_F_price_list_manager_cycle.bat`.
+    - Restored FPM130 owner PID: `16112`.
+    - Restored F061 child PID: `27348`.
+    - Restored child command uses `--stage-mode legacy_full`, so split mode remains disabled by default.
+  - Post-proof storage:
+    - Latest storage drift report at `2026-05-22T12:25:37Z` shows row deltas `0` and `status_after=ok` for all checked F contracts.
+  - Result:
+    - Phase 10 capped two-step proof passed for one positive TD Synnex sample.
+    - Browser attempted rows were lower than API checked rows: `2` browser rows after `10` API rows.
+    - No Google Sheets writes were made.
+  - Automatic next step:
+    - Continue with Phase 11 AI gate and review-lock verification.
+
+## F Scanner Phase 11 AI Gate And Review Lock - 2026-05-22T12:32:12Z
+- Current phase:
+  - Make sure raw FPM150 review packs cannot become operator work.
+  - Keep FPM155 as the only publisher of operator-ready `manifest.csv`.
+  - Require FPM156 quality proof before a manifest remains operator-ready.
+- Allowed implementation files:
+  - `scripts/flows/F/price_list_manager/FPM155_apply_review_intelligence_gate.py`.
+  - `scripts/flows/F/price_list_manager/FPM156_build_ai_gate_quality_report.py`.
+  - `scripts/flows/F/price_list_manager/_schemas.py`.
+  - `scripts/flows/O/O400_operator_ui.py`.
+  - `scripts/flows/F/F090_build_amazon_listing_intake.py`.
+  - Focused FPM150, FPM155, FPM156, FPM157, O400, and F090 tests.
+- Backup:
+  - `out/backups/f_phase11_ai_gate_lock_before_20260522T123212Z`.
+- Required behavior:
+  - FPM150 remains raw candidate-pack creation only.
+  - FPM155 may write the only operator-ready manifest.
+  - FPM155 must run or consume FPM156 quality proof and keep `operator_ready_flag=0` if `fail_checks > 0`.
+  - O400 New Product Review must read only AI-gated pass rows.
+  - F090 listing intake must read only AI-gated pass rows.
+  - Stale hidden FPM157 precheck decisions must be archived when evidence hashes change.
+- Proof plan:
+  - Patch FPM155 if it does not already enforce FPM156 `fail_checks=0`.
+  - Compile changed scripts.
+  - Run focused tests for FPM150, FPM155, FPM156, FPM157, O400, and F090.
+  - Confirm live FPM130 remains in normal `legacy_full` scanner mode after tests.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_status.csv`.
+  - `out/systems/F/price_list_manager/live/fpm_live_supervisor_state.txt`.
+- Success threshold:
+  - Quality failure leaves no operator-ready manifest.
+  - Raw candidate manifests stay blocked from O400 and F090.
+  - Stale precheck decisions are archived, not reused.
+  - Focused tests pass.
+- Timeout rule:
+  - If proof cannot complete this turn, record the exact failing test or blocker here before ending.
+- Automatic next step:
+  - If Phase 11 passes, prepare controlled default-off split rollout plan.
+- Implementation and proof update - 2026-05-22T12:40:05Z:
+  - Code fix applied:
+    - `FPM155` now runs `FPM156` quality proof before leaving a manifest operator-ready.
+    - If `FPM156` returns `fail_checks > 0`, `FPM155` rewrites the handoff and live manifests with `ai_gate_status=failed_quality`, `operator_ready_flag=0`, and `block_reason=ai_gate_quality_report_failed`.
+    - `review_handoff_manifest.csv` schema now carries the quality stamp fields: `ai_gate_quality_status`, `ai_gate_quality_fail_checks`, `ai_gate_quality_warn_checks`, and `ai_gate_quality_report_path`.
+    - Existing already-gated manifests are rechecked and stamped when FPM155 is run again.
+  - Isolated verification passed:
+    - Compile passed for `FPM155`, `FPM156`, `O400`, and `F090`.
+    - Narrow quality-lock proof passed: `2 passed`.
+    - Phase 11 focused regression passed: `114 passed`.
+  - Live loop status:
+    - Normal FPM170 supervisor remains active as PID `31008`.
+    - Normal FPM130 owner remains active as PID `16112`.
+    - Normal F061 child remains active as PID `27348`.
+    - F061 is still running with `--stage-mode legacy_full`, so no split mode was enabled during Phase 11 code proof.
+    - Latest live lock heartbeat observed: `2026-05-22T12:39:47Z`.
+    - Latest supervisor state observed: `state=ok` at `2026-05-22T12:40:44Z`.
+  - Result:
+    - Phase 11 AI gate and review lock passed isolated proof.
+    - No Google Sheets writes were made.
+  - Automatic next step:
+    - Continue with the controlled default-off split rollout plan.
+
+## F Scanner Phase 12 Default-Off Split Rollout Control - 2026-05-22T12:42:00Z
+- Current phase:
+  - Keep the split scanner path disabled by default.
+  - Add a local readiness report that proves whether the system is safe for a capped split proof window.
+  - Do not enable long-running `split_enforced` mode in the normal live owner during this phase.
+- Allowed implementation files:
+  - `scripts/flows/F/price_list_manager/FPM190_build_split_rollout_readiness.py`.
+  - `scripts/flows/F/price_list_manager/FPM191_backfill_ai_quality_stamps.py`.
+  - `tests/test_fpm190_split_rollout_readiness.py`.
+  - `tests/test_fpm191_backfill_ai_quality_stamps.py`.
+  - `project_control/feeder_scanner_to_review/CODING_PLAN.md`.
+  - `project_control/EXPECTATIONS/feeder_cycle_expectations.md`.
+- Backup:
+  - `out/backups/f_phase12_default_off_rollout_before_20260522T124200Z`.
+- Required behavior:
+  - The readiness report must be read-only against scanner row data.
+  - It must confirm the current split execution switch is default-off unless an explicit proof run is active.
+  - It must check storage drift, live ownership markers, latest production-line health, routing health, speed ledger presence, and AI-gated manifest quality stamps.
+  - It must write a health row so default-off rollout readiness is visible outside chat.
+  - Any operator-ready manifest with missing or failed FPM156 quality proof must block rollout readiness.
+  - If old operator-ready manifests are missing the new quality stamp, the metadata repair must run FPM156 first and stop without writing if FPM156 has hard failures.
+- Proof plan:
+  - Compile the new readiness script.
+  - Run unit tests for the readiness report.
+  - Run the readiness report against the current repo.
+  - Confirm live FPM130 remains in normal `legacy_full` scanner mode after the report.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/split_rollout_readiness.csv`.
+  - `out/systems/F/price_list_manager/live/production_line_health.csv`.
+  - `out/systems/F/price_list_manager/live/live_cycle_status.csv`.
+- Success threshold:
+  - Readiness unit tests pass.
+  - Current readiness report returns no hard `fail` checks.
+  - Normal FPM130/F061 ownership remains active and default-off.
+- Timeout rule:
+  - If readiness is blocked, record the exact failed check and remediation path here before ending.
+- Automatic next step:
+  - If readiness passes, continue with a controlled capped split rollout proof only when the report says the default-off switchboard is ready.
+- Implementation and proof update - 2026-05-22T12:53:30Z:
+  - Code fix applied:
+    - Added `FPM190_build_split_rollout_readiness.py` as a read-only readiness report for the default-off split rollout switchboard.
+    - Added `FPM191_backfill_ai_quality_stamps.py` as a guarded metadata repair for old operator-ready manifests missing the new FPM156 quality stamp.
+    - `FPM191` runs FPM156 first and writes no manifest changes if `fail_checks > 0`.
+  - Initial readiness result:
+    - `split_rollout_readiness.csv` first returned `status=fail`, `fail_checks=1`, because 15 historical operator-ready manifest rows were missing quality stamp fields.
+    - This was a real old-manifest metadata gap, not a scanner row or product decision change.
+  - Repair result:
+    - FPM156 quality proof returned `fail_checks=0`.
+    - FPM191 updated quality stamp metadata on 15 old operator-ready manifest rows.
+    - FPM191 made rollback backups under `out/backups/f_phase12_ai_quality_stamp_backfill_20260522T125600Z`.
+    - No product pass/fail decisions, supplier queues, Google Sheets, or product DB authority were changed.
+  - Isolated verification passed:
+    - Compile passed for `FPM190` and `FPM191`.
+    - New readiness/backfill tests passed: `4 passed`.
+    - Focused FPM130/FPM180/FPM190 regression passed: `78 passed`.
+    - Focused rollout plus AI gate regression passed: `91 passed`.
+  - Current proof:
+    - FPM156 quality report refreshed at `2026-05-22T12:53:30Z` with `status=ok`, `fail_checks=0`, and `warn_checks=0`.
+    - Final split rollout readiness at `2026-05-22T12:53:16Z` returned `status=ok`, `fail_checks=0`, `warn_checks=1`.
+    - Remaining warning is the previous enforced-routing empty-route proof: `routing_mode=enforced;browser_input_empty`; it is non-blocking for default-off readiness.
+  - Live loop status:
+    - FPM170 supervisor PID `31008` remains active.
+    - FPM130 owner PID `16112` remains active under the normal live command.
+    - F061 child PID `20476` remains active with `--stage-mode legacy_full`.
+    - Latest live status observed: `state=running`, supplier `td_synnex`, pending rows `44141`.
+  - Result:
+    - Phase 12 default-off rollout readiness passed.
+    - Split mode remains disabled by default.
+  - Automatic next step:
+    - Continue with a capped split-enforced proof window only under the readiness report guard.
+
+## F Scanner Phase 13 Capped Split-Enforced Proof Window - 2026-05-22T12:58:00Z
+- Current phase:
+  - Run one controlled capped `split_enforced` proof window under the FPM190 readiness guard.
+  - Restore the normal `legacy_full` live owner after the proof.
+- Allowed runtime action:
+  - Stop the active script-owned F061 child, FPM130 manager, and FPM170 supervisor for the proof window.
+  - Clear only stale owner markers after their PIDs are dead.
+  - Run FPM130 once in the foreground with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced` and capped `--chunk-rows 10`.
+  - Restart normal FPM supervisor through `run_F_price_list_manager_cycle.bat` after the proof or blocker.
+- Backup:
+  - Capture F live status files, readiness reports, production-line files, active-run CSV, run-state CSV, and SQLite files before stopping ownership.
+- Required behavior:
+  - FPM190 must return `status=ok` and `fail_checks=0` before proof starts.
+  - API-only must run first and must not open browser work.
+  - Browser-only may run only if completed `browser_input.csv` has rows.
+  - If no browser rows exist, the cycle must end as a truthful API-only no-browser proof, not a product failure.
+  - After proof, normal F061 must return to `--stage-mode legacy_full`.
+- Proof plan:
+  - Capture pre-stop live ownership.
+  - Stop F child, manager, and supervisor.
+  - Run capped split one-shot.
+  - Inspect live events, child stdout, production-line health, readiness, routing manifest, and speed ledger.
+  - Restore normal live owner and confirm one manager plus one child.
+- Success threshold:
+  - No duplicate FPM130 owner remains.
+  - No Google Sheets writes.
+  - Readiness guard passes before proof.
+  - Split proof reaches a terminal FPM130 result.
+  - If browser rows exist, browser-only uses allowlist and processes only routed rows.
+  - If browser rows do not exist, API-only hard stops are recorded and no browser run is forced.
+  - Normal live owner is restored in `legacy_full`.
+- Timeout rule:
+  - If the proof run exceeds 20 minutes or leaves ownership unclear, stop proof, restore normal owner, and record the blocker here.
+- Automatic next step:
+  - If proof passes, continue with a small monitored shadow period before any longer split rollout.
+- Live proof update - 2026-05-22T13:12:00Z:
+  - Pre-proof guard:
+    - FPM190 readiness returned `status=ok`, `fail_checks=0`, `warn_checks=1`.
+    - Remaining warning was the old empty-route enforced proof and did not block default-off proof readiness.
+  - Backup:
+    - `out/backups/f_phase13_split_enforced_proof_before_20260522T125800Z`.
+  - Runtime control:
+    - Stopped active F runtime for the proof window.
+    - Stopped PIDs recorded by PowerShell: `16112`, `25008`, and `31008`.
+    - Cleared stale `live_cycle.lock` for dead PID `16112`.
+    - Cleared stale `f061_child_status.txt` for dead PID `20476`.
+  - Capped split proof:
+    - Command: FPM130 one-shot with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced`, `FPM_PRODUCTION_LINE_ROUTING_MODE=enforced`, and `--chunk-rows 10`.
+    - FPM130 result: `status=success`, `production_line_execution_mode=split_enforced`, `production_line_routing_status=ready`, `production_line_status=completed`.
+    - Pending rows moved from `44116` to `44106`.
+  - API-only station:
+    - Started at `2026-05-22T12:59:05Z`.
+    - Processed `10` TD Synnex rows.
+    - Hard/API stops: `8` rows (`ROIFAIL=1`, `OVER50K=6`, `NOASIN=1`).
+    - Browser-ready survivors: `2`.
+    - Browser scrape attempted in API-only mode: `0`.
+    - API endpoint calls: catalog `13`, hazmat `3`, pricing `3`, fees `3`.
+    - 429 count in scanner pricing stats: `0`.
+  - Production-line routing:
+    - Pre-browser production-line event recorded `browser_input_rows=2`.
+    - Routing path: `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/browser_input.csv`.
+  - Browser-only station:
+    - Started at `2026-05-22T13:02:28Z`.
+    - Processed `2` routed rows.
+    - `allowlist_status=loaded`.
+    - `allowlist_rows=2`.
+    - `allowlist_selected_rows=2`.
+    - Browser scrape attempted rows: `2`.
+    - Browser scrape success rows: `1`.
+    - Browser scrape failed rows: `1`.
+    - Browser-only reused API evidence: catalog, hazmat, pricing, and fees endpoint calls were all `0`.
+    - Browser outcomes were `PASS=1` and `LOWROI=1`; no login/CAPTCHA/BBP login wait was triggered.
+  - Post-proof checks:
+    - Storage drift dry check returned `status=ok`, `checked_contracts=7`, `drift_rows=0`, `blocked_rows=0`.
+    - FPM190 readiness after restore returned `status=ok`, `fail_checks=0`, `warn_checks=1`.
+  - Ownership restored:
+    - Normal FPM170 supervisor PID `30860`.
+    - Normal FPM130 owner PID `3492`.
+    - Normal F061 child PID `7088`.
+    - Restored child command uses `--stage-mode legacy_full`.
+    - Latest live status observed: `state=running`, supplier `td_synnex`, pending rows `44106`.
+  - Result:
+    - Phase 13 capped split-enforced proof passed.
+    - Browser attempted rows were lower than API checked rows: `2` browser rows after `10` API rows.
+    - No Google Sheets writes were made.
+    - Split mode remains default-off after proof.
+  - Automatic next step:
+    - Continue with a small monitored shadow period before any longer split rollout.
+
+## F Scanner Phase 14 Shadow Monitor Before 25-Row Split - 2026-05-22T13:54:11Z
+- Current phase:
+  - Run a short monitored shadow period while normal live scanning stays in `legacy_full`.
+  - Treat production-line files as inspection paperwork only; do not make them control browser routing in this phase.
+- Allowed runtime action:
+  - Keep the existing FPM170/FPM130/F061 live owner running.
+  - Run read-only readiness and artifact checks that may refresh `split_rollout_readiness.csv` and append the readiness health row.
+  - Do not stop the live F owner during the shadow monitor.
+  - Do not run `A015_build_system_health_check.py`.
+- Backup:
+  - `out/backups/f_phase14_shadow_monitor_before_20260522T135411Z`.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_status.csv`.
+  - `out/systems/F/price_list_manager/live/f061_child_status.txt`.
+  - `out/systems/F/price_list_manager/live/production_line_health.csv`.
+  - `out/systems/F/price_list_manager/live/split_rollout_readiness.csv`.
+  - `out/systems/F/price_list_manager/live/storage_drift_report.csv`.
+  - `out/systems/F/price_list_manager/live/f061_child_stdout.log`.
+- Poll cadence:
+  - First check immediately.
+  - Second check after the next normal legacy F061 chunk finalizes, or at 10 minutes, whichever comes first.
+  - Stop after 20 minutes unless a new `FAIL`, ownership mismatch, or storage drift appears.
+- Success threshold:
+  - One FPM170 supervisor, one FPM130 owner, and one F061 child are active.
+  - F061 child command/status remains `stage_mode=legacy_full`.
+  - FPM190 readiness remains `status=ok` with `fail_checks=0`.
+  - Storage drift remains `status_after=ok` and row deltas stay `0`.
+  - Latest production-line stage contract remains `status=ok`.
+  - Normal legacy scan chunks may show API throttling or retry evidence, but those must stay retry/API-work and must not become browser routing or false product failures.
+- Timeout rule:
+  - If the monitor window ends without a finalized new legacy chunk, record the latest heartbeat and leave status as `parked pending next proof window`.
+- Automatic next step:
+  - If shadow monitoring is clean, prepare and run the capped 25-row `split_enforced` proof window.
+  - If any hard check fails, keep normal `legacy_full` scanning active and fix the earliest failing contract before another split proof.
+- Shadow proof update - 2026-05-22T13:57:30Z:
+  - Normal live scanner stayed in `legacy_full`; no split routing was enabled during the monitor.
+  - FPM190 readiness returned `status=ok`, `fail_checks=0`, and `warn_checks=1`.
+  - The remaining warning is the known old empty-route enforced proof: `routing_mode=enforced;browser_input_empty`.
+  - Storage drift at `2026-05-22T13:51:00Z` showed `7` checked contracts, all `status_after=ok`, all row deltas `0`.
+  - Normal legacy chunk evidence:
+    - F061 started at `2026-05-22T13:51:58Z` with `stage_mode=legacy_full`.
+    - F061 finished with `processed_rows=25`, `pending_rows=44006`, `allowlist_status=not_configured`, `allowlist_rows=0`, and `allowlist_selected_rows=0`.
+    - API throttle/exception messages stayed inside normal retry/API handling; they did not trigger split browser routing.
+  - Production-line shadow snapshot:
+    - `production_line_snapshot` appeared for the same run at `2026-05-22T13:51:00Z`.
+    - Stage contract returned `status=ok`, `value=completed`, `stage_count=5`, `final_pass_rows=23`, `final_blocked_rows=0`, `final_retry_rows=0`, and `browser_input_rows=0`.
+  - Result:
+    - Phase 14 shadow monitor passed.
+    - Normal live owner was left running during the monitor.
+  - Automatic next step:
+    - Continue with the capped 25-row `split_enforced` proof window.
+
+## F Scanner Phase 15 Capped 25-Row Split-Enforced Proof Window - 2026-05-22T13:58:00Z
+- Current phase:
+  - Run one controlled `split_enforced` proof with `--chunk-rows 25` after the clean shadow period.
+  - Restore normal `legacy_full` ownership immediately after the proof or blocker.
+- Allowed runtime action:
+  - Capture a rollback snapshot of F live status files, readiness reports, production-line files, active-run CSV, run-state CSV, and SQLite files before stopping ownership.
+  - Stop only the active script-owned F061 child, FPM130 manager, and FPM170 supervisor for the proof window.
+  - Clear or archive stale owner markers only after their referenced PIDs are dead.
+  - Run FPM130 once in the foreground with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced`, `FPM_PRODUCTION_LINE_ROUTING_MODE=enforced`, and `--chunk-rows 25 --run-once`.
+  - Restart normal FPM supervisor through `run_F_price_list_manager_cycle.bat`.
+- Required behavior:
+  - FPM190 must return `status=ok` and `fail_checks=0` before the proof starts.
+  - API-only must run first and must not open browser work.
+  - Browser-only may run only from a completed `browser_input.csv`.
+  - Browser-only must use the allowlist and must not repeat catalog, hazmat, pricing, or fees calls for routed rows.
+  - API throttling remains retry/API work.
+  - Login/CAPTCHA/BBP rows remain normal F061 login/retry work.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_events.csv`.
+  - `out/systems/F/price_list_manager/live/f061_child_stdout.log`.
+  - `out/systems/F/price_list_manager/live/production_line_health.csv`.
+  - `out/systems/F/price_list_manager/live/split_rollout_readiness.csv`.
+  - `out/systems/F/price_list_manager/live/storage_drift_report.csv`.
+  - `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/browser_routing_manifest.csv`.
+  - `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/production_line_speed_ledger.csv`.
+- Success threshold:
+  - No duplicate FPM130 owner remains.
+  - No Google Sheets writes.
+  - Split proof reaches a terminal FPM130 result.
+  - API checked rows equal `25` unless the active queue drains earlier.
+  - Browser attempted rows are lower than API checked rows when API hard stops exist.
+  - Browser-only, if used, consumes only completed `browser_input.csv` rows with `allowlist_status=loaded`.
+  - Normal live owner is restored with F061 in `stage_mode=legacy_full`.
+- Timeout rule:
+  - If the proof run exceeds 30 minutes or leaves ownership unclear, stop the proof, restore normal owner, and record the blocker here.
+- Automatic next step:
+  - If the 25-row proof passes, continue to a capped 50-row proof only after readiness, storage drift, stage reconciliation, and ownership restoration are clean.
+- Live proof update - 2026-05-22T14:12:00Z:
+  - Pre-proof guard:
+    - FPM190 readiness returned `status=ok`, `fail_checks=0`, and `warn_checks=1` at `2026-05-22T13:57:41Z`.
+    - Remaining warning is still the old empty-route enforced proof and remains non-blocking for capped proof windows.
+  - Backup:
+    - `out/backups/f_phase15_split25_before_20260522T135942Z`.
+  - Runtime control:
+    - A PowerShell parse error happened before the first stop attempt executed, so no owner process was affected by that failed command.
+    - A second stop helper matched its own command text and ended early; live FPM130/F061 remained active.
+    - The next normal `legacy_full` child was allowed to finish at `2026-05-22T14:00:39Z` instead of being interrupted mid-row.
+    - The boundary stop then stopped FPM130 PID `18988`; no FPM170/FPM130/F061 owner process remained.
+    - Stale `live_cycle.lock` and `f061_child_status.txt` markers were archived with stamp `20260522T140151Z` only after the PIDs were dead.
+  - Capped 25-row split proof:
+    - Command: FPM130 one-shot with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced`, `FPM_PRODUCTION_LINE_ROUTING_MODE=enforced`, and `--chunk-rows 25 --run-once`.
+    - FPM130 result: `status=success`, `production_line_execution_mode=split_enforced`, `production_line_routing_status=empty`, `production_line_status=completed`.
+    - Pending rows moved from `43981` to `43956`.
+  - API-only station:
+    - Started at `2026-05-22T14:03:12Z`.
+    - Processed `25` TD Synnex rows.
+    - Expanded candidate rows: `27`.
+    - Hard/API stops: `27` rows (`NOASIN=12`, `OVER50K=13`, `ROIFAIL=2`).
+    - Browser-ready survivors: `0`.
+    - Browser scrape attempted in API-only mode: `0`.
+    - API endpoint calls: catalog `61`, hazmat `2`, pricing `2`, fees `2`.
+    - 429 count in scanner pricing stats: `0`.
+  - Browser routing:
+    - `browser_routing_manifest.csv` completed with `browser_input_rows=0`.
+    - Browser-only did not start because there were no completed browser-input survivor rows.
+    - Browser attempted rows were lower than API checked rows: `0` browser rows after `25` API rows.
+  - Post-proof checks:
+    - Storage drift at `2026-05-22T14:10:01Z` showed `7` checked contracts, all `status_after=ok`, all row deltas `0`.
+    - FPM190 readiness after restore returned `status=ok`, `fail_checks=0`, and `warn_checks=1`.
+  - Ownership restored:
+    - Normal FPM170 supervisor PID `21340`.
+    - Normal FPM130 owner PID `25528`.
+    - Normal F061 child PID `18848`.
+    - Restored child command uses `--stage-mode legacy_full`.
+    - Latest live status observed: `state=running`, supplier `td_synnex`, pending rows `43956`.
+  - Result:
+    - Phase 15 capped 25-row split-enforced proof passed.
+    - No Google Sheets writes were made.
+    - Split mode remains default-off after proof.
+  - Automatic next step:
+    - Continue with the capped 50-row `split_enforced` proof after the current restored `legacy_full` child reaches a normal boundary and readiness remains clean.
+
+## F Scanner Phase 16 Capped 50-Row Split-Enforced Proof Window - 2026-05-22T14:13:55Z
+- Current phase:
+  - Run one controlled `split_enforced` proof with `--chunk-rows 50` after the clean 25-row proof.
+  - Restore normal `legacy_full` ownership immediately after the proof or blocker.
+- Allowed runtime action:
+  - Wait for the currently restored normal `legacy_full` child to finish before stopping F ownership.
+  - Capture a rollback snapshot of F live status files, readiness reports, production-line files, active-run CSV, run-state CSV, and SQLite files before stopping ownership.
+  - Stop only the active script-owned F061 child, FPM130 manager, and FPM170 supervisor for the proof window.
+  - Clear or archive stale owner markers only after their referenced PIDs are dead.
+  - Run FPM130 once in the foreground with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced`, `FPM_PRODUCTION_LINE_ROUTING_MODE=enforced`, and `--chunk-rows 50 --run-once`.
+  - Restart normal FPM supervisor through `run_F_price_list_manager_cycle.bat`.
+- Required behavior:
+  - FPM190 must return `status=ok` and `fail_checks=0` before the proof starts.
+  - API-only must run first and must not open browser work.
+  - Browser-only may run only from completed `browser_input.csv`.
+  - Browser-only must use the allowlist and must not repeat catalog, hazmat, pricing, or fees calls for routed rows.
+  - API throttling remains retry/API work.
+  - Login/CAPTCHA/BBP rows remain normal F061 login/retry work.
+- Live monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_events.csv`.
+  - `out/systems/F/price_list_manager/live/f061_child_stdout.log`.
+  - `out/systems/F/price_list_manager/live/production_line_health.csv`.
+  - `out/systems/F/price_list_manager/live/split_rollout_readiness.csv`.
+  - `out/systems/F/price_list_manager/live/storage_drift_report.csv`.
+  - `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/browser_routing_manifest.csv`.
+  - `out/systems/F/price_list_manager/pipeline_runs/td_synnex/fpm_td_synnex_20260519t095000z/production_line_speed_ledger.csv`.
+- Success threshold:
+  - No duplicate FPM130 owner remains.
+  - No Google Sheets writes.
+  - Split proof reaches a terminal FPM130 result.
+  - API checked rows equal `50` unless the active queue drains earlier.
+  - Browser attempted rows are lower than API checked rows when API hard stops exist.
+  - Browser-only, if used, consumes only completed `browser_input.csv` rows with `allowlist_status=loaded`.
+  - Normal live owner is restored with F061 in `stage_mode=legacy_full`.
+- Timeout rule:
+  - If the proof run exceeds 45 minutes or leaves ownership unclear, stop the proof, restore normal owner, and record the blocker here.
+- Automatic next step:
+  - If the 50-row proof passes, continue to a full supplier-window split-mode trial only after readiness, storage drift, stage reconciliation, speed ledger, and ownership restoration are clean.
+- Live proof update - 2026-05-22T14:59:00Z:
+  - Pre-proof guard:
+    - FPM190 readiness returned `status=ok`, `fail_checks=0`, and `warn_checks=1` at `2026-05-22T14:16:14Z`.
+    - Remaining warning is still the old empty-route enforced proof and remains non-blocking for capped proof windows.
+  - Backups:
+    - Plan snapshot: `out/backups/f_phase16_split50_before_20260522T141355Z`.
+    - Runtime snapshot: `out/backups/f_phase16_split50_runtime_before_20260522T141642Z`.
+  - Runtime control:
+    - The restored normal `legacy_full` child was allowed to finish at `2026-05-22T14:13:31Z` before the proof window started.
+    - F owner processes were stopped only at the boundary; no FPM170/FPM130/F061 owner remained before the one-shot proof.
+    - Stale `live_cycle.lock` and `f061_child_status.txt` markers were archived with stamp `20260522T141642Z` only after their referenced PIDs were dead.
+  - Capped 50-row split proof:
+    - Command: FPM130 one-shot with `FPM_PRODUCTION_LINE_EXECUTION_MODE=split_enforced`, `FPM_PRODUCTION_LINE_ROUTING_MODE=enforced`, and `--chunk-rows 50 --run-once`.
+    - FPM130 result: `status=success`, `production_line_execution_mode=split_enforced`, `production_line_routing_status=ready`, and `production_line_status=completed`.
+    - Pending rows moved from `43931` to `43883`.
+  - API-only station:
+    - Started at `2026-05-22T14:18:01Z`.
+    - Processed `50` TD Synnex rows.
+    - Expanded candidate rows: `51`.
+    - Hard/API stops: `42` rows (`OVER50K=15`, `NOASIN=3`, `ROIFAIL=24`).
+    - Browser-ready survivors: `9`.
+    - Browser scrape attempted in API-only mode: `0`.
+    - API endpoint calls: catalog `59`, hazmat `33`, pricing `33`, fees `36`.
+    - 429 count in scanner pricing stats: `0`.
+    - API throttle wait remained API-stage retry/wait work and did not route rows straight to browser.
+  - Browser-only station:
+    - Started at `2026-05-22T14:38:58Z`.
+    - Consumed completed `browser_input.csv` from the TD Synnex pipeline run.
+    - Processed exactly `9` rows with `allowlist_status=loaded`, `allowlist_rows=9`, and `allowlist_selected_rows=9`.
+    - Browser scrape attempted rows: `9`.
+    - Browser endpoint calls repeated: catalog `0`, hazmat `0`, pricing `0`, fees `0`.
+    - Browser attempted rows were lower than API checked rows: `9` browser rows after `50` API rows.
+  - Stage reconciliation:
+    - Pre-browser production-line snapshot recorded `browser_input_rows=9` and `final_retry_rows=9`.
+    - Post-browser production-line snapshot recorded `browser_input_rows=0`, `final_retry_rows=0`, and `final_pass_rows=25`.
+    - `browser_routing_manifest.csv` now shows the completed post-consumption state with `browser_input_rows=0`; the actual survivor count is preserved in the F061 API-only and browser-only child output plus the pre-browser production-line snapshot.
+  - Post-proof checks:
+    - Normal live ownership was restored through `run_F_price_list_manager_cycle.bat`.
+    - Stale proof child marker `f061_child_status.txt` was archived with stamp `20260522T145528Z` before restart because no live F owner process existed.
+    - Restored FPM170 supervisor PID `25312`.
+    - Restored FPM130 owner PID `11112`.
+    - Restored F061 child PID `20476`.
+    - Restored child command uses `--stage-mode legacy_full`.
+    - FPM190 readiness after restore returned `status=ok`, `fail_checks=0`, and `warn_checks=1`.
+    - FPM190 live owner marker check returned `single_owner_marker` with `lock_pid=11112`, `status_owner_pid=11112`, and `state=running`.
+    - Storage drift at `2026-05-22T14:55:32Z` showed `7` checked contracts, all `status_after=ok`, and all row deltas `0`.
+  - Result:
+    - Phase 16 capped 50-row split-enforced proof passed.
+    - No Google Sheets writes were made.
+    - Split mode remains default-off after proof, and normal live scanning is restored in `legacy_full`.
+  - Automatic next step:
+    - Continue with a controlled full supplier-window split-mode trial only after confirming the next trial boundary and keeping FPM130 as the sole coordinator.
+
+## Daily Queue Manager Run - 2026-05-23T05:03:07Z
+- Safe refresh path run: `python scripts\one_off\F035_refresh_f032_ai_review_queues.py`.
+- Queue status after refresh: `candidate_manifest_count = 14`, `already_gated = 14`, `pending_ai_decision = 0` under review handoffs.
+- Review-handoff AI queue inspection proof:
+  - `ai_review_queue.csv files checked = 14`.
+  - `queue rows = 38`, `decision rows = 38`.
+  - `queue files with missing decision IDs = 0`.
+- Secondary guard re-review trigger proof from FPM156: `current_visible_secondary_guard_rows = 0`.
+- Decision work this run:
+  - Rows needing fresh Codex review in review handoffs: `0`.
+  - `codex_ai_review_decisions.csv` files changed: `0`.
+  - FPM155 reruns required: `0`.
+- Direct quality rebuild proof: `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py` returned `status = ok`, `fail_checks = 0`, `warn_checks = 0`, `current_pending_ai_check_rows = 0`, `current_visible_secondary_guard_rows = 0`, `final_review_rows = 3`.
+- Deferred blocker tracked (outside review-handoff scope): hidden TD Synnex precheck queue remains pending with `precheck_pending_ai_decision_rows = 5` and `catchup_status = pending_ai_decision`.
+- Follow-up trigger/time: next daily queue manager cycle at `2026-05-24T05:00:00Z` UTC, or earlier if `precheck_pending_ai_decision_rows` increases.
+- Artifact to inspect: `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_review_queue.csv` and `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/codex_ai_review_decisions.csv`.
+- Success condition: hidden precheck pending rows reach `0` with valid Codex actions and no low-confidence row routed to clean pass.
+- Remediation if it fails: keep rows hidden, write/refresh `codex_ai_review_decisions.csv` for those rows with evidence-backed actions, rerun the owning gate refresh, then rerun FPM156 before exposing any final handoff rows.
+## Daily Queue Manager Run - 2026-05-24T05:01:54Z
+- Safe refresh path run: `python scripts\one_off\F035_refresh_f032_ai_review_queues.py`.
+- Review-handoff queue status after refresh: `candidate_manifest_count = 14`, `status_counts.already_gated = 14`, `status_counts.pending_ai_decision = 0`.
+- Direct quality rebuild proof: `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py` returned `status = warn`, `fail_checks = 0`, `warn_checks = 1`, `current_pending_ai_check_rows = 0`, `current_visible_secondary_guard_rows = 0`.
+- Review-handoff file inspection proof:
+  - `ai_review_queue.csv files checked = 14`.
+  - `codex_ai_review_decisions.csv files checked = 14`.
+  - `ai_review_queue_rows = 38`, `codex_ai_review_decision_rows = 38`, `row_balance_delta = 0`.
+  - `queue_missing_decision_id_rows = 0`, `decision_missing_decision_id_rows = 0`.
+  - `decision_missing_reason_rows = 0`, `decision_missing_evidence_rows = 0`, `decision_invalid_action_rows = 0`.
+  - `pending_handoff_count = 0` (no `manifest.csv` in `pending_ai_decision` state).
+- Decision work this run:
+  - Rows needing fresh Codex review in review handoffs: `0`.
+  - `codex_ai_review_decisions.csv` files changed: `0`.
+  - FPM155 reruns required: `0`.
+- Deferred blocker tracked (outside review-handoff scope): hidden TD Synnex precheck queue remains pending with `status = pending_ai_decision`, `ai_queue_rows = 5`, `pending_ai_decision_rows = 5`, `decided_rows = 0`, `hidden_until_completed_flag = 1`.
+- Follow-up trigger/time: next daily queue manager cycle at `2026-05-25T05:00:00Z` UTC, or earlier if `precheck_pending_ai_decision_rows` increases above `5`.
+- Artifact to inspect: `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_precheck_status.csv`, `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_review_queue.csv`, and `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/codex_ai_review_decisions.csv`.
+- Success condition: hidden precheck pending rows reach `0` with valid Codex actions and no low-confidence row routed to clean pass.
+- Remediation if it fails: keep rows hidden, write or refresh `codex_ai_review_decisions.csv` for those precheck rows with evidence-backed actions, rerun the owning queue refresh path, rerun FPM156, and only allow reuse at final handoff when decision IDs and evidence hashes still match.
+- Run close (UTC): `2026-05-24T05:03:37Z`.
+
+## Daily Queue Manager Run - 2026-05-25T05:02:35Z
+- Safe refresh path run: `python scripts\one_off\F035_refresh_f032_ai_review_queues.py`.
+- Review-handoff queue status after refresh: `candidate_manifest_count = 14`, `status_counts.already_gated = 14`, `status_counts.pending_ai_decision = 0`.
+- Direct quality rebuild proof: `python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py` returned `status = warn`, `fail_checks = 0`, `warn_checks = 1`, `current_pending_ai_check_rows = 0`, `current_visible_secondary_guard_rows = 0`, `final_review_rows = 3`.
+- Review-handoff file inspection proof:
+  - `ai_review_queue.csv files checked = 14`.
+  - `codex_ai_review_decisions.csv files checked = 14`.
+  - `ai_review_queue_rows = 38`, `codex_ai_review_decision_rows = 38`, `row_balance_delta = 0`.
+  - `queue_missing_decision_rows = 0`, `pending_handoff_count = 0`.
+- Decision work this run:
+  - Rows needing fresh Codex review in review handoffs: `0`.
+  - `codex_ai_review_decisions.csv` files changed: `0`.
+  - FPM155 reruns required: `0`.
+- Deferred blocker tracked (outside review-handoff scope): hidden TD Synnex precheck queue remains pending with `status = pending_ai_decision`, `precheck_ai_queue_rows = 5`, `precheck_pending_ai_decision_rows = 5`, `precheck_decided_rows = 0`, `hidden_until_completed_flag = 1`.
+- Follow-up trigger/time: next daily queue manager cycle at `2026-05-26T05:00:00Z` UTC, or earlier if `precheck_pending_ai_decision_rows` increases above `5`.
+- Artifact to inspect: `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_precheck_status.csv`, `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_review_queue.csv`, and `out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/codex_ai_review_decisions.csv`.
+- Success condition: hidden precheck pending rows reach `0` with valid Codex actions and no low-confidence row routed to clean pass.
+- Remediation if it fails: keep rows hidden, write or refresh `codex_ai_review_decisions.csv` for those precheck rows with evidence-backed actions, rerun the owning queue refresh path, rerun FPM156, and only allow reuse at final handoff when decision IDs and evidence hashes still match.
+- Run close (UTC): `2026-05-25T05:04:10Z`.
+
+## Daily Queue Manager Run - 2026-05-26T05:01:23Z
+- Safe refresh path run: python scripts\one_off\F035_refresh_f032_ai_review_queues.py.
+- Review-handoff queue status after refresh: candidate_manifest_count = 14, status_counts.already_gated = 14, status_counts.pending_ai_decision = 0.
+- Direct quality rebuild proof: python scripts\flows\F\price_list_manager\FPM156_build_ai_gate_quality_report.py returned status = warn, fail_checks = 0, warn_checks = 1, current_pending_ai_check_rows = 0, current_visible_secondary_guard_rows = 0, final_review_rows = 3.
+- Review-handoff file inspection proof:
+  - ai_review_queue.csv files checked = 14.
+  - codex_ai_review_decisions.csv files checked = 14.
+  - ai_review_queue_rows = 38, codex_ai_review_decision_rows = 38, row_balance_delta = 0.
+  - queue_missing_decision_rows = 0, pending_handoff_count = 0.
+- Decision work this run:
+  - Rows needing fresh Codex review in review handoffs: 0.
+  - codex_ai_review_decisions.csv files changed: 0.
+  - FPM155 reruns required: 0.
+- Deferred blocker tracked (outside review-handoff scope): hidden TD Synnex precheck queue remains pending with status = pending_ai_decision, precheck_ai_queue_rows = 5, precheck_pending_ai_decision_rows = 5, precheck_decided_rows = 0, hidden_until_completed_flag = 1.
+- Follow-up trigger/time: next daily queue manager cycle at 2026-05-27T05:00:00Z UTC, or earlier if precheck_pending_ai_decision_rows increases above 5.
+- Artifact to inspect: out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_precheck_status.csv, out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/ai_review_queue.csv, and out/systems/F/price_list_manager/ai_prechecks/td_synnex/fpm_td_synnex_20260519T095000Z/codex_ai_review_decisions.csv.
+- Success condition: hidden precheck pending rows reach 0 with valid Codex actions and no low-confidence row routed to clean pass.
+- Remediation if it fails: keep rows hidden, write or refresh codex_ai_review_decisions.csv for those precheck rows with evidence-backed actions, rerun the owning queue refresh path, rerun FPM156, and only allow reuse at final handoff when decision IDs and evidence hashes still match.
+- Run close (UTC): 2026-05-26T05:03:51Z.
+

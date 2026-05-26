@@ -4,8 +4,9 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ LOCKS_DIR = OUT / "locks"
 RESTART_DIR = LOCKS_DIR / "restart_control"
 H_LIVE = OUT / "systems" / "H" / "live"
 B_LIVE = OUT / "systems" / "B" / "live"
+F_LIVE = OUT / "systems" / "F" / "price_list_manager" / "live"
 A_LIVE = OUT / "systems" / "A" / "live"
 E_LIVE = OUT / "systems" / "E" / "live"
 
@@ -24,6 +26,7 @@ DEFAULT_WINDOW_END_HOUR = 3
 DEFAULT_WINDOW_MINUTE_SPAN = 60
 DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS = 180
 DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS = 180
+DEFAULT_F_HEARTBEAT_MAX_AGE_SECONDS = 180
 UNRESOLVED_BOUNDARY_STATUSES = {"active", "unresolved_parent_exit", "waiting"}
 FINALIZE_BLOCKED_TOKENS = {
     "FINALIZE_BLOCKED_NO_PUBLISH",
@@ -31,6 +34,26 @@ FINALIZE_BLOCKED_TOKENS = {
 }
 DEFAULT_ESCALATION_MODE_ENV = "H_RESTART_ESCALATION_MODE"
 OWNERSHIP_TRANSFER_PATH = RESTART_DIR / "h_restart_ownership_transfer.json"
+SIMPLIFICATION_FREEZE_PATH = LOCKS_DIR / "simplification.freeze"
+SIMPLIFICATION_FREEZE_OVERRIDE_ENV = "SIMPLIFICATION_FREEZE_OVERRIDE"
+
+# Script entry from Task Scheduler may set sys.path to scripts/tools only.
+# Add repo roots explicitly so imports work consistently in all launch modes.
+for _path in (ROOT, ROOT / "scripts"):
+    _path_str = str(_path)
+    if _path_str not in sys.path:
+        sys.path.insert(0, _path_str)
+
+try:
+    from scripts.core.runtime_stream import (
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
+except ModuleNotFoundError:
+    from core.runtime_stream import (
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
 
 
 @dataclass
@@ -43,6 +66,10 @@ class Decision:
 
 def _norm(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _truthy(value: Any) -> bool:
+    return _norm(value).lower() in {"1", "true", "yes", "on"}
 
 
 def _utc_now() -> datetime:
@@ -98,20 +125,12 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _parse_lock_value(payload: str, key: str) -> str:
-    for part in [p.strip() for p in payload.split("|") if p.strip()]:
-        if part.startswith(f"{key}="):
-            return _norm(part.split("=", 1)[1])
-    return ""
+    fields = parse_stream_lock_fields(payload)
+    return _norm(fields.get(str(key or "").strip(), ""))
 
 
 def _parse_lock_pid(payload: str) -> int | None:
-    raw = _parse_lock_value(payload, "pid")
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except Exception:
-        return None
+    return parse_stream_lock_pid(payload)
 
 
 def _parse_utc(value: str) -> datetime | None:
@@ -148,6 +167,15 @@ def _pid_alive(pid: int | None) -> bool:
         return True
     except Exception:
         return False
+
+
+def _file_mtime_utc(path: Path) -> datetime | None:
+    try:
+        if not path.exists():
+            return None
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except Exception:
+        return None
 
 
 def _boundary_updated_age_seconds(payload: dict[str, Any]) -> float | None:
@@ -211,6 +239,8 @@ def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -
     launcher_heartbeat_path = H_LIVE / "H_launcher.heartbeat"
     cycle_lock_path = H_LIVE / "H_pricing_cycle.lock"
     h_restart_drain_ready_path = H_LIVE / "H_restart_drain.ready"
+    h_restart_notice_before_path = H_LIVE / "H_restart_drain.notice.before_cycle_boundary_wait.txt"
+    h_restart_notice_after_path = H_LIVE / "H_restart_drain.notice.after_safe_cycle_boundary_wait.txt"
 
     runtime = _read_json(runtime_status_path)
     mode = _norm(runtime.get("mode", "")).upper()
@@ -294,7 +324,22 @@ def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -
     cycle_lock_line = _read_first_line(cycle_lock_path)
     cycle_pid = _parse_lock_pid(cycle_lock_line)
     h_restart_drain_ready_line = _read_first_line(h_restart_drain_ready_path)
-    h_drain_ready = restart_drain_owned and bool(h_restart_drain_ready_line)
+    h_restart_notice_before_line = _read_first_line(h_restart_notice_before_path)
+    h_restart_notice_after_line = _read_first_line(h_restart_notice_after_path)
+    h_restart_notice_owned = (
+        "requested_by=controlled_restart_gate" in h_restart_notice_before_line
+        or "requested_by=controlled_restart_gate" in h_restart_notice_after_line
+    )
+    h_boundary_wait_inferred = (
+        restart_drain_owned
+        and h_restart_notice_owned
+        and bool(finalized)
+        and not run_in_progress
+        and mode in {"", "IDLE", "WAITING", "PAUSED"}
+    )
+    h_drain_ready = restart_drain_owned and (bool(h_restart_drain_ready_line) or h_boundary_wait_inferred)
+    if h_boundary_wait_inferred and not h_restart_drain_ready_line:
+        notes.append("H restart drain boundary inferred from notice/finalized idle state")
 
     if launcher_pid:
         try:
@@ -304,13 +349,15 @@ def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -
         if launcher_pid_int is None:
             blockers.append("H_LAUNCHER_PID_INVALID")
         elif _pid_alive(launcher_pid_int):
-            if h_drain_ready and not cycle_lock_line:
-                notes.append("H launcher in restart drain boundary wait (child work not active)")
+            if h_drain_ready:
+                notes.append("H launcher accepted during restart drain boundary wait")
             else:
                 blockers.append("H_LAUNCHER_ACTIVE")
         else:
             blockers.append("H_LAUNCHER_PID_STALE")
-    if heartbeat_age is None and launcher_heartbeat_line:
+    if h_drain_ready and launcher_heartbeat_line:
+        notes.append("H launcher heartbeat accepted during restart drain boundary wait")
+    elif heartbeat_age is None and launcher_heartbeat_line:
         blockers.append("H_LAUNCHER_HEARTBEAT_INVALID")
     elif heartbeat_age is not None and heartbeat_age > float(h_heartbeat_max_age_s):
         blockers.append("H_LAUNCHER_HEARTBEAT_STALE")
@@ -320,7 +367,10 @@ def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -
         if cycle_pid is None:
             blockers.append("H_CYCLE_LOCK_UNPARSEABLE")
         elif _pid_alive(cycle_pid):
-            blockers.append("H_CYCLE_ACTIVE_LOCK")
+            if h_drain_ready:
+                notes.append("H cycle lock accepted during restart drain boundary wait")
+            else:
+                blockers.append("H_CYCLE_ACTIVE_LOCK")
         else:
             blockers.append("H_CYCLE_STALE_LOCK_PRESENT")
 
@@ -336,6 +386,9 @@ def _collect_h_state(h_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -
         "launcher_heartbeat_age_seconds": "" if heartbeat_age is None else round(heartbeat_age, 2),
         "cycle_lock_line": cycle_lock_line,
         "restart_drain_ready_line": h_restart_drain_ready_line,
+        "restart_drain_notice_before_line": h_restart_notice_before_line,
+        "restart_drain_notice_after_line": h_restart_notice_after_line,
+        "restart_drain_boundary_inferred": h_boundary_wait_inferred,
         "restart_drain_owned": restart_drain_owned,
     }
     if not runtime:
@@ -348,6 +401,7 @@ def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, m
     blockers: list[str] = []
     notes: list[str] = []
     b_lock_path = B_LIVE / "B_cycle.lock"
+    b_supervisor_lock_path = B_LIVE / "B_supervisor.lock"
     b_log_path = B_LIVE / "B_cycle.log"
     checklist_path = OUT / "cycle_alerts" / "checklist_B.csv"
     checklist_split_path = OUT / "cycle_alerts" / "checklist_B_split.csv"
@@ -376,6 +430,9 @@ def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, m
     b_pid = _parse_lock_pid(b_lock_line)
     b_hb = _parse_lock_value(b_lock_line, "heartbeat")
     b_hb_dt = _parse_utc(b_hb)
+    b_supervisor_lock_line = _read_first_line(b_supervisor_lock_path)
+    b_supervisor_hb = _parse_lock_value(b_supervisor_lock_line, "heartbeat")
+    b_supervisor_hb_dt = _parse_utc(b_supervisor_hb)
     b_hb_age = None
     if b_hb_dt is not None:
         b_hb_age = max((_utc_now() - b_hb_dt).total_seconds(), 0.0)
@@ -393,6 +450,24 @@ def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, m
             blockers.append("B_HEARTBEAT_INVALID")
         elif b_hb_age is not None and b_hb_age > float(b_heartbeat_max_age_s):
             blockers.append("B_HEARTBEAT_STALE")
+
+    b_runtime_evidence: list[tuple[str, datetime]] = []
+    if b_hb_dt is not None:
+        b_runtime_evidence.append(("B_cycle.lock.heartbeat", b_hb_dt))
+    if b_supervisor_hb_dt is not None:
+        b_runtime_evidence.append(("B_supervisor.lock.heartbeat", b_supervisor_hb_dt))
+    b_log_mtime = _file_mtime_utc(b_log_path)
+    if b_log_mtime is not None:
+        b_runtime_evidence.append(("B_cycle.log.mtime", b_log_mtime))
+    runtime_latest_dt = max([dt for _, dt in b_runtime_evidence], default=None)
+
+    def checklist_stale_vs_runtime(path: Path) -> tuple[bool, str, float | None]:
+        mtime_dt = _file_mtime_utc(path)
+        if mtime_dt is None:
+            return False, "", None
+        age_seconds = max((_utc_now() - mtime_dt).total_seconds(), 0.0)
+        stale = bool(runtime_latest_dt is not None and runtime_latest_dt > (mtime_dt + timedelta(seconds=1)))
+        return stale, mtime_dt.strftime("%Y-%m-%dT%H:%M:%SZ"), age_seconds
 
     def checklist_counts(path: Path) -> tuple[int, int, list[str]]:
         if not path.exists():
@@ -421,12 +496,20 @@ def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, m
 
     b_fail, b_warn, b_warn_checks = checklist_counts(checklist_path)
     b_split_fail, b_split_warn, b_split_warn_checks = checklist_counts(checklist_split_path)
+    b_checklist_stale, b_checklist_snapshot_utc, b_checklist_age_seconds = checklist_stale_vs_runtime(checklist_path)
+    b_split_checklist_stale, b_split_snapshot_utc, b_split_checklist_age_seconds = checklist_stale_vs_runtime(checklist_split_path)
     if b_fail < 0:
         blockers.append("B_CHECKLIST_UNAVAILABLE")
     elif b_fail > 0 or b_warn > 0:
-        blockers.append("B_HEALTH_NOT_CLEAN")
+        if b_checklist_stale:
+            notes.append("B checklist non-ok rows treated as stale context due to newer runtime evidence")
+        else:
+            blockers.append("B_HEALTH_NOT_CLEAN")
     if b_split_fail >= 0 and (b_split_fail > 0 or b_split_warn > 0):
-        blockers.append("B_SPLIT_HEALTH_NOT_CLEAN")
+        if b_split_checklist_stale:
+            notes.append("B split checklist non-ok rows treated as stale context due to newer runtime evidence")
+        else:
+            blockers.append("B_SPLIT_HEALTH_NOT_CLEAN")
 
     # Add light log context for operator visibility.
     b_log_tail = ""
@@ -442,16 +525,84 @@ def _collect_b_state(b_heartbeat_max_age_s: int, *, restart_drain_owned: bool, m
         "maintenance_markers_present": maintenance_markers,
         "b_cycle_lock_line": b_lock_line,
         "b_cycle_heartbeat_age_seconds": "" if b_hb_age is None else round(b_hb_age, 2),
+        "b_supervisor_lock_line": b_supervisor_lock_line,
+        "b_runtime_evidence_latest_utc": (
+            runtime_latest_dt.strftime("%Y-%m-%dT%H:%M:%SZ") if runtime_latest_dt is not None else ""
+        ),
+        "b_runtime_evidence_sources": [name for name, _ in b_runtime_evidence],
         "checklist_B_fail": b_fail,
         "checklist_B_warn": b_warn,
         "checklist_B_warn_fail_checks": b_warn_checks,
+        "checklist_B_snapshot_utc": b_checklist_snapshot_utc,
+        "checklist_B_age_seconds": "" if b_checklist_age_seconds is None else round(b_checklist_age_seconds, 2),
+        "checklist_B_stale_vs_runtime": b_checklist_stale,
+        "checklist_B_pending_stale_fail": b_fail if b_checklist_stale else 0,
+        "checklist_B_pending_stale_warn": b_warn if b_checklist_stale else 0,
         "checklist_B_split_fail": b_split_fail,
         "checklist_B_split_warn": b_split_warn,
         "checklist_B_split_warn_fail_checks": b_split_warn_checks,
+        "checklist_B_split_snapshot_utc": b_split_snapshot_utc,
+        "checklist_B_split_age_seconds": "" if b_split_checklist_age_seconds is None else round(b_split_checklist_age_seconds, 2),
+        "checklist_B_split_stale_vs_runtime": b_split_checklist_stale,
+        "checklist_B_split_pending_stale_fail": b_split_fail if b_split_checklist_stale else 0,
+        "checklist_B_split_pending_stale_warn": b_split_warn if b_split_checklist_stale else 0,
         "b_cycle_log_tail": b_log_tail,
         "restart_drain_owned": restart_drain_owned,
         "restart_ready_boundary_pause": b_restart_ready,
         "maintenance_ready_text": _norm(maintenance_ready_text),
+    }
+    return blockers, artifacts, notes
+
+
+def _collect_f_state(f_heartbeat_max_age_s: int, *, restart_drain_owned: bool) -> tuple[list[str], dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    notes: list[str] = []
+    live_lock_path = F_LIVE / "live_cycle.lock"
+    drain_ready_path = F_LIVE / "F_restart_drain.ready"
+    status_path = F_LIVE / "live_cycle_status.csv"
+
+    lock_line = _read_first_line(live_lock_path)
+    lock_pid = _parse_lock_pid(lock_line)
+    heartbeat_utc = _parse_lock_value(lock_line, "heartbeat")
+    heartbeat_dt = _parse_utc(heartbeat_utc)
+    heartbeat_age = None
+    if heartbeat_dt is not None:
+        heartbeat_age = max((_utc_now() - heartbeat_dt).total_seconds(), 0.0)
+    drain_ready_line = _read_first_line(drain_ready_path)
+    drain_ready = restart_drain_owned and bool(drain_ready_line)
+
+    if lock_line:
+        if lock_pid is None:
+            blockers.append("F_MANAGER_LOCK_UNPARSEABLE")
+        elif _pid_alive(lock_pid):
+            if drain_ready:
+                notes.append("F manager in restart drain boundary wait")
+            else:
+                blockers.append("F_MANAGER_ACTIVE_LOCK")
+        else:
+            blockers.append("F_MANAGER_STALE_LOCK_PRESENT")
+        if drain_ready:
+            notes.append("F manager heartbeat accepted during restart drain boundary wait")
+        elif heartbeat_dt is None:
+            blockers.append("F_MANAGER_HEARTBEAT_INVALID")
+        elif heartbeat_age is not None and heartbeat_age > float(f_heartbeat_max_age_s):
+            blockers.append("F_MANAGER_HEARTBEAT_STALE")
+
+    status_tail = ""
+    try:
+        if status_path.exists():
+            lines = status_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            status_tail = "\n".join(lines[-3:])
+    except Exception:
+        notes.append("F manager status tail read failed")
+
+    artifacts = {
+        "f_live_lock_line": lock_line,
+        "f_live_heartbeat_age_seconds": "" if heartbeat_age is None else round(heartbeat_age, 2),
+        "f_restart_drain_ready_line": drain_ready_line,
+        "restart_drain_owned": restart_drain_owned,
+        "restart_ready_boundary_pause": drain_ready,
+        "f_live_status_tail": status_tail,
     }
     return blockers, artifacts, notes
 
@@ -488,7 +639,16 @@ def _collect_ae_state() -> tuple[list[str], dict[str, Any], list[str]]:
     return blockers, artifacts, notes
 
 
-def _build_decision(*, start_hour: int, end_hour: int, minute_span: int, b_heartbeat_max_age_s: int, h_heartbeat_max_age_s: int, require_window: bool) -> Decision:
+def _build_decision(
+    *,
+    start_hour: int,
+    end_hour: int,
+    minute_span: int,
+    b_heartbeat_max_age_s: int,
+    h_heartbeat_max_age_s: int,
+    f_heartbeat_max_age_s: int,
+    require_window: bool,
+) -> Decision:
     blockers: list[str] = []
     notes: list[str] = []
     in_window, window_artifacts = _window_check(start_hour, end_hour, minute_span)
@@ -505,12 +665,18 @@ def _build_decision(*, start_hour: int, end_hour: int, minute_span: int, b_heart
         restart_drain_owned=bool(marker_info.get("restart_drain_owned", False)),
         maintenance_ready_text=_norm(marker_info.get("maintenance_ready_text", "")),
     )
+    f_blockers, f_artifacts, f_notes = _collect_f_state(
+        f_heartbeat_max_age_s,
+        restart_drain_owned=bool(marker_info.get("restart_drain_owned", False)),
+    )
     ae_blockers, ae_artifacts, ae_notes = _collect_ae_state()
     blockers.extend(h_blockers)
     blockers.extend(b_blockers)
+    blockers.extend(f_blockers)
     blockers.extend(ae_blockers)
     notes.extend(h_notes)
     notes.extend(b_notes)
+    notes.extend(f_notes)
     notes.extend(ae_notes)
 
     # Conservative fallback.
@@ -525,6 +691,7 @@ def _build_decision(*, start_hour: int, end_hour: int, minute_span: int, b_heart
         "maintenance": marker_info,
         "H": h_artifacts,
         "B": b_artifacts,
+        "F": f_artifacts,
         "A_E": ae_artifacts,
     }
     # De-dup while preserving order.
@@ -620,6 +787,12 @@ def _escalation_mode_enabled(args: argparse.Namespace) -> bool:
     return arg_flag or env_flag == "1"
 
 
+def _simplification_freeze_active() -> bool:
+    if _truthy(os.environ.get(SIMPLIFICATION_FREEZE_OVERRIDE_ENV, "0")):
+        return False
+    return SIMPLIFICATION_FREEZE_PATH.exists()
+
+
 def _ownership_transfer_payload() -> dict[str, Any]:
     payload = _read_json(OWNERSHIP_TRANSFER_PATH)
     return payload if isinstance(payload, dict) else {}
@@ -669,7 +842,13 @@ def _maybe_reboot(*, approved: bool, execute_reboot: bool, allow_reboot_action: 
 def run_gate(args: argparse.Namespace) -> int:
     requested_utc = _utc_ts()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + f".pid{os.getpid()}"
+    freeze_active = _simplification_freeze_active()
     escalation_mode = _escalation_mode_enabled(args)
+    if freeze_active:
+        escalation_mode = False
+        args.request_drain = False
+        args.execute_reboot = False
+        args.allow_reboot_action = False
     transfer_ok, transfer_reason = _ownership_transfer_active_for_gate()
     observer_only = not escalation_mode
     drain_markers: list[str] = []
@@ -682,11 +861,13 @@ def run_gate(args: argparse.Namespace) -> int:
         minute_span=args.window_minute_span,
         b_heartbeat_max_age_s=args.b_heartbeat_max_age_s,
         h_heartbeat_max_age_s=args.h_heartbeat_max_age_s,
+        f_heartbeat_max_age_s=args.f_heartbeat_max_age_s,
         require_window=not args.ignore_window,
     )
     decision.notes.append("restart_owner=launcher_loop")
     decision.notes.append("gate_role=observer_only" if observer_only else "gate_role=escalation_only")
     decision.notes.append("escalation_mode=" + ("1" if escalation_mode else "0"))
+    decision.notes.append("simplification_freeze_active=" + ("1" if freeze_active else "0"))
     decision.notes.append("ownership_transfer=" + transfer_reason)
 
     if args.request_drain and observer_only:
@@ -730,6 +911,7 @@ def run_gate(args: argparse.Namespace) -> int:
         "request_drain": bool(args.request_drain),
         "observer_only_mode": observer_only,
         "escalation_mode": escalation_mode,
+        "simplification_freeze_active": freeze_active,
         "ownership_transfer": transfer_reason,
         "evidence_paths": {k: str(v) for k, v in paths.items()},
     }
@@ -748,6 +930,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--request-drain", action="store_true")
     parser.add_argument("--b-heartbeat-max-age-s", type=int, default=DEFAULT_B_HEARTBEAT_MAX_AGE_SECONDS)
     parser.add_argument("--h-heartbeat-max-age-s", type=int, default=DEFAULT_H_HEARTBEAT_MAX_AGE_SECONDS)
+    parser.add_argument("--f-heartbeat-max-age-s", type=int, default=DEFAULT_F_HEARTBEAT_MAX_AGE_SECONDS)
     parser.add_argument("--escalation-mode", action="store_true")
     parser.add_argument("--execute-reboot", action="store_true")
     parser.add_argument("--allow-reboot-action", action="store_true")

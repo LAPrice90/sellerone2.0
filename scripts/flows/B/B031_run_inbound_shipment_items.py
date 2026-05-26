@@ -23,11 +23,13 @@ if str(ROOT) not in sys.path:
 from scripts.api.get_financial_events import get_lwa_access_token, load_dotenv_if_missing  # noqa: E402
 from scripts.api.spapi_signed import sign_spapi_request  # noqa: E402
 from scripts.api.get_restricted_data_token import get_rdt  # noqa: E402
+from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe  # noqa: E402
 
 
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
 MARKETPLACE_ID = os.environ.get("MARKETPLACE_ID")
 OUT_MAP = Path("out/inbound_shipment_contents.csv")
+SQL_TABLE_INBOUND_SHIPMENT_CONTENTS = "sys_inbound_shipment_contents"
 
 
 def _list_shipments(access_token: str) -> List[str]:
@@ -106,6 +108,27 @@ def _fetch_items(access_token: str, shipment_id: str) -> List[Dict[str, object]]
     return items
 
 
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE"))
+    sql_rows = 0
+    if mode in {"sql_shadow", "sql_primary_csv_export"}:
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, sql_table, df)
+            sql_rows = int(result["rows"])
+        finally:
+            store.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return {
+        "mode": mode,
+        "path": str(path),
+        "csv_rows": int(len(df.index)),
+        "sql_table": sql_table if mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
+
+
 def main() -> None:
     load_dotenv_if_missing()
     access_token = get_lwa_access_token()
@@ -138,7 +161,7 @@ def main() -> None:
     df = df.groupby(["inbound_shipment_id", "sku"], dropna=False)["quantity"].sum().reset_index()
 
     OUT_MAP.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(OUT_MAP, index=False)
+    _write_output_frame(df, OUT_MAP, SQL_TABLE_INBOUND_SHIPMENT_CONTENTS)
 
     print(
         json.dumps(

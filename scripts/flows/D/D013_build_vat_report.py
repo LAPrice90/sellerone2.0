@@ -13,8 +13,12 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-import gspread
-from gspread.exceptions import APIError
+try:
+    import gspread
+    from gspread.exceptions import APIError
+except Exception:
+    gspread = None
+    APIError = Exception
 from pandas.errors import EmptyDataError
 
 ORDER_LEDGER_FX = Path("out/order_ledger_fx.csv")
@@ -280,6 +284,8 @@ def main() -> None:
     monthly.to_csv(OUT_MONTHLY, index=False)
 
     try:
+        if gspread is None:
+            raise RuntimeError("gspread not available")
         client = gspread.service_account(filename=str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json"))
         sheet = client.open_by_key(SHEET_ID)
         _write_tab_with_retry(sheet, TAB_DAILY, daily)

@@ -14,3 +14,20 @@ __pycache__/
 # Local tooling/cache
 .cache/
 .pytest_cache/
+
+# Local Codex/app state
+.codex/
+
+# Runtime outputs and generated working files
+out/
+Processed/
+worker_marker.txt
+tmp_missing_keys.txt
+data/*.tmp.*
+project_control/backups/
+
+# Legacy scanner generated files
+scripts/flows/F/legacy_scanner_2_1/logs/
+scripts/flows/F/legacy_scanner_2_1/newProductSourcing/*.csv
+scripts/flows/F/legacy_scanner_2_1/newProductSourcing/Data/*.csv
+scripts/flows/F/legacy_scanner_2_1/newProductSourcing/token.json

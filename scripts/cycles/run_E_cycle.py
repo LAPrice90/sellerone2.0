@@ -33,6 +33,20 @@ try:
     from scripts.core.script_locator import resolve_script_path
 except ModuleNotFoundError:
     from core.script_locator import resolve_script_path
+try:
+    from scripts.core.flow_health_gate import flow_gate_checklist_path
+except ModuleNotFoundError:
+    from core.flow_health_gate import flow_gate_checklist_path
+try:
+    from scripts.core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
+except ModuleNotFoundError:
+    from core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "out"
@@ -43,9 +57,7 @@ E_DECISION_LOG = Path(os.environ.get("E_DECISION_LOG_PATH", str(OUT / "e_decisio
 E_LOCK_PATH = Path(os.environ.get("E_CYCLE_LOCK_PATH", str(E_LIVE_DIR / "E_cycle.lock")))
 E_LOCK_LEGACY_PATH = OUT / "E_cycle.lock"
 E_SPLIT_HEALTH_MODE = os.environ.get("E_SPLIT_HEALTH_MODE", "shadow").strip().lower() or "shadow"
-E_SPLIT_CHECKLIST_PATH = Path(
-    os.environ.get("E_SPLIT_CHECKLIST_PATH", OUT / "cycle_alerts" / "checklist_E_split.csv")
-)
+E_SPLIT_CHECKLIST_PATH = flow_gate_checklist_path("E")
 E_HEALTH_FAIL_CLOSED = os.environ.get("E_HEALTH_FAIL_CLOSED", "1").strip() == "1"
 FLOW_SELFTEST_COMPARE_PATH = OUT / "cycle_alerts" / "flow_selftest_compare.csv"
 FLOW_SELFTEST_STATE_PATH = OUT / "cycle_alerts" / "flow_selftest_state.json"
@@ -77,6 +89,8 @@ TASKS = [
     resolve_script_path(ROOT / "scripts", "E003_build_restock_signals.py"),
     resolve_script_path(ROOT / "scripts", "E004_build_performance_summary.py"),
     resolve_script_path(ROOT / "scripts", "E005_build_study_report.py"),
+    resolve_script_path(ROOT / "scripts", "E006_build_sales_truth_reconciliation.py"),
+    resolve_script_path(ROOT / "scripts", "E007_build_sku_daily_sales_truth.py"),
 ]
 
 STEP_ARTIFACTS = {
@@ -85,6 +99,11 @@ STEP_ARTIFACTS = {
     "E003_build_restock_signals.py": ["out/sku_restock_signals.csv"],
     "E004_build_performance_summary.py": ["out/sku_performance_summary.csv"],
     "E005_build_study_report.py": ["out/e_study_report.csv"],
+    "E006_build_sales_truth_reconciliation.py": [
+        "out/sales_truth_sku_30d_latest.csv",
+        "out/sales_truth_reconciliation_latest.csv",
+    ],
+    "E007_build_sku_daily_sales_truth.py": ["out/sku_daily_sales_truth_latest.csv"],
     "A015_build_system_health_check.py:profile=e": ["out/cycle_alerts/checklist_E_split.csv"],
     "E010_publish_e_outputs.py": ["out/e_publish_log.csv"],
 }
@@ -170,6 +189,7 @@ def _latest_output_asof() -> str:
         OUT / "sku_restock_signals.csv",
         OUT / "sku_performance_summary.csv",
         OUT / "e_study_report.csv",
+        OUT / "sales_truth_reconciliation_latest.csv",
     ):
         val = _max_asof_date(path)
         if not val:
@@ -241,14 +261,7 @@ def _pid_alive(pid: int) -> bool:
 
 
 def _parse_lock_pid(payload: str) -> int | None:
-    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
-    for part in parts:
-        if part.startswith("pid="):
-            try:
-                return int(part.split("=", 1)[1].strip())
-            except Exception:
-                return None
-    return None
+    return parse_stream_lock_pid(payload)
 
 
 def _lock_paths() -> list[Path]:
@@ -271,7 +284,7 @@ def _acquire_lock() -> None:
                 raise SystemExit(f"[E_cycle] lock exists (pid {pid})")
             path.unlink(missing_ok=True)
     now = _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ")
-    payload = f"E|pid={os.getpid()}|start={now}|heartbeat={now}\n"
+    payload = build_lock_payload(owner="E", pid=os.getpid(), start_utc=now, heartbeat_utc=now)
     for path in _lock_paths():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(payload, encoding="utf-8")
@@ -509,79 +522,79 @@ def main() -> None:
                 ended_at=utc_now_iso(),
             )
 
-        if os.environ.get("E_WRITE_SHEETS", "0").strip() == "1":
-            legacy_gate_block = False
-            split_gate_block = False
-            split_fail = -1
-            split_warn = -1
-            split_rc = 0
-            split_fresh = False
-            if mode_effective in {"shadow", "split"}:
-                tasks_run.append("A015_build_system_health_check.py:profile=e")
-                split_started = _utc_now()
-                split_step_started = utc_now_iso()
-                split_rc, split_fresh = _run_a015_profile_e()
-                elapsed_total += (_utc_now() - split_started).total_seconds()
-                split_counts = _health_counts(E_SPLIT_CHECKLIST_PATH)
-                split_fail = split_counts[0] if split_counts is not None else -1
-                split_warn = split_counts[1] if split_counts is not None else -1
-                append_step(
-                    manifest,
-                    name="A015_build_system_health_check.py:profile=e",
-                    script_or_function="A015_build_system_health_check.py",
-                    inputs=[str(E_SPLIT_CHECKLIST_PATH)],
-                    outputs=STEP_ARTIFACTS.get("A015_build_system_health_check.py:profile=e", []),
-                    rc=split_rc,
-                    notes=f"split_mode={mode_effective};split_fresh={'1' if split_fresh else '0'}",
-                    started_at=split_step_started,
-                    ended_at=utc_now_iso(),
-                )
-                if mode_effective == "split":
-                    if split_counts is None:
-                        split_gate_block = bool(E_HEALTH_FAIL_CLOSED)
-                    else:
-                        split_gate_block = bool(split_fail > 0)
-                    if split_rc == 2:
-                        split_gate_block = True
+        legacy_gate_block = False
+        split_gate_block = False
+        split_fail = -1
+        split_warn = -1
+        split_rc = 0
+        split_fresh = False
+        if mode_effective in {"shadow", "split"}:
+            tasks_run.append("A015_build_system_health_check.py:profile=e")
+            split_started = _utc_now()
+            split_step_started = utc_now_iso()
+            split_rc, split_fresh = _run_a015_profile_e()
+            elapsed_total += (_utc_now() - split_started).total_seconds()
+            split_counts = _health_counts(E_SPLIT_CHECKLIST_PATH)
+            split_fail = split_counts[0] if split_counts is not None else -1
+            split_warn = split_counts[1] if split_counts is not None else -1
+            append_step(
+                manifest,
+                name="A015_build_system_health_check.py:profile=e",
+                script_or_function="A015_build_system_health_check.py",
+                inputs=[str(E_SPLIT_CHECKLIST_PATH)],
+                outputs=STEP_ARTIFACTS.get("A015_build_system_health_check.py:profile=e", []),
+                rc=split_rc,
+                notes=f"split_mode={mode_effective};split_fresh={'1' if split_fresh else '0'}",
+                started_at=split_step_started,
+                ended_at=utc_now_iso(),
+            )
+            if mode_effective == "split":
+                if split_counts is None:
+                    split_gate_block = bool(E_HEALTH_FAIL_CLOSED)
                 else:
-                    split_gate_block = bool(split_rc == 2 or (split_counts is not None and split_fail > 0))
+                    split_gate_block = bool(split_fail > 0)
+                if split_rc == 2:
+                    split_gate_block = True
+            else:
+                split_gate_block = bool(split_rc == 2 or (split_counts is not None and split_fail > 0))
 
-                if mode_effective == "shadow":
-                    decision_match = legacy_gate_block == split_gate_block
-                    state = _update_e_shadow_streak(decision_match)
-                    _append_flow_selftest_compare(
-                        {
-                            "timestamp_utc": _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                            "cycle_start_utc": run_id,
-                            "cycle": "E",
-                            "mode_requested": mode_requested,
-                            "mode_effective": mode_effective,
-                            "legacy_fail_count": "",
-                            "legacy_warn_count": "",
-                            "legacy_gate_block": "0",
-                            "split_fail_count": "" if split_fail < 0 else str(split_fail),
-                            "split_warn_count": "" if split_warn < 0 else str(split_warn),
-                            "split_gate_block": "1" if split_gate_block else "0",
-                            "decision_match": "1" if decision_match else "0",
-                            "a_match_streak": str(_safe_int(state.get("a_match_streak", 0), 0)),
-                            "b_match_streak": str(_safe_int(state.get("b_match_streak", 0), 0)),
-                            "e_match_streak": str(_safe_int(state.get("e_match_streak", 0), 0)),
-                            "ready_for_cutover": "1" if bool(state.get("ready_for_cutover", False)) else "0",
-                            "legacy_source": "none",
-                            "split_source": E_SPLIT_CHECKLIST_PATH.name,
-                            "notes": f"split_rc={split_rc};split_fresh={'1' if split_fresh else '0'}",
-                        }
-                    )
-                    print(
-                        "[E_cycle] split_shadow_compare "
-                        f"split_fail={split_fail} split_warn={split_warn} "
-                        f"candidate_gate_block={'1' if split_gate_block else '0'} "
-                        f"a_match_streak={_safe_int(state.get('a_match_streak', 0), 0)} "
-                        f"b_match_streak={_safe_int(state.get('b_match_streak', 0), 0)} "
-                        f"e_match_streak={_safe_int(state.get('e_match_streak', 0), 0)} "
-                        f"ready_for_cutover={'1' if bool(state.get('ready_for_cutover', False)) else '0'}"
-                    )
+            if mode_effective == "shadow":
+                decision_match = legacy_gate_block == split_gate_block
+                state = _update_e_shadow_streak(decision_match)
+                _append_flow_selftest_compare(
+                    {
+                        "timestamp_utc": _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "cycle_start_utc": run_id,
+                        "cycle": "E",
+                        "mode_requested": mode_requested,
+                        "mode_effective": mode_effective,
+                        "legacy_fail_count": "",
+                        "legacy_warn_count": "",
+                        "legacy_gate_block": "0",
+                        "split_fail_count": "" if split_fail < 0 else str(split_fail),
+                        "split_warn_count": "" if split_warn < 0 else str(split_warn),
+                        "split_gate_block": "1" if split_gate_block else "0",
+                        "decision_match": "1" if decision_match else "0",
+                        "a_match_streak": str(_safe_int(state.get("a_match_streak", 0), 0)),
+                        "b_match_streak": str(_safe_int(state.get("b_match_streak", 0), 0)),
+                        "e_match_streak": str(_safe_int(state.get("e_match_streak", 0), 0)),
+                        "ready_for_cutover": "1" if bool(state.get("ready_for_cutover", False)) else "0",
+                        "legacy_source": "none",
+                        "split_source": E_SPLIT_CHECKLIST_PATH.name,
+                        "notes": f"split_rc={split_rc};split_fresh={'1' if split_fresh else '0'}",
+                    }
+                )
+                print(
+                    "[E_cycle] split_shadow_compare "
+                    f"split_fail={split_fail} split_warn={split_warn} "
+                    f"candidate_gate_block={'1' if split_gate_block else '0'} "
+                    f"a_match_streak={_safe_int(state.get('a_match_streak', 0), 0)} "
+                    f"b_match_streak={_safe_int(state.get('b_match_streak', 0), 0)} "
+                    f"e_match_streak={_safe_int(state.get('e_match_streak', 0), 0)} "
+                    f"ready_for_cutover={'1' if bool(state.get('ready_for_cutover', False)) else '0'}"
+                )
 
+        if os.environ.get("E_WRITE_SHEETS", "0").strip() == "1":
             if mode_effective == "split" and split_gate_block:
                 status = "gated_fail"
                 error = (
@@ -639,7 +652,13 @@ def main() -> None:
             "asof_rerun_trigger": "1" if asof_rerun_trigger else "0",
             "error": error,
         })
-        finalize_manifest(manifest, health_checklist_path=E_SPLIT_CHECKLIST_PATH, end_time=utc_now_iso())
+        manifest_final_state = "completed" if str(status).strip().lower() == "success" else "failed"
+        finalize_manifest(
+            manifest,
+            health_checklist_path=E_SPLIT_CHECKLIST_PATH,
+            end_time=utc_now_iso(),
+            final_state=manifest_final_state,
+        )
         write_manifest(ROOT, manifest)
         _release_lock()
 

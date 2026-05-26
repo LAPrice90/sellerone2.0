@@ -1,128 +1,92 @@
 # Task Queue
 
-## Purpose
+Audit source: project control full audit on 2026-05-01.
 
-This file is the draft project queue for unapproved or upcoming work that should move out of `NOTES.md` and other scattered planning files.
+## Scanner / F Price-List Manager
 
-## Priority Queue
+- [ ] F due checks now live in `project_control/DUE_CHECK_REGISTER.csv`; morning MOT should read `out/cycle_alerts/due_check_register_status.csv` for due/overdue follow-ups.
+- [x] Investigate duplicate scanner ASIN `B0DPMGDZLZ` in `out/scanner_latest.csv`. User decision: different supplier SKUs are separate products and must not be sold together. Applied classification reason `different_sku_separate_product_not_sold_together`.
+- [x] Add or confirm a scanner-level uniqueness check for ASIN plus supplier SKU. Implemented as `P012_scanner_identity_check.py`; current proof reads 51 scanner rows, 51 unique `asin + supplier_sku` keys, 0 exact duplicate keys, and 1 same-ASIN/different-supplier-SKU context row.
+- [x] Insert approved scanner new-product candidates into SQL Product DB and local Product DB mirror. `P011_apply_scanner_product_db_inserts.py` inserted 51 rows, including the 2 duplicate-ASIN scanner rows as separate products with `different_sku_separate_product_not_sold_together`.
+- [ ] Continue FPM live-owner monitoring from `out/systems/F/price_list_manager/live/live_cycle_status.csv` until pending rows materially reduce from 18168.
+- [ ] Add a stable scanner proof summary that is not dependent on reading a live file mid-owner-run.
+- [x] Provide or locate the latest ABGee price-list attachment, then rerun the single-supplier Gmail/import/O cost proof. Completed 2026-05-22: Gmail label `ABGee` contained `ABGee_Stock_Feed.xlsx` from `2026-05-21T14:47:06Z`; ABGee import batch `abgee_source_20260522T134758Z_fa74c131f665` produced 5770 valid rows, 2975 held rows, and 17 current ABGee O cost matches. Proof: `out/systems/O/history/abgee_pack_price_proof_20260522T134747Z/proof.md`.
+- [ ] We Stock Lots authenticated export check. Trigger: when a logged-in CSV/XLSX export from `https://westocklots.com/api/export/stocklist/?format=csv` or `?format=xlsx` is available. Inspect artifact: exported file saved under `out/systems/F/price_list_manager/test_mode/downloaded_sources/we_stock_lots/Inbox/` or a manually supplied equivalent. Success condition: export contains usable barcode/EAN plus cost/price columns and converter produces scan-ready rows. If it fails: keep `we_stock_lots` parked and record whether the blocker is `unauthorized_export`, `missing_barcode`, or `missing_cost`.
 
-### Weekly Reset Execution Block (2026-03-17 to 2026-03-23 UTC)
+## Database / Product DB
 
-- Must Do:
-- Validate overnight restart end-to-end in one real overnight run (shutdown, reboot, auto-login, morning cycle recovery).
-- Keep A -> E daily chain green and verify fresh A and E manifests each morning.
-- Keep B live freshness stable (orders, order_master) and confirm no stale-running scheduler state.
-- Keep H live stable with launcher ownership model and no churn-loop regression.
-- Decide and document handling path for `h_parked_sku_write_attempts` WARN (event-time proof or approved exception).
-- Should Do:
-- Add event-time parked evidence so parked-write WARN can be promoted to deterministic pass/fail.
-- Tighten daily runbook checks into a single morning-midday-evening checklist.
-- Review one week of H runtime logs for interruption/reconcile drift.
-- Nice To Have:
-- Refresh progress chart wording to reflect "H stable enough for normal live use".
-- Start backlog grooming for feeder/operations-loop work without pulling focus from stability.
+- [x] Define Product DB single source of truth: SQL, edited through the UI.
+- [x] Define the SQL Product DB table contract before moving writes. Implemented in `scripts/core/storage/product_db_contract.py` with `seller_sku` primary key and non-unique ASIN index.
+- [x] Decide whether the first implementation target is PostgreSQL production only, or SQLite local proof first with later PostgreSQL promotion. Current decision: PostgreSQL production target, SQLite local proof only.
+- [ ] Mark Google Sheet `Product_DB` as legacy/export-only after SQL cutover.
+- [ ] Mark CSV Product DB files as read-only mirrors/export artifacts after SQL cutover.
+- [x] Control Product DB CSV mirror drift. P018 reports SQL/O rows 659, SQL unique `seller_sku` 659, legacy CSV mirror rows 608, and classifies the CSV as `mirror_stale_not_authority`.
+- [x] Build exact Product DB reader migration map for A/B/E/H/F/O before changing any runtime consumers. P019 mapped 298 Product DB references across 87 files, with 0 unknown owners and 58 changes blocked without explicit approval.
+- [x] Prepare PostgreSQL Product DB DDL, seed, export, and rollback rehearsal without live production promotion. P020 passed offline and reports production promotion `not_run_requires_explicit_approval`.
+- [x] Make O Product DB operator view prefer SQL authority when the local `product_db_products` table exists. O030 rebuilt 659 operator rows from SQL while the legacy CSV mirror was stale at 608 rows.
+- [x] Add a local-only Product DB edit-event applier. Implemented as `P014_apply_product_db_edit_events.py`; dry-run by default, confirmed local apply only, blocks unsafe ASIN identity changes, writes local SQL plus mirror export only.
+- [x] Add SQL authority rehearsal proof for Product DB. Implemented as `P015_product_db_sql_authority_rehearsal.py`; latest proof reports SQL 659 rows, O view 659 rows, CSV mirror 608 rows, 0 FAIL, 3 WARN.
+- [x] Build a staged legacy import check from current Sheet/CSV shape into SQL without changing live Product DB records. Implemented as `scripts/one_off/P008_product_db_sql_contract_check.py`; current live source fails closed before staged import.
+- [x] Fix Product DB duplicate header `last_updated_A003` at the source/export generation path. Shared repair helper now coalesces duplicate Product_DB headers before A/B Product DB sheet updates or preview exports; current local preview has 71 unique columns and staged SQL import passes.
+- [x] Add Product DB schema validation before SQL import, export, or mirror use. O030 now writes `out/systems/O/live/product_db_source_health.csv`; P008 writes `out/sql_migration/product_db_contract/product_db_sql_contract_check.csv`.
+- [x] Review duplicate Product DB ASINs: `0786964502`, `B07RRQX71T`, `B09NQ9ZHDQ`. User decision: different SKUs stay on different rows and are classed as separate products not sold together. Recorded as `different_sku_separate_product_not_sold_together`.
+- [x] Enforce Product DB identity rule in SQL: `seller_sku` is primary key.
+- [x] Enforce ASIN rule: ASIN is controlled non-unique unless later approved otherwise.
+- [x] Add a non-destructive Product DB unique-key validation for `seller_sku` and optional ASIN duplicates.
+- [x] Build a safe local-only database linking test that simulates `WOULD INSERT`, `WOULD UPDATE`, `REVIEW`, and `BLOCKED` without writing SQL, CSV, or Google Sheets. Implemented as `scripts/one_off/P009_product_db_link_simulation.py`; current live run reads 51 scanner rows and returns 49 `WOULD INSERT`, 2 `REVIEW`, and 0 `BLOCKED`.
 
-### Governance Consolidation
+## Pricing / H Repricing
 
-- Populate `project_control/OPERATING_SYSTEM.md` so the new control lane has a clear narrative operating model.
-- Review the drafted `project_control` files and approve which legacy files can be demoted to reference-only.
-- Plan a later migration task to retire active planning use of `NOTES.md` and `APP_PLAN.txt` without deleting history.
+- [x] Investigate the 20 rows in `out/pricing_output.csv` with blank `execution_write_status`. Read-only proof `P013_repricing_write_status_proof.py` now distinguishes current H runtime evidence from stale audit pricing output.
+- [x] Migrate the repricer tracker from Google Sheets to a UI view backed by SQL/read-only pricing outputs. O UI replacement candidate is locally complete; P017 reports `ready_with_stale_audit_warning`, missing critical fields `0`, tracker rows 89, terminal run `20260501T215343Z`, publish `ok`. The Sheet is not retired.
+- [x] Keep the current repricer tracker Sheet as a temporary operator output until the UI replacement is proven. P017/P021 record Sheet status as temporary fallback until explicit operator cutover.
+- [ ] Complete one normal operating day of repricer tracker UI observation before retiring or disabling the repricer tracker Sheet. User accepted this path on 2026-05-02; keep the Sheet fallback during observation.
+- [x] Define the UI repricer tracker fields from existing H outputs before changing `scripts/flows/H/H130_build_phase1_observation_sheet.py`.
+- [ ] Let the next owner health pass clear or confirm stale H freshness FAIL rows from `out/cycle_alerts/checklist_H.csv`.
+- [x] Keep separate evidence for eligible-to-write, decision-to-change-price, write-attempted, and write-applied stages. P017 requires those tracker fields before UI parity can pass.
+- [x] Add a compact H pricing proof summary that records latest run id, finalized status, publish status, and write status counts. Implemented as read-only `P013_repricing_write_status_proof.py`; current proof writes `repricing_write_status_proof_summary.json` and `repricing_write_status_root_cause.csv`.
+- [x] Decide whether H should normalize `WRITE_NOT_APPLIED` to an approved contract value such as `ERROR`/`BLOCKED`, or whether `WRITE_NOT_APPLIED` should be added to the approved write-status contract. User approved the suggested path; `WRITE_NOT_APPLIED` is now an approved contract status because it is already produced by the write-verification path when a write was attempted but not applied.
+- [x] Apply the H source blank-status normalization patch. `run_H_pricing_cycle.py` now sets and re-asserts `execution_write_status=READ_ONLY_NO_WRITE` for current-cycle no-market-data rows after truth reconciliation and sets `execution_write_status=NO_WRITE_REQUIRED` for parked rows; `H130_build_phase1_observation_sheet.py` keeps parked rows as `NO_WRITE_REQUIRED`.
+- [x] Mark stale audit `out/pricing_output.csv` separately in P013/O050 instead of treating it as current H source proof. Current stale reason: `pricing_output_older_than_runtime_and_missing_latest_runtime_run`.
+- [x] Run H-owned proof for blank-status normalization. Owner run `20260501T183549Z` finalized with publish `ok`; P013 at `2026-05-01T18:56:55Z` reports runtime blanks `0`, invalid statuses `0`, proof-run rows `49`, and proof-run status counts `APPLIED=3`, `NO_WRITE_REQUIRED=34`, `READ_ONLY_NO_WRITE=12`. O050 health has 9 ok checks and 2 stale-audit warnings only.
+- [x] Re-check repricer tracker UI cutover after latest H terminal recovery. P016 at `2026-05-01T21:01:46Z` reports `ready_with_stale_audit_warning`, `fail_count=0`, terminal run `20260501T203514Z`, publish `ok`; remaining warning is stale audit `out/pricing_output.csv`.
+- [x] Root-cause H `item_offers` timeout from run `20260501T174941Z` before using H as repricer tracker sign-off evidence. Evidence showed one-cycle retry expanded the candidate ASIN budget to 65 and the snapshot budget to 645 seconds, but the `H_item_offers_lookup.py` subprocess still had a fixed 240-second watchdog. Code now passes the remaining retry-aware snapshot budget into the helper watchdog, with focused tests covering base, expanded, and nearly-consumed budget cases.
+- [x] Confirm whether 4 `APPLIED` pricing rows in the latest proof are expected under current writer mode. O050 shows 3 current proof-run `APPLIED` rows from `20260501T183549Z` with eligible/write-attempted/write-applied flags all `1`; the fourth `APPLIED` row is historical from `20260430T134435Z` and not part of the latest terminal proof run.
+- [x] Keep stale compact `out/pricing_output.csv` as audit-only until a later approved cleanup/export refresh removes its historical blank-status rows without hiding source truth. P013/O050/P016/P017 classify it as stale audit evidence and do not use it as current H runtime proof.
 
-### H Stability Ghosts - Control Simplification Plan (PROMPT 022)
+## B Cycle
 
-- Stage 1 - disable duplicate restart authorities:
-- enforce one active restart owner window for H
-- move non-owner layers to observe-only or escalation-only behavior
-- Stage 2 - anti-churn relaunch policy:
-- replace fixed rapid relaunch pattern with cooldown-aware behavior
-- add repeated-short-failure guardrail
-- Stage 3 - lock and heartbeat tolerance hardening:
-- increase stale tolerance windows
-- delay stale cleanup until reconcile window expires
-- Stage 4 - interruption-aware handling:
-- classify SIGBREAK/session-like exits as interruption class
-- prevent rapid looped relaunch during interruption windows
-- Stage 5 - controlled validation:
-- run controlled H sessions and verify reduced relaunch churn
-- verify no multi-authority overlap in restart decisions
+- [x] MAIN MONDAY MOT TASK: Resolve `token_shortages_by_sku` FAIL with value 6 in `out/cycle_alerts/checklist_B.csv`. Completed on 2026-05-06 after approved correction tokens were applied under B maintenance; B proof cycle `B_20260506T083023Z` finalized with `token_shortages_by_sku=ok 0`.
+- [x] Review `order_master_placeholder_cogs_rows` WARN with value 6. Cleared in the same B proof cycle with `order_master_placeholder_cogs_rows=ok 0`.
+- [ ] Keep B proof owner-safe. If a manual B proof is required, use maintenance handoff and `B_RUN_ONCE=1` only at a safe boundary.
 
-### Canonical Source Enforcement
+## A Cycle
 
-- Continue safe compat-mapped reader cleanup outside unresolved ownership areas.
-- Add narrow guardrail checks to catch new hardcoded reads of compat-mapped live datasets.
-- Resolve ownership for the decision-required datasets identified in `project_control/CANONICAL_ENFORCEMENT_PLAN.md` before attempting broader rewiring.
+- [ ] Do not run A015 ad hoc as proof. Use next A-owned run or an explicitly approved A-owned proof window.
+- [ ] Confirm whether `out/system_health_checklist.csv` should be refreshed by the next scheduled A015 after the H runtime evidence at 2026-05-01T14:20:11Z.
+- [ ] Record A current-state evidence from owner artifacts after the next completed A run.
 
-### Repricer Governance And Cleanup
+## E Analytics
 
-- Formalize repricer document roles so one document defines the current live repricer contract and one defines the target repricer architecture.
-- Reconcile repricer drift between:
-- single-SKU Phase 1 wording and multi-SKU live reality
-- `strategy-steps-v1.3.md` and `masterplan_v10.md`
-- stock-source priority wording and implemented order
-- ceiling fallback and CPT wording
-- writer-mode/config authority
-- file naming and terminology
-- Add a repricer capability matrix to project-control so live, partial, deferred, and target-only areas are visible without rereading all process-guide documents.
+- [ ] Keep E scoped proof separate from global health. E checklist currently has 23 ok and 0 fail/warn.
+- [ ] Add a small E proof summary from `out/systems/E/live/e_run_log.jsonl` with latest success run id and row counts.
 
-### Repricer Product Sequence
+## O Operations
 
-- After H runtime stability is fixed separately, complete repricer planning cleanup before starting additional repricer feature work.
-- Best next repricer feature candidate after planning cleanup:
-- finish suppressed Buy Box fallback policy so suppression handling matches current architecture direction and live behavior expectations
-- Suppressed Buy Box fallback completion should be staged as:
-- define current-contract suppression policy and decision order
-- align persistence and audit outputs
-- add retry-budget, cooldown, stop, and ceiling-floor guardrails
-- add validation and contract coverage
-- Follow-on repricer product work after suppression cleanup:
-- refine slow-bleed policy and inventory-pressure handling
-- then plan portfolio and notification architecture as a separate later stage
-- Keep these later-stage items deferred until the current runtime contract is cleaned up:
-- pressure workflow
-- demand learning
-- broader portfolio governor behavior
+- [ ] Standardize module execution for O scripts that import `scripts.flows.*`; direct path execution can fail without `PYTHONPATH`.
+- [x] Add a Product DB operator view schema check that reports source duplicate headers before the O view masks them.
+- [ ] Confirm O outputs that remain planned or empty are marked NOT VERIFIED, not treated as complete.
 
-### Suppression Fallback Completion Plan
+## External Integrations
 
-- Must-have scope:
-- define suppression entry, direct-target preference, learned-threshold use, inferred-upper-bound use, carry-forward use, and downward-probe rules
-- define retry-budget, cooldown, stop, and re-entry rules
-- add resolved-state audit outcomes to suppression outputs
-- ensure persisted suppression ceilings are re-clamped to anchor-floor governance before storage
-- Should-have scope:
-- add contract checks for suppression decision order and persistence guardrails
-- add output-level checks for stale temporary ceilings and repeated suppression loops
-- update runtime and strategy documents so suppression wording matches live behavior
-- Deferred scope:
-- richer suppression learning models
-- notification-led suppression handling
-- portfolio-aware suppression policy
-- demand-learning extensions tied to suppression recovery
+- [ ] Produce a read-only external integration inventory: Amazon SP-API, Google Sheets, BBP/web scrape, and scheduler task names.
+- [ ] Add a no-write external integration smoke test plan. Do not execute write-capable Sheet or listing calls without explicit approval.
+- [ ] Export or document scheduler XML for `AMZ Orders`, `AMZ H Cycle`, and `AMZ Controlled Restart` if those tasks are still active owners.
+- [ ] Fix controlled restart gate/ownership handling after missed 2026-05-06 overnight reboot. Evidence: `AMZ Controlled Restart` ran at 2026-05-06 02:10:02 local with task result 0, but `out/locks/restart_control/restart_controller.latest.json` ended `skipped_post_heal_blocked` with final blockers `H_LAUNCHER_ACTIVE`, `H_CYCLE_ACTIVE_LOCK`, `B_ACTIVE_LOCK`, `F_MANAGER_ACTIVE_LOCK`, and `AMBIGUOUS_OWNERSHIP_HOLD`; OS `LastBootUpTime` remained 2026-05-05 02:24:12. Success condition: next controlled restart either reboots inside the 02:00-03:00 window after a clean drain boundary, or records one explicit safe skip reason without relaunching owners into a self-blocking final gate.
 
-### Data And Product Backlog Carried From Legacy Notes
+## Governance
 
-- Add missing-SKUs warning to A003 run status when inventory rows are lower than active listings.
-- Add a sales-linked sanity check for stock drops that exceed recent sales.
-- Consider per-SKU inventory fetch fallback logging so failures are visible at SKU level.
-- Build or formalize the Product DB manual field scaffold if that design is still current.
-- Clarify fees strategy so actual posted fees supersede estimates without losing estimate visibility.
-- Revisit refund handling, returns tracking, and inbound transportation fee allocation when those areas are approved for work.
-- Review the SKU fee override cases noted in `NOTES.md`.
-
-## Decision-Required Queue
-
-- Decide whether Product DB sheet-first architecture is still the intended canonical business layer or whether a different long-term authority model now applies.
-- Decide which unresolved duplicate-truth datasets should be canonical before any non-safe rewiring begins.
-- Decide how much of the repo-wide operating model should migrate from `AGENTS.md` into `project_control/OPERATING_SYSTEM.md`.
-- Confirm the repricer runtime-contract authority split:
-- current live contract = `strategy-steps-v1.3.md`
-- target architecture = `masterplan_v10.md`
-- Confirm whether `config/h_sku_switches.csv` fully replaces `config/phase1_writer_modes.csv` for repricer write authority.
-- Approve the suppressed Buy Box fallback completion policy for the current live repricer contract before code changes begin.
-
-## Reference Sources For This Queue
-
-- `project_control/CANONICAL_ENFORCEMENT_PLAN.md`
-- `project_control/GOVERNANCE_AUDIT.md`
-- `NOTES.md`
-- `APP_PLAN.txt`
+- [x] Build a proper due-check register for deferred operational checks, with fields for due date, owner flow, artifact to inspect, success condition, and alert status. Implemented as `project_control/DUE_CHECK_REGISTER.csv` plus `scripts/tools/due_check_register.py`.
+- [ ] Keep `project_control/SCRIPT_INVENTORY.csv` current when new flow scripts or entrypoints are added.
+- [ ] Convert `project_control/OUTPUT_SCHEMA_CHECKS.md` into a repeatable check if these visibility exports become daily artifacts.
+- [ ] Update roadmap/expectation progress only when a flow-owned proof confirms a real reliability or completion change.

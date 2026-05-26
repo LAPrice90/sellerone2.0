@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from decimal import Decimal, ROUND_HALF_UP
-import gspread
+try:
+    import gspread
+except Exception:
+    gspread = None
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -28,6 +31,8 @@ from scripts.api.get_orders import (
 )
 from scripts.api.get_pricing import run_live_price_lookup
 from scripts.api.get_listing_item_price import run_own_offer_price_lookup
+from scripts.core.storage import dataframe_from_product_db_sheet_rows, write_dataframe_with_sql_compat
+from scripts.flows.B._finance_io import read_finance_frame, write_finance_frame
 
 SHEET_ID = "1BHueJTk4dvvhIXypzh6i2hQTgc0pB3DWj2khQ2IT6_A"
 ORDERS_TAB = "Orders_raw"
@@ -56,6 +61,8 @@ FIRST_RUN_START_ISO = "2025-11-01T00:00:00Z"
 PULLED_LAST_RUN_PATH = Path("out/orders_pulled_last_run.csv")
 ORDERS_ALL_PATH = Path("out/orders_all.csv")
 ITEMS_ALL_PATH = Path("out/order_items_all.csv")
+SQL_TABLE_ORDERS_ALL = "b_orders_all"
+SQL_TABLE_ORDER_ITEMS_ALL = "b_order_items_all"
 FX_RATES_PATH = Path("out/fx_rates_daily.csv")
 FEE_MODEL_PATH = Path("out/fee_country_model.csv")
 FEE_RULES_PATH = Path("reference/fee_vat_rules.csv")
@@ -63,6 +70,7 @@ MP_PARTICIPATIONS_PATH = Path("out/marketplace_participations.csv")
 # Use marker-based cursor (no forced midnight) after initial backfill.
 FORCE_FROM_MIDNIGHT = False
 PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 PRODUCT_DB_SHEET_ID = os.environ.get("PRODUCT_DB_SHEET_ID", "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s")
 PRODUCT_DB_TAB = "Product_DB"
 REFRESH_PRODUCT_DB = os.environ.get("REFRESH_PRODUCT_DB", "1") == "1"
@@ -74,6 +82,11 @@ RETRY_MAX_ATTEMPTS = int(os.environ.get("ORDERS_RETRY_MAX_ATTEMPTS", "10"))
 RETRY_BACKOFF_BASE = float(os.environ.get("ORDERS_RETRY_BACKOFF_BASE", "60"))
 RETRY_BACKOFF_MAX = float(os.environ.get("ORDERS_RETRY_BACKOFF_MAX", "3600"))
 SKIP_MARKER_WRITE = os.environ.get("ORDERS_SKIP_MARKER_WRITE", "").strip() == "1"
+WRITE_SHEETS = os.environ.get("ORDERS_WRITE_SHEETS", "0").strip() == "1"
+if os.environ.get("B_CYCLE_QUIET", "0").strip() == "1":
+    WRITE_SHEETS = False
+if gspread is None:
+    WRITE_SHEETS = False
 DURABILITY_LEDGER_PATH = Path("out/orders_ingestion_durability_log.csv")
 DURABILITY_LEDGER_FIELDS = [
     "timestamp_utc",
@@ -205,6 +218,8 @@ def _load_fee_vat_rules() -> Dict[str, Dict[str, object]]:
 
 
 def get_gspread_client() -> gspread.Client:
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not cred_path:
         cred_path = str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json")
@@ -221,8 +236,15 @@ def export_product_db() -> None:
         rows = ws.get_all_values()
         if not rows:
             return
+        df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
         PRODUCT_DB_PREVIEW.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(rows[1:], columns=rows[0]).to_csv(PRODUCT_DB_PREVIEW, index=False)
+        write_dataframe_with_sql_compat(
+            df,
+            PRODUCT_DB_PREVIEW,
+            SQL_TABLE_PRODUCT_DB_PREVIEW,
+        )
+        if repaired_headers:
+            print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
     except Exception:
         # Fall back to any existing local snapshot.
         return
@@ -346,19 +368,22 @@ def _format_iso_z(dt: datetime) -> str:
 
 
 def _read_csv_if_exists(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        return pd.DataFrame()
     try:
-        return pd.read_csv(path, dtype=str).fillna("")
+        return read_finance_frame(path, dtype=str).fillna("")
+    except KeyError:
+        if not path.exists():
+            return pd.DataFrame()
+        try:
+            return pd.read_csv(path, dtype=str).fillna("")
+        except Exception:
+            return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
 
 
 def _load_existing_item_order_ids() -> set[str]:
-    if not ITEMS_ALL_PATH.exists():
-        return set()
     try:
-        df = pd.read_csv(ITEMS_ALL_PATH, usecols=["amazon_order_id"], dtype=str).fillna("")
+        df = read_finance_frame(ITEMS_ALL_PATH, usecols=["amazon_order_id"], dtype=str).fillna("")
     except Exception:
         return set()
     if df.empty or "amazon_order_id" not in df.columns:
@@ -542,7 +567,7 @@ def _process_retry_queue(df: pd.DataFrame, token: str) -> tuple[pd.DataFrame, st
                 items_all_df = pd.read_csv(ITEMS_ALL_PATH, dtype=str).fillna("")
                 if "_dedupe_key" in items_all_df.columns:
                     items_all_df = items_all_df.drop(columns=["_dedupe_key"])
-                    items_all_df.to_csv(ITEMS_ALL_PATH, index=False)
+                    write_dataframe_with_sql_compat(items_all_df, ITEMS_ALL_PATH, SQL_TABLE_ORDER_ITEMS_ALL)
             except Exception:
                 pass
             df = df[df["order_id"] != order_id]
@@ -592,7 +617,11 @@ def _write_compiled_unique(
                 out[c] = ""
         out = out.sort_values(by=sort_cols)
     path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(path, index=False)
+    sql_table = SQL_TABLE_ORDER_ITEMS_ALL if path == ITEMS_ALL_PATH else SQL_TABLE_ORDERS_ALL if path == ORDERS_ALL_PATH else ""
+    if sql_table:
+        write_dataframe_with_sql_compat(out, path, sql_table)
+    else:
+        out.to_csv(path, index=False)
     return len(out)
 
 
@@ -1322,8 +1351,10 @@ def main() -> None:
     col_count = 0
     failed_orders: List[str] = []
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID)
+    sheet = None
+    if WRITE_SHEETS:
+        client = get_gspread_client()
+        sheet = client.open_by_key(SHEET_ID)
 
     try:
         retry_df, token = _process_retry_queue(retry_df, token)
@@ -1628,8 +1659,8 @@ def main() -> None:
                 print({"status": "warning", "alert": "live_price_lookup_failed", "error": str(exc)})
         # Build Level 1 from compiled history (full DB) when available.
         try:
-            orders_all_df = pd.read_csv(ORDERS_ALL_PATH, dtype=str).fillna("")
-            items_all_df = pd.read_csv(ITEMS_ALL_PATH, dtype=str).fillna("")
+            orders_all_df = read_finance_frame(ORDERS_ALL_PATH, dtype=str).fillna("")
+            items_all_df = read_finance_frame(ITEMS_ALL_PATH, dtype=str).fillna("")
             df_level1 = build_level1(orders_all_df, items_all_df, price_lookup)
         except Exception as exc:
             print({"status": "warning", "alert": "level1_from_archive_failed", "error": str(exc)})
@@ -1654,14 +1685,14 @@ def main() -> None:
         out_level1 = Path("out/financial_events_level1.csv")
         out_pulled = PULLED_LAST_RUN_PATH
         out_orders.parent.mkdir(parents=True, exist_ok=True)
-        df_orders.to_csv(out_orders, index=False)
-        df_items.to_csv(out_items, index=False)
-        df_level1.to_csv(out_level1, index=False)
+        write_finance_frame(df_orders, out_orders)
+        write_finance_frame(df_items, out_items)
+        write_finance_frame(df_level1, out_level1)
         pulled_cols = ["amazon_order_id", "purchase_date", "last_update_date", "order_status"]
         for col in pulled_cols:
             if col not in df_orders.columns:
                 df_orders[col] = ""
-        df_orders[pulled_cols].to_csv(out_pulled, index=False)
+        write_finance_frame(df_orders[pulled_cols], out_pulled)
         # Compiled history (unique keys), in addition to latest snapshots.
         existing_orders_all = _read_csv_if_exists(ORDERS_ALL_PATH)
         existing_items_all = _read_csv_if_exists(ITEMS_ALL_PATH)
@@ -1690,32 +1721,33 @@ def main() -> None:
         )
         # Remove helper column from the stored CSV by rewriting without it.
         try:
-            items_all_df = pd.read_csv(ITEMS_ALL_PATH, dtype=str).fillna("")
+            items_all_df = read_finance_frame(ITEMS_ALL_PATH, dtype=str).fillna("")
             if "_dedupe_key" in items_all_df.columns:
                 items_all_df = items_all_df.drop(columns=["_dedupe_key"])
-                items_all_df.to_csv(ITEMS_ALL_PATH, index=False)
+                write_dataframe_with_sql_compat(items_all_df, ITEMS_ALL_PATH, SQL_TABLE_ORDER_ITEMS_ALL)
         except Exception:
             pass
         snapshot_path = f"{out_orders};{out_items}"
 
-        write_tab(sheet, ORDERS_TAB, df_orders)
-        write_tab(sheet, ITEMS_TAB, df_items)
-        # Write compiled views to sheet if available
-        try:
-            orders_all_df = pd.read_csv(ORDERS_ALL_PATH, dtype=str).fillna("")
-            write_tab(sheet, ORDERS_ALL_TAB, orders_all_df)
-        except Exception:
-            pass
-        try:
-            items_all_df = pd.read_csv(ITEMS_ALL_PATH, dtype=str).fillna("")
-            write_tab(sheet, ITEMS_ALL_TAB, items_all_df)
-        except Exception:
-            pass
-        try:
-            write_tab(sheet, LEVEL1_TAB, df_level1)
-        except Exception:
-            pass
-        sheet_tabs_written = [ORDERS_TAB, ITEMS_TAB, LEVEL1_TAB]
+        if sheet is not None:
+            write_tab(sheet, ORDERS_TAB, df_orders)
+            write_tab(sheet, ITEMS_TAB, df_items)
+            # Write compiled views to sheet if available
+            try:
+                orders_all_df = read_finance_frame(ORDERS_ALL_PATH, dtype=str).fillna("")
+                write_tab(sheet, ORDERS_ALL_TAB, orders_all_df)
+            except Exception:
+                pass
+            try:
+                items_all_df = read_finance_frame(ITEMS_ALL_PATH, dtype=str).fillna("")
+                write_tab(sheet, ITEMS_ALL_TAB, items_all_df)
+            except Exception:
+                pass
+            try:
+                write_tab(sheet, LEVEL1_TAB, df_level1)
+            except Exception:
+                pass
+            sheet_tabs_written = [ORDERS_TAB, ITEMS_TAB, LEVEL1_TAB]
     except Exception as exc:
         status = "error"
         alert = "error"
@@ -1728,53 +1760,54 @@ def main() -> None:
 
     consecutive_failures = 0
     consecutive_successes = 0
-    try:
-        ws_status = sheet.worksheet(RUN_STATUS_TAB)
-        existing = ws_status.get_all_values()
-    except gspread.WorksheetNotFound:
-        existing = []
-        ws_status = None
-    headers = [
-        "script",
-        "mode",
-        "marketplace_id",
-        "status",
-        "alert",
-        "run_id",
-        "started_at",
-        "ended_at",
-        "duration_seconds",
-        "attempts",
-        "records_count",
-        "col_count",
-        "snapshot_path",
-        "sheet_tabs",
-        "poll_interval",
-        "max_attempts",
-        "consecutive_failures",
-        "consecutive_successes",
-        "env",
-        "version",
-        "last_error",
-    ]
-    if existing and existing[0] == headers:
-        index = {(r[0], r[1], r[2]): r for r in existing[1:] if len(r) >= 3}
-        key = (script_name, mode, MARKETPLACE_ID)
-        prev = index.get(key, [])
+    if sheet is not None:
         try:
-            consecutive_failures = int(prev[16]) if len(prev) > 16 else 0
-        except Exception:
+            ws_status = sheet.worksheet(RUN_STATUS_TAB)
+            existing = ws_status.get_all_values()
+        except gspread.WorksheetNotFound:
+            existing = []
+            ws_status = None
+        headers = [
+            "script",
+            "mode",
+            "marketplace_id",
+            "status",
+            "alert",
+            "run_id",
+            "started_at",
+            "ended_at",
+            "duration_seconds",
+            "attempts",
+            "records_count",
+            "col_count",
+            "snapshot_path",
+            "sheet_tabs",
+            "poll_interval",
+            "max_attempts",
+            "consecutive_failures",
+            "consecutive_successes",
+            "env",
+            "version",
+            "last_error",
+        ]
+        if existing and existing[0] == headers:
+            index = {(r[0], r[1], r[2]): r for r in existing[1:] if len(r) >= 3}
+            key = (script_name, mode, MARKETPLACE_ID)
+            prev = index.get(key, [])
+            try:
+                consecutive_failures = int(prev[16]) if len(prev) > 16 else 0
+            except Exception:
+                consecutive_failures = 0
+            try:
+                consecutive_successes = int(prev[17]) if len(prev) > 17 else 0
+            except Exception:
+                consecutive_successes = 0
+        if status == "success":
+            consecutive_successes += 1
             consecutive_failures = 0
-        try:
-            consecutive_successes = int(prev[17]) if len(prev) > 17 else 0
-        except Exception:
+        else:
+            consecutive_failures += 1
             consecutive_successes = 0
-    if status == "success":
-        consecutive_successes += 1
-        consecutive_failures = 0
-    else:
-        consecutive_failures += 1
-        consecutive_successes = 0
 
     run_id = f"{script_name}-{started_at.isoformat()}"
     # Advance marker after successful fetch: max(last_update_date, purchase_date) from returned orders.
@@ -1836,7 +1869,8 @@ def main() -> None:
         git_version,
         last_error,
     ]
-    append_run_status(sheet, status_row)
+    if sheet is not None:
+        append_run_status(sheet, status_row)
 
     if failed_orders:
         FAILED_ORDERS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -1867,6 +1901,7 @@ def main() -> None:
             "columns": col_count,
             "snapshot": snapshot_path,
             "sheet_tabs": sheet_tabs_written,
+            "write_sheets": sheet is not None,
             "alert": alert,
             "error": last_error,
         }

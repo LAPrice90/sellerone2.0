@@ -1,0 +1,4 @@
+candidate_id,source_discovery_candidate_id,source_discovery_run_id,asin,barcode,brand,chosen_supplier_id,chosen_supplier_name,price_list_status,price_list_artifact_path,handoff_ready_flag,intake_status,intake_reason_codes,intake_received_utc,source_row_ref,source_file_path,title,keyword_source,category_source,last_reviewed_utc
+READY-1,DC-READY-1,DR-A,B0READY001,,BrandR,SUP-1,Supplier One,acquired,out/raw/sup1.csv,1,intake_ready,,2026-04-07T12:00:00Z,2,tests/inbox.csv,Ready Title,kw,cat,2026-04-07T12:00:00Z
+MANUAL-1,DC-MANUAL-1,DR-B,B0MANU1234,5012345678901,BrandM,SUP-2,Supplier Two,acquired,out/raw/sup2.csv,1,intake_ready,,2026-04-07T12:00:00Z,3,tests/inbox.csv,Manual Title,kw,cat,2026-04-07T12:00:00Z
+HOLD-1,DC-HOLD-1,DR-C,,12345,BrandH,SUP-3,Supplier Three,acquired,out/raw/sup3.csv,1,intake_ready,,2026-04-07T12:00:00Z,4,tests/inbox.csv,Hold Title,kw,cat,2026-04-07T12:00:00Z

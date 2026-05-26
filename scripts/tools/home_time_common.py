@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,10 +14,63 @@ H_LIVE_DIR = ROOT / "out" / "systems" / "H" / "live"
 LOCKS_DIR = ROOT / "out" / "locks"
 ACTIVE_PATH = H_LIVE_DIR / "H_home_time_mode.active.json"
 LOG_PATH = H_LIVE_DIR / "H_home_time_mode.log"
+HOME_TIME_LOG_ROTATE_MAX_BYTES = max(
+    int(float(os.environ.get("H_HOME_TIME_MODE_ROTATE_MAX_MB", "4") or "4") * 1024 * 1024),
+    512 * 1024,
+)
+HOME_TIME_LOG_ROTATE_MAX_FILES = max(
+    int(float(os.environ.get("H_HOME_TIME_MODE_ROTATE_MAX_FILES", "3") or "3")),
+    2,
+)
+HOME_TIME_LOG_FAMILY_MAX_BYTES = max(
+    int(float(os.environ.get("H_HOME_TIME_MODE_FAMILY_MAX_MB", "12") or "12") * 1024 * 1024),
+    1024 * 1024,
+)
+HOME_TIME_REPORT_RETENTION_DAYS = max(
+    float(os.environ.get("H_HOME_TIME_REPORT_RETENTION_DAYS", "30") or "30"),
+    1.0,
+)
+HOME_TIME_REPORT_MAX_FILES = max(
+    int(float(os.environ.get("H_HOME_TIME_REPORT_MAX_FILES", "40") or "40")),
+    5,
+)
+HOME_TIME_REPORT_FAMILY_MAX_BYTES = max(
+    int(float(os.environ.get("H_HOME_TIME_REPORT_FAMILY_MAX_MB", "64") or "64") * 1024 * 1024),
+    1024 * 1024,
+)
+HOME_TIME_DIAGNOSTIC_RETENTION_DAYS = max(
+    float(os.environ.get("H_HOME_TIME_DIAGNOSTIC_RETENTION_DAYS", "14") or "14"),
+    1.0,
+)
+HOME_TIME_DIAGNOSTIC_MAX_FILES = max(
+    int(float(os.environ.get("H_HOME_TIME_DIAGNOSTIC_MAX_FILES", "80") or "80")),
+    10,
+)
+HOME_TIME_DIAGNOSTIC_FAMILY_MAX_BYTES = max(
+    int(float(os.environ.get("H_HOME_TIME_DIAGNOSTIC_FAMILY_MAX_MB", "64") or "64") * 1024 * 1024),
+    1024 * 1024,
+)
+HOME_TIME_SAFETY_SNAPSHOT_RETENTION_DAYS = max(
+    float(os.environ.get("H_HOME_TIME_SAFETY_SNAPSHOT_RETENTION_DAYS", "21") or "21"),
+    1.0,
+)
+HOME_TIME_SAFETY_SNAPSHOT_MAX_FILES = max(
+    int(float(os.environ.get("H_HOME_TIME_SAFETY_SNAPSHOT_MAX_FILES", "2") or "2")),
+    2,
+)
+HOME_TIME_SAFETY_SNAPSHOT_FAMILY_MAX_BYTES = max(
+    int(float(os.environ.get("H_HOME_TIME_SAFETY_SNAPSHOT_FAMILY_MAX_MB", "96") or "96") * 1024 * 1024),
+    1024 * 1024,
+)
 H_LAUNCHER_LOCK_PATH = H_LIVE_DIR / "H_launcher.lock"
 H_RUN_IN_PROGRESS_PATH = H_LIVE_DIR / "H_run_in_progress.txt"
 H_LAST_FINALIZED_RUN_ID_PATH = H_LIVE_DIR / "H_last_finalized_run_id.txt"
 H_RUNTIME_STATUS_PATH = H_LIVE_DIR / "H_runtime_status.json"
+HOME_TIME_ARTIFACT_RETENTION_SWEEP_SECONDS = max(
+    float(os.environ.get("H_HOME_TIME_ARTIFACT_RETENTION_SWEEP_SECONDS", "300") or "300"),
+    15.0,
+)
+_LAST_HOME_TIME_RETENTION_SWEEP_MONO = 0.0
 
 UNRESOLVED_BOUNDARY_STATUSES = {"active", "unresolved_parent_exit", "stale_or_orphaned", "waiting"}
 MAINTENANCE_MARKER_NAMES = [
@@ -24,7 +78,6 @@ MAINTENANCE_MARKER_NAMES = [
     "maintenance.ready",
     "maintenance.active",
     "b_cycle.maintenance",
-    "h_controlled_mode.active",
 ]
 
 
@@ -70,9 +123,216 @@ def atomic_write_text(path: Path, text: str) -> None:
 
 
 def append_jsonl(path: Path, payload: dict[str, object]) -> None:
+    _apply_home_time_log_retention(path)
+    _maybe_run_home_time_artifact_retention()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="ascii", newline="\n") as fh:
         fh.write(json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n")
+
+
+def _rotate_log_file(path: Path, *, max_bytes: int, max_files: int) -> bool:
+    if max_bytes <= 0 or max_files <= 1:
+        return False
+    try:
+        if not path.exists():
+            return False
+        if int(path.stat().st_size) < int(max_bytes):
+            return False
+    except Exception:
+        return False
+    try:
+        oldest = Path(f"{path}.{max_files}")
+        if oldest.exists():
+            oldest.unlink(missing_ok=True)
+        for idx in range(max_files - 1, 0, -1):
+            src = Path(f"{path}.{idx}")
+            dst = Path(f"{path}.{idx + 1}")
+            if src.exists():
+                src.replace(dst)
+        path.replace(Path(f"{path}.1"))
+        return True
+    except Exception:
+        return False
+
+
+def _log_family_members(base_path: Path) -> list[tuple[int, Path]]:
+    members: list[tuple[int, Path]] = []
+    if base_path.exists():
+        members.append((0, base_path))
+    pattern = f"{base_path.name}.*"
+    for candidate in base_path.parent.glob(pattern):
+        if not candidate.is_file():
+            continue
+        suffix = candidate.name[len(base_path.name) + 1 :]
+        if not suffix.isdigit():
+            continue
+        try:
+            idx = int(suffix)
+        except Exception:
+            continue
+        if idx <= 0:
+            continue
+        members.append((idx, candidate))
+    members.sort(key=lambda item: item[0])
+    return members
+
+
+def _file_size_bytes(path: Path) -> int:
+    try:
+        if path.exists():
+            return int(path.stat().st_size)
+    except Exception:
+        pass
+    return 0
+
+
+def _prune_log_family_budget(base_path: Path, *, max_total_bytes: int, max_total_files: int) -> None:
+    max_files = max(int(max_total_files), 1)
+    max_bytes = max(int(max_total_bytes), 1)
+    members = _log_family_members(base_path)
+    rotated_desc = sorted([item for item in members if item[0] > 0], key=lambda item: item[0], reverse=True)
+    while len(members) > max_files and rotated_desc:
+        _, path = rotated_desc.pop(0)
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        members = [item for item in members if item[1] != path]
+    total_bytes = sum(_file_size_bytes(path) for _, path in members)
+    while total_bytes > max_bytes and rotated_desc:
+        _, path = rotated_desc.pop(0)
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        members = [item for item in members if item[1] != path]
+        total_bytes = sum(_file_size_bytes(path2) for _, path2 in members)
+
+
+def _apply_home_time_log_retention(path: Path) -> None:
+    if path != LOG_PATH:
+        return
+    try:
+        _rotate_log_file(path, max_bytes=HOME_TIME_LOG_ROTATE_MAX_BYTES, max_files=HOME_TIME_LOG_ROTATE_MAX_FILES)
+        _prune_log_family_budget(
+            path,
+            max_total_bytes=HOME_TIME_LOG_FAMILY_MAX_BYTES,
+            max_total_files=HOME_TIME_LOG_ROTATE_MAX_FILES + 1,
+        )
+    except Exception:
+        pass
+
+
+def _utc_now_epoch() -> float:
+    return time.time()
+
+
+def _prune_home_time_artifact_group(
+    *,
+    live_dir: Path,
+    pattern: str,
+    ttl_days: float,
+    max_files: int,
+    max_total_bytes: int,
+) -> dict[str, int]:
+    files = [p for p in live_dir.glob(pattern) if p.is_file()]
+    removed_files = 0
+    removed_bytes = 0
+    cutoff = _utc_now_epoch() - (max(float(ttl_days), 0.0) * 86400.0)
+
+    # First drop stale files by TTL.
+    for path in list(files):
+        try:
+            if path.stat().st_mtime >= cutoff:
+                continue
+            size = _file_size_bytes(path)
+            path.unlink(missing_ok=True)
+            removed_files += 1
+            removed_bytes += max(size, 0)
+        except Exception:
+            continue
+
+    files = [p for p in live_dir.glob(pattern) if p.is_file()]
+    files.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+
+    # Then enforce file-count cap (keep most recent).
+    while len(files) > max(int(max_files), 1):
+        path = files.pop()
+        try:
+            size = _file_size_bytes(path)
+            path.unlink(missing_ok=True)
+            removed_files += 1
+            removed_bytes += max(size, 0)
+        except Exception:
+            continue
+
+    files = [p for p in live_dir.glob(pattern) if p.is_file()]
+    files.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+
+    # Finally enforce retained-byte budget (drop oldest first).
+    total_bytes = sum(_file_size_bytes(path) for path in files)
+    max_bytes = max(int(max_total_bytes), 1)
+    while total_bytes > max_bytes and files:
+        path = files.pop()
+        try:
+            size = _file_size_bytes(path)
+            path.unlink(missing_ok=True)
+            removed_files += 1
+            removed_bytes += max(size, 0)
+        except Exception:
+            pass
+        files = [p for p in live_dir.glob(pattern) if p.is_file()]
+        files.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+        total_bytes = sum(_file_size_bytes(path2) for path2 in files)
+
+    return {"removed_files": int(removed_files), "removed_bytes": int(removed_bytes)}
+
+
+def run_home_time_artifact_retention(root: Path = ROOT) -> dict[str, dict[str, int]]:
+    live_dir = root / "out" / "systems" / "H" / "live"
+    groups = {
+        "home_time_reports": _prune_home_time_artifact_group(
+            live_dir=live_dir,
+            pattern="H_home_time_report.*.json",
+            ttl_days=HOME_TIME_REPORT_RETENTION_DAYS,
+            max_files=HOME_TIME_REPORT_MAX_FILES,
+            max_total_bytes=HOME_TIME_REPORT_FAMILY_MAX_BYTES,
+        ),
+        "home_time_diagnostics": _prune_home_time_artifact_group(
+            live_dir=live_dir,
+            pattern="H_home_time_*diagnostic*.json",
+            ttl_days=HOME_TIME_DIAGNOSTIC_RETENTION_DAYS,
+            max_files=HOME_TIME_DIAGNOSTIC_MAX_FILES,
+            max_total_bytes=HOME_TIME_DIAGNOSTIC_FAMILY_MAX_BYTES,
+        ),
+        "home_time_remediations": _prune_home_time_artifact_group(
+            live_dir=live_dir,
+            pattern="H_home_time_*remediation*.json",
+            ttl_days=HOME_TIME_DIAGNOSTIC_RETENTION_DAYS,
+            max_files=HOME_TIME_DIAGNOSTIC_MAX_FILES,
+            max_total_bytes=HOME_TIME_DIAGNOSTIC_FAMILY_MAX_BYTES,
+        ),
+        "home_time_safety_snapshots": _prune_home_time_artifact_group(
+            live_dir=live_dir,
+            pattern="H_home_time_safety_snapshot.*.json",
+            ttl_days=HOME_TIME_SAFETY_SNAPSHOT_RETENTION_DAYS,
+            max_files=HOME_TIME_SAFETY_SNAPSHOT_MAX_FILES,
+            max_total_bytes=HOME_TIME_SAFETY_SNAPSHOT_FAMILY_MAX_BYTES,
+        ),
+    }
+    return groups
+
+
+def _maybe_run_home_time_artifact_retention(root: Path = ROOT) -> None:
+    global _LAST_HOME_TIME_RETENTION_SWEEP_MONO
+    now = time.monotonic()
+    if _LAST_HOME_TIME_RETENTION_SWEEP_MONO > 0.0 and (now - _LAST_HOME_TIME_RETENTION_SWEEP_MONO) < HOME_TIME_ARTIFACT_RETENTION_SWEEP_SECONDS:
+        return
+    _LAST_HOME_TIME_RETENTION_SWEEP_MONO = now
+    try:
+        run_home_time_artifact_retention(root)
+    except Exception:
+        pass
 
 
 def parse_launcher_owner_pid(lock_text: str) -> str:
@@ -169,6 +429,8 @@ def detect_state_anomalies(snapshot: dict[str, object], *, activation_payload: d
         runtime_status = {}
     runtime_run_id = norm(runtime_status.get("run_id", ""))
     runtime_mode = norm(runtime_status.get("mode", "")).upper()
+    runtime_detail = norm(runtime_status.get("detail", "")).lower()
+    runtime_error = norm(runtime_status.get("error", "")).upper()
     h_run_in_progress = norm(snapshot.get("H_run_in_progress", ""))
     h_last_finalized_run = norm(snapshot.get("H_last_finalized_run", ""))
     boundary_summary = snapshot.get("boundary_state_summary", {})
@@ -177,6 +439,25 @@ def detect_state_anomalies(snapshot: dict[str, object], *, activation_payload: d
     boundary_details = boundary_summary.get("details", [])
     if not isinstance(boundary_details, list):
         boundary_details = []
+    boundary_status_by_run: dict[str, str] = {}
+    for item in boundary_details:
+        if not isinstance(item, dict):
+            continue
+        item_run_id = norm(item.get("run_id", ""))
+        if not item_run_id:
+            continue
+        boundary_status_by_run[item_run_id] = norm(item.get("status", "")).lower()
+    runtime_boundary_status = boundary_status_by_run.get(runtime_run_id, "")
+    runtime_boundary_unresolved = runtime_boundary_status in UNRESOLVED_BOUNDARY_STATUSES
+    runtime_run_is_finalized = bool(runtime_run_id and h_last_finalized_run and runtime_run_id == h_last_finalized_run)
+    terminal_idle_no_publish = (
+        runtime_detail == "wrapper_no_publish_terminal_ok"
+        and runtime_error in {
+            "",
+            "PRE_PUBLISH_EARLY_EXIT_NO_PUBLISH",
+        }
+        and not runtime_boundary_unresolved
+    )
     if not launcher_owner_pid:
         anomalies.append("launcher_owner_pid_missing")
     if not snapshot.get("h_launcher_lock_exists", False):
@@ -188,7 +469,11 @@ def detect_state_anomalies(snapshot: dict[str, object], *, activation_payload: d
     if h_run_in_progress and h_last_finalized_run and h_run_in_progress == h_last_finalized_run:
         anomalies.append("run_in_progress_equals_finalized")
     if runtime_mode == "RUNNING" and not h_run_in_progress:
-        anomalies.append("runtime_running_without_run_in_progress")
+        # In home-time wrapper mode, the runtime can remain process-alive after a no-publish terminal.
+        # If the run is already finalized and no unresolved boundary exists, this is an expected idle state.
+        runtime_expected_idle = (runtime_run_is_finalized and not runtime_boundary_unresolved) or terminal_idle_no_publish
+        if not runtime_expected_idle:
+            anomalies.append("runtime_running_without_run_in_progress")
     if h_run_in_progress and runtime_run_id and h_run_in_progress != runtime_run_id:
         anomalies.append("runtime_run_id_mismatch")
     if bool(boundary_summary.get("unresolved_exists", False)):
@@ -248,6 +533,7 @@ def write_home_time_report(root: Path, payload: dict[str, object], *, timestamp_
     stamp = (timestamp_utc or utc_now()).replace("-", "").replace(":", "")
     path = live_dir / f"H_home_time_report.{stamp}.json"
     atomic_write_text(path, json.dumps(payload, ensure_ascii=True, indent=2) + "\n")
+    run_home_time_artifact_retention(root)
     return path
 
 
@@ -256,6 +542,7 @@ def write_diagnostic_snapshot(root: Path, payload: dict[str, object], *, prefix:
     stamp = (timestamp_utc or utc_now()).replace("-", "").replace(":", "")
     path = live_dir / f"{prefix}.{stamp}.json"
     atomic_write_text(path, json.dumps(payload, ensure_ascii=True, indent=2) + "\n")
+    run_home_time_artifact_retention(root)
     return path
 
 

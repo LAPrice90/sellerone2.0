@@ -7,10 +7,13 @@ from __future__ import annotations
 import os
 import csv
 import json
+import re
 import subprocess
 import sys
 import time
 import signal
+import traceback
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -40,6 +43,34 @@ try:
     from scripts.core.script_locator import resolve_script_path
 except ModuleNotFoundError:
     from core.script_locator import resolve_script_path
+try:
+    from scripts.core.flow_health_gate import flow_gate_checklist_path
+except ModuleNotFoundError:
+    from core.flow_health_gate import flow_gate_checklist_path
+try:
+    from scripts.core.cycle_failure_events import (
+        build_failure_event_from_manifest,
+        tail_text,
+        upsert_cycle_failure_event,
+    )
+except ModuleNotFoundError:
+    from core.cycle_failure_events import (
+        build_failure_event_from_manifest,
+        tail_text,
+        upsert_cycle_failure_event,
+    )
+try:
+    from scripts.core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
+except ModuleNotFoundError:
+    from core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+    )
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
@@ -53,6 +84,12 @@ B_CYCLE_LOCK_PATH = Path(
         ROOT / "out" / "systems" / "B" / "live" / "B_cycle.lock",
     )
 )
+B_LEGACY_CYCLE_LOCK_PATH = Path(
+    os.environ.get(
+        "B_LEGACY_CYCLE_LOCK_PATH",
+        ROOT / "out" / "B_cycle.lock",
+    )
+)
 MAINTENANCE_REQUEST_PATH = Path(
     os.environ.get("MAINTENANCE_REQUEST_PATH", LOCKS_DIR / "maintenance.requested")
 )
@@ -64,9 +101,7 @@ MAINTENANCE_ACTIVE_PATH = Path(
 )
 MAINTENANCE_REASON = os.environ.get("MAINTENANCE_REASON", "A_cycle_run").strip() or "A_cycle_run"
 HEALTH_CHECKLIST_PATH = Path(os.environ.get("HEALTH_CHECKLIST_PATH", ROOT / "out" / "system_health_checklist.csv"))
-A_SPLIT_CHECKLIST_PATH = Path(
-    os.environ.get("A_SPLIT_CHECKLIST_PATH", ROOT / "out" / "cycle_alerts" / "checklist_A_split.csv")
-)
+A_SPLIT_CHECKLIST_PATH = flow_gate_checklist_path("A")
 A_SPLIT_HEALTH_MODE = os.environ.get("A_SPLIT_HEALTH_MODE", "split").strip().lower() or "split"
 FLOW_SELFTEST_COMPARE_PATH = ROOT / "out" / "cycle_alerts" / "flow_selftest_compare.csv"
 FLOW_SELFTEST_STATE_PATH = ROOT / "out" / "cycle_alerts" / "flow_selftest_state.json"
@@ -91,55 +126,102 @@ FLOW_SELFTEST_COMPARE_FIELDS = [
     "split_source",
     "notes",
 ]
-ENSURE_B_AFTER_A = True
+_ensure_b_after_a_raw = os.environ.get("A_ENSURE_B_AFTER_A", "0").strip().lower()
+ENSURE_B_AFTER_A = _ensure_b_after_a_raw in {"1", "true", "yes", "y", "on"}
+LEGACY_SHEET_OUTPUT_STEPS = {
+    "A001_run_listings_to_sheet.py",
+    "A002_run_catalog_items_to_sheet.py",
+    "A004_run_fees_to_sheet.py",
+    "dedupe_product_db.py",
+    "sync_product_db_to_main_sheet.py",
+}
+_skip_sheet_outputs_raw = os.environ.get("A_SKIP_LEGACY_SHEET_OUTPUT_STEPS", "0").strip().lower()
+A_SKIP_LEGACY_SHEET_OUTPUT_STEPS = _skip_sheet_outputs_raw in {"1", "true", "yes", "y", "on"}
+_stock_receipts_sheet_raw = os.environ.get("A_ENABLE_STOCK_RECEIPTS_SHEET", "1").strip().lower()
+A_ENABLE_STOCK_RECEIPTS_SHEET = _stock_receipts_sheet_raw in {"1", "true", "yes", "y", "on"}
+_extra_skip_steps_raw = os.environ.get("A_EXTRA_SKIP_STEPS", "")
+A_EXTRA_SKIP_STEPS = {
+    step.strip()
+    for step in re.split(r"[;,]", _extra_skip_steps_raw)
+    if step.strip()
+}
 try:
     MAINTENANCE_READY_TIMEOUT_SECONDS = int(
         float(
             os.environ.get(
                 "A_MAINT_WAIT_READY_MAX_S",
-                os.environ.get("MAINTENANCE_READY_TIMEOUT_SECONDS", "120"),
+                os.environ.get("MAINTENANCE_READY_TIMEOUT_SECONDS", "300"),
             )
-            or "120"
+            or "300"
         )
     )
 except Exception:
-    MAINTENANCE_READY_TIMEOUT_SECONDS = 120
+    MAINTENANCE_READY_TIMEOUT_SECONDS = 300
 try:
     MAINTENANCE_READY_POLL_SECONDS = float(
         os.environ.get(
             "A_MAINT_POLL_S",
-            os.environ.get("MAINTENANCE_READY_POLL_SECONDS", "2"),
+            os.environ.get("MAINTENANCE_READY_POLL_SECONDS", "5"),
         )
-        or "2"
+        or "5"
     )
 except Exception:
-    MAINTENANCE_READY_POLL_SECONDS = 2.0
+    MAINTENANCE_READY_POLL_SECONDS = 5.0
+try:
+    MAINTENANCE_WAIT_LOG_EVERY_SECONDS = float(
+        os.environ.get(
+            "A_MAINT_WAIT_LOG_EVERY_S",
+            os.environ.get("MAINTENANCE_WAIT_LOG_EVERY_SECONDS", "10"),
+        )
+        or "10"
+    )
+except Exception:
+    MAINTENANCE_WAIT_LOG_EVERY_SECONDS = 10.0
 try:
     B_HEARTBEAT_MAX_AGE_SECONDS = int(float(os.environ.get("A_MAINT_HEARTBEAT_MAX_AGE_S", "90") or "90"))
 except Exception:
     B_HEARTBEAT_MAX_AGE_SECONDS = 90
+try:
+    B_HEARTBEAT_STALE_ASSUME_DEAD_SECONDS = int(
+        float(os.environ.get("A_MAINT_HEARTBEAT_STALE_ASSUME_DEAD_S", "600") or "600")
+    )
+except Exception:
+    B_HEARTBEAT_STALE_ASSUME_DEAD_SECONDS = 600
+try:
+    MAINTENANCE_B_NOT_RUNNING_STABLE_SECONDS = float(
+        os.environ.get("A_MAINT_B_NOT_RUNNING_STABLE_S", "30") or "30"
+    )
+except Exception:
+    MAINTENANCE_B_NOT_RUNNING_STABLE_SECONDS = 30.0
+try:
+    B_RECOVERY_WAIT_SECONDS = float(os.environ.get("A_B_RECOVERY_WAIT_S", "60") or "60")
+except Exception:
+    B_RECOVERY_WAIT_SECONDS = 60.0
+try:
+    B_RECOVERY_POLL_SECONDS = float(os.environ.get("A_B_RECOVERY_POLL_S", "5") or "5")
+except Exception:
+    B_RECOVERY_POLL_SECONDS = 5.0
+_b_recovery_use_scheduler_raw = os.environ.get("A_B_RECOVERY_USE_SCHEDULER", "1").strip().lower()
+B_RECOVERY_USE_SCHEDULER = _b_recovery_use_scheduler_raw in {"1", "true", "yes", "y", "on"}
+B_SCHEDULER_TASK_NAME = os.environ.get("A_B_SCHEDULER_TASK_NAME", "AMZ Orders").strip() or "AMZ Orders"
 
 
-def _parse_lock_pid(payload: str) -> int | None:
-    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
-    for part in parts:
-        if part.startswith("pid="):
-            raw = part.split("=", 1)[1].strip()
-            try:
-                return int(raw)
-            except Exception:
-                return None
-    return None
+def _payload_text(payload: object) -> str:
+    if isinstance(payload, str):
+        return payload
+    if isinstance(payload, bytes):
+        try:
+            return payload.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    return ""
+
+
+def _parse_lock_pid(payload: object) -> int | None:
+    return parse_stream_lock_pid(_payload_text(payload))
 
 
 def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except PermissionError:
-        return True
-    except Exception:
-        pass
     if os.name == "nt":
         try:
             result = subprocess.run(
@@ -149,21 +231,29 @@ def _pid_alive(pid: int) -> bool:
                 check=False,
             )
             out = (result.stdout or "").strip().lower()
+            err = (result.stderr or "").strip().lower()
+            if "access denied" in out or "access denied" in err:
+                return True
             if "no tasks are running" in out:
                 return False
             return str(int(pid)) in out
         except Exception:
             return False
-    return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except PermissionError:
+        return True
+    except Exception:
+        return False
 
 
-def _parse_lock_field(payload: str, key: str) -> str | None:
-    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
-    needle = f"{key}="
-    for part in parts:
-        if part.startswith(needle):
-            return part.split("=", 1)[1].strip()
-    return None
+def _parse_lock_field(payload: object, key: str) -> str | None:
+    fields = parse_stream_lock_fields(_payload_text(payload))
+    if not fields:
+        return None
+    value = str(fields.get(str(key or "").strip(), "")).strip()
+    return value or None
 
 
 def _heartbeat_age_seconds(heartbeat_utc: str | None) -> float:
@@ -177,6 +267,19 @@ def _heartbeat_age_seconds(heartbeat_utc: str | None) -> float:
 
 
 def _terminate_pid(pid: int) -> bool:
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception:
+            return not _pid_alive(pid)
+        if result.returncode == 0:
+            return True
+        return not _pid_alive(pid)
     try:
         os.kill(pid, signal.SIGTERM)
     except Exception:
@@ -198,7 +301,8 @@ def _terminate_pid(pid: int) -> bool:
 
 def _write_lock() -> None:
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-    payload = f"A|pid={os.getpid()}|start={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = build_lock_payload(owner="A", pid=os.getpid(), start_utc=now, heartbeat_utc=now)
     LOCK_PATH.write_text(payload, encoding="utf-8")
 
 
@@ -235,53 +339,159 @@ def _release_lock() -> None:
         pass
 
 
-def _request_maintenance() -> None:
+def _new_maintenance_request_id() -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    token = uuid.uuid4().hex[:8]
+    return f"A_{ts}_{os.getpid()}_{token}"
+
+
+def _request_maintenance() -> str:
     LOCKS_DIR.mkdir(parents=True, exist_ok=True)
+    request_id = _new_maintenance_request_id()
+    if MAINTENANCE_REQUEST_PATH.exists():
+        try:
+            existing = MAINTENANCE_REQUEST_PATH.read_text(encoding="utf-8").strip()
+        except Exception:
+            existing = ""
+        existing_pid = _parse_lock_pid(existing)
+        if existing_pid is None or not _pid_alive(existing_pid):
+            try:
+                MAINTENANCE_REQUEST_PATH.unlink()
+                print("[A_all] cleared stale maintenance request marker")
+            except Exception:
+                pass
     try:
         if MAINTENANCE_READY_PATH.exists():
             MAINTENANCE_READY_PATH.unlink()
     except Exception:
         pass
-    payload = f"requested_by=A|pid={os.getpid()}|ts={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}|reason={MAINTENANCE_REASON}\n"
+    payload = (
+        f"requested_by=A|pid={os.getpid()}|ts={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}|"
+        f"reason={MAINTENANCE_REASON}|request_id={request_id}\n"
+    )
     MAINTENANCE_REQUEST_PATH.write_text(payload, encoding="utf-8")
+    return request_id
+
+
+def _b_cycle_lock_paths() -> list[Path]:
+    out = [B_CYCLE_LOCK_PATH]
+    if B_LEGACY_CYCLE_LOCK_PATH not in out:
+        out.append(B_LEGACY_CYCLE_LOCK_PATH)
+    return out
+
+
+def _b_cycle_status() -> dict:
+    for lock_path in _b_cycle_lock_paths():
+        if not lock_path.exists():
+            continue
+        try:
+            payload = lock_path.read_text(encoding="utf-8")
+        except Exception:
+            return {
+                "running": True,
+                "healthy": False,
+                "reason": "lock_unreadable",
+                "lock_path": str(lock_path),
+                "pid": None,
+                "heartbeat_age_s": None,
+            }
+        pid = _parse_lock_pid(payload)
+        if pid is None:
+            continue
+        if not _pid_alive(pid):
+            continue
+        heartbeat = _parse_lock_field(payload, "heartbeat")
+        heartbeat_age_s = _heartbeat_age_seconds(heartbeat)
+        running = heartbeat_age_s <= float(B_HEARTBEAT_STALE_ASSUME_DEAD_SECONDS)
+        healthy = heartbeat_age_s <= float(B_HEARTBEAT_MAX_AGE_SECONDS)
+        return {
+            "running": running,
+            "healthy": healthy,
+            "reason": "lock_pid_alive",
+            "lock_path": str(lock_path),
+            "pid": pid,
+            "heartbeat_age_s": heartbeat_age_s,
+        }
+    return {
+        "running": False,
+        "healthy": False,
+        "reason": "no_active_b_lock",
+        "lock_path": "",
+        "pid": None,
+        "heartbeat_age_s": None,
+    }
 
 
 def _b_cycle_running() -> bool:
-    if not B_CYCLE_LOCK_PATH.exists():
-        return False
+    return bool(_b_cycle_status().get("running", False))
+
+
+def _maintenance_ready_request_id() -> str:
+    if not MAINTENANCE_READY_PATH.exists():
+        return ""
     try:
-        payload = B_CYCLE_LOCK_PATH.read_text(encoding="utf-8")
+        payload = MAINTENANCE_READY_PATH.read_text(encoding="utf-8").strip()
     except Exception:
-        return True
-    pid = _parse_lock_pid(payload)
-    if pid is None:
-        return False
-    if not _pid_alive(pid):
-        return False
-    heartbeat = _parse_lock_field(payload, "heartbeat")
-    return _heartbeat_age_seconds(heartbeat) <= float(B_HEARTBEAT_MAX_AGE_SECONDS)
+        return ""
+    return _parse_lock_field(payload, "request_id") or ""
 
 
-def _wait_for_b_maintenance_ready() -> str:
+def _wait_for_b_maintenance_ready(request_id: str) -> str:
     started = time.time()
+    last_log_elapsed = -1e9
+    poll_seconds = max(MAINTENANCE_READY_POLL_SECONDS, 1.0)
+    log_every_seconds = max(MAINTENANCE_WAIT_LOG_EVERY_SECONDS, poll_seconds)
+    stable_not_running_since = None
     while True:
         if MAINTENANCE_READY_PATH.exists():
-            return "b_ready"
-        if not _b_cycle_running():
-            return "b_not_running"
+            ready_request_id = _maintenance_ready_request_id()
+            if ready_request_id and ready_request_id == request_id:
+                return "b_ready"
+            # Stale ready marker from another request. Clear and keep waiting.
+            try:
+                MAINTENANCE_READY_PATH.unlink()
+                print(
+                    "[A_all] ignored stale maintenance ready marker "
+                    f"(request_id={ready_request_id or '-'} expected={request_id})"
+                )
+            except Exception:
+                pass
+        status = _b_cycle_status()
+        if not bool(status.get("running", False)):
+            if stable_not_running_since is None:
+                stable_not_running_since = time.time()
+            down_for = time.time() - stable_not_running_since
+            if down_for >= max(MAINTENANCE_B_NOT_RUNNING_STABLE_SECONDS, 0.0):
+                return "b_not_running"
+        else:
+            stable_not_running_since = None
         elapsed = time.time() - started
         if elapsed > MAINTENANCE_READY_TIMEOUT_SECONDS:
-            return "timeout"
-        print(
-            f"[A_all] waiting for B cycle boundary... elapsed={elapsed:.0f}s "
-            f"(poll {MAINTENANCE_READY_POLL_SECONDS:.0f}s)"
-        )
-        time.sleep(max(MAINTENANCE_READY_POLL_SECONDS, 1.0))
+            if bool(status.get("running", False)):
+                return "timeout_b_running"
+            return "timeout_b_not_running"
+        if elapsed <= 0.1 or (elapsed - last_log_elapsed) >= log_every_seconds:
+            heartbeat_age = status.get("heartbeat_age_s")
+            heartbeat_note = (
+                ""
+                if heartbeat_age is None
+                else f", hb_age={float(heartbeat_age):.1f}s"
+            )
+            print(
+                f"[A_all] waiting for B cycle boundary... elapsed={elapsed:.0f}s "
+                f"(poll {poll_seconds:.0f}s, timeout {MAINTENANCE_READY_TIMEOUT_SECONDS}s, "
+                f"status={status.get('reason', '-')}{heartbeat_note})"
+            )
+            last_log_elapsed = elapsed
+        time.sleep(poll_seconds)
 
 
-def _activate_maintenance() -> None:
+def _activate_maintenance(request_id: str) -> None:
     LOCKS_DIR.mkdir(parents=True, exist_ok=True)
-    payload = f"active_by=A|pid={os.getpid()}|ts={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}|reason={MAINTENANCE_REASON}\n"
+    payload = (
+        f"active_by=A|pid={os.getpid()}|ts={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}|"
+        f"reason={MAINTENANCE_REASON}|request_id={request_id}\n"
+    )
     MAINTENANCE_ACTIVE_PATH.write_text(payload, encoding="utf-8")
 
 
@@ -295,33 +505,44 @@ def _clear_maintenance() -> None:
 
 
 def _clear_stale_b_lock_if_any() -> None:
-    if not B_CYCLE_LOCK_PATH.exists():
-        return
-    try:
-        payload = B_CYCLE_LOCK_PATH.read_text(encoding="utf-8")
-    except Exception:
-        payload = ""
-    pid = _parse_lock_pid(payload)
-    if pid is not None and _pid_alive(pid):
-        return
-    try:
-        B_CYCLE_LOCK_PATH.unlink()
-        print("[A_all] cleared stale B lock")
-    except Exception:
-        pass
+    for lock_path in _b_cycle_lock_paths():
+        if not lock_path.exists():
+            continue
+        try:
+            payload = lock_path.read_text(encoding="utf-8")
+        except Exception:
+            payload = ""
+        pid = _parse_lock_pid(payload)
+        if pid is not None and _pid_alive(pid):
+            continue
+        try:
+            lock_path.unlink()
+            print(f"[A_all] cleared stale B lock ({lock_path})")
+        except Exception:
+            pass
 
 
-def _ensure_b_cycle_running_after_a() -> None:
-    if not ENSURE_B_AFTER_A:
-        return
-    if _b_cycle_running():
-        print("[A_all] B cycle already running")
-        return
+def _start_b_cycle_detached() -> bool:
     _clear_stale_b_lock_if_any()
-    cmd = [sys.executable, str(resolve_script_path(SCRIPTS, "run_B_cycle.py"))]
+    b_live_dir = ROOT / "out" / "systems" / "B" / "live"
+    b_live_dir.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        cmd = ["cmd.exe", "/d", "/c", f"\"{ROOT / 'run_B_cycle.bat'}\""]
+    else:
+        cmd = [sys.executable, str(resolve_script_path(SCRIPTS, "run_B_supervisor.py"))]
+    env = os.environ.copy()
+    b_lock_path = B_CYCLE_LOCK_PATH
+    env["B_RUN_ONCE"] = "0"
+    env["B_ALLOW_DIRECT_WORKER_START"] = "0"
+    env["B_CYCLE_LOG_PATH"] = str(b_live_dir / "B_cycle.log")
+    env["B_CYCLE_LOCK_PATH"] = str(b_lock_path)
+    env["RUN_LOCK_PATH"] = str(b_lock_path)
+    env["B002_STATE_PATH"] = str(b_live_dir / "B002_last_run.txt")
+    env["REFUND_COLLECTION_STATE_PATH"] = str(b_live_dir / "refund_collection_last_run.txt")
+    env["LISTING_COLLECTION_STATE_PATH"] = str(b_live_dir / "listing_offer_collection_last_run.txt")
     kwargs = {
         "cwd": str(ROOT),
-        "env": os.environ.copy(),
+        "env": env,
         "stdout": subprocess.DEVNULL,
         "stderr": subprocess.DEVNULL,
     }
@@ -335,8 +556,206 @@ def _ensure_b_cycle_running_after_a() -> None:
     try:
         proc = subprocess.Popen(cmd, **kwargs)
         print(f"[A_all] started B cycle after A (pid {proc.pid})")
+        return True
     except Exception as exc:
         print(f"[A_all] WARN could not restart B cycle after A: {exc}")
+        return False
+
+
+def _run_b_scheduler_once() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        result = subprocess.run(
+            ["schtasks", "/Run", "/TN", B_SCHEDULER_TASK_NAME],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as exc:
+        print(f"[A_all] WARN could not trigger scheduler task for B: {exc}")
+        return False
+    output = " ".join(
+        part.strip()
+        for part in [result.stdout or "", result.stderr or ""]
+        if part and part.strip()
+    ).strip()
+    if result.returncode == 0:
+        print(f"[A_all] scheduler trigger sent for B task ({B_SCHEDULER_TASK_NAME})")
+        return True
+    lowered = output.lower()
+    if "already running" in lowered:
+        print(f"[A_all] scheduler task already running for B ({B_SCHEDULER_TASK_NAME})")
+        return True
+    print(
+        f"[A_all] WARN scheduler trigger for B failed rc={result.returncode} "
+        f"task={B_SCHEDULER_TASK_NAME} detail={output[:280]}"
+    )
+    return False
+
+
+def _scheduler_task_running(task_name: str) -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        result = subprocess.run(
+            ["schtasks", "/Query", "/TN", task_name, "/FO", "LIST", "/V"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return False
+    text = "\n".join([result.stdout or "", result.stderr or ""])
+    match = re.search(r"^Status:\s*(.+)$", text, re.MULTILINE | re.IGNORECASE)
+    if not match:
+        return False
+    return match.group(1).strip().lower() == "running"
+
+
+def _list_b_runtime_pids_windows() -> list[int]:
+    if os.name != "nt":
+        return []
+    ps_cmd = (
+        "$ErrorActionPreference='SilentlyContinue'; "
+        "Get-CimInstance Win32_Process | Where-Object { "
+        "($_.Name -ieq 'cmd.exe' -or $_.Name -ieq 'python.exe' -or $_.Name -ieq 'pythonw.exe') -and "
+        "($_.CommandLine -like '*run_B_cycle.bat*' -or "
+        "$_.CommandLine -like '*run_B_supervisor.py*' -or "
+        "$_.CommandLine -like '*scripts\\\\cycles\\\\run_B_cycle.py*') "
+        "} | Select-Object -ExpandProperty ProcessId"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return []
+    pids: list[int] = []
+    for line in (result.stdout or "").splitlines():
+        token = str(line).strip()
+        if not token:
+            continue
+        try:
+            pid = int(token)
+        except Exception:
+            continue
+        if pid > 0:
+            pids.append(pid)
+    return sorted(set(pids), reverse=True)
+
+
+def _kill_stale_b_runtime_processes() -> int:
+    if os.name != "nt":
+        return 0
+    pids = _list_b_runtime_pids_windows()
+    if not pids:
+        return 0
+    killed = 0
+    for pid in pids:
+        try:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception:
+            continue
+        if result.returncode == 0:
+            killed += 1
+    return killed
+
+
+def _restart_b_scheduler_task() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        end_result = subprocess.run(
+            ["schtasks", "/End", "/TN", B_SCHEDULER_TASK_NAME],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as exc:
+        print(f"[A_all] WARN could not end stale B scheduler task: {exc}")
+        return False
+    end_output = " ".join(
+        part.strip()
+        for part in [end_result.stdout or "", end_result.stderr or ""]
+        if part and part.strip()
+    ).strip()
+    if end_result.returncode == 0:
+        print(f"[A_all] ended stale B scheduler task ({B_SCHEDULER_TASK_NAME})")
+    else:
+        lowered = end_output.lower()
+        if "is not currently running" not in lowered and "there is no running instance" not in lowered:
+            print(
+                f"[A_all] WARN could not end stale B scheduler task rc={end_result.returncode} "
+                f"task={B_SCHEDULER_TASK_NAME} detail={end_output[:280]}"
+            )
+            return False
+    time.sleep(2.0)
+    killed = _kill_stale_b_runtime_processes()
+    if killed > 0:
+        print(f"[A_all] killed stale B runtime processes count={killed}")
+    _clear_stale_b_lock_if_any()
+    time.sleep(1.0)
+    return _run_b_scheduler_once()
+
+
+def _wait_for_b_healthy_after_a(wait_seconds: float) -> bool:
+    poll_seconds = max(B_RECOVERY_POLL_SECONDS, 1.0)
+    deadline = time.time() + max(wait_seconds, 0.0)
+    while time.time() <= deadline:
+        status = _b_cycle_status()
+        if bool(status.get("healthy", False)):
+            heartbeat_age = status.get("heartbeat_age_s")
+            age_note = "" if heartbeat_age is None else f", hb_age={float(heartbeat_age):.1f}s"
+            print(
+                f"[A_all] B recovery healthy after A "
+                f"(pid={status.get('pid')}, source={status.get('lock_path')}{age_note})"
+            )
+            return True
+        time.sleep(poll_seconds)
+    status = _b_cycle_status()
+    heartbeat_age = status.get("heartbeat_age_s")
+    age_note = "" if heartbeat_age is None else f", hb_age={float(heartbeat_age):.1f}s"
+    print(
+        f"[A_all] B recovery not healthy yet after A "
+        f"(status={status.get('reason')}, pid={status.get('pid')}{age_note})"
+    )
+    return False
+
+
+def _ensure_b_cycle_running_after_a() -> None:
+    if not ENSURE_B_AFTER_A and not B_RECOVERY_USE_SCHEDULER:
+        print("[A_all] B recovery after A disabled by config")
+        return
+
+    if _wait_for_b_healthy_after_a(B_RECOVERY_WAIT_SECONDS):
+        return
+
+    print("[A_all] B not healthy after A clear; starting single recovery action")
+    action_taken = False
+    if ENSURE_B_AFTER_A:
+        action_taken = _start_b_cycle_detached()
+    elif B_RECOVERY_USE_SCHEDULER:
+        if _scheduler_task_running(B_SCHEDULER_TASK_NAME):
+            print("[A_all] B scheduler task is still marked running but B is unhealthy; forcing scheduler restart")
+            action_taken = _restart_b_scheduler_task()
+        else:
+            action_taken = _run_b_scheduler_once()
+
+    if not action_taken:
+        print("[A_all] WARN no B recovery action succeeded after A")
+        return
+
+    if not _wait_for_b_healthy_after_a(B_RECOVERY_WAIT_SECONDS):
+        print("[A_all] WARN B still not healthy after recovery action")
 
 
 def _safe_int(value: object, default: int = 0) -> int:
@@ -504,6 +923,7 @@ def _run_step_subprocess(
     capture_output: bool = False,
 ) -> dict[str, object]:
     kwargs: dict[str, object] = {}
+    resolved_cwd = str(cwd or ROOT)
     creationflags = 0
     if os.name == "nt":
         creationflags = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
@@ -514,7 +934,7 @@ def _run_step_subprocess(
     if creationflags:
         kwargs["creationflags"] = creationflags
     _log_step_event("STEP_START", step_name)
-    proc = subprocess.Popen(cmd, cwd=cwd, env=env, **kwargs)
+    proc = subprocess.Popen(cmd, cwd=resolved_cwd, env=env, **kwargs)
     try:
         if capture_output:
             stdout_text, stderr_text = proc.communicate()
@@ -671,7 +1091,7 @@ STEP_ARTIFACTS = {
     "A001_run_listings_to_sheet.py": ["out/listings_data_latest.csv", "out/merchant_listings_latest.csv"],
     "A002_run_catalog_items_to_sheet.py": ["out/catalog_items_flat.csv"],
     "A003_run_inventory_to_sheet.py": ["out/inventory_snapshot_latest.csv", "out/inventory_history.csv"],
-    "A010_apply_researching_delta.py": ["out/product_db_preview.csv"],
+    "A010_apply_researching_delta.py": ["out/inventory_summaries_prev.csv", "out/researching_delta_events.csv"],
     "A005_run_inventory_adjustments_report.py": ["out/inventory_adjustments_latest.csv"],
     "A004_run_fees_to_sheet.py": ["out/fees_latest.csv", "out/fees_failed.csv"],
     "A016_refresh_phase1_daily_intel.py": ["out/phase1_daily_intel_latest.csv"],
@@ -685,8 +1105,21 @@ STEP_ARTIFACTS = {
 
 STEP_OPTIONAL_OUTPUTS = {
     "A004_run_fees_to_sheet.py": ["out/fees_failed.csv"],
+    "A010_apply_researching_delta.py": ["out/researching_delta_events.csv"],
     "run_E_cycle.py": ["out/e_decision_log.csv"],
     "A020_run_daily_finance.py": ["out/token_cogs_ledger.csv", "out/token_ledger_live.csv"],
+}
+
+STALE_OUTPUT_RETRY_STEPS = {
+    "A003_run_inventory_to_sheet.py",
+    "A016_refresh_phase1_daily_intel.py",
+}
+
+A_STEP_OUTPUT_TAIL_CAPTURE_STEPS = {
+    "process_stock_receipts_sheet.py",
+    "A003_run_inventory_to_sheet.py",
+    "A005_run_inventory_adjustments_report.py",
+    "A016_refresh_phase1_daily_intel.py",
 }
 
 
@@ -765,6 +1198,59 @@ def _verify_required_outputs(
     }
 
 
+def _should_retry_stale_outputs(name: str, verification: dict[str, object]) -> bool:
+    if name not in STALE_OUTPUT_RETRY_STEPS:
+        return False
+    status = str(verification.get("verification_status", "") or "").strip()
+    return status in {"failed_missing_outputs", "failed_stale_outputs"}
+
+
+def _result_output_tails(result: dict[str, object] | None) -> tuple[str, str]:
+    if not isinstance(result, dict):
+        return "", ""
+    return (
+        tail_text(result.get("stdout", ""), max_chars=2000),
+        tail_text(result.get("stderr", ""), max_chars=2000),
+    )
+
+
+def _record_a_failure_event(
+    *,
+    run_id: str,
+    final_state: str,
+    cause_code: str,
+    cause_detail: str,
+    step_name: str = "",
+    stage: str = "",
+    rc: object = "",
+    verification_status: str = "",
+    manifest_path: Path | str = "",
+    health_path: Path | str = "",
+    recovery_action: str = "",
+) -> None:
+    try:
+        upsert_cycle_failure_event(
+            {
+                "timestamp_utc": utc_now_iso(),
+                "cycle": "A",
+                "run_id": run_id,
+                "final_state": final_state,
+                "cause_code": cause_code,
+                "cause_detail": cause_detail,
+                "step_name": step_name,
+                "stage": stage,
+                "rc": str(rc),
+                "verification_status": verification_status,
+                "manifest_path": str(manifest_path) if manifest_path else "",
+                "health_path": str(health_path) if health_path else "",
+                "source_path": "scripts/cycles/run_A_all.py",
+                "recovery_action": recovery_action,
+            }
+        )
+    except Exception as exc:
+        print(f"[A_all] WARN failure event write failed: {type(exc).__name__}: {exc}")
+
+
 def _health_summary_payload(
     path: Path | None,
     *,
@@ -821,6 +1307,8 @@ def _append_a_step(
     fresh_outputs: list[str] | None = None,
     missing_outputs: list[str] | None = None,
     stale_outputs: list[str] | None = None,
+    stdout_tail: str = "",
+    stderr_tail: str = "",
 ) -> None:
     all_outputs, default_required, default_optional = _step_output_lists(name, outputs)
     append_step(
@@ -843,6 +1331,8 @@ def _append_a_step(
         fresh_outputs=fresh_outputs or [],
         missing_outputs=missing_outputs or [],
         stale_outputs=stale_outputs or [],
+        stdout_tail=tail_text(stdout_tail, max_chars=2000),
+        stderr_tail=tail_text(stderr_tail, max_chars=2000),
     )
 
 
@@ -857,13 +1347,29 @@ def main() -> int:
     )
     try:
         print("[A_all] requesting maintenance handoff from B cycle")
-        _request_maintenance()
-        handoff_mode = _wait_for_b_maintenance_ready()
-        if handoff_mode == "timeout":
-            print("[A_all] maintenance handoff timeout; treating as b_not_running; activating A maintenance")
+        request_id = _request_maintenance()
+        handoff_mode = _wait_for_b_maintenance_ready(request_id)
+        if handoff_mode == "timeout_b_running":
+            print("[A_all] ERROR maintenance handoff timeout while B is still running; aborting A run to avoid overlap")
+            _record_a_failure_event(
+                run_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+                final_state="failed",
+                cause_code="MAINTENANCE_ABORT",
+                cause_detail="maintenance handoff timeout while B was still running",
+                step_name="maintenance_handoff",
+                stage="wait_for_b_maintenance_ready",
+                rc=3,
+                verification_status="maintenance_timeout",
+                recovery_action="inspect B live lock and retry only at a safe maintenance boundary",
+            )
+            return 3
+        if handoff_mode == "timeout_b_not_running":
+            print("[A_all] maintenance handoff timeout with B not running; activating A maintenance")
+        elif handoff_mode == "b_not_running":
+            print("[A_all] maintenance handoff ready (b_not_running); activating A maintenance")
         else:
             print(f"[A_all] maintenance handoff ready ({handoff_mode}); activating A maintenance")
-        _activate_maintenance()
+        _activate_maintenance(request_id)
         _acquire_lock()
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         manifest = new_manifest(cycle="A", run_id=run_id, start_time=utc_now_iso())
@@ -890,6 +1396,23 @@ def main() -> int:
                 )
                 exit_code = 1
                 break
+            if name in A_EXTRA_SKIP_STEPS:
+                print(f"[A_all {run_id}] skipping {name} (A_EXTRA_SKIP_STEPS)")
+                _append_a_step(
+                    manifest,
+                    name=name,
+                    step_started=step_started,
+                    rc=0,
+                    notes="skipped because A_EXTRA_SKIP_STEPS includes this step",
+                    launched=False,
+                    completed=False,
+                    outputs_verified=False,
+                    step_status="skipped",
+                    verification_status="skipped_by_config",
+                )
+                if name == "A003_run_inventory_to_sheet.py":
+                    inventory_ok = True
+                continue
             # If inventory snapshot failed earlier, skip A010 before running it.
             if name == "A010_apply_researching_delta.py" and not inventory_ok:
                 print(f"[A_all {run_id}] skipping A010 (inventory snapshot failed)")
@@ -906,6 +1429,38 @@ def main() -> int:
                     verification_status="skipped_due_to_prior_failure",
                 )
                 continue
+            if A_SKIP_LEGACY_SHEET_OUTPUT_STEPS and name in LEGACY_SHEET_OUTPUT_STEPS:
+                print(f"[A_all {run_id}] skipping {name} (legacy sheet output disabled)")
+                _append_a_step(
+                    manifest,
+                    name=name,
+                    step_started=step_started,
+                    rc=0,
+                    notes="skipped because A_SKIP_LEGACY_SHEET_OUTPUT_STEPS=1",
+                    launched=False,
+                    completed=False,
+                    outputs_verified=False,
+                    step_status="skipped",
+                    verification_status="skipped_by_config",
+                )
+                if name == "A003_run_inventory_to_sheet.py":
+                    inventory_ok = True
+                continue
+            if name == "process_stock_receipts_sheet.py" and not A_ENABLE_STOCK_RECEIPTS_SHEET:
+                print(f"[A_all {run_id}] skipping {name} (stock receipts sheet disabled)")
+                _append_a_step(
+                    manifest,
+                    name=name,
+                    step_started=step_started,
+                    rc=0,
+                    notes="skipped because A_ENABLE_STOCK_RECEIPTS_SHEET=0",
+                    launched=False,
+                    completed=False,
+                    outputs_verified=False,
+                    step_status="skipped",
+                    verification_status="skipped_by_config",
+                )
+                continue
             print(f"[A_all {run_id}] running: {name}")
             env = os.environ.copy()
             env["PYTHONPATH"] = os.pathsep.join(
@@ -919,6 +1474,9 @@ def main() -> int:
                 # Default to no sheet writes to avoid quota issues unless explicitly enabled.
                 if "INVENTORY_WRITE_SHEETS" not in env:
                     env["INVENTORY_WRITE_SHEETS"] = "0"
+                # Prefer direct collector in A cycle by default.
+                # API-owner mode remains opt-in via A003_USE_API_OWNER=1.
+                env["INVENTORY_USE_API_OWNER"] = str(env.get("A003_USE_API_OWNER", "0")).strip() or "0"
             if name == "A020_run_daily_finance.py":
                 # Default to skipping Level 3 sheet writes to avoid 10M cell limits.
                 if "FIN_L3_SKIP_SHEETS" not in env:
@@ -1117,7 +1675,7 @@ def main() -> int:
             declared_outputs, required_outputs, optional_outputs = _step_output_lists(name)
             before_mtimes = _capture_output_mtimes(declared_outputs)
             started = time.time()
-            capture_step_output = name == "process_stock_receipts_sheet.py"
+            capture_step_output = name in A_STEP_OUTPUT_TAIL_CAPTURE_STEPS
             result = _run_step_subprocess(
                 name,
                 cmd,
@@ -1125,6 +1683,7 @@ def main() -> int:
                 capture_output=capture_step_output,
             )
             elapsed = time.time() - started
+            stdout_tail, stderr_tail = _result_output_tails(result)
             if bool(result.get("interrupted", False)):
                 print(f"[A_all {run_id}] interrupted during step: {name} after {elapsed:.1f}s")
                 _append_a_step(
@@ -1138,6 +1697,8 @@ def main() -> int:
                     verification_status="interrupted",
                     required_outputs=required_outputs,
                     optional_outputs=optional_outputs,
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
                 )
                 exit_code = 130
                 break
@@ -1156,6 +1717,8 @@ def main() -> int:
                         verification_status="child_rc_nonzero",
                         required_outputs=required_outputs,
                         optional_outputs=optional_outputs,
+                        stdout_tail=stdout_tail,
+                        stderr_tail=stderr_tail,
                     )
                     continue
                 # If inventory snapshot failed, skip the research/unsellable delta step.
@@ -1173,6 +1736,8 @@ def main() -> int:
                         verification_status="child_rc_nonzero",
                         required_outputs=required_outputs,
                         optional_outputs=optional_outputs,
+                        stdout_tail=stdout_tail,
+                        stderr_tail=stderr_tail,
                     )
                     continue
                 # If stock receipts guardrail blocks, do not fail the whole A cycle.
@@ -1196,6 +1761,8 @@ def main() -> int:
                             verification_status="guardrail_blocked",
                             required_outputs=required_outputs,
                             optional_outputs=optional_outputs,
+                            stdout_tail=stdout_tail,
+                            stderr_tail=stderr_tail,
                         )
                         continue
                     print(
@@ -1213,6 +1780,8 @@ def main() -> int:
                         verification_status="child_rc_nonzero",
                         required_outputs=required_outputs,
                         optional_outputs=optional_outputs,
+                        stdout_tail=stdout_tail,
+                        stderr_tail=stderr_tail,
                     )
                     exit_code = result_rc
                     break
@@ -1228,6 +1797,8 @@ def main() -> int:
                     verification_status="child_rc_nonzero",
                     required_outputs=required_outputs,
                     optional_outputs=optional_outputs,
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
                 )
                 exit_code = result_rc
                 break
@@ -1237,6 +1808,82 @@ def main() -> int:
                 step_started_at=step_started,
             )
             verification_notes = f"elapsed={elapsed:.1f}s;{verification['notes']}"
+            if _should_retry_stale_outputs(name, verification):
+                first_verification = str(verification.get("verification_status", "") or "")
+                first_notes = str(verification.get("notes", "") or "")
+                print(
+                    f"[A_all {run_id}] retrying producer after stale output verification: "
+                    f"{name} status={first_verification} detail={first_notes}"
+                )
+                retry_started_at = utc_now_iso()
+                retry_before_mtimes = _capture_output_mtimes(declared_outputs)
+                retry_started = time.time()
+                retry_result = _run_step_subprocess(
+                    name,
+                    cmd,
+                    env=env,
+                    capture_output=capture_step_output,
+                )
+                retry_elapsed = time.time() - retry_started
+                retry_stdout_tail, retry_stderr_tail = _result_output_tails(retry_result)
+                if bool(retry_result.get("interrupted", False)):
+                    print(f"[A_all {run_id}] interrupted during retry step: {name} after {retry_elapsed:.1f}s")
+                    _append_a_step(
+                        manifest,
+                        name=name,
+                        step_started=step_started,
+                        rc=130,
+                        notes=(
+                            f"elapsed={elapsed:.1f}s;attempts=2;first={first_verification};"
+                            f"retry_interrupted elapsed={retry_elapsed:.1f}s"
+                        ),
+                        outputs_verified=False,
+                        step_status="failed",
+                        verification_status="interrupted",
+                        required_outputs=required_outputs,
+                        optional_outputs=optional_outputs,
+                        stdout_tail=retry_stdout_tail or stdout_tail,
+                        stderr_tail=retry_stderr_tail or stderr_tail,
+                    )
+                    exit_code = 130
+                    break
+                retry_rc = int(retry_result.get("returncode", 0) or 0)
+                if retry_rc != 0:
+                    print(
+                        f"[A_all {run_id}] retry failed: {name} "
+                        f"(code {retry_rc}) after {retry_elapsed:.1f}s"
+                    )
+                    _append_a_step(
+                        manifest,
+                        name=name,
+                        step_started=step_started,
+                        rc=retry_rc,
+                        notes=(
+                            f"elapsed={elapsed:.1f}s;attempts=2;first={first_verification};"
+                            f"retry_child_rc_nonzero elapsed={retry_elapsed:.1f}s"
+                        ),
+                        outputs_verified=False,
+                        step_status="failed",
+                        verification_status="child_rc_nonzero",
+                        required_outputs=required_outputs,
+                        optional_outputs=optional_outputs,
+                        stdout_tail=retry_stdout_tail or stdout_tail,
+                        stderr_tail=retry_stderr_tail or stderr_tail,
+                    )
+                    exit_code = retry_rc
+                    break
+                verification = _verify_required_outputs(
+                    required_outputs,
+                    before_mtimes=retry_before_mtimes,
+                    step_started_at=retry_started_at,
+                )
+                verification_notes = (
+                    f"elapsed={elapsed:.1f}s;attempts=2;first={first_verification};"
+                    f"first_detail={first_notes};retry_elapsed={retry_elapsed:.1f}s;"
+                    f"{verification['notes']}"
+                )
+                stdout_tail = retry_stdout_tail or stdout_tail
+                stderr_tail = retry_stderr_tail or stderr_tail
             if not bool(verification["verified"]):
                 print(
                     f"[A_all {run_id}] failed verification: {name} "
@@ -1256,6 +1903,8 @@ def main() -> int:
                     fresh_outputs=list(verification["fresh_outputs"]),
                     missing_outputs=list(verification["missing_outputs"]),
                     stale_outputs=list(verification["stale_outputs"]),
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
                 )
                 exit_code = 1
                 break
@@ -1310,20 +1959,10 @@ def main() -> int:
                                 f"completed={completed_count} configured={configured_count}"
                             ),
                         )
-                elif completed_count < configured_count:
-                    final_state = "interrupted"
-                    if not health_summary_payload.get("current_cycle_evidence", False):
-                        health_summary_payload = _health_summary_payload(
-                            None,
-                            status="unverified",
-                            current_cycle_evidence=False,
-                            notes=(
-                                f"incomplete completion_count={completed_count} "
-                                f"configured={configured_count}"
-                            ),
-                        )
                 elif exit_code != 0:
                     final_state = "failed"
+                else:
+                    final_state = "completed"
                 finalize_manifest(
                     manifest,
                     health_checklist_path=None,
@@ -1333,12 +1972,28 @@ def main() -> int:
                 )
                 manifest_path = write_manifest(ROOT, manifest)
                 print(f"[A_all] manifest written: {manifest_path}")
+                if final_state in {"failed", "partial"} or exit_code != 0:
+                    try:
+                        event = build_failure_event_from_manifest(
+                            manifest,
+                            manifest_path=manifest_path,
+                            health_path=str(health_summary_payload.get("source", "") or ""),
+                            source_path="scripts/cycles/run_A_all.py",
+                            recovery_action="inspect A manifest failed step and rerun only through A-owned proof path",
+                        )
+                        upsert_cycle_failure_event(event)
+                    except Exception as event_exc:
+                        print(f"[A_all] WARN failure event write failed: {type(event_exc).__name__}: {event_exc}")
             except Exception as exc:
                 print(f"[A_all] WARN manifest write failed: {exc}")
         _release_lock()
         _clear_maintenance()
         print("[A_all] maintenance cleared; B cycle may resume")
-        # Intentionally do not auto-start B here.
+        try:
+            _ensure_b_cycle_running_after_a()
+        except Exception as exc:
+            print(f"[A_all] WARN could not ensure B cycle resume after A: {exc!r}")
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

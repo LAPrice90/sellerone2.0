@@ -77,6 +77,64 @@ def _to_confidence(value: Decimal) -> str:
     return f"{value.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP):.4f}".rstrip("0").rstrip(".")
 
 
+def _ladder_cap_source(
+    *,
+    ladder_price_1: Decimal | None,
+    ladder_price_2: Decimal | None,
+    ladder_price_3: Decimal | None,
+    ladder_gap_buffer: Decimal,
+    final_ceiling: Decimal | None,
+) -> tuple[Decimal | None, str, List[str]]:
+    """
+    Resolve ladder-aware cap and source for multi-seller paths.
+
+    Source priority:
+    - second_lowest: conservative default
+    - cluster_edge: when third rung is close enough to second rung
+    - ceiling_clamp: final ceiling is tighter than ladder-derived cap
+    """
+    if ladder_price_2 is None or ladder_price_2 <= 0:
+        return None, "", []
+
+    reason_codes: List[str] = []
+    safe_gap = ladder_gap_buffer if ladder_gap_buffer > 0 else Decimal("0.01")
+    cap = ladder_price_2 - safe_gap
+    if cap <= 0:
+        cap = ladder_price_2
+    source = "second_lowest"
+
+    # If the third rung sits near the second rung, use the cluster edge as the
+    # cap source to avoid repeatedly pinning into the absolute bottom rung.
+    if (
+        ladder_price_1 is not None
+        and ladder_price_1 > 0
+        and ladder_price_3 is not None
+        and ladder_price_3 > 0
+        and ladder_price_3 > ladder_price_2
+    ):
+        cluster_gap_max = max(safe_gap * Decimal("5"), Decimal("0.15"))
+        second_third_gap = ladder_price_3 - ladder_price_2
+        if second_third_gap <= cluster_gap_max:
+            cluster_cap = ladder_price_3 - safe_gap
+            if cluster_cap <= 0:
+                cluster_cap = ladder_price_3
+            if cluster_cap > cap:
+                cap = cluster_cap
+                source = "cluster_edge"
+
+    if final_ceiling is not None and final_ceiling > 0 and cap > final_ceiling:
+        cap = final_ceiling
+        source = "ceiling_clamp"
+
+    if source == "second_lowest":
+        reason_codes.append("LADDER_CAP_SOURCE_SECOND_LOWEST")
+    elif source == "cluster_edge":
+        reason_codes.append("LADDER_CAP_SOURCE_CLUSTER_EDGE")
+    elif source == "ceiling_clamp":
+        reason_codes.append("LADDER_CAP_SOURCE_CEILING_CLAMP")
+    return cap, source, reason_codes
+
+
 def best_rival_effective_price(snapshot_rows: Iterable[Mapping[str, object]]) -> Decimal | None:
     rivals: List[Decimal] = []
     for row in snapshot_rows:
@@ -215,6 +273,11 @@ def choose_next_price(
     anchor_floor_gbp: object = "",
     suppression_threshold_estimate_gbp: object = "",
     suppression_threshold_upper_bound_gbp: object = "",
+    seller_count: object = "",
+    ladder_price_1_gbp: object = "",
+    ladder_price_2_gbp: object = "",
+    ladder_price_3_gbp: object = "",
+    ladder_gap_buffer_gbp: object = "0.01",
 ) -> NextPriceDecision:
     reason_codes: List[str] = []
     chosen_state = str(state or "").strip().upper()
@@ -233,6 +296,11 @@ def choose_next_price(
     anchor_floor = _to_decimal(anchor_floor_gbp)
     suppression_threshold = _to_decimal(suppression_threshold_estimate_gbp)
     suppression_upper_bound = _to_decimal(suppression_threshold_upper_bound_gbp)
+    seller_count_num = _to_count(seller_count)
+    ladder_price_1 = _to_decimal(ladder_price_1_gbp)
+    ladder_price_2 = _to_decimal(ladder_price_2_gbp)
+    ladder_price_3 = _to_decimal(ladder_price_3_gbp)
+    ladder_gap_buffer = _to_decimal(ladder_gap_buffer_gbp) or Decimal("0.01")
 
     target = current
     write_required = False
@@ -275,11 +343,44 @@ def choose_next_price(
                 write_required=False,
                 reason_codes=reason_codes,
             )
-        # REGAIN no longer stair-steps down by fixed caps; move directly to rival target,
-        # then let floor/ceiling guardrails clamp as needed.
-        target = best_rival
+        if seller_count_num >= 2 and ladder_price_2 is not None and ladder_price_2 > 0:
+            ladder_target, _, ladder_source_codes = _ladder_cap_source(
+                ladder_price_1=ladder_price_1,
+                ladder_price_2=ladder_price_2,
+                ladder_price_3=ladder_price_3,
+                ladder_gap_buffer=ladder_gap_buffer,
+                final_ceiling=ceiling,
+            )
+            if ladder_target is None:
+                ladder_target = best_rival
+                ladder_source_codes = []
+            # Multi-seller ladders are capped to the next rung instead of blindly
+            # chasing the absolute bottom every cycle. If the ladder cap is above
+            # current, step upward toward that cap to reset bottom-chase pressure.
+            target = current
+            if ladder_target < current:
+                target = ladder_target
+            elif ladder_target > current and max_up > 0:
+                target = min(current + max_up, ladder_target)
+                if target > current:
+                    reason_codes.append("STEP_REGAIN_MULTI_SELLER_RESET_UP")
+            reason_codes.append("STEP_REGAIN_MULTI_SELLER_LADDER_CAP")
+            reason_codes.append("TACTIC_MULTI_SELLER_LADDER_CAP")
+            reason_codes.extend(ladder_source_codes)
+            if target == current:
+                reason_codes.append("REGAIN_MULTI_SELLER_NO_DOWNWARD_HEADROOM")
+            if ladder_price_1 is not None and ladder_price_3 is not None:
+                reason_codes.append("LADDER_DEPTH_THREE_PLUS")
+        else:
+            # Single-rival paths keep direct regain behavior.
+            target = best_rival
+            reason_codes.append("STEP_REGAIN_TO_RIVAL")
+            reason_codes.append("TACTIC_SINGLE_RIVAL_RESET")
+            if target == current and ceiling is not None and ceiling > current and max_up > 0:
+                target = min(current + max_up, ceiling)
+                reason_codes.append("SINGLE_RIVAL_RESET_DEADLOCK_BREAK")
+                reason_codes.append("STEP_SINGLE_RIVAL_RESET_BREAK_UP")
         write_required = target != current
-        reason_codes.append("STEP_REGAIN_TO_RIVAL")
     elif chosen_state == "RAISE_FIND_LOSS":
         if ceiling is None:
             reason_codes.append("NO_CEILING_HOLD")
@@ -289,9 +390,29 @@ def choose_next_price(
                 write_required=False,
                 reason_codes=reason_codes,
             )
-        target = min(current + max_up, ceiling)
-        write_required = target > current
-        reason_codes.append("STEP_RAISE_FIND_LOSS_UP")
+        if seller_count_num >= 2 and ladder_price_2 is not None and ladder_price_2 > 0:
+            ladder_ceiling, _, ladder_source_codes = _ladder_cap_source(
+                ladder_price_1=ladder_price_1,
+                ladder_price_2=ladder_price_2,
+                ladder_price_3=ladder_price_3,
+                ladder_gap_buffer=ladder_gap_buffer,
+                final_ceiling=ceiling,
+            )
+            effective_ceiling = ladder_ceiling if ladder_ceiling is not None else ceiling
+            target = min(current + max_up, effective_ceiling)
+            write_required = target > current
+            reason_codes.append("STEP_RAISE_FIND_LOSS_LADDER_CAP")
+            reason_codes.append("TACTIC_MULTI_SELLER_LADDER_CAP")
+            reason_codes.extend(ladder_source_codes)
+            if effective_ceiling < ceiling:
+                reason_codes.append("RAISE_MULTI_SELLER_CEILING_CAPPED_TO_LADDER")
+            if not write_required:
+                reason_codes.append("RAISE_MULTI_SELLER_NO_HEADROOM")
+        else:
+            target = min(current + max_up, ceiling)
+            write_required = target > current
+            reason_codes.append("STEP_RAISE_FIND_LOSS_UP")
+            reason_codes.append("TACTIC_SINGLE_RIVAL_RESET")
     elif chosen_state in {"MARGIN_COMPRESS_TO_FLOOR", "CONTROLLED_EXIT_TO_FLOOR", "LIQUIDATE_TO_FLOOR"}:
         if current <= floor:
             reason_codes.append("CANNOT_COMPETE_ALREADY_AT_ACTIVE_FLOOR")
@@ -351,6 +472,27 @@ def choose_next_price(
             target = suppression_target
             write_required = target != current
             reason_codes.append("SUPPRESSION_DIRECT_TARGET")
+            if not write_required:
+                reason_codes.append("SUPPRESSION_DIRECT_TARGET_NO_MOVE")
+                upward_caps = [d for d in (suppression_upper_bound, ceiling) if d is not None and d > current]
+                upward_step = max(max_up, Decimal("0"))
+                if upward_caps and upward_step > 0:
+                    target = min(current + upward_step, min(upward_caps))
+                    write_required = target != current
+                    if write_required:
+                        reason_codes.append("SUPPRESSION_DIRECT_TARGET_STALE")
+                        reason_codes.append("SUPPRESSION_PROBE_UPWARD_STEP")
+                if not write_required:
+                    allowed_drop = _allowed_downward_step(Decimal("0.20"))
+                    if allowed_drop > 0 and current > probe_floor:
+                        target = current - allowed_drop
+                        if target < probe_floor:
+                            target = probe_floor
+                            reason_codes.append("SUPPRESSION_PROBE_FLOOR_CLAMP")
+                        write_required = target != current
+                        if write_required:
+                            reason_codes.append("SUPPRESSION_DIRECT_TARGET_STALE")
+                            reason_codes.append("SUPPRESSION_PROBE_DOWNWARD_STEP")
         elif suppression_threshold is not None and suppression_threshold > 0:
             target = suppression_threshold
             write_required = target != current
@@ -387,7 +529,16 @@ def choose_next_price(
         target = ceiling
         reason_codes.append("GUARDRAIL_FINAL_CEILING_CLAMP")
 
-    write_required = write_required or (target != current)
+    if chosen_state == "REGAIN" and seller_count_num >= 2 and target == current:
+        if "REGAIN_MULTI_SELLER_NO_DOWNWARD_HEADROOM" not in reason_codes:
+            reason_codes.append("REGAIN_MULTI_SELLER_NO_DOWNWARD_HEADROOM")
+    if chosen_state == "RAISE_FIND_LOSS" and seller_count_num >= 2 and target == current:
+        if "RAISE_MULTI_SELLER_NO_HEADROOM" not in reason_codes:
+            reason_codes.append("RAISE_MULTI_SELLER_NO_HEADROOM")
+
+    # Final write intent must follow the post-guardrail target, not the pre-clamp
+    # target candidate, otherwise no-op writes can be emitted as APPLIED.
+    write_required = target != current
     return NextPriceDecision(
         state=chosen_state,
         target_price_gbp=_to_money_string(target),

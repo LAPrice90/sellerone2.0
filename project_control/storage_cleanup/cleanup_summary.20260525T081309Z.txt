@@ -1,0 +1,7 @@
+created_utc=2026-05-25T08:14:51Z
+manifest=C:\Users\Luke\Desktop\SellerOne 2.0\project_control\storage_cleanup\cleanup_manifest.20260525T081309Z.csv
+delete_rows=4307
+keep_rows=6
+estimated_delete_gb=667.123
+estimated_keep_gb=3.743
+f_keep=f_storage_drift_reconcile_20260524T085426Z

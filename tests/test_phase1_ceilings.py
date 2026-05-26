@@ -196,6 +196,42 @@ class Phase1CeilingsTests(unittest.TestCase):
         self.assertEqual(result.suppression_ceiling_source, "LOWEST_COMPETITOR_INFERENCE")
         self.assertIn("SUPPRESSION_THRESHOLD_UPPER_BOUND_INFERRED_LOWEST_COMPETITOR", result.reason_codes)
 
+    def test_enforce_effective_ceiling_floor_clamps_below_floor(self) -> None:
+        raw = phase1_ceilings.FinalCeilingResult(
+            compliance_ceiling_landed_gbp="6.00",
+            eligibility_ceiling_landed_gbp="6.00",
+            suppression_ceiling_landed_temp="",
+            demand_ceiling_landed_gbp="6.00",
+            final_ceiling_landed_gbp="6.00",
+            binding_ceiling_type="COMPLIANCE",
+            reason_codes=["BINDING_CEILING_COMPLIANCE"],
+        )
+        repaired = phase1_ceilings.enforce_effective_ceiling_floor(
+            final_ceiling=raw,
+            hard_floor_gbp="7.25",
+        )
+        self.assertEqual(repaired.final_ceiling_landed_gbp, "7.25")
+        self.assertEqual(repaired.binding_ceiling_type, "COMPLIANCE")
+        self.assertIn("CEILING_RAW_BELOW_HARD_FLOOR", repaired.reason_codes)
+        self.assertIn("CEILING_EFFECTIVE_CLAMPED_TO_HARD_FLOOR", repaired.reason_codes)
+
+    def test_enforce_effective_ceiling_floor_keeps_valid_ceiling(self) -> None:
+        raw = phase1_ceilings.FinalCeilingResult(
+            compliance_ceiling_landed_gbp="9.99",
+            eligibility_ceiling_landed_gbp="9.99",
+            suppression_ceiling_landed_temp="",
+            demand_ceiling_landed_gbp="9.99",
+            final_ceiling_landed_gbp="9.99",
+            binding_ceiling_type="COMPLIANCE",
+            reason_codes=["BINDING_CEILING_COMPLIANCE"],
+        )
+        repaired = phase1_ceilings.enforce_effective_ceiling_floor(
+            final_ceiling=raw,
+            hard_floor_gbp="7.25",
+        )
+        self.assertEqual(repaired.final_ceiling_landed_gbp, "9.99")
+        self.assertNotIn("CEILING_RAW_BELOW_HARD_FLOOR", repaired.reason_codes)
+
 
 if __name__ == "__main__":
     unittest.main()

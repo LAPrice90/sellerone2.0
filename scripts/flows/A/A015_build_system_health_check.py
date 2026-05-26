@@ -11,8 +11,31 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Tuple
 
+BOOT_ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS_ROOT = BOOT_ROOT / "scripts"
+for _path in (BOOT_ROOT, SCRIPTS_ROOT):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
 import pandas as pd
 from scripts.core.out_paths import resolve_compat_path
+from scripts.core.storage import read_dataframe_with_sql_fallback, write_dataframe_with_sql_compat
+try:
+    from scripts.core.flow_health_gate import flow_gate_checklist_path
+except ModuleNotFoundError:
+    from core.flow_health_gate import flow_gate_checklist_path
+try:
+    from scripts.core.cycle_failure_events import (
+        FAILURE_EVENT_COLUMNS,
+        DEFAULT_LEDGER_PATH as DEFAULT_CYCLE_FAILURE_LEDGER_PATH,
+        validate_cycle_failure_events_schema,
+    )
+except ModuleNotFoundError:
+    from core.cycle_failure_events import (
+        FAILURE_EVENT_COLUMNS,
+        DEFAULT_LEDGER_PATH as DEFAULT_CYCLE_FAILURE_LEDGER_PATH,
+        validate_cycle_failure_events_schema,
+    )
 try:
     from scripts.phase1 import daily_intel_required_skus
 except ModuleNotFoundError:
@@ -23,13 +46,26 @@ ROOT = Path(__file__).resolve().parents[3]
 DATA = Path("data")
 CHECKLIST_CSV = OUT / "system_health_checklist.csv"
 CYCLE_ALERT_DIR = OUT / "cycle_alerts"
+CYCLE_FAILURE_EVENTS_PATH = Path(
+    os.environ.get("CYCLE_FAILURE_EVENTS_PATH", DEFAULT_CYCLE_FAILURE_LEDGER_PATH)
+)
+SQL_TABLE_SYSTEM_HEALTH_CHECKLIST = "sys_system_health_checklist"
+SQL_TABLE_CHECKLIST_B = "b_checklist_b"
 ALERT_STATE_CSV = OUT / "system_health_alert_state.csv"
 ALERT_STATE_A_CSV = OUT / "system_health_alert_state_A.csv"
 ALERT_STATE_B_CSV = OUT / "system_health_alert_state_B.csv"
 ALERT_STATE_E_CSV = OUT / "system_health_alert_state_E.csv"
 ALERT_STATE_H_CSV = OUT / "system_health_alert_state_H.csv"
+ALERT_HISTORY_CSV = OUT / "system_health_alert_history.csv"
+ALERT_HISTORY_A_CSV = OUT / "system_health_alert_history_A.csv"
+ALERT_HISTORY_B_CSV = OUT / "system_health_alert_history_B.csv"
+ALERT_HISTORY_E_CSV = OUT / "system_health_alert_history_E.csv"
+ALERT_HISTORY_H_CSV = OUT / "system_health_alert_history_H.csv"
 ALERT_SNOOZE_PATH = OUT / "locks" / "health_alert_snooze.json"
 DETAIL_BLANK_COGS = OUT / "health_order_master_blank_cogs_lvl1plus.csv"
+DETAIL_PLACEHOLDER_COGS = OUT / "health_order_master_placeholder_cogs.csv"
+DETAIL_MISSING_TOKEN_NO_PLACEHOLDER = OUT / "health_order_master_missing_token_no_placeholder.csv"
+DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS = OUT / "health_allocated_tokens_on_canceled_orders.csv"
 DETAIL_UNKNOWN_FEE_COUNTRIES = OUT / "health_unknown_fee_countries.csv"
 FEE_RULES_PATH = Path("reference/fee_vat_rules.csv")
 VAT_MODEL = OUT / "vat_country_model.csv"
@@ -43,6 +79,8 @@ HEALTH_STATUS_H_CSV = OUT / "health_status_H.csv"
 CHECKLIST_A_SPLIT_CSV = OUT / "cycle_alerts" / "checklist_A_split.csv"
 CHECKLIST_B_SPLIT_CSV = OUT / "cycle_alerts" / "checklist_B_split.csv"
 CHECKLIST_E_SPLIT_CSV = OUT / "cycle_alerts" / "checklist_E_split.csv"
+# H flow-owned gate truth is checklist_H.csv; split file remains observability-only.
+CHECKLIST_H_GATE_CSV = flow_gate_checklist_path("H")
 CHECKLIST_H_SPLIT_CSV = OUT / "cycle_alerts" / "checklist_H_split.csv"
 A015_SPLIT_RUNTIME_EXCEPTION_PATH = OUT / "cycle_alerts" / "A015_split_runtime_exception.txt"
 L1_MISSING_FEE_KEYS = OUT / "l1_missing_fee_keys.csv"
@@ -65,6 +103,11 @@ PROBE_RESPONSE_LOG_PATH = (
 H_EXECUTIONER_ACTION_LOG_PATH = OUT / "h_executioner_action_log.csv"
 H_SELLER_PROFILE_PATH = OUT / "h_seller_profiles.csv"
 H_SELLER_SOI_PATH = OUT / "h_seller_of_interest.csv"
+H_CEILING_EVENTS_PATH = OUT / "h_ceiling_events.csv"
+H_STRATEGY_OUTCOME_LOG_PATH = OUT / "h_strategy_outcome_log.csv"
+H_STRATEGY_OUTCOME_DAILY_PATH = OUT / "h_strategy_outcome_daily.csv"
+H_SUPPRESSION_CASES_PATH = OUT / "h_suppression_cases.csv"
+H_SUPPRESSION_REACTIVATION_LOG_PATH = OUT / "h_suppression_reactivation_log.csv"
 LISTING_OFFER_HISTORY_COMPAT = resolve_compat_path("listing_offer_history.csv", default_system="H")
 LISTING_OFFER_HISTORY = (
     LISTING_OFFER_HISTORY_COMPAT.live_path
@@ -84,6 +127,7 @@ INBOUND_HISTORY = OUT / "inbound_history.csv"
 INVENTORY_SNAPSHOT_GLOB = "inventory_snapshot_*.csv"
 INBOUND_SNAPSHOT_GLOB = "inbound_snapshot_*.csv"
 INVENTORY_SUMMARIES_PATH = OUT / "inventory_summaries.csv"
+MERCHANT_LISTINGS_PATH = OUT / "merchant_listings_latest.csv"
 STOCK_SNAPSHOT_LATEST_PATH = OUT / "parking" / "stock_snapshot_latest.csv"
 REFUND_ADJUSTMENT_HISTORY = OUT / "refund_adjustment_history.csv"
 REFUND_ADJUSTMENT_SNAPSHOT_GLOB = "refund_adjustment_snapshot_*.csv"
@@ -97,6 +141,85 @@ E_RUN_LOG_PATH_CANDIDATES = [
     OUT / "e_run_log.jsonl",
 ]
 PHASE1_SCOPE_PATH = OUT / "phase1_sku_scope.csv"
+O_RESTOCK_SOURCE_VIEW_PATH = OUT / "systems" / "O" / "live" / "restock_source_view.csv"
+O_RESTOCK_RECOMMENDATIONS_PATH = OUT / "systems" / "O" / "live" / "restock_recommendations_live.csv"
+O_REORDER_INPUT_COVERAGE_PATH = OUT / "systems" / "O" / "live" / "reorder_input_coverage_report.csv"
+O_NET_FEE_ACTION_STATUSES = {
+    "full_restock",
+    "test_restock",
+    "approve_full_restock",
+    "approve_test_restock",
+}
+O_NET_FEE_SOURCE_REQUIRED_FIELDS = (
+    "market_price_ex_vat_gbp",
+    "market_price_vat_rate_pct",
+    "current_token_cost_gbp",
+    "break_even_price_gbp",
+    "net_fee_drag_per_unit_gbp",
+    "net_fee_model_status",
+    "net_fee_model_asof",
+    "net_fee_model_age_hours",
+    "net_fee_model_source",
+)
+O_NET_FEE_RECOMMENDATION_REQUIRED_FIELDS = (
+    "forward_roi_pct",
+    "forward_profit_per_unit_gbp",
+    "market_price_ex_vat_gbp",
+    "current_token_cost_gbp",
+    "break_even_price_gbp",
+    "net_fee_drag_per_unit_gbp",
+    "net_fee_model_status",
+    "net_fee_model_asof",
+    "net_fee_model_age_hours",
+    "net_fee_model_source",
+    "gross_forward_roi_pct",
+    "gross_forward_profit_per_unit_gbp",
+)
+O_NET_FEE_COVERAGE_REQUIRED_FIELDS = (
+    "expected_forward_roi_pct",
+    "net_fee_drag_per_unit_gbp",
+    "net_fee_model_status",
+    "net_fee_model_asof",
+    "net_fee_model_age_hours",
+)
+O_NET_FEE_NUMERIC_FIELDS = {
+    "market_price_ex_vat_gbp",
+    "market_price_vat_rate_pct",
+    "current_token_cost_gbp",
+    "break_even_price_gbp",
+    "net_fee_drag_per_unit_gbp",
+    "net_fee_model_age_hours",
+    "forward_roi_pct",
+    "forward_profit_per_unit_gbp",
+    "expected_forward_roi_pct",
+    "gross_forward_roi_pct",
+    "gross_forward_profit_per_unit_gbp",
+}
+O_NET_FEE_POSITIVE_FIELDS = {
+    "market_price_ex_vat_gbp",
+    "current_token_cost_gbp",
+    "break_even_price_gbp",
+}
+
+
+def _write_health_checklist_csv(dataframe: pd.DataFrame, path: Path) -> None:
+    rel_path = path.as_posix().replace("\\", "/")
+    if rel_path.endswith("out/system_health_checklist.csv"):
+        write_dataframe_with_sql_compat(dataframe, path, SQL_TABLE_SYSTEM_HEALTH_CHECKLIST)
+        return
+    if rel_path.endswith("out/cycle_alerts/checklist_B.csv"):
+        write_dataframe_with_sql_compat(dataframe, path, SQL_TABLE_CHECKLIST_B)
+        return
+    dataframe.to_csv(path, index=False)
+
+
+SQL_READER_TABLES = {
+    str((OUT / "phase1_sku_scope.csv").as_posix()): "b_phase1_sku_scope",
+    str((OUT / "inventory_summaries.csv").as_posix()): "a_inventory_summaries",
+    str((OUT / "inventory_history.csv").as_posix()): "a_inventory_history",
+    str((OUT / "h_seller_of_interest.csv").as_posix()): "h_seller_of_interest",
+    str(LISTING_OFFER_HISTORY.as_posix()): "h_listing_offer_history",
+}
 PHASE1_DAILY_INTEL_PATH = DATA / "sku_daily_intel.csv"
 PHASE1_DAILY_INTEL_LATEST_PATH = OUT / "phase1_daily_intel_latest.csv"
 PHASE1_EXECUTION_LOG_PATH = DATA / "execution_log.csv"
@@ -110,6 +233,10 @@ B_CYCLE_LOG_PATH_CANDIDATES = [
     OUT / "systems" / "B" / "live" / "B_cycle.log",
     OUT / "B_cycle.log",
 ]
+H_CYCLE_LOG_PATH_CANDIDATES = [
+    OUT / "systems" / "H" / "live" / "H_cycle.log",
+    OUT / "H_cycle.log",
+]
 H_LOCK_PATH_CANDIDATES = [
     OUT / "systems" / "H" / "live" / "H_pricing_cycle.lock",
     OUT / "H_pricing_cycle.lock",
@@ -120,6 +247,24 @@ E_LOCK_PATH_CANDIDATES = [
 ]
 B_SHEET_SYNC_STATUS_PATH = OUT / "b_sheet_sync_status.csv"
 B_LISTING_COLLECTION_STATUS_PATH = OUT / "systems" / "B" / "live" / "listing_offer_collection_status.json"
+B_MAINTENANCE_MARKER_PATHS = [
+    OUT / "locks" / "maintenance.requested",
+    OUT / "locks" / "maintenance.ready",
+    OUT / "locks" / "maintenance.active",
+    OUT / "locks" / "b_cycle.maintenance",
+]
+ORDERS_ALL_PATH = OUT / "orders_all.csv"
+ORDER_MASTER_PATH = OUT / "order_master.csv"
+LISTING_OFFER_SNAPSHOT_LATEST_PATH = OUT / "listing_offer_snapshot_latest.csv"
+PHASE1_RUNTIME_FLOOR_SNAPSHOT_LATEST_PATH = OUT / "phase1_runtime_floor_snapshot_latest.csv"
+H_PUBLISH_INFO_PATH_CANDIDATES = [
+    OUT / "systems" / "H" / "live" / "H_cycle_last_publish_info.txt",
+    OUT / "H_cycle_last_publish_info.txt",
+]
+H_TERMINAL_INFO_PATH_CANDIDATES = [
+    OUT / "systems" / "H" / "live" / "H_cycle_last_terminal_info.txt",
+    OUT / "H_cycle_last_terminal_info.txt",
+]
 H_CPT_ENDPOINT = "products_pricing_post_competitive_summary_batch"
 H_FLOOR_VAT_POLICY_PATH = Path("config/h_floor_vat_policy.json")
 H_TEMP_FLOOR_SNAPSHOT_PATH = OUT / "sku_temp_floor_snapshot.csv"
@@ -129,6 +274,12 @@ H_KILL_SWITCH_PATH = OUT / "locks" / "h_pricing_cycle.kill"
 A_MANIFESTS_DIR = OUT / "manifests" / "A"
 TOKEN_LEDGER_COMPAT = resolve_compat_path("token_ledger_live.csv", default_system="B")
 TOKEN_LEDGER_PATH = TOKEN_LEDGER_COMPAT.live_path if TOKEN_LEDGER_COMPAT.live_path.exists() else TOKEN_LEDGER_COMPAT.legacy_path
+TOKEN_ALLOCATIONS_COMPAT = resolve_compat_path("token_allocations_live.csv", default_system="B")
+TOKEN_ALLOCATIONS_PATH = (
+    TOKEN_ALLOCATIONS_COMPAT.live_path
+    if TOKEN_ALLOCATIONS_COMPAT.live_path.exists()
+    else TOKEN_ALLOCATIONS_COMPAT.legacy_path
+)
 ORPHAN_SCOPE_START_DATE = os.environ.get("ORPHAN_SCOPE_START_DATE", "").strip()
 # Default scope start to keep pre-window orphans from failing health checks.
 if not ORPHAN_SCOPE_START_DATE:
@@ -147,6 +298,173 @@ def _file_info(path: Path) -> Dict[str, str]:
     stat = path.stat()
     mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
     return {"exists": "yes", "size_bytes": str(stat.st_size), "mtime_utc": mtime}
+
+
+def _critical_freshness_check(
+    rows: List[Dict[str, str]],
+    check_name: str,
+    paths: List[Path] | Tuple[Path, ...],
+    *,
+    warn_after_minutes: float,
+    fail_after_minutes: float,
+    owner_cycle: str,
+    recovery_signal: str,
+    now_utc: datetime | None = None,
+    missing_status: str = "fail",
+) -> None:
+    candidate_paths = list(paths)
+    chosen = _first_existing_path(candidate_paths) or (candidate_paths[0] if candidate_paths else None)
+    if chosen is None:
+        _add(
+            rows,
+            check_name,
+            "warn",
+            "missing_path_config",
+            f"owner={owner_cycle};recovery_signal={recovery_signal}",
+        )
+        return
+    note_base = (
+        f"owner={owner_cycle};recovery_signal={recovery_signal};path={chosen};"
+        f"warn_after_min={warn_after_minutes:.1f};fail_after_min={fail_after_minutes:.1f}"
+    )
+    if not chosen.exists():
+        _add(rows, check_name, missing_status, "missing", note_base)
+        return
+    probe_now = now_utc or datetime.now(timezone.utc)
+    try:
+        mtime_utc = datetime.fromtimestamp(chosen.stat().st_mtime, tz=timezone.utc)
+        age_minutes = max((probe_now - mtime_utc).total_seconds() / 60.0, 0.0)
+    except Exception as exc:
+        _add(rows, check_name, "warn", "read_error", f"{note_base};error={exc.__class__.__name__}:{exc}")
+        return
+    status = "ok"
+    if fail_after_minutes >= 0 and age_minutes >= fail_after_minutes:
+        status = "fail"
+    elif warn_after_minutes >= 0 and age_minutes >= warn_after_minutes:
+        status = "warn"
+    _add(rows, check_name, status, f"{age_minutes:.2f}", f"{note_base};mtime_utc={mtime_utc.isoformat()}")
+
+
+def _relax_check_status_for_maintenance(
+    rows: List[Dict[str, str]],
+    *,
+    check_name: str,
+    from_status: str = "fail",
+    to_status: str = "warn",
+) -> None:
+    active_markers = _b_maintenance_marker_paths_present()
+    if not active_markers:
+        return
+    for row in reversed(rows):
+        if str(row.get("check", "")) != check_name:
+            continue
+        current_status = str(row.get("status", "")).strip().lower()
+        if current_status == from_status:
+            row["status"] = to_status
+        notes = str(row.get("notes", "")).strip()
+        marker_text = ",".join([path.name for path in active_markers])
+        suffix = f"maintenance_markers={marker_text};maintenance_expected_staleness=1"
+        row["notes"] = f"{notes};{suffix}" if notes else suffix
+        break
+
+
+def _read_kv_file_value(path: Path, key: str) -> str:
+    key_norm = str(key or "").strip()
+    if not key_norm or not path.exists():
+        return ""
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for raw_line in fh:
+                line = str(raw_line or "").strip()
+                if not line or "=" not in line:
+                    continue
+                lhs, rhs = line.split("=", 1)
+                if str(lhs or "").strip() == key_norm:
+                    return str(rhs or "").strip()
+    except Exception:
+        return ""
+    return ""
+
+
+def _h_publish_marker_freshness_check(
+    rows: List[Dict[str, str]],
+    *,
+    now_utc: datetime | None = None,
+) -> None:
+    warn_after_minutes = float(os.environ.get("H_PUBLISH_MARKER_WARN_MINUTES", "30"))
+    fail_after_minutes = float(os.environ.get("H_PUBLISH_MARKER_FAIL_MINUTES", "90"))
+    probe_now = now_utc or datetime.now(timezone.utc)
+    publish_path = _first_existing_path(H_PUBLISH_INFO_PATH_CANDIDATES) or H_PUBLISH_INFO_PATH_CANDIDATES[0]
+    terminal_path = _first_existing_path(H_TERMINAL_INFO_PATH_CANDIDATES) or H_TERMINAL_INFO_PATH_CANDIDATES[0]
+
+    def _age_minutes(path: Path) -> float | None:
+        if not path.exists():
+            return None
+        try:
+            mtime_utc = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            return max((probe_now - mtime_utc).total_seconds() / 60.0, 0.0)
+        except Exception:
+            return None
+
+    publish_age_min = _age_minutes(publish_path)
+    terminal_age_min = _age_minutes(terminal_path)
+    publish_status_value = _read_kv_file_value(publish_path, "status")
+    terminal_state_value = _read_kv_file_value(terminal_path, "state")
+    note_base = (
+        "owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;"
+        f"publish_path={publish_path};terminal_path={terminal_path};"
+        f"warn_after_min={warn_after_minutes:.1f};fail_after_min={fail_after_minutes:.1f};"
+        f"publish_status={publish_status_value or 'unknown'};terminal_state={terminal_state_value or 'unknown'}"
+    )
+    publish_age_note = f"publish_age_min={publish_age_min:.2f}" if publish_age_min is not None else "publish_age_min=missing"
+    terminal_age_note = f"terminal_age_min={terminal_age_min:.2f}" if terminal_age_min is not None else "terminal_age_min=missing"
+
+    if publish_age_min is not None:
+        if publish_age_min >= fail_after_minutes:
+            publish_class = "fail"
+        elif publish_age_min >= warn_after_minutes:
+            publish_class = "warn"
+        else:
+            publish_class = "ok"
+    else:
+        publish_class = "missing"
+
+    if publish_class in {"ok", "warn"}:
+        _add(
+            rows,
+            "h_publish_marker_freshness",
+            publish_class,
+            f"{publish_age_min:.2f}" if publish_age_min is not None else "missing",
+            f"{note_base};source=publish_marker;{publish_age_note};{terminal_age_note}",
+        )
+        return
+
+    if terminal_age_min is None:
+        _add(
+            rows,
+            "h_publish_marker_freshness",
+            "fail",
+            f"{publish_age_min:.2f}" if publish_age_min is not None else "missing",
+            f"{note_base};source=publish_marker;publish_class={publish_class};{publish_age_note};{terminal_age_note}",
+        )
+        return
+
+    if terminal_age_min >= fail_after_minutes:
+        status = "fail"
+    elif terminal_age_min >= warn_after_minutes:
+        status = "warn"
+    else:
+        status = "warn"
+    _add(
+        rows,
+        "h_publish_marker_freshness",
+        status,
+        f"{publish_age_min:.2f}" if publish_age_min is not None else f"{terminal_age_min:.2f}",
+        (
+            f"{note_base};source=terminal_marker_fallback;publish_class={publish_class};"
+            f"{publish_age_note};{terminal_age_note}"
+        ),
+    )
 
 
 def _h_cycle_pause_requested() -> bool:
@@ -169,9 +487,213 @@ def _h_cycle_running() -> bool:
 
 
 def _read_csv(path: Path, usecols: List[str] | None = None) -> pd.DataFrame:
+    table = SQL_READER_TABLES.get(path.as_posix())
+    if table:
+        try:
+            return read_dataframe_with_sql_fallback(path, table, dtype=str, usecols=usecols)
+        except FileNotFoundError:
+            return pd.DataFrame()
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, dtype=str, usecols=usecols)
+
+
+def _order_key_series(df: pd.DataFrame, *, order_col: str = "Order ID", sku_col: str = "SKU") -> pd.Series:
+    if df.empty or order_col not in df.columns or sku_col not in df.columns:
+        return pd.Series([], dtype=str)
+    return df[order_col].astype(str).str.strip() + "||" + df[sku_col].astype(str).str.strip()
+
+
+def _read_order_key_file(path: Path) -> set[str]:
+    df = _read_csv(path)
+    if df.empty:
+        return set()
+    return set(_order_key_series(df).tolist())
+
+
+def _order_master_l1_coverage_stats(
+    l1: pd.DataFrame,
+    order_master: pd.DataFrame,
+    *,
+    l1_missing_fee_keys_path: Path = L1_MISSING_FEE_KEYS,
+    missing_token_orders_path: Path = MISSING_TOKEN_ORDERS,
+) -> Dict[str, object]:
+    l1_keys = set(_order_key_series(l1).tolist())
+    master_keys = set(_order_key_series(order_master).tolist())
+    observed_missing_fee_keys = _read_order_key_file(l1_missing_fee_keys_path)
+    observed_missing_token_keys = _read_order_key_file(missing_token_orders_path)
+
+    notes: List[str] = []
+    if observed_missing_fee_keys:
+        notes.append(f"observed_missing_fee_keys={len(observed_missing_fee_keys)}")
+    if observed_missing_token_keys:
+        notes.append(f"observed_missing_token_keys={len(observed_missing_token_keys)}")
+
+    missing_set = l1_keys - master_keys
+    orphan_set = master_keys - l1_keys
+    return {
+        "missing_set": missing_set,
+        "missing_count": len(missing_set),
+        "orphan_set": orphan_set,
+        "orphan_count": len(orphan_set),
+        "note": ";".join(notes),
+    }
+
+
+def _order_master_placeholder_stats(order_master: pd.DataFrame) -> Dict[str, object]:
+    if order_master.empty:
+        return {
+            "placeholder_rows": 0,
+            "missing_token_no_placeholder_rows": 0,
+            "placeholder_repeat_sku_count": 0,
+            "placeholder_repeat_row_count": 0,
+            "placeholder_repeat_sample": [],
+        }
+
+    df = order_master.copy()
+    qty = pd.to_numeric(df.get("Quantity Ordered", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
+    lvl = df.get("lvl", pd.Series([], dtype=str)).astype(str).str.strip()
+    target_rows = qty.gt(0) & lvl.ne("0")
+
+    placeholder_flag = (
+        df.get("COGS_Placeholder_Applied", pd.Series([], dtype=str))
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .isin({"1", "true", "yes", "y"})
+    )
+    missing_token_flag = (
+        df.get("Missing_Token_Flag", pd.Series([], dtype=str))
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .isin({"1", "true", "yes", "y"})
+    )
+
+    placeholder_rows = int((target_rows & placeholder_flag).sum())
+    missing_token_no_placeholder_rows = int((target_rows & missing_token_flag & ~placeholder_flag).sum())
+
+    sku_series = df.get("SKU", pd.Series([], dtype=str)).astype(str).str.strip().str.upper()
+    placeholder_skus = sku_series[target_rows & placeholder_flag]
+    if placeholder_skus.empty:
+        placeholder_repeat_sku_count = 0
+        placeholder_repeat_row_count = 0
+        placeholder_repeat_sample: List[str] = []
+    else:
+        sku_counts = placeholder_skus.value_counts()
+        repeated = sku_counts[sku_counts > 1]
+        placeholder_repeat_sku_count = int(len(repeated.index))
+        placeholder_repeat_row_count = int(repeated.sum())
+        placeholder_repeat_sample = [f"{sku}:{int(count)}" for sku, count in repeated.head(5).items()]
+
+    return {
+        "placeholder_rows": placeholder_rows,
+        "missing_token_no_placeholder_rows": missing_token_no_placeholder_rows,
+        "placeholder_repeat_sku_count": placeholder_repeat_sku_count,
+        "placeholder_repeat_row_count": placeholder_repeat_row_count,
+        "placeholder_repeat_sample": placeholder_repeat_sample,
+    }
+
+
+def _token_allocated_on_canceled_orders_stats(
+    token_allocations: pd.DataFrame,
+    orders_all_status: pd.DataFrame,
+    order_master: pd.DataFrame,
+) -> Dict[str, object]:
+    required_alloc_cols = {"order_id", "seller_sku", "quantity", "token_id", "allocation_date"}
+    if token_allocations.empty:
+        return {
+            "ready": True,
+            "rows": 0,
+            "units": 0,
+            "sample": [],
+            "details": pd.DataFrame(columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]),
+            "notes": "allocations_empty",
+        }
+    if not required_alloc_cols.issubset(set(token_allocations.columns)):
+        missing = sorted(required_alloc_cols - set(token_allocations.columns))
+        return {
+            "ready": False,
+            "rows": 0,
+            "units": 0,
+            "sample": [],
+            "details": pd.DataFrame(columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]),
+            "notes": "missing_alloc_cols=" + ",".join(missing),
+        }
+    if orders_all_status.empty or {"amazon_order_id", "order_status"} - set(orders_all_status.columns):
+        return {
+            "ready": False,
+            "rows": 0,
+            "units": 0,
+            "sample": [],
+            "details": pd.DataFrame(columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]),
+            "notes": "missing_orders_all_status",
+        }
+
+    canceled_ids = set(
+        orders_all_status.loc[
+            orders_all_status["order_status"].astype(str).str.strip().str.lower().eq("canceled"),
+            "amazon_order_id",
+        ]
+        .astype(str)
+        .str.strip()
+        .tolist()
+    )
+    if not canceled_ids:
+        return {
+            "ready": True,
+            "rows": 0,
+            "units": 0,
+            "sample": [],
+            "details": pd.DataFrame(columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]),
+            "notes": "no_canceled_orders",
+        }
+
+    demand_keys: set[str] = set()
+    if not order_master.empty and {"Order ID", "SKU"}.issubset(set(order_master.columns)):
+        qty = pd.to_numeric(order_master.get("Quantity Ordered", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
+        lvl = order_master.get("lvl", pd.Series([], dtype=str)).astype(str).str.strip()
+        active = qty.gt(0) & lvl.ne("0")
+        demand_keys = set(
+            (
+                order_master.loc[active, "Order ID"].astype(str).str.strip()
+                + "||"
+                + order_master.loc[active, "SKU"].astype(str).str.strip()
+            ).tolist()
+        )
+
+    alloc = token_allocations.copy()
+    alloc["order_id"] = alloc["order_id"].astype(str).str.strip()
+    alloc["seller_sku"] = alloc["seller_sku"].astype(str).str.strip()
+    alloc["quantity_num"] = pd.to_numeric(alloc["quantity"], errors="coerce").fillna(1).clip(lower=0)
+    alloc_key = alloc["order_id"] + "||" + alloc["seller_sku"]
+    candidate = alloc[alloc["order_id"].isin(canceled_ids) & ~alloc_key.isin(demand_keys)].copy()
+    if candidate.empty:
+        return {
+            "ready": True,
+            "rows": 0,
+            "units": 0,
+            "sample": [],
+            "details": pd.DataFrame(columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]),
+            "notes": "none",
+        }
+
+    candidate["order_status"] = "Canceled"
+    details = candidate[["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]].copy()
+    sample = (
+        details.assign(_qty_num=candidate["quantity_num"])
+        .head(5)
+        .apply(lambda r: f"{r['order_id']}|{r['seller_sku']}|{int(float(r['_qty_num']))}", axis=1)
+        .tolist()
+    )
+    return {
+        "ready": True,
+        "rows": int(len(details)),
+        "units": int(candidate["quantity_num"].sum()),
+        "sample": sample,
+        "details": details,
+        "notes": "canceled_allocations_detected",
+    }
 
 
 def _load_parked_sku_reasons(path: Path = PARKED_SKUS_PATH) -> Dict[str, str]:
@@ -365,30 +887,128 @@ def _first_existing_path(paths: List[Path]) -> Path | None:
 
 
 def _pid_alive(pid: int) -> bool:
-    pid_int = int(pid)
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            open_process = kernel32.OpenProcess
+            open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            open_process.restype = wintypes.HANDLE
+            close_handle = kernel32.CloseHandle
+            close_handle.argtypes = [wintypes.HANDLE]
+            close_handle.restype = wintypes.BOOL
+            get_exit_code = kernel32.GetExitCodeProcess
+            get_exit_code.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            get_exit_code.restype = wintypes.BOOL
+
+            handle = open_process(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            if handle:
+                try:
+                    exit_code = wintypes.DWORD(0)
+                    if bool(get_exit_code(handle, ctypes.byref(exit_code))):
+                        return int(exit_code.value) == STILL_ACTIVE
+                    return True
+                finally:
+                    close_handle(handle)
+            last_error = ctypes.get_last_error()
+            if int(last_error or 0) == 5:
+                return True
+        except Exception:
+            pass
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            out = f"{result.stdout or ''}\n{result.stderr or ''}".strip().lower()
+            if not out:
+                return False
+            if "no tasks are running" in out:
+                return False
+            return f"\"{int(pid)}\"" in out or str(int(pid)) in out
+        except Exception:
+            return False
     try:
-        os.kill(pid_int, 0)
+        os.kill(int(pid), 0)
         return True
     except PermissionError:
         # Process exists but signal probe is not permitted on this platform/user.
         return True
     except Exception:
-        pass
+        return False
+
+
+def _a016_refresh_running_pids() -> List[int]:
+    pids: List[int] = []
     if os.name == "nt":
         try:
-            result = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid_int}", "/FO", "CSV", "/NH"],
+            probe = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    (
+                        "Get-CimInstance Win32_Process | "
+                        "Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*A016_refresh_phase1_daily_intel.py*' } | "
+                        "Select-Object -ExpandProperty ProcessId"
+                    ),
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=15,
             )
-            out = (result.stdout or "").strip().lower()
-            if "no tasks are running" in out:
-                return False
-            return str(pid_int) in out
+            for raw in (probe.stdout or "").splitlines():
+                text = str(raw or "").strip()
+                if not text:
+                    continue
+                try:
+                    pid = int(text)
+                except Exception:
+                    continue
+                if pid > 0:
+                    pids.append(pid)
         except Exception:
-            return False
-    return False
+            return []
+    else:
+        try:
+            probe = subprocess.run(
+                ["pgrep", "-f", "A016_refresh_phase1_daily_intel.py"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+            for raw in (probe.stdout or "").splitlines():
+                text = str(raw or "").strip()
+                if not text:
+                    continue
+                try:
+                    pid = int(text)
+                except Exception:
+                    continue
+                if pid > 0:
+                    pids.append(pid)
+        except Exception:
+            return []
+    unique: List[int] = []
+    seen: set[int] = set()
+    for pid in pids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        unique.append(pid)
+    return unique
+
+
+def _a016_refresh_is_running() -> bool:
+    return len(_a016_refresh_running_pids()) > 0
 
 
 def _parse_lock_pid(payload: str) -> int | None:
@@ -545,6 +1165,8 @@ def _cycle_for_check(check: str) -> str:
         return "C"
     if name.startswith("f_"):
         return "F"
+    if name.startswith("o_"):
+        return "O"
     if name.startswith("z_"):
         return "Z"
     b_prefixes = (
@@ -577,12 +1199,12 @@ def _write_cycle_alert_files(df_out: pd.DataFrame) -> None:
     # canonical full snapshot in cycle folder
     df_all.to_csv(CYCLE_ALERT_DIR / "checklist_all.csv", index=False)
 
-    for cycle in ["A", "B", "H", "E", "C", "F", "Z", "shared"]:
+    for cycle in ["A", "B", "H", "E", "C", "F", "O", "Z", "shared"]:
         scoped = df_all[df_all["cycle"] == cycle].copy()
-        scoped.to_csv(CYCLE_ALERT_DIR / f"checklist_{cycle}.csv", index=False)
+        _write_health_checklist_csv(scoped, CYCLE_ALERT_DIR / f"checklist_{cycle}.csv")
 
     summary_rows: List[Dict[str, str]] = []
-    for cycle in ["all", "A", "B", "H", "E", "C", "F", "Z", "shared"]:
+    for cycle in ["all", "A", "B", "H", "E", "C", "F", "O", "Z", "shared"]:
         scoped = df_all if cycle == "all" else df_all[df_all["cycle"] == cycle]
         status = scoped.get("status", pd.Series(dtype=str)).astype(str).str.lower()
         fail_count = int(status.eq("fail").sum())
@@ -613,7 +1235,7 @@ def _default_checklist_for_profile(profile: str) -> Path:
     if profile == "e":
         return CHECKLIST_E_SPLIT_CSV
     if profile == "h":
-        return CHECKLIST_H_SPLIT_CSV
+        return CHECKLIST_H_GATE_CSV
     return CHECKLIST_CSV
 
 
@@ -627,6 +1249,18 @@ def _default_alert_state_for_profile(profile: str) -> Path:
     if profile == "h":
         return ALERT_STATE_H_CSV
     return ALERT_STATE_CSV
+
+
+def _default_alert_history_for_profile(profile: str) -> Path:
+    if profile == "a":
+        return ALERT_HISTORY_A_CSV
+    if profile == "b":
+        return ALERT_HISTORY_B_CSV
+    if profile == "e":
+        return ALERT_HISTORY_E_CSV
+    if profile == "h":
+        return ALERT_HISTORY_H_CSV
+    return ALERT_HISTORY_CSV
 
 
 def _default_health_status_for_profile(profile: str) -> Path:
@@ -685,6 +1319,11 @@ def _build_arg_parser(*, add_help: bool = True) -> argparse.ArgumentParser:
         help="Optional output path override for alert aging state CSV.",
     )
     parser.add_argument(
+        "--alert-history-path",
+        default="",
+        help="Optional output path override for alert lifecycle history CSV.",
+    )
+    parser.add_argument(
         "--health-status-path",
         default="",
         help="Optional output path override for health status CSV.",
@@ -708,13 +1347,25 @@ def _parse_cli_args(argv: List[str] | None = None, *, strict: bool = True) -> ar
 def _resolve_runtime_paths(args: argparse.Namespace) -> dict:
     profile = _normalize_profile(getattr(args, "profile", "global"))
     checklist_path = Path(getattr(args, "checklist_path", "") or _default_checklist_for_profile(profile))
-    alert_state_path = Path(getattr(args, "alert_state_path", "") or _default_alert_state_for_profile(profile))
+    alert_state_override = str(getattr(args, "alert_state_path", "") or "").strip()
+    alert_state_path = Path(alert_state_override or _default_alert_state_for_profile(profile))
+    alert_history_override = str(getattr(args, "alert_history_path", "") or "").strip()
+    if alert_history_override:
+        alert_history_path = Path(alert_history_override)
+    elif alert_state_override:
+        history_name = alert_state_path.name.replace("alert_state", "alert_history")
+        if history_name == alert_state_path.name:
+            history_name = f"{alert_state_path.stem}.history{alert_state_path.suffix}"
+        alert_history_path = alert_state_path.with_name(history_name)
+    else:
+        alert_history_path = _default_alert_history_for_profile(profile)
     health_status_path = Path(getattr(args, "health_status_path", "") or _default_health_status_for_profile(profile))
     no_toast = bool(getattr(args, "no_toast", False))
     return {
         "profile": profile,
         "checklist_path": checklist_path,
         "alert_state_path": alert_state_path,
+        "alert_history_path": alert_history_path,
         "health_status_path": health_status_path,
         "no_toast": no_toast,
     }
@@ -735,6 +1386,58 @@ def _schema_check(rows: List[Dict[str, str]], name: str, path: Path, required_co
         _add(rows, name, "fail" if not optional else "warn", "missing_cols", ",".join(missing))
     else:
         _add(rows, name, "ok", "ok", "")
+
+
+def _cycle_failure_ledger_schema_check(rows: List[Dict[str, str]], path: Path = CYCLE_FAILURE_EVENTS_PATH) -> None:
+    ok, reason = validate_cycle_failure_events_schema(path)
+    status = "ok" if ok else "fail"
+    value = "ok" if ok else "invalid"
+    required = ",".join(FAILURE_EVENT_COLUMNS)
+    _add(rows, "shared_cycle_failure_ledger_schema", status, value, f"path {path};reason={reason};required={required}")
+
+
+def _required_non_blank_check(
+    rows: List[Dict[str, str]],
+    name: str,
+    path: Path,
+    required_cols: List[str],
+    *,
+    optional: bool = False,
+) -> None:
+    if not path.exists():
+        status = "warn" if optional else "fail"
+        _add(rows, name, status, "missing", f"path {path}")
+        return
+    try:
+        df = pd.read_csv(path, dtype=str).fillna("")
+    except Exception as exc:
+        _add(rows, name, "fail", "read_error", str(exc))
+        return
+    if df.empty:
+        status = "warn" if optional else "ok"
+        _add(rows, name, status, "0", "empty")
+        return
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        _add(rows, name, "fail" if not optional else "warn", "missing_cols", ",".join(missing))
+        return
+    blank_counts: List[str] = []
+    bad_total = 0
+    for col in required_cols:
+        blanks = int(df[col].astype(str).str.strip().eq("").sum())
+        if blanks > 0:
+            blank_counts.append(f"{col}:{blanks}")
+            bad_total += blanks
+    if bad_total > 0:
+        _add(
+            rows,
+            name,
+            "fail" if not optional else "warn",
+            str(bad_total),
+            "blank_required=" + ",".join(blank_counts),
+        )
+        return
+    _add(rows, name, "ok", "0", "")
 
 
 def _phase1_contract_checks(rows: List[Dict[str, str]], path: Path) -> None:
@@ -933,18 +1636,53 @@ def _read_last_health_status(path: Path = HEALTH_STATUS_CSV) -> str:
     return str(df.iloc[-1]["status"]).strip().upper()
 
 
+ALERT_STATE_COLUMNS = ["check", "status", "first_seen_utc", "last_seen_utc", "consecutive_runs"]
+ALERT_HISTORY_COLUMNS = [
+    "event_utc",
+    "event_type",
+    "check",
+    "status",
+    "instance_first_seen_utc",
+    "instance_last_seen_utc",
+    "consecutive_runs",
+    "cleared_by_status",
+    "clear_reason",
+    "evidence_source",
+    "evidence_utc",
+    "profile",
+]
+
+
 def _read_alert_state(path: Path) -> pd.DataFrame:
-    cols = ["check", "status", "first_seen_utc", "last_seen_utc", "consecutive_runs"]
     if not path.exists():
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=ALERT_STATE_COLUMNS)
     try:
         df = pd.read_csv(path, dtype=str).fillna("")
     except Exception:
-        return pd.DataFrame(columns=cols)
-    for col in cols:
+        return pd.DataFrame(columns=ALERT_STATE_COLUMNS)
+    for col in ALERT_STATE_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-    return df[cols]
+    return df[ALERT_STATE_COLUMNS]
+
+
+def _append_alert_history(path: Path, rows: List[Dict[str, str]]) -> None:
+    if not rows:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df_new = pd.DataFrame(rows, columns=ALERT_HISTORY_COLUMNS)
+    if not path.exists():
+        df_new.to_csv(path, index=False)
+        return
+    try:
+        existing = pd.read_csv(path, dtype=str).fillna("")
+    except Exception:
+        existing = pd.DataFrame(columns=ALERT_HISTORY_COLUMNS)
+    for col in ALERT_HISTORY_COLUMNS:
+        if col not in existing.columns:
+            existing[col] = ""
+    merged = pd.concat([existing[ALERT_HISTORY_COLUMNS], df_new], ignore_index=True)
+    merged.to_csv(path, index=False)
 
 
 def _apply_alert_aging(
@@ -952,6 +1690,7 @@ def _apply_alert_aging(
     state_path: Path,
     now_utc: datetime,
     *,
+    history_path: Path | None = None,
     recompute_source: str = "",
     profile: str = "global",
 ) -> pd.DataFrame:
@@ -971,7 +1710,16 @@ def _apply_alert_aging(
     streak_vals: List[str] = []
     age_hours_vals: List[str] = []
     next_state_rows: List[Dict[str, str]] = []
+    history_rows: List[Dict[str, str]] = []
+    opened_keys: set[str] = set()
     now_iso = now_utc.isoformat()
+    evidence_source = recompute_source or "current_checklist"
+    latest_status_by_check: Dict[str, str] = {}
+    for _, row in df_out.iterrows():
+        check_name = str(row.get("check", "")).strip()
+        if not check_name:
+            continue
+        latest_status_by_check[check_name] = str(row.get("status", "")).strip().lower()
 
     for _, row in df_out.iterrows():
         check = str(row.get("check", "")).strip()
@@ -995,9 +1743,11 @@ def _apply_alert_aging(
         if prev_status == status and prev_first:
             first_seen = prev_first
             streak = prev_streak + 1 if prev_streak > 0 else 1
+            opened_new_instance = False
         else:
             first_seen = now_iso
             streak = 1
+            opened_new_instance = True
 
         age_hours = ""
         try:
@@ -1021,27 +1771,87 @@ def _apply_alert_aging(
                 "consecutive_runs": str(streak),
             }
         )
+        if opened_new_instance:
+            opened_keys.add(check)
+            if prev_status in {"fail", "warn"} and prev_first and prev_status != status:
+                history_rows.append(
+                    {
+                        "event_utc": now_iso,
+                        "event_type": "cleared",
+                        "check": check,
+                        "status": prev_status,
+                        "instance_first_seen_utc": prev_first,
+                        "instance_last_seen_utc": str(prev_row.get("last_seen_utc", "")).strip() or now_iso,
+                        "consecutive_runs": str(prev_row.get("consecutive_runs", "")).strip(),
+                        "cleared_by_status": status,
+                        "clear_reason": "status_transition",
+                        "evidence_source": evidence_source,
+                        "evidence_utc": now_iso,
+                        "profile": profile,
+                    }
+                )
+            history_rows.append(
+                {
+                    "event_utc": now_iso,
+                    "event_type": "opened",
+                    "check": check,
+                    "status": status,
+                    "instance_first_seen_utc": first_seen,
+                    "instance_last_seen_utc": now_iso,
+                    "consecutive_runs": str(streak),
+                    "cleared_by_status": "",
+                    "clear_reason": "",
+                    "evidence_source": evidence_source,
+                    "evidence_utc": now_iso,
+                    "profile": profile,
+                }
+            )
 
     df_out = df_out.copy()
     df_out["alert_first_seen_utc"] = first_seen_vals
     df_out["alert_last_seen_utc"] = last_seen_vals
     df_out["alert_consecutive_runs"] = streak_vals
     df_out["alert_age_hours"] = age_hours_vals
-    pd.DataFrame(next_state_rows, columns=["check", "status", "first_seen_utc", "last_seen_utc", "consecutive_runs"]).to_csv(
-        state_path, index=False
-    )
+    pd.DataFrame(next_state_rows, columns=ALERT_STATE_COLUMNS).to_csv(state_path, index=False)
     prev_active_keys = {k for k, v in prev_map.items() if str(v.get("status", "")).strip().lower() in {"fail", "warn"}}
     current_active_keys = {str(r.get("check", "")).strip() for r in next_state_rows}
     carried_keys = prev_active_keys.intersection(current_active_keys)
     cleared_keys = prev_active_keys.difference(current_active_keys)
+    for check in sorted(cleared_keys):
+        prev_row = prev_map.get(check, {})
+        prev_status = str(prev_row.get("status", "")).strip().lower()
+        prev_first = str(prev_row.get("first_seen_utc", "")).strip()
+        if prev_status not in {"fail", "warn"} or not prev_first:
+            continue
+        cleared_by_status = latest_status_by_check.get(check, "") or "missing"
+        history_rows.append(
+            {
+                "event_utc": now_iso,
+                "event_type": "cleared",
+                "check": check,
+                "status": prev_status,
+                "instance_first_seen_utc": prev_first,
+                "instance_last_seen_utc": str(prev_row.get("last_seen_utc", "")).strip() or now_iso,
+                "consecutive_runs": str(prev_row.get("consecutive_runs", "")).strip(),
+                "cleared_by_status": cleared_by_status,
+                "clear_reason": "contradicted_by_newer_healthy_evidence",
+                "evidence_source": evidence_source,
+                "evidence_utc": now_iso,
+                "profile": profile,
+            }
+        )
+    if history_path is not None:
+        _append_alert_history(history_path, history_rows)
     print(
         "[health_check] alert_state_reconcile "
         f"profile={profile} "
         f"keys_total={len(df_out.index)} "
+        f"opened_warn_fail={len(opened_keys)} "
         f"carried_warn_fail={len(carried_keys)} "
         f"cleared_to_ok={len(cleared_keys)} "
         f"recomputed_from={recompute_source or 'current_checklist'} "
         f"state_path={state_path} "
+        f"history_path={history_path or ''} "
         f"ts={now_iso} "
         f"cleared_sample={','.join(sorted(list(cleared_keys))[:5])}"
     )
@@ -1122,6 +1932,1072 @@ def _safe_float(value: object) -> float | None:
         return out
     except Exception:
         return None
+
+
+def _o_net_fee_text(value: object) -> str:
+    text = str(value or "").strip()
+    if text.lower() in {"nan", "none", "nat"}:
+        return ""
+    return text
+
+
+def _o_net_fee_truthy(value: object) -> bool:
+    return _o_net_fee_text(value).lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _o_net_fee_sku_key(value: object) -> str:
+    return _o_net_fee_text(value).upper()
+
+
+def _o_net_fee_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if df.empty or column not in df.columns:
+        return pd.Series([""] * len(df.index), index=df.index, dtype=str)
+    return df[column].fillna("").astype(str).map(_o_net_fee_text)
+
+
+def _read_o_net_fee_csv(path: Path) -> Tuple[pd.DataFrame, str, str]:
+    if not path.exists():
+        return pd.DataFrame(), "missing", f"path={path}"
+    try:
+        df = pd.read_csv(path, dtype=str).fillna("")
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame(), "empty", f"path={path};empty_file=1"
+    except Exception as exc:
+        return pd.DataFrame(), "read_error", f"path={path};error={exc.__class__.__name__}:{exc}"
+    if df.empty:
+        return df, "empty", f"path={path};rows=0"
+    return df, "ok", f"path={path};rows={len(df.index)}"
+
+
+def _o_net_fee_field_errors(row: pd.Series, required_fields: Tuple[str, ...]) -> List[str]:
+    errors: List[str] = []
+    for field in required_fields:
+        value = _o_net_fee_text(row.get(field, ""))
+        if value == "":
+            errors.append(field)
+            continue
+        if field in O_NET_FEE_NUMERIC_FIELDS:
+            parsed = _safe_float(value)
+            if parsed is None:
+                errors.append(f"{field}:invalid")
+            elif field in O_NET_FEE_POSITIVE_FIELDS and parsed <= 0:
+                errors.append(f"{field}:nonpositive")
+    return errors
+
+
+def _o_net_fee_rows_by_sku(df: pd.DataFrame) -> Dict[str, pd.Series]:
+    if df.empty or "seller_sku" not in df.columns:
+        return {}
+    out: Dict[str, pd.Series] = {}
+    for _, row in df.iterrows():
+        sku_key = _o_net_fee_sku_key(row.get("seller_sku", ""))
+        if sku_key:
+            out[sku_key] = row
+    return out
+
+
+def _o_net_fee_action_mask(df: pd.DataFrame, *, flag_column: str, action_column: str) -> pd.Series:
+    if df.empty:
+        return pd.Series([], dtype=bool)
+    if flag_column in df.columns:
+        return _o_net_fee_series(df, flag_column).map(_o_net_fee_truthy).astype(bool)
+    if action_column in df.columns:
+        return _o_net_fee_series(df, action_column).str.lower().isin(O_NET_FEE_ACTION_STATUSES)
+    return pd.Series([False] * len(df.index), index=df.index, dtype=bool)
+
+
+def _o_net_fee_collect_action_skus(
+    coverage_df: pd.DataFrame,
+    recommendation_df: pd.DataFrame,
+) -> Tuple[set[str], pd.DataFrame, pd.DataFrame, int]:
+    action_skus: set[str] = set()
+    missing_sku_rows = 0
+
+    coverage_action = coverage_df.iloc[0:0].copy()
+    if not coverage_df.empty:
+        coverage_mask = _o_net_fee_action_mask(
+            coverage_df,
+            flag_column="action_ready_now",
+            action_column="suggested_action",
+        )
+        coverage_action = coverage_df.loc[coverage_mask].copy()
+        for _, row in coverage_action.iterrows():
+            sku_key = _o_net_fee_sku_key(row.get("seller_sku", ""))
+            if sku_key:
+                action_skus.add(sku_key)
+            else:
+                missing_sku_rows += 1
+
+    recommendation_action = recommendation_df.iloc[0:0].copy()
+    if not recommendation_df.empty:
+        rec_mask = _o_net_fee_action_mask(
+            recommendation_df,
+            flag_column="",
+            action_column="recommendation_status",
+        )
+        recommendation_action = recommendation_df.loc[rec_mask].copy()
+        for _, row in recommendation_action.iterrows():
+            sku_key = _o_net_fee_sku_key(row.get("seller_sku", ""))
+            if sku_key:
+                action_skus.add(sku_key)
+            else:
+                missing_sku_rows += 1
+
+    return action_skus, coverage_action, recommendation_action, missing_sku_rows
+
+
+def _o_net_fee_bad_status(row: pd.Series) -> bool:
+    return _o_net_fee_text(row.get("net_fee_model_status", "")).lower() != "fresh"
+
+
+def _o_net_fee_bad_age(row: pd.Series, max_age_hours: float) -> bool:
+    age = _safe_float(row.get("net_fee_model_age_hours", ""))
+    return age is None or age > max_age_hours
+
+
+def _o_net_fee_first_float(row: pd.Series, fallback_row: pd.Series | None, fields: Tuple[str, ...]) -> float | None:
+    for source_row in (row, fallback_row):
+        if source_row is None:
+            continue
+        for field in fields:
+            parsed = _safe_float(source_row.get(field, ""))
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _o_net_fee_first_text(row: pd.Series, fallback_row: pd.Series | None, fields: Tuple[str, ...]) -> str:
+    for source_row in (row, fallback_row):
+        if source_row is None:
+            continue
+        for field in fields:
+            text = _o_net_fee_text(source_row.get(field, ""))
+            if text:
+                return text
+    return ""
+
+
+def _o_net_fee_roi_compare_applicable(row: pd.Series, fallback_row: pd.Series | None) -> bool:
+    status = _o_net_fee_first_text(row, fallback_row, ("net_fee_model_status",)).lower()
+    current_cost = _o_net_fee_first_float(
+        row,
+        fallback_row,
+        ("expected_sell_pack_cost_gbp", "current_supplier_buy_cost_gbp"),
+    )
+    market_price = _o_net_fee_first_float(row, fallback_row, ("market_price_gbp",))
+    market_price_ex_vat = _o_net_fee_first_float(row, fallback_row, ("market_price_ex_vat_gbp",))
+    return (
+        status == "fresh"
+        and current_cost is not None
+        and current_cost > 0
+        and market_price is not None
+        and market_price > 0
+        and market_price_ex_vat is not None
+        and market_price_ex_vat > 0
+    )
+
+
+def _o_net_fee_bridge_stats(
+    source_path: Path = O_RESTOCK_SOURCE_VIEW_PATH,
+    recommendations_path: Path = O_RESTOCK_RECOMMENDATIONS_PATH,
+    coverage_path: Path = O_REORDER_INPUT_COVERAGE_PATH,
+    *,
+    max_age_hours: float | None = None,
+    roi_tolerance_pct: float | None = None,
+    fee_drag_tolerance_gbp: float | None = None,
+) -> Dict[str, object]:
+    max_age = (
+        max_age_hours
+        if max_age_hours is not None
+        else float(os.environ.get("O_NET_FEE_MAX_AGE_HOURS", "48") or "48")
+    )
+    roi_tolerance = (
+        roi_tolerance_pct
+        if roi_tolerance_pct is not None
+        else float(os.environ.get("O_NET_FEE_ROI_TOLERANCE_PCT", "0.01") or "0.01")
+    )
+    fee_drag_tolerance = (
+        fee_drag_tolerance_gbp
+        if fee_drag_tolerance_gbp is not None
+        else float(os.environ.get("O_NET_FEE_DRAG_TOLERANCE_GBP", "0.0001") or "0.0001")
+    )
+
+    source_df, source_state, source_note = _read_o_net_fee_csv(source_path)
+    rec_df, rec_state, rec_note = _read_o_net_fee_csv(recommendations_path)
+    coverage_df, coverage_state, coverage_note = _read_o_net_fee_csv(coverage_path)
+    read_states = {
+        "source": source_state,
+        "recommendations": rec_state,
+        "coverage": coverage_state,
+    }
+    read_notes = {
+        "source": source_note,
+        "recommendations": rec_note,
+        "coverage": coverage_note,
+    }
+
+    source_by_sku = _o_net_fee_rows_by_sku(source_df)
+    rec_by_sku = _o_net_fee_rows_by_sku(rec_df)
+    action_skus, coverage_action, recommendation_action, missing_sku_rows = _o_net_fee_collect_action_skus(
+        coverage_df,
+        rec_df,
+    )
+
+    missing_action_source_rows = 0
+    missing_action_recommendation_rows = 0
+    missing_net_field_rows = 0
+    bad_status_rows = 0
+    stale_age_rows = 0
+    issue_samples: List[str] = []
+
+    def remember(sample: str) -> None:
+        if len(issue_samples) < 8:
+            issue_samples.append(sample)
+
+    for sku_key in sorted(action_skus):
+        source_row = source_by_sku.get(sku_key)
+        if source_row is None:
+            missing_action_source_rows += 1
+            remember(f"{sku_key}:missing_source_row")
+        else:
+            field_errors = _o_net_fee_field_errors(source_row, O_NET_FEE_SOURCE_REQUIRED_FIELDS)
+            if field_errors:
+                missing_net_field_rows += 1
+                remember(f"{sku_key}:source_fields={','.join(field_errors[:4])}")
+            if _o_net_fee_bad_status(source_row):
+                bad_status_rows += 1
+                remember(f"{sku_key}:source_status={_o_net_fee_text(source_row.get('net_fee_model_status', '')) or 'blank'}")
+            if _o_net_fee_bad_age(source_row, max_age):
+                stale_age_rows += 1
+                remember(f"{sku_key}:source_age={_o_net_fee_text(source_row.get('net_fee_model_age_hours', '')) or 'blank'}")
+
+        rec_row = rec_by_sku.get(sku_key)
+        if rec_row is None:
+            missing_action_recommendation_rows += 1
+            remember(f"{sku_key}:missing_recommendation_row")
+        else:
+            field_errors = _o_net_fee_field_errors(rec_row, O_NET_FEE_RECOMMENDATION_REQUIRED_FIELDS)
+            if field_errors:
+                missing_net_field_rows += 1
+                remember(f"{sku_key}:recommendation_fields={','.join(field_errors[:4])}")
+            if _o_net_fee_bad_status(rec_row):
+                bad_status_rows += 1
+                remember(f"{sku_key}:recommendation_status={_o_net_fee_text(rec_row.get('net_fee_model_status', '')) or 'blank'}")
+            if _o_net_fee_bad_age(rec_row, max_age):
+                stale_age_rows += 1
+                remember(f"{sku_key}:recommendation_age={_o_net_fee_text(rec_row.get('net_fee_model_age_hours', '')) or 'blank'}")
+
+    if not coverage_action.empty:
+        for _, row in coverage_action.iterrows():
+            sku_key = _o_net_fee_sku_key(row.get("seller_sku", "")) or "blank_sku"
+            field_errors = _o_net_fee_field_errors(row, O_NET_FEE_COVERAGE_REQUIRED_FIELDS)
+            if field_errors:
+                missing_net_field_rows += 1
+                remember(f"{sku_key}:coverage_fields={','.join(field_errors[:4])}")
+            if _o_net_fee_bad_status(row):
+                bad_status_rows += 1
+                remember(f"{sku_key}:coverage_status={_o_net_fee_text(row.get('net_fee_model_status', '')) or 'blank'}")
+            if _o_net_fee_bad_age(row, max_age):
+                stale_age_rows += 1
+                remember(f"{sku_key}:coverage_age={_o_net_fee_text(row.get('net_fee_model_age_hours', '')) or 'blank'}")
+
+    fee_drag_rows = 0
+    equal_net_gross_roi_rows = 0
+    roi_compare_missing_rows = 0
+    roi_compare_not_applicable_rows = 0
+    if not rec_df.empty:
+        for _, row in rec_df.iterrows():
+            sku_key = _o_net_fee_sku_key(row.get("seller_sku", ""))
+            source_row = source_by_sku.get(sku_key) if sku_key else None
+            drag = _safe_float(row.get("net_fee_drag_per_unit_gbp", ""))
+            if drag is None and source_row is not None:
+                drag = _safe_float(source_row.get("net_fee_drag_per_unit_gbp", ""))
+            if drag is None or abs(drag) <= fee_drag_tolerance:
+                continue
+            fee_drag_rows += 1
+            net_roi = _safe_float(row.get("forward_roi_pct", ""))
+            gross_roi = _safe_float(row.get("gross_forward_roi_pct", ""))
+            if net_roi is None or gross_roi is None:
+                if not _o_net_fee_roi_compare_applicable(row, source_row):
+                    roi_compare_not_applicable_rows += 1
+                    continue
+                roi_compare_missing_rows += 1
+                remember(f"{sku_key or 'blank_sku'}:roi_compare_missing")
+                continue
+            if abs(net_roi - gross_roi) <= roi_tolerance:
+                equal_net_gross_roi_rows += 1
+                remember(f"{sku_key or 'blank_sku'}:net_roi_equals_gross_roi")
+
+    hard_fail_count = (
+        missing_sku_rows
+        + missing_action_source_rows
+        + missing_action_recommendation_rows
+        + missing_net_field_rows
+        + bad_status_rows
+        + stale_age_rows
+        + equal_net_gross_roi_rows
+    )
+    missing_or_error_files = [name for name, state in read_states.items() if state in {"missing", "read_error"}]
+    empty_files = [name for name, state in read_states.items() if state == "empty"]
+
+    status = "ok"
+    value = str(len(action_skus))
+    if hard_fail_count > 0:
+        status = "fail"
+        value = str(hard_fail_count)
+    elif roi_compare_missing_rows > 0 and fee_drag_rows > 0:
+        status = "warn"
+        value = "roi_compare_missing"
+    elif missing_or_error_files:
+        status = "warn"
+        value = "missing_live_output"
+    elif len(empty_files) == len(read_states):
+        value = "empty_outputs"
+    elif len(action_skus) == 0:
+        value = "no_action_ready"
+
+    notes = (
+        f"source={source_path};recommendations={recommendations_path};coverage={coverage_path};"
+        f"source_rows={len(source_df.index)};recommendation_rows={len(rec_df.index)};coverage_rows={len(coverage_df.index)};"
+        f"coverage_action_ready_rows={len(coverage_action.index)};buy_recommendation_rows={len(recommendation_action.index)};"
+        f"action_skus={len(action_skus)};max_age_hours={max_age:.2f};"
+        f"missing_sku_rows={missing_sku_rows};missing_action_source_rows={missing_action_source_rows};"
+        f"missing_action_recommendation_rows={missing_action_recommendation_rows};"
+        f"missing_net_field_rows={missing_net_field_rows};bad_status_rows={bad_status_rows};"
+        f"stale_age_rows={stale_age_rows};fee_drag_rows={fee_drag_rows};"
+        f"equal_net_gross_roi_rows={equal_net_gross_roi_rows};roi_compare_missing_rows={roi_compare_missing_rows};"
+        f"roi_compare_not_applicable_rows={roi_compare_not_applicable_rows};"
+        f"read_states={','.join([f'{k}:{v}' for k, v in read_states.items()])};"
+        f"read_notes={'|'.join(read_notes.values())};sample={','.join(issue_samples)}"
+    )
+    return {
+        "status": status,
+        "value": value,
+        "notes": notes,
+        "action_skus": len(action_skus),
+        "coverage_action_ready_rows": len(coverage_action.index),
+        "buy_recommendation_rows": len(recommendation_action.index),
+        "hard_fail_count": hard_fail_count,
+        "missing_net_field_rows": missing_net_field_rows,
+        "bad_status_rows": bad_status_rows,
+        "stale_age_rows": stale_age_rows,
+        "equal_net_gross_roi_rows": equal_net_gross_roi_rows,
+        "roi_compare_missing_rows": roi_compare_missing_rows,
+        "roi_compare_not_applicable_rows": roi_compare_not_applicable_rows,
+        "read_states": read_states,
+    }
+
+
+def _o_net_fee_bridge_check(
+    rows: List[Dict[str, str]],
+    source_path: Path = O_RESTOCK_SOURCE_VIEW_PATH,
+    recommendations_path: Path = O_RESTOCK_RECOMMENDATIONS_PATH,
+    coverage_path: Path = O_REORDER_INPUT_COVERAGE_PATH,
+) -> None:
+    stats = _o_net_fee_bridge_stats(
+        source_path=source_path,
+        recommendations_path=recommendations_path,
+        coverage_path=coverage_path,
+    )
+    _add(
+        rows,
+        "o_net_fee_bridge_health",
+        str(stats.get("status", "warn") or "warn"),
+        str(stats.get("value", "unknown") or "unknown"),
+        str(stats.get("notes", "") or ""),
+    )
+
+
+def _inventory_scope_skus(path: Path = MERCHANT_LISTINGS_PATH) -> set[str]:
+    if not path.exists():
+        return set()
+    try:
+        scope = _read_csv(path)
+    except Exception:
+        return set()
+    if scope.empty:
+        return set()
+    skus: set[str] = set()
+    for col in ("seller_sku", "seller-sku", "sku", "SKU"):
+        if col not in scope.columns:
+            continue
+        vals = scope[col].astype(str).str.strip().str.upper()
+        skus.update([v for v in vals.tolist() if v])
+    return skus
+
+
+def _a_inventory_stale_token_gap_stats(
+    inventory: pd.DataFrame,
+    token_ledger: pd.DataFrame,
+    *,
+    scope_skus: set[str] | None = None,
+    now_utc: datetime | None = None,
+) -> Dict[str, object]:
+    stats: Dict[str, object] = {
+        "status": "warn",
+        "reason": "not_checked",
+        "row_stale_hours": 24.0,
+        "scope_rows": 0,
+        "stale_scope_rows": 0,
+        "unresolved_gap_rows": 0,
+        "unresolved_available_gap_rows": 0,
+        "unresolved_total_gap_rows": 0,
+        "stale_scope_sample": [],
+        "unresolved_sample": [],
+    }
+    raw_stale_hours = os.environ.get("A003_STOCK_ROW_STALE_HOURS", os.environ.get("H_STOCK_ROW_STALE_HOURS", "24"))
+    try:
+        stats["row_stale_hours"] = max(float(str(raw_stale_hours).strip() or "24"), 0.0)
+    except Exception:
+        stats["row_stale_hours"] = 24.0
+    row_stale_hours = float(stats["row_stale_hours"])
+    probe_now = now_utc or datetime.now(timezone.utc)
+
+    if inventory is None or inventory.empty:
+        stats["reason"] = "missing_inventory"
+        return stats
+    if token_ledger is None or token_ledger.empty:
+        stats["reason"] = "missing_token_ledger"
+        return stats
+    if "seller_sku" not in token_ledger.columns or "status" not in token_ledger.columns:
+        stats["reason"] = "token_ledger_missing_cols"
+        return stats
+
+    token_work = token_ledger.copy()
+    token_work["sku_key"] = token_work["seller_sku"].astype(str).str.strip().str.upper()
+    token_work["status_key"] = token_work["status"].astype(str).str.strip().str.lower()
+    token_work = token_work.loc[token_work["sku_key"].ne("")].copy()
+    if token_work.empty:
+        stats["reason"] = "empty_token_skus"
+        return stats
+
+    token_available_rows = token_work.loc[token_work["status_key"].eq("available")]
+    token_available_by_sku = token_available_rows.groupby("sku_key", as_index=False).size()
+    token_available_map = {str(r["sku_key"]): int(r["size"]) for _, r in token_available_by_sku.iterrows()}
+    effective_statuses = {"available", "allocated", "unsellable", "research_pending", "returned_pending"}
+    token_effective_rows = token_work.loc[token_work["status_key"].isin(effective_statuses)]
+    token_effective_by_sku = token_effective_rows.groupby("sku_key", as_index=False).size()
+    token_effective_map = {str(r["sku_key"]): int(r["size"]) for _, r in token_effective_by_sku.iterrows()}
+
+    scope = {str(v).strip().upper() for v in (scope_skus or set()) if str(v).strip()}
+    work = inventory.copy()
+    if "seller_sku" not in work.columns and "sku" in work.columns:
+        work["seller_sku"] = work["sku"]
+    if "seller_sku" not in work.columns:
+        stats["reason"] = "inventory_missing_seller_sku"
+        return stats
+
+    stale_scope_sample: List[str] = []
+    unresolved_sample: List[str] = []
+    unresolved_gap_rows = 0
+    unresolved_available_gap_rows = 0
+    unresolved_total_gap_rows = 0
+    stale_scope_rows = 0
+    scope_rows = 0
+
+    for _, row in work.iterrows():
+        sku = str(row.get("seller_sku", "")).strip().upper()
+        if not sku:
+            continue
+        if scope and sku not in scope:
+            continue
+        scope_rows += 1
+
+        stale_flag_raw = str(row.get("row_last_updated_is_stale", "")).strip().lower()
+        stale_status_raw = str(row.get("row_last_updated_status", "")).strip().lower()
+        is_stale = False
+        if stale_flag_raw in {"1", "true", "yes", "y", "on"}:
+            is_stale = True
+        elif stale_flag_raw in {"0", "false", "no", "n", "off"}:
+            is_stale = False
+        elif stale_status_raw in {"stale", "unknown"}:
+            is_stale = True
+        elif stale_status_raw == "fresh":
+            is_stale = False
+        else:
+            age_hours = _safe_float(row.get("row_last_updated_age_hours", ""))
+            if age_hours is None:
+                updated = _to_dt(pd.Series([row.get("last_updated_time", "")])).iloc[0]
+                if pd.isna(updated):
+                    age_hours = None
+                else:
+                    age_hours = max((probe_now - updated.to_pydatetime()).total_seconds() / 3600.0, 0.0)
+            if age_hours is None:
+                is_stale = True
+            else:
+                is_stale = bool(age_hours >= row_stale_hours)
+        if not is_stale:
+            continue
+
+        stale_scope_rows += 1
+        if len(stale_scope_sample) < 5:
+            stale_scope_sample.append(sku)
+
+        inv_available = max(_safe_int(row.get("available", 0)), _safe_int(row.get("in_stock_supply_quantity", 0)))
+        inv_total = max(_safe_int(row.get("total_quantity", 0)), inv_available)
+        token_available = int(token_available_map.get(sku, 0))
+        token_total_effective = int(token_effective_map.get(sku, token_available))
+        available_gap = max(token_available - inv_available, 0)
+        total_gap = max(token_total_effective - inv_total, 0)
+        if available_gap > 0:
+            unresolved_available_gap_rows += 1
+        if total_gap > 0:
+            unresolved_total_gap_rows += 1
+        if available_gap > 0 or total_gap > 0:
+            unresolved_gap_rows += 1
+            if len(unresolved_sample) < 5:
+                unresolved_sample.append(
+                    f"{sku}:avail_gap={available_gap},total_gap={total_gap},inv_avail={inv_available},token_avail={token_available}"
+                )
+
+    stats.update(
+        {
+            "status": "fail" if unresolved_gap_rows > 0 else "ok",
+            "reason": "",
+            "scope_rows": int(scope_rows),
+            "stale_scope_rows": int(stale_scope_rows),
+            "unresolved_gap_rows": int(unresolved_gap_rows),
+            "unresolved_available_gap_rows": int(unresolved_available_gap_rows),
+            "unresolved_total_gap_rows": int(unresolved_total_gap_rows),
+            "stale_scope_sample": stale_scope_sample,
+            "unresolved_sample": unresolved_sample,
+        }
+    )
+    return stats
+
+
+def _e_sales_truth_roi_integrity_stats(path: Path) -> Dict[str, object]:
+    required = ["units_sold", "revenue_exvat_gbp", "profit_exvat_gbp", "missing_cogs_units"]
+    if not path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_file", "notes": f"path={path}"}
+    try:
+        df = _read_csv(path)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "read_error",
+            "notes": f"path={path};error={exc.__class__.__name__}:{exc}",
+        }
+    if df.empty:
+        return {"ready": False, "status": "warn", "reason": "empty_file", "notes": f"path={path}"}
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_cols",
+            "notes": f"path={path};missing_cols={','.join(missing)}",
+        }
+    units = pd.to_numeric(df["units_sold"], errors="coerce").fillna(0)
+    revenue = pd.to_numeric(df["revenue_exvat_gbp"], errors="coerce").fillna(0)
+    profit = pd.to_numeric(df["profit_exvat_gbp"], errors="coerce").fillna(0)
+    missing_cogs_units = pd.to_numeric(df["missing_cogs_units"], errors="coerce").fillna(0)
+    selling = units > 0
+    selling_rows = int(selling.sum())
+    zero_revenue_rows = int((selling & revenue.eq(0)).sum())
+    zero_profit_with_revenue_rows = int((selling & revenue.ne(0) & profit.eq(0)).sum())
+    missing_cogs_equals_units_rows = int((selling & missing_cogs_units.ge(units)).sum())
+    return {
+        "ready": True,
+        "selling_rows": selling_rows,
+        "zero_revenue_rows": zero_revenue_rows,
+        "zero_profit_with_revenue_rows": zero_profit_with_revenue_rows,
+        "missing_cogs_equals_units_rows": missing_cogs_equals_units_rows,
+        "notes": f"path={path};selling_rows={selling_rows}",
+    }
+
+
+def _e_sales_truth_reconciliation_stats(path: Path) -> Dict[str, object]:
+    required = ["confidence_status", "revenue_delta_gbp", "profit_delta_gbp"]
+    if not path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_file", "notes": f"path={path}"}
+    try:
+        df = _read_csv(path)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "read_error",
+            "notes": f"path={path};error={exc.__class__.__name__}:{exc}",
+        }
+    if df.empty:
+        return {"ready": False, "status": "warn", "reason": "empty_file", "notes": f"path={path}"}
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_cols",
+            "notes": f"path={path};missing_cols={','.join(missing)}",
+        }
+    status_col = df["confidence_status"].astype(str).str.strip().str.lower()
+    mismatch_rows = int(status_col.ne("match").sum())
+    total_rows = int(len(df.index))
+    mismatch_share = (mismatch_rows / total_rows) if total_rows > 0 else 0.0
+    revenue_delta_abs_sum = float(pd.to_numeric(df["revenue_delta_gbp"], errors="coerce").fillna(0).abs().sum())
+    profit_delta_abs_sum = float(pd.to_numeric(df["profit_delta_gbp"], errors="coerce").fillna(0).abs().sum())
+    fail_share = _safe_float(os.environ.get("E_SALES_TRUTH_RECON_FAIL_SHARE", "0.80"))
+    if fail_share is None or fail_share <= 0:
+        fail_share = 0.80
+    status = "ok"
+    if mismatch_rows > 0 and mismatch_share >= fail_share:
+        status = "fail"
+    elif mismatch_rows > 0:
+        status = "warn"
+    return {
+        "ready": True,
+        "status": status,
+        "mismatch_rows": mismatch_rows,
+        "total_rows": total_rows,
+        "mismatch_share": mismatch_share,
+        "revenue_delta_abs_sum": revenue_delta_abs_sum,
+        "profit_delta_abs_sum": profit_delta_abs_sum,
+        "notes": (
+            f"path={path};total_rows={total_rows};mismatch_rows={mismatch_rows};"
+            f"mismatch_share={mismatch_share:.4f};revenue_delta_abs_sum={revenue_delta_abs_sum:.2f};"
+            f"profit_delta_abs_sum={profit_delta_abs_sum:.2f};fail_share={fail_share:.2f}"
+        ),
+    }
+
+
+def _e_performance_units_alignment_stats(path: Path) -> Dict[str, object]:
+    required = ["units_sold", "units_sold_roi", "revenue_exvat_gbp", "profit_exvat_gbp"]
+    if not path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_file", "notes": f"path={path}"}
+    try:
+        df = _read_csv(path)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "read_error",
+            "notes": f"path={path};error={exc.__class__.__name__}:{exc}",
+        }
+    if df.empty:
+        return {"ready": False, "status": "warn", "reason": "empty_file", "notes": f"path={path}"}
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_cols",
+            "notes": f"path={path};missing_cols={','.join(missing)}",
+        }
+
+    units = pd.to_numeric(df["units_sold"], errors="coerce")
+    units_roi = pd.to_numeric(df["units_sold_roi"], errors="coerce")
+    roi_rows = units_roi.fillna(0).gt(0)
+    mismatch = (units.fillna(0) - units_roi.fillna(0)).abs().gt(1e-6)
+    mismatch_rows = int((roi_rows & mismatch).sum())
+    roi_row_count = int(roi_rows.sum())
+    status = "fail" if mismatch_rows > 0 else "ok"
+    return {
+        "ready": True,
+        "status": status,
+        "roi_row_count": roi_row_count,
+        "mismatch_rows": mismatch_rows,
+        "notes": f"path={path};roi_row_count={roi_row_count};mismatch_rows={mismatch_rows}",
+    }
+
+
+def _e_daily_sales_truth_stats(path: Path) -> Dict[str, object]:
+    required = [
+        "sku",
+        "date",
+        "source_state",
+        "units",
+        "revenue_gbp",
+        "profit_gbp",
+        "confidence_status",
+        "notes",
+    ]
+    if not path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_file", "notes": f"path={path}"}
+    try:
+        df = _read_csv(path)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "read_error",
+            "notes": f"path={path};error={exc.__class__.__name__}:{exc}",
+        }
+    if df.empty:
+        return {"ready": False, "status": "warn", "reason": "empty_file", "notes": f"path={path}"}
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_cols",
+            "notes": f"path={path};missing_cols={','.join(missing)}",
+        }
+
+    source = df["source_state"].astype(str).str.strip()
+    confidence = df["confidence_status"].astype(str).str.strip().str.lower()
+
+    allowed_source = {"finalized_ledger", "provisional_order_master"}
+    invalid_source_rows = int(source[~source.isin(allowed_source)].shape[0])
+    blank_source_rows = int(source.eq("").sum())
+    provisional_mask = source.eq("provisional_order_master")
+    finalized_mask = source.eq("finalized_ledger")
+    provisional_bad_confidence = int((provisional_mask & ~confidence.str.startswith("provisional")).sum())
+    finalized_bad_confidence = int((finalized_mask & confidence.ne("finalized")).sum())
+
+    status = "ok"
+    if invalid_source_rows > 0 or blank_source_rows > 0:
+        status = "fail"
+    elif provisional_bad_confidence > 0 or finalized_bad_confidence > 0:
+        status = "fail"
+    return {
+        "ready": True,
+        "status": status,
+        "rows": int(len(df.index)),
+        "invalid_source_rows": invalid_source_rows,
+        "blank_source_rows": blank_source_rows,
+        "provisional_bad_confidence_rows": provisional_bad_confidence,
+        "finalized_bad_confidence_rows": finalized_bad_confidence,
+        "notes": (
+            f"path={path};rows={len(df.index)};invalid_source_rows={invalid_source_rows};"
+            f"blank_source_rows={blank_source_rows};provisional_bad_confidence_rows={provisional_bad_confidence};"
+            f"finalized_bad_confidence_rows={finalized_bad_confidence}"
+        ),
+    }
+
+
+def _e_study_report_fresh_vs_summary_stats(summary_path: Path, study_path: Path) -> Dict[str, object]:
+    if not summary_path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_summary", "notes": f"path={summary_path}"}
+    if not study_path.exists():
+        return {"ready": False, "status": "fail", "reason": "missing_study", "notes": f"path={study_path}"}
+    try:
+        summary_mtime = datetime.fromtimestamp(summary_path.stat().st_mtime, tz=timezone.utc)
+        study_mtime = datetime.fromtimestamp(study_path.stat().st_mtime, tz=timezone.utc)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "stat_error",
+            "notes": f"summary={summary_path};study={study_path};error={exc.__class__.__name__}:{exc}",
+        }
+
+    lag_seconds = max((summary_mtime - study_mtime).total_seconds(), 0.0)
+    status = "fail" if study_mtime < summary_mtime else "ok"
+    return {
+        "ready": True,
+        "status": status,
+        "lag_seconds": lag_seconds,
+        "notes": (
+            f"summary={summary_path};study={study_path};summary_mtime_utc={summary_mtime.isoformat()};"
+            f"study_mtime_utc={study_mtime.isoformat()};lag_seconds={lag_seconds:.0f}"
+        ),
+    }
+
+
+def _e_study_report_truth_alignment_stats(summary_path: Path, study_path: Path) -> Dict[str, object]:
+    summary_required = ["sku", "units_sold", "revenue_exvat_gbp", "profit_exvat_gbp", "units_sold_roi"]
+    study_required = [
+        "sku",
+        "units_sold_30d",
+        "units_sold_truth_30d",
+        "revenue_exvat_gbp_30d",
+        "profit_exvat_gbp_30d",
+    ]
+    if not summary_path.exists():
+        return {"ready": False, "status": "warn", "reason": "missing_summary", "notes": f"path={summary_path}"}
+    if not study_path.exists():
+        return {"ready": False, "status": "fail", "reason": "missing_study", "notes": f"path={study_path}"}
+    try:
+        summary = _read_csv(summary_path)
+        study = _read_csv(study_path)
+    except Exception as exc:
+        return {
+            "ready": False,
+            "status": "warn",
+            "reason": "read_error",
+            "notes": f"summary={summary_path};study={study_path};error={exc.__class__.__name__}:{exc}",
+        }
+    if summary.empty:
+        return {"ready": False, "status": "warn", "reason": "empty_summary", "notes": f"path={summary_path}"}
+    if study.empty:
+        return {"ready": False, "status": "fail", "reason": "empty_study", "notes": f"path={study_path}"}
+    missing_summary = [c for c in summary_required if c not in summary.columns]
+    if missing_summary:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_summary_cols",
+            "notes": f"path={summary_path};missing_cols={','.join(missing_summary)}",
+        }
+    missing_study = [c for c in study_required if c not in study.columns]
+    if missing_study:
+        return {
+            "ready": False,
+            "status": "fail",
+            "reason": "missing_study_cols",
+            "notes": f"path={study_path};missing_cols={','.join(missing_study)}",
+        }
+
+    summary_cmp = summary.rename(
+        columns={
+            "units_sold": "summary_units_sold",
+            "units_sold_roi": "summary_units_sold_roi",
+            "revenue_exvat_gbp": "summary_revenue_exvat_gbp",
+            "profit_exvat_gbp": "summary_profit_exvat_gbp",
+        }
+    )
+    study_cmp = study.rename(
+        columns={
+            "units_sold_30d": "study_units_sold_30d",
+            "units_sold_truth_30d": "study_units_sold_truth_30d",
+            "revenue_exvat_gbp_30d": "study_revenue_exvat_gbp_30d",
+            "profit_exvat_gbp_30d": "study_profit_exvat_gbp_30d",
+        }
+    )
+
+    merged = summary_cmp.merge(study_cmp, on="sku", how="left")
+    roi_rows = pd.to_numeric(merged["summary_units_sold_roi"], errors="coerce").fillna(0).gt(0)
+    study_missing = merged["study_units_sold_truth_30d"].astype(str).eq("")
+    units_match = (
+        pd.to_numeric(merged["study_units_sold_truth_30d"], errors="coerce").fillna(0)
+        - pd.to_numeric(merged["summary_units_sold"], errors="coerce").fillna(0)
+    ).abs().le(1e-6)
+    revenue_match = (
+        pd.to_numeric(merged["study_revenue_exvat_gbp_30d"], errors="coerce").fillna(0)
+        - pd.to_numeric(merged["summary_revenue_exvat_gbp"], errors="coerce").fillna(0)
+    ).abs().le(1e-6)
+    profit_match = (
+        pd.to_numeric(merged["study_profit_exvat_gbp_30d"], errors="coerce").fillna(0)
+        - pd.to_numeric(merged["summary_profit_exvat_gbp"], errors="coerce").fillna(0)
+    ).abs().le(1e-6)
+
+    mismatch_mask = roi_rows & (study_missing | ~units_match | ~revenue_match | ~profit_match)
+    mismatch_rows = int(mismatch_mask.sum())
+    roi_row_count = int(roi_rows.sum())
+    sample = merged.loc[mismatch_mask, "sku"].astype(str).head(5).tolist()
+    return {
+        "ready": True,
+        "status": "fail" if mismatch_rows > 0 else "ok",
+        "roi_row_count": roi_row_count,
+        "mismatch_rows": mismatch_rows,
+        "notes": f"summary={summary_path};study={study_path};roi_row_count={roi_row_count};mismatch_rows={mismatch_rows};sample={','.join(sample)}",
+    }
+
+
+def _h_ceiling_effective_floor_integrity_result(ceiling_df: pd.DataFrame, *, path: Path) -> Dict[str, str]:
+    if ceiling_df.empty:
+        return {
+            "status": "warn",
+            "value": "missing_or_empty",
+            "notes": f"path={path}",
+        }
+
+    if "run_id" not in ceiling_df.columns:
+        return {
+            "status": "warn",
+            "value": "missing_run_id_col",
+            "notes": f"path={path};total_rows={len(ceiling_df.index)}",
+        }
+
+    run_ids = ceiling_df["run_id"].astype(str).str.strip()
+    latest_run_candidates = run_ids.replace("", pd.NA).dropna()
+    if latest_run_candidates.empty:
+        return {
+            "status": "warn",
+            "value": "missing_run_id_values",
+            "notes": f"path={path};total_rows={len(ceiling_df.index)}",
+        }
+
+    latest_run_id = str(latest_run_candidates.max())
+    scoped_df = ceiling_df.loc[run_ids.eq(latest_run_id)].copy()
+    conflict_count = 0
+    checked_rows = 0
+    samples: list[str] = []
+
+    for _, row in scoped_df.iterrows():
+        ceiling_val = _safe_float(row.get("true_binding_ceiling_gbp", ""))
+        floor_val = _safe_float(row.get("hard_floor_gbp", ""))
+        if ceiling_val is None or floor_val is None:
+            continue
+        checked_rows += 1
+        if ceiling_val + 1e-9 < floor_val:
+            conflict_count += 1
+            if len(samples) < 5:
+                sku = str(row.get("sku", "")).strip()
+                samples.append(f"{sku}:{ceiling_val:.2f}<{floor_val:.2f}")
+
+    return {
+        "status": "fail" if conflict_count > 0 else "ok",
+        "value": str(conflict_count),
+        "notes": (
+            f"path={path};scope_run_id={latest_run_id};scoped_rows={len(scoped_df.index)};"
+            f"checked_rows={checked_rows};total_rows={len(ceiling_df.index)};"
+            + (f"samples={','.join(samples)}" if samples else "samples=none")
+        ),
+    }
+
+
+def _strategy_sample_min_rows_for_health(scenario_type: object) -> int:
+    scenario = str(scenario_type or "").strip().lower()
+    if scenario == "multi_seller_ladder_cap":
+        return max(_safe_int(os.environ.get("H_STRATEGY_SAMPLE_MIN_MULTI_SELLER", "150")), 1)
+    if scenario == "single_rival_reset":
+        return max(_safe_int(os.environ.get("H_STRATEGY_SAMPLE_MIN_SINGLE_RIVAL", "30")), 1)
+    if scenario == "suppression_reactivation":
+        return max(_safe_int(os.environ.get("H_STRATEGY_SAMPLE_MIN_SUPPRESSION", "20")), 1)
+    return max(_safe_int(os.environ.get("H_STRATEGY_SAMPLE_MIN_DEFAULT", "30")), 1)
+
+
+def _strategy_health_scenarios_for_entry(*, scenario_type: object, chosen_tactic: object) -> List[str]:
+    scenario = str(scenario_type or "").strip().lower()
+    tactic = str(chosen_tactic or "").strip().upper()
+    out: List[str] = []
+    if scenario in {"multi_seller_ladder_cap", "single_rival_reset", "suppression_reactivation"}:
+        out.append(scenario)
+    if "SINGLE_RIVAL_RESET" in tactic and "single_rival_reset" not in out:
+        out.append("single_rival_reset")
+    if "SUPPRESSION_REACTIVATION" in tactic and "suppression_reactivation" not in out:
+        out.append("suppression_reactivation")
+    return out
+
+
+def _strategy_is_failed_write_for_streak(*, tactic_success_state: object, writer_outcome: object) -> bool:
+    state = str(tactic_success_state or "").strip().lower()
+    writer = str(writer_outcome or "").strip().upper()
+    if state != "failed":
+        return False
+    if writer in {"", "NO_WRITE_REQUIRED", "READ_ONLY_NO_WRITE", "APPLIED"}:
+        return False
+    return True
+
+
+def _strategy_no_write_failed_streaks(path: Path) -> Dict[str, Dict[str, object]]:
+    if not path.exists():
+        return {}
+    try:
+        df = pd.read_csv(path, dtype=str).fillna("")
+    except Exception:
+        return {}
+    if df.empty:
+        return {}
+    for col in ["event_ts_utc", "scenario_type", "chosen_tactic", "writer_outcome", "tactic_success_state", "tactic_case_id"]:
+        if col not in df.columns:
+            df[col] = ""
+    df["event_dt"] = pd.to_datetime(df.get("event_ts_utc", ""), errors="coerce", utc=True)
+    df = df.sort_values(["event_dt"], ascending=[False], kind="stable")
+    focus = ["multi_seller_ladder_cap", "single_rival_reset", "suppression_reactivation"]
+    streaks: Dict[str, int] = {key: 0 for key in focus}
+    sample_cases: Dict[str, List[str]] = {key: [] for key in focus}
+    closed: Dict[str, bool] = {key: False for key in focus}
+    for _, row in df.iterrows():
+        row_scenarios = _strategy_health_scenarios_for_entry(
+            scenario_type=row.get("scenario_type", ""),
+            chosen_tactic=row.get("chosen_tactic", ""),
+        )
+        if not row_scenarios:
+            continue
+        for scenario in row_scenarios:
+            if scenario not in closed or closed[scenario]:
+                continue
+            is_failed_write = _strategy_is_failed_write_for_streak(
+                tactic_success_state=row.get("tactic_success_state", ""),
+                writer_outcome=row.get("writer_outcome", ""),
+            )
+            if is_failed_write:
+                streaks[scenario] += 1
+                case_id = str(row.get("tactic_case_id", "")).strip()
+                if case_id and case_id not in sample_cases[scenario] and len(sample_cases[scenario]) < 3:
+                    sample_cases[scenario].append(case_id)
+            else:
+                closed[scenario] = True
+        if all(closed.values()):
+            break
+    out: Dict[str, Dict[str, object]] = {}
+    for scenario in focus:
+        out[scenario] = {"streak": int(streaks.get(scenario, 0)), "sample_case_ids": sample_cases.get(scenario, [])}
+    return out
+
+
+def _strategy_sample_size_snapshot(path: Path) -> Dict[str, object]:
+    if not path.exists():
+        return {"asof_date": "", "rows_by_scenario": {}}
+    try:
+        df = pd.read_csv(path, dtype=str).fillna("")
+    except Exception:
+        return {"asof_date": "", "rows_by_scenario": {}}
+    if df.empty or "scenario_type" not in df.columns:
+        return {"asof_date": "", "rows_by_scenario": {}}
+    asof_series = df.get("asof_date", "").astype(str).str.strip()
+    non_blank = asof_series[asof_series.ne("")]
+    latest_asof = str(non_blank.max()) if not non_blank.empty else ""
+    if latest_asof:
+        work = df.loc[asof_series.eq(latest_asof)].copy()
+    else:
+        work = df.copy()
+    rows_by_scenario: Dict[str, Dict[str, object]] = {}
+    for _, row in work.iterrows():
+        row_scenarios = _strategy_health_scenarios_for_entry(
+            scenario_type=row.get("scenario_type", ""),
+            chosen_tactic=row.get("chosen_tactic", ""),
+        )
+        if not row_scenarios:
+            continue
+        row_decision_rows = _safe_int(row.get("decision_rows", "0"))
+        row_chosen_tactic = str(row.get("chosen_tactic", "")).strip()
+        for scenario in row_scenarios:
+            sample_min_rows = _safe_int(row.get("sample_min_rows", "0")) or _strategy_sample_min_rows_for_health(scenario)
+            stat = rows_by_scenario.get(
+                scenario,
+                {
+                    "decision_rows": 0,
+                    "sample_min_rows": _strategy_sample_min_rows_for_health(scenario),
+                    "provisional_sample_flag": 1,
+                    "success_rows": 0,
+                    "failed_rows": 0,
+                    "expired_rows": 0,
+                    "aborted_rows": 0,
+                    "chosen_tactic": "",
+                    "_chosen_tactic_decision_rows": -1,
+                },
+            )
+            row_success_rows = _safe_int(row.get("success_rows", "0"))
+            row_failed_rows = _safe_int(row.get("failed_rows", "0"))
+            row_expired_rows = _safe_int(row.get("expired_rows", "0"))
+            row_aborted_rows = _safe_int(row.get("aborted_rows", "0"))
+            stat["decision_rows"] = int(_safe_int(stat.get("decision_rows", 0)) + row_decision_rows)
+            stat["sample_min_rows"] = int(max(_safe_int(stat.get("sample_min_rows", 0)), sample_min_rows))
+            stat["success_rows"] = int(_safe_int(stat.get("success_rows", 0)) + row_success_rows)
+            stat["failed_rows"] = int(_safe_int(stat.get("failed_rows", 0)) + row_failed_rows)
+            stat["expired_rows"] = int(_safe_int(stat.get("expired_rows", 0)) + row_expired_rows)
+            stat["aborted_rows"] = int(_safe_int(stat.get("aborted_rows", 0)) + row_aborted_rows)
+            chosen_rows = _safe_int(stat.get("_chosen_tactic_decision_rows", -1))
+            if row_decision_rows > chosen_rows:
+                stat["chosen_tactic"] = row_chosen_tactic
+                stat["_chosen_tactic_decision_rows"] = row_decision_rows
+            rows_by_scenario[scenario] = stat
+    for scenario, stat in rows_by_scenario.items():
+        decision_rows = _safe_int(stat.get("decision_rows", 0))
+        sample_min_rows = _safe_int(stat.get("sample_min_rows", 0)) or _strategy_sample_min_rows_for_health(scenario)
+        success_rows = _safe_int(stat.get("success_rows", 0))
+        failed_rows = _safe_int(stat.get("failed_rows", 0))
+        expired_rows = _safe_int(stat.get("expired_rows", 0))
+        aborted_rows = _safe_int(stat.get("aborted_rows", 0))
+        terminal_rows = max(success_rows + failed_rows + expired_rows + aborted_rows, 0)
+        judged_rows = max(success_rows + failed_rows, 0)
+        expired_share_pct = (expired_rows * 100.0 / decision_rows) if decision_rows > 0 else 0.0
+        stat["decision_rows"] = int(decision_rows)
+        stat["sample_min_rows"] = int(sample_min_rows)
+        stat["success_rows"] = int(success_rows)
+        stat["failed_rows"] = int(failed_rows)
+        stat["expired_rows"] = int(expired_rows)
+        stat["aborted_rows"] = int(aborted_rows)
+        stat["terminal_rows"] = int(terminal_rows)
+        stat["judged_rows"] = int(judged_rows)
+        stat["expired_share_pct"] = round(float(expired_share_pct), 2)
+        stat["provisional_sample_flag"] = 1 if decision_rows < sample_min_rows else 0
+        stat.pop("_chosen_tactic_decision_rows", None)
+    return {"asof_date": latest_asof, "rows_by_scenario": rows_by_scenario}
 
 
 def _stock_qty_map_from_path(path: Path) -> Dict[str, float]:
@@ -1236,11 +3112,35 @@ def _parse_utc_ts(value: object) -> datetime | None:
 
 
 def _iter_b_cycle_log_events(path: Path, cutoff: datetime) -> List[Dict[str, object]]:
+    line_events = _iter_b_cycle_log_lines(path, cutoff=cutoff)
+    events: List[Dict[str, object]] = []
+    event_re = re.compile(r"^(ok|warn|fail|skip)\s+([^\s]+)", re.IGNORECASE)
+    for line_event in line_events:
+        msg = str(line_event.get("msg", "")).strip()
+        em = event_re.match(msg)
+        if not em:
+            continue
+        event = str(em.group(1)).strip().lower()
+        script = str(em.group(2)).strip()
+        events.append(
+            {
+                "idx": int(line_event.get("idx", 0)),
+                "ts": str(line_event.get("ts", "")),
+                "cycle": str(line_event.get("cycle", "")),
+                "event": event,
+                "script": script,
+                "msg": msg,
+                "line": str(line_event.get("line", "")),
+            }
+        )
+    return events
+
+
+def _iter_b_cycle_log_lines(path: Path, cutoff: datetime) -> List[Dict[str, object]]:
     events: List[Dict[str, object]] = []
     if not path.exists():
         return events
     line_re = re.compile(r"^(?P<ts>\S+)\s+\[(?P<cycle>[^\]]+)\]\s+(?P<msg>.*)$")
-    event_re = re.compile(r"^(ok|warn|fail|skip)\s+([^\s]+)", re.IGNORECASE)
     try:
         with path.open("r", encoding="utf-8", errors="ignore") as fh:
             for idx, raw in enumerate(fh):
@@ -1254,25 +3154,70 @@ def _iter_b_cycle_log_events(path: Path, cutoff: datetime) -> List[Dict[str, obj
                 if ts is not None and ts < cutoff:
                     continue
                 msg = m.group("msg").strip()
-                em = event_re.match(msg)
-                if not em:
-                    continue
-                event = str(em.group(1)).strip().lower()
-                script = str(em.group(2)).strip()
                 cycle = str(m.group("cycle")).strip()
                 events.append(
                     {
                         "idx": idx,
                         "ts": ts.isoformat() if ts is not None else "",
                         "cycle": cycle,
-                        "event": event,
-                        "script": script,
+                        "msg": msg,
                         "line": line,
                     }
                 )
     except Exception:
         return []
     return events
+
+
+def _b_maintenance_marker_paths_present() -> List[Path]:
+    return [path for path in B_MAINTENANCE_MARKER_PATHS if path.exists()]
+
+
+def _normalize_step_name(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text.endswith(".py"):
+        text = text[:-3]
+    return text
+
+
+def _b_cycle_latest_cycle_context(path: Path) -> Dict[str, object]:
+    if not path.exists():
+        return {
+            "latest_cycle": "",
+            "maintenance_abort_scripts": set(),
+            "maintenance_marker_lines": 0,
+            "maintenance_context": False,
+            "finalized_cycle_complete": False,
+        }
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=3650)
+    lines = _iter_b_cycle_log_lines(path, cutoff=cutoff)
+    latest_cycle = str(lines[-1].get("cycle", "")).strip() if lines else ""
+    cycle_lines = [row for row in lines if str(row.get("cycle", "")).strip() == latest_cycle] if latest_cycle else []
+
+    maintenance_abort_scripts: set[str] = set()
+    maintenance_marker_lines = 0
+    finalized_cycle_complete = False
+    for row in cycle_lines:
+        msg = str(row.get("msg", "")).strip()
+        msg_l = msg.lower()
+        if msg_l.startswith("maintenance_abort "):
+            parts = msg.split()
+            if len(parts) >= 2:
+                maintenance_abort_scripts.add(_normalize_step_name(parts[1]))
+        if "maintenance " in msg_l:
+            maintenance_marker_lines += 1
+        if "b_finalize ran" in msg_l and "reason=cycle_complete" in msg_l:
+            finalized_cycle_complete = True
+
+    maintenance_context = maintenance_marker_lines > 0 or bool(maintenance_abort_scripts)
+    return {
+        "latest_cycle": latest_cycle,
+        "maintenance_abort_scripts": maintenance_abort_scripts,
+        "maintenance_marker_lines": maintenance_marker_lines,
+        "maintenance_context": maintenance_context,
+        "finalized_cycle_complete": finalized_cycle_complete,
+    }
 
 
 def _fees_failed_rows_today(path: Path, now_utc: datetime) -> Dict[str, object]:
@@ -1349,12 +3294,20 @@ def _b_cycle_recent_fail_stats(path: Path, window_hours: float) -> Dict[str, obj
     # Do not depend on rolling time windows for this check.
     # Evaluate only the latest completed B cycle so old fail lines cannot keep alerting.
     _ = window_hours
+    cycle_context = _b_cycle_latest_cycle_context(path)
+    latest_cycle = str(cycle_context.get("latest_cycle", "")).strip()
     cutoff = datetime.now(timezone.utc) - timedelta(days=3650)
     events_all = _iter_b_cycle_log_events(path, cutoff=cutoff)
-    latest_cycle = str(events_all[-1].get("cycle", "")).strip() if events_all else ""
     events = [e for e in events_all if str(e.get("cycle", "")).strip() == latest_cycle] if latest_cycle else []
     fail_events: List[Dict[str, object]] = []
     ignored_non_actionable = 0
+    maintenance_abort_scripts = cycle_context.get("maintenance_abort_scripts")
+    if not isinstance(maintenance_abort_scripts, set):
+        maintenance_abort_scripts = set()
+    maintenance_context = bool(cycle_context.get("maintenance_context", False))
+    active_maintenance_markers = _b_maintenance_marker_paths_present()
+    if active_maintenance_markers:
+        maintenance_context = True
     for event in events:
         if str(event.get("event", "")).strip().lower() != "fail":
             continue
@@ -1363,6 +3316,12 @@ def _b_cycle_recent_fail_stats(path: Path, window_hours: float) -> Dict[str, obj
         # Ignore legacy/global end-of-cycle A015 fail lines here.
         # They are health summaries, not actionable B step failures.
         if script == "A015_build_system_health_check.py" and "end_of_cycle" in line:
+            ignored_non_actionable += 1
+            continue
+        is_maintenance_abort = "rc=125" in line or "aborted_for_maintenance" in line
+        script_norm = _normalize_step_name(script)
+        script_in_abort_set = script_norm in maintenance_abort_scripts
+        if is_maintenance_abort and (script_in_abort_set or maintenance_context):
             ignored_non_actionable += 1
             continue
         fail_events.append(event)
@@ -1392,6 +3351,9 @@ def _b_cycle_recent_fail_stats(path: Path, window_hours: float) -> Dict[str, obj
         "unresolved_count": len(unresolved_events),
         "unresolved_sample": unresolved_sample,
         "ignored_non_actionable": ignored_non_actionable,
+        "maintenance_context": int(1 if maintenance_context else 0),
+        "maintenance_markers_active": ",".join([path.name for path in active_maintenance_markers]),
+        "maintenance_marker_lines": int(cycle_context.get("maintenance_marker_lines", 0)),
     }
 
 
@@ -1855,6 +3817,43 @@ def _phase1_rollout_checks(rows: List[Dict[str, str]], now_utc: datetime, log_fn
     today = now_utc.strftime("%Y-%m-%d")
     scope = _read_csv(PHASE1_SCOPE_PATH)
     daily = _read_csv(PHASE1_DAILY_INTEL_PATH)
+    refresh_timeout_seconds = max(
+        float(os.environ.get("A015_DAILY_INTEL_REFRESH_TIMEOUT_SECONDS", "900") or "900"),
+        5.0,
+    )
+
+    def _run_daily_intel_refresh(trigger_reason: str) -> bool:
+        if _a016_refresh_is_running():
+            running_pids = ",".join([str(pid) for pid in _a016_refresh_running_pids()[:5]])
+            log_fn(
+                "Daily intel refresh skipped because another A016 run is active "
+                f"(reason={trigger_reason};active_pids={running_pids})"
+            )
+            return False
+        log_fn(f"Daily intel refresh triggered ({trigger_reason})")
+        try:
+            a016_script = ROOT / "scripts" / "flows" / "A" / "A016_refresh_phase1_daily_intel.py"
+            subprocess.run(
+                [sys.executable, str(a016_script)],
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=str(ROOT),
+                timeout=refresh_timeout_seconds,
+            )
+            log_fn("Daily intel successfully refreshed")
+            return True
+        except subprocess.TimeoutExpired as exc:
+            log_fn("Daily intel refresh attempted but timed out")
+            log_fn(
+                "Daily intel refresh timeout: "
+                f"{exc.__class__.__name__}: timeout={refresh_timeout_seconds:.0f}s"
+            )
+            return False
+        except Exception as exc:
+            log_fn("Daily intel refresh attempted but failed")
+            log_fn(f"Daily intel refresh error: {exc.__class__.__name__}: {exc}")
+            return False
 
     # Orchestration guard: if scope is newer than daily-intel latest output,
     # trigger one A016 refresh attempt before evaluating freshness gates.
@@ -1864,21 +3863,7 @@ def _phase1_rollout_checks(rows: List[Dict[str, str]], now_utc: datetime, log_fn
     if scope_mtime_guard and (
         daily_latest_mtime_guard is None or daily_latest_mtime_guard + timedelta(seconds=1) < scope_mtime_guard
     ):
-        refresh_attempted = True
-        log_fn("Daily intel refresh triggered because scope was newer")
-        try:
-            a016_script = ROOT / "scripts" / "flows" / "A" / "A016_refresh_phase1_daily_intel.py"
-            subprocess.run(
-                [sys.executable, str(a016_script)],
-                check=True,
-                capture_output=True,
-                text=True,
-                cwd=str(ROOT),
-            )
-            log_fn("Daily intel successfully refreshed")
-        except Exception as exc:
-            log_fn("Daily intel refresh attempted but failed")
-            log_fn(f"Daily intel refresh error: {exc.__class__.__name__}: {exc}")
+        refresh_attempted = _run_daily_intel_refresh("scope_newer_than_daily_latest")
 
     if refresh_attempted:
         # Re-read after attempted refresh so existing health checks use latest artifacts.
@@ -1935,7 +3920,15 @@ def _phase1_rollout_checks(rows: List[Dict[str, str]], now_utc: datetime, log_fn
         stock_source_path = str(required_meta.get("stock_source_path", "") or "")
         scope_mtime_utc = str(required_meta.get("scope_mtime_utc", "") or "")
         stock_source_mtime_utc = str(required_meta.get("stock_source_mtime_utc", "") or "")
-        daily_mtime_utc = _file_info(PHASE1_DAILY_INTEL_PATH).get("mtime_utc", "")
+        daily_data_mtime_utc = _file_info(PHASE1_DAILY_INTEL_PATH).get("mtime_utc", "")
+        daily_latest_mtime_utc = _file_info(PHASE1_DAILY_INTEL_LATEST_PATH).get("mtime_utc", "")
+        daily_data_dt = _parse_utc_ts(daily_data_mtime_utc)
+        daily_latest_dt = _parse_utc_ts(daily_latest_mtime_utc)
+        daily_mtime_utc = daily_data_mtime_utc
+        daily_mtime_source = "daily_intel"
+        if daily_latest_dt is not None and (daily_data_dt is None or daily_latest_dt > daily_data_dt):
+            daily_mtime_utc = daily_latest_mtime_utc
+            daily_mtime_source = "daily_intel_latest"
 
         daily_today = pd.DataFrame()
         covered_required_count = 0
@@ -1973,7 +3966,8 @@ def _phase1_rollout_checks(rows: List[Dict[str, str]], now_utc: datetime, log_fn
             f"dropped={int(required_meta.get('dropped', len(dropped_skus)) or 0)}; "
             f"covered={covered_required_count}; stock_source={stock_source_path}; "
             f"scope_mtime_utc={scope_mtime_utc}; daily_mtime_utc={daily_mtime_utc}; "
-            f"stock_source_mtime_utc={stock_source_mtime_utc}"
+            f"stock_source_mtime_utc={stock_source_mtime_utc}; "
+            f"daily_mtime_source={daily_mtime_source}"
         )
 
         if freshness_reason:
@@ -2242,12 +4236,23 @@ $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNoti
 $notifier.Show($toast)
 """
     try:
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        run_kwargs: Dict[str, object] = {
+            "check": False,
+            "capture_output": True,
+            "text": True,
+        }
+        if os.name == "nt":
+            no_window = int(getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if no_window:
+                run_kwargs["creationflags"] = no_window
+            try:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= int(getattr(subprocess, "STARTF_USESHOWWINDOW", 0))
+                startupinfo.wShowWindow = int(getattr(subprocess, "SW_HIDE", 0))
+                run_kwargs["startupinfo"] = startupinfo
+            except Exception:
+                pass
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps], **run_kwargs)
     except Exception:
         pass
 
@@ -2302,6 +4307,7 @@ def main() -> None:
     profile = str(runtime["profile"])
     checklist_path = Path(runtime["checklist_path"])
     alert_state_path = Path(runtime["alert_state_path"])
+    alert_history_path = Path(runtime["alert_history_path"])
     health_status_path = Path(runtime["health_status_path"])
     no_toast = bool(runtime["no_toast"])
 
@@ -2319,6 +4325,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     checklist_path.parent.mkdir(parents=True, exist_ok=True)
     alert_state_path.parent.mkdir(parents=True, exist_ok=True)
+    alert_history_path.parent.mkdir(parents=True, exist_ok=True)
     health_status_path.parent.mkdir(parents=True, exist_ok=True)
     now_utc_dt = datetime.now(timezone.utc)
     snooze = _read_alert_snooze(ALERT_SNOOZE_PATH, now_utc_dt)
@@ -2332,6 +4339,8 @@ def main() -> None:
                 snooze_notes += f";reason={snooze['reason']}"
         _add(rows, "h_health_alert_snooze_config", "ok", snooze["status"], snooze_notes)
 
+    _cycle_failure_ledger_schema_check(rows)
+
     if not health_status_path.exists():
         pd.DataFrame(columns=["timestamp_utc", "status", "fail_count", "warn_count", "notes"]).to_csv(
             health_status_path, index=False
@@ -2342,13 +4351,22 @@ def main() -> None:
         f"profile={profile} "
         f"checklist_path={checklist_path} "
         f"alert_state_path={alert_state_path} "
+        f"alert_history_path={alert_history_path} "
         f"health_status_path={health_status_path} "
         f"no_toast={'1' if no_toast else '0'}"
     )
 
     log("loading orders_all.csv")
-    orders_all = _read_csv(OUT / "orders_all.csv", usecols=["amazon_order_id", "purchase_date"])
+    orders_all = _read_csv(ORDERS_ALL_PATH, usecols=["amazon_order_id", "purchase_date"])
     log(f"orders_all rows: {len(orders_all)}")
+    log("loading orders_all status view")
+    orders_all_status = _read_csv(ORDERS_ALL_PATH)
+    if not orders_all_status.empty:
+        for col in ["amazon_order_id", "order_status"]:
+            if col not in orders_all_status.columns:
+                orders_all_status[col] = ""
+        orders_all_status = orders_all_status[["amazon_order_id", "order_status"]].copy()
+    log(f"orders_all status rows: {len(orders_all_status)}")
 
     log("loading order_items_all.csv")
     order_items_all = _read_csv(OUT / "order_items_all.csv", usecols=["amazon_order_id", "seller_sku", "quantity_shipped", "quantity_ordered"])
@@ -2356,8 +4374,22 @@ def main() -> None:
 
     log("loading order_master.csv")
     order_master = _read_csv(
-        OUT / "order_master.csv",
-        usecols=["Date", "Order ID", "SKU", "lvl", "COGS_Total", "COGS_ExVAT", "Quantity Ordered"],
+        ORDER_MASTER_PATH,
+        usecols=[
+            "Date",
+            "Order ID",
+            "SKU",
+            "lvl",
+            "COGS_Total",
+            "COGS_ExVAT",
+            "Quantity Ordered",
+            "COGS_Placeholder_Applied",
+            "COGS_Basis_Type",
+            "COGS_Basis_Source",
+            "COGS_Basis_Date",
+            "Missing_Token_Flag",
+            "Missing_Token_Reason",
+        ],
     )
     log("loading order_master_prev.csv")
     order_master_prev = _read_csv(OUT / "order_master_prev.csv", usecols=["Order ID", "SKU"])
@@ -2377,6 +4409,9 @@ def main() -> None:
         if col not in token_ledger.columns:
             token_ledger[col] = ""
     log(f"token_ledger rows: {len(token_ledger)}")
+    log("loading token_allocations_live.csv")
+    token_allocations = _read_csv(TOKEN_ALLOCATIONS_PATH)
+    log(f"token_allocations rows: {len(token_allocations)}")
 
     log("loading token_cogs_ledger.csv")
     token_cogs_path = OUT / "token_cogs_ledger.csv"
@@ -2391,12 +4426,33 @@ def main() -> None:
     log(f"token_cogs rows: {len(token_cogs)}")
 
     log("loading inventory_summaries.csv")
-    inventory = _read_csv(OUT / "inventory_summaries.csv", usecols=["seller_sku"])
+    inventory = _read_csv(OUT / "inventory_summaries.csv")
     log(f"inventory rows: {len(inventory)}")
 
     # Orders overview
     orders_all_count = len(orders_all)
     _add(rows, "orders_all_rows", "ok" if orders_all_count > 0 else "fail", str(orders_all_count))
+    _critical_freshness_check(
+        rows,
+        "b_orders_all_freshness",
+        [ORDERS_ALL_PATH],
+        warn_after_minutes=float(os.environ.get("B_ORDERS_ALL_WARN_MINUTES", "45")),
+        fail_after_minutes=float(os.environ.get("B_ORDERS_ALL_FAIL_MINUTES", "180")),
+        owner_cycle="B",
+        recovery_signal="controlled_restart_gate",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "b_order_master_freshness",
+        [ORDER_MASTER_PATH],
+        warn_after_minutes=float(os.environ.get("B_ORDER_MASTER_WARN_MINUTES", "60")),
+        fail_after_minutes=float(os.environ.get("B_ORDER_MASTER_FAIL_MINUTES", "180")),
+        owner_cycle="B",
+        recovery_signal="controlled_restart_gate",
+        now_utc=now_utc_dt,
+    )
+    _relax_check_status_for_maintenance(rows, check_name="b_order_master_freshness")
     if not orders_all.empty:
         max_order_dt = _to_dt(orders_all["purchase_date"]).max()
     else:
@@ -2443,21 +4499,15 @@ def main() -> None:
         prev_rows = len(order_master_prev)
         if master_rows < prev_rows:
             drop = prev_rows - master_rows
-            explained_drop = 0
-            try:
-                if L1_MISSING_FEE_KEYS.exists():
-                    fee_hold = pd.read_csv(L1_MISSING_FEE_KEYS, dtype=str)
-                    explained_drop += len(fee_hold)
-            except Exception:
-                pass
-            try:
-                if MISSING_TOKEN_ORDERS.exists():
-                    token_hold = pd.read_csv(MISSING_TOKEN_ORDERS, dtype=str)
-                    explained_drop += len(token_hold)
-            except Exception:
-                pass
-            status = "ok" if explained_drop >= drop else "warn"
-            note = f"prev={prev_rows}, current={master_rows}, explained_holdbacks={explained_drop}"
+            note_parts = [f"prev={prev_rows}", f"current={master_rows}"]
+            observed_missing_fee_keys = len(_read_order_key_file(L1_MISSING_FEE_KEYS))
+            observed_missing_token_keys = len(_read_order_key_file(MISSING_TOKEN_ORDERS))
+            if observed_missing_fee_keys > 0:
+                note_parts.append(f"observed_missing_fee_keys={observed_missing_fee_keys}")
+            if observed_missing_token_keys > 0:
+                note_parts.append(f"observed_missing_token_keys={observed_missing_token_keys}")
+            status = "warn"
+            note = ", ".join(note_parts)
             _add(rows, "order_master_row_drop", status, str(drop), note)
         else:
             _add(rows, "order_master_row_drop", "ok", "0", f"prev={prev_rows}, current={master_rows}")
@@ -2480,29 +4530,15 @@ def main() -> None:
         max_master_dt = _to_dt(order_master["Date"]).max()
         recency_ref_dt = max_order_dt
         recency_ref_label = "orders_all"
-        # Order_Master intentionally excludes qty>0 rows without token COGS.
-        # Use token-eligible L1 recency as the primary freshness baseline to avoid false FAILs.
+        # Order_Master is expected to keep all current L1 keys, even when COGS is still provisional.
+        # Use the latest L1 order date when it is newer than orders_all so coverage gaps stay visible.
         if not l1.empty and "Date" in l1.columns:
             try:
                 l1_dates = _to_dt(l1["Date"])
-                l1_qty = pd.to_numeric(l1.get("Quantity Ordered", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
-                l1_key_series = l1["Order ID"].astype(str).str.strip() + "||" + l1["SKU"].astype(str).str.strip()
-                token_cogs = _read_csv(OUT / "token_cogs_ledger.csv")
-                token_valid_keys = set()
-                if not token_cogs.empty:
-                    if "Order ID" not in token_cogs.columns and "order_id" in token_cogs.columns:
-                        token_cogs["Order ID"] = token_cogs["order_id"]
-                    if "SKU" not in token_cogs.columns and "seller_sku" in token_cogs.columns:
-                        token_cogs["SKU"] = token_cogs["seller_sku"]
-                    if "Order ID" in token_cogs.columns and "SKU" in token_cogs.columns:
-                        cogs_ex = pd.to_numeric(token_cogs.get("cogs_exvat", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
-                        token_keys = token_cogs["Order ID"].astype(str).str.strip() + "||" + token_cogs["SKU"].astype(str).str.strip()
-                        token_valid_keys = set(token_keys[cogs_ex.gt(0.0)].tolist())
-                token_eligible = l1_qty.le(0.0) | l1_key_series.isin(token_valid_keys)
-                max_l1_token_eligible_dt = l1_dates[token_eligible].max()
-                if pd.notna(max_l1_token_eligible_dt):
-                    recency_ref_dt = max_l1_token_eligible_dt
-                    recency_ref_label = "l1_token_eligible"
+                max_l1_dt = l1_dates.max()
+                if pd.notna(max_l1_dt) and (pd.isna(recency_ref_dt) or max_l1_dt > recency_ref_dt):
+                    recency_ref_dt = max_l1_dt
+                    recency_ref_label = "l1"
             except Exception:
                 pass
         if pd.notna(recency_ref_dt) and pd.notna(max_master_dt):
@@ -2532,70 +4568,124 @@ def main() -> None:
             details = order_master.loc[blank_cogs, cols].copy()
             details.to_csv(DETAIL_BLANK_COGS, index=False)
 
+        # Placeholder COGS observability:
+        # keep placeholder-backed rows visible as WARN (not PASS), and fail any missing-token rows
+        # that still have no placeholder basis.
+        placeholder_stats = _order_master_placeholder_stats(order_master)
+        placeholder_rows = int(placeholder_stats.get("placeholder_rows", 0))
+        missing_token_no_placeholder_rows = int(placeholder_stats.get("missing_token_no_placeholder_rows", 0))
+        repeat_sku_count = int(placeholder_stats.get("placeholder_repeat_sku_count", 0))
+        repeat_row_count = int(placeholder_stats.get("placeholder_repeat_row_count", 0))
+        repeat_sample = placeholder_stats.get("placeholder_repeat_sample", [])
+        repeat_note = ""
+        if repeat_sku_count > 0:
+            repeat_note = (
+                f"repeat_sku_count={repeat_sku_count};repeat_row_count={repeat_row_count};"
+                f"sample={','.join([str(v) for v in repeat_sample])}"
+            )
+        _add(
+            rows,
+            "order_master_placeholder_cogs_rows",
+            "warn" if placeholder_rows > 0 else "ok",
+            str(placeholder_rows),
+            repeat_note,
+        )
+        _add(
+            rows,
+            "order_master_missing_token_no_placeholder_rows",
+            "fail" if missing_token_no_placeholder_rows > 0 else "ok",
+            str(missing_token_no_placeholder_rows),
+        )
+
+        placeholder_mask = (
+            order_master.get("COGS_Placeholder_Applied", pd.Series([], dtype=str))
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .isin({"1", "true", "yes", "y"})
+        )
+        missing_no_placeholder_mask = (
+            order_master.get("Missing_Token_Flag", pd.Series([], dtype=str))
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .isin({"1", "true", "yes", "y"})
+            & ~placeholder_mask
+        )
+        if placeholder_rows > 0:
+            cols = [
+                "Order ID",
+                "SKU",
+                "Date",
+                "lvl",
+                "Quantity Ordered",
+                "COGS_ExVAT",
+                "COGS_Basis_Type",
+                "COGS_Basis_Source",
+                "COGS_Basis_Date",
+                "Missing_Token_Reason",
+            ]
+            cols = [c for c in cols if c in order_master.columns]
+            order_master.loc[placeholder_mask, cols].copy().to_csv(DETAIL_PLACEHOLDER_COGS, index=False)
+        else:
+            pd.DataFrame(
+                columns=[
+                    "Order ID",
+                    "SKU",
+                    "Date",
+                    "lvl",
+                    "Quantity Ordered",
+                    "COGS_ExVAT",
+                    "COGS_Basis_Type",
+                    "COGS_Basis_Source",
+                    "COGS_Basis_Date",
+                    "Missing_Token_Reason",
+                ]
+            ).to_csv(DETAIL_PLACEHOLDER_COGS, index=False)
+        if missing_token_no_placeholder_rows > 0:
+            cols = [
+                "Order ID",
+                "SKU",
+                "Date",
+                "lvl",
+                "Quantity Ordered",
+                "COGS_ExVAT",
+                "Missing_Token_Flag",
+                "Missing_Token_Reason",
+            ]
+            cols = [c for c in cols if c in order_master.columns]
+            order_master.loc[missing_no_placeholder_mask, cols].copy().to_csv(
+                DETAIL_MISSING_TOKEN_NO_PLACEHOLDER,
+                index=False,
+            )
+        else:
+            pd.DataFrame(
+                columns=[
+                    "Order ID",
+                    "SKU",
+                    "Date",
+                    "lvl",
+                    "Quantity Ordered",
+                    "COGS_ExVAT",
+                    "Missing_Token_Flag",
+                    "Missing_Token_Reason",
+                ]
+            ).to_csv(DETAIL_MISSING_TOKEN_NO_PLACEHOLDER, index=False)
+
     # L1 vs master key coverage
     if not l1.empty and not order_master.empty:
-        l1_keys = set((l1["Order ID"].astype(str).str.strip() + "||" + l1["SKU"].astype(str).str.strip()).tolist())
-        master_keys = set((order_master["Order ID"].astype(str).str.strip() + "||" + order_master["SKU"].astype(str).str.strip()).tolist())
-        ignore_keys = set()
-        missing_token_keys = set()
-        dynamic_missing_token_keys = set()
-        if L1_MISSING_FEE_KEYS.exists():
-            try:
-                drop_df = pd.read_csv(L1_MISSING_FEE_KEYS, dtype=str)
-                if not drop_df.empty and "Order ID" in drop_df.columns and "SKU" in drop_df.columns:
-                    ignore_keys = set(
-                        (drop_df["Order ID"].astype(str).str.strip() + "||" + drop_df["SKU"].astype(str).str.strip()).tolist()
-                    )
-            except Exception:
-                ignore_keys = set()
-        if MISSING_TOKEN_ORDERS.exists():
-            try:
-                miss_df = pd.read_csv(MISSING_TOKEN_ORDERS, dtype=str)
-                if not miss_df.empty and "Order ID" in miss_df.columns and "SKU" in miss_df.columns:
-                    missing_token_keys = set(
-                        (miss_df["Order ID"].astype(str).str.strip() + "||" + miss_df["SKU"].astype(str).str.strip()).tolist()
-                    )
-            except Exception:
-                missing_token_keys = set()
-        # Derive held-back missing-token keys directly from L1 + token ledger
-        # so health does not rely solely on sidecar CSV timing.
-        try:
-            l1_qty = pd.to_numeric(l1.get("Quantity Ordered", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
-            l1_has_qty = l1_qty.gt(0)
-            l1_key_series = l1["Order ID"].astype(str).str.strip() + "||" + l1["SKU"].astype(str).str.strip()
-            token_cogs = _read_csv(OUT / "token_cogs_ledger.csv")
-            token_valid_keys = set()
-            if not token_cogs.empty:
-                if "Order ID" not in token_cogs.columns and "order_id" in token_cogs.columns:
-                    token_cogs["Order ID"] = token_cogs["order_id"]
-                if "SKU" not in token_cogs.columns and "seller_sku" in token_cogs.columns:
-                    token_cogs["SKU"] = token_cogs["seller_sku"]
-                if "Order ID" in token_cogs.columns and "SKU" in token_cogs.columns:
-                    cogs_ex = pd.to_numeric(token_cogs.get("cogs_exvat", pd.Series([], dtype=str)), errors="coerce").fillna(0.0)
-                    keys = token_cogs["Order ID"].astype(str).str.strip() + "||" + token_cogs["SKU"].astype(str).str.strip()
-                    token_valid_keys = set(keys[cogs_ex.gt(0.0)].tolist())
-            dynamic_missing_token_keys = set(l1_key_series[l1_has_qty & (~l1_key_series.isin(token_valid_keys))].tolist())
-        except Exception:
-            dynamic_missing_token_keys = set()
-
-        missing_set = (l1_keys - master_keys) - ignore_keys - missing_token_keys - dynamic_missing_token_keys
-        missing = len(missing_set)
-        notes = []
-        if ignore_keys:
-            notes.append(f"ignored_missing_fee_keys={len(ignore_keys)}")
-        if missing_token_keys:
-            notes.append(f"held_back_missing_tokens={len(missing_token_keys)}")
-        if dynamic_missing_token_keys:
-            notes.append(f"held_back_missing_tokens_dynamic={len(dynamic_missing_token_keys)}")
-        note = ";".join(notes)
+        coverage = _order_master_l1_coverage_stats(l1, order_master)
+        missing_set = set(coverage.get("missing_set", set()))
+        missing = int(coverage.get("missing_count", 0))
+        note = str(coverage.get("note", ""))
         _add(rows, "l1_keys_missing_in_master", "fail" if missing > 0 else "ok", str(missing), note)
         if missing:
             missing_keys = list(missing_set)[:10]
             print("[health_check] missing L1 keys (first 10):", missing_keys)
-        orphans = len(master_keys - l1_keys)
+        orphans = int(coverage.get("orphan_count", 0))
         _add(rows, "order_master_orphans_count", "fail" if orphans > 0 else "ok", str(orphans))
         if orphans:
-            orphan_keys = list(master_keys - l1_keys)[:10]
+            orphan_keys = list(set(coverage.get("orphan_set", set())))[:10]
             print("[health_check] master keys not in L1 (first 10):", orphan_keys)
     else:
         _add(rows, "l1_keys_missing_in_master", "warn", "n/a", "missing L1 or master")
@@ -2719,6 +4809,32 @@ def main() -> None:
 
     # Inventory
     _add(rows, "inventory_rows", "ok" if len(inventory) > 0 else "warn", str(len(inventory)))
+    inventory_gap_stats = _a_inventory_stale_token_gap_stats(
+        inventory,
+        token_ledger,
+        scope_skus=_inventory_scope_skus(),
+        now_utc=now_utc_dt,
+    )
+    inventory_gap_status = str(inventory_gap_stats.get("status", "warn")).strip().lower() or "warn"
+    inventory_gap_reason = str(inventory_gap_stats.get("reason", "")).strip()
+    inventory_gap_notes = (
+        f"stale_hours={inventory_gap_stats.get('row_stale_hours', '')};"
+        f"scope_rows={inventory_gap_stats.get('scope_rows', 0)};"
+        f"stale_scope_rows={inventory_gap_stats.get('stale_scope_rows', 0)};"
+        f"available_gap_rows={inventory_gap_stats.get('unresolved_available_gap_rows', 0)};"
+        f"total_gap_rows={inventory_gap_stats.get('unresolved_total_gap_rows', 0)};"
+        f"stale_scope_sample={','.join([str(v) for v in inventory_gap_stats.get('stale_scope_sample', [])])};"
+        f"unresolved_sample={';'.join([str(v) for v in inventory_gap_stats.get('unresolved_sample', [])])}"
+    )
+    if inventory_gap_reason:
+        inventory_gap_notes = f"reason={inventory_gap_reason};" + inventory_gap_notes
+    _add(
+        rows,
+        "a_inventory_stale_token_gap",
+        inventory_gap_status,
+        str(inventory_gap_stats.get("unresolved_gap_rows", "n/a")),
+        inventory_gap_notes,
+    )
 
     # Token shortages (per SKU)
     shortage_path = OUT / "token_shortages_by_sku.csv"
@@ -2726,11 +4842,64 @@ def main() -> None:
         try:
             shortages = pd.read_csv(shortage_path, dtype=str)
             count = len(shortages)
-            _add(rows, "token_shortages_by_sku", "fail" if count > 0 else "ok", str(count))
+            notes = ""
+            if count > 0 and "shortage_class" in shortages.columns:
+                classes = (
+                    shortages["shortage_class"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    .replace("", "unclassified")
+                    .value_counts()
+                    .sort_index()
+                )
+                notes = "classes=" + ",".join([f"{name}:{int(value)}" for name, value in classes.items()])
+            _add(rows, "token_shortages_by_sku", "fail" if count > 0 else "ok", str(count), notes)
         except Exception as exc:
             _add(rows, "token_shortages_by_sku", "fail", "read_error", str(exc))
     else:
         _add(rows, "token_shortages_by_sku", "warn", "missing", f"path {shortage_path}")
+
+    canceled_alloc_stats = _token_allocated_on_canceled_orders_stats(
+        token_allocations,
+        orders_all_status,
+        order_master,
+    )
+    DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS.parent.mkdir(parents=True, exist_ok=True)
+    canceled_details = canceled_alloc_stats.get("details", pd.DataFrame())
+    if isinstance(canceled_details, pd.DataFrame):
+        if canceled_details.empty:
+            pd.DataFrame(
+                columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]
+            ).to_csv(DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS, index=False)
+        else:
+            canceled_details.to_csv(DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS, index=False)
+    else:
+        pd.DataFrame(
+            columns=["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"]
+        ).to_csv(DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS, index=False)
+    if not bool(canceled_alloc_stats.get("ready", False)):
+        _add(
+            rows,
+            "token_allocated_on_canceled_orders",
+            "warn",
+            "n/a",
+            str(canceled_alloc_stats.get("notes", "unavailable")),
+        )
+    else:
+        canceled_rows = int(canceled_alloc_stats.get("rows", 0))
+        canceled_units = int(canceled_alloc_stats.get("units", 0))
+        sample = canceled_alloc_stats.get("sample", [])
+        sample_text = ""
+        if isinstance(sample, list) and sample:
+            sample_text = f";sample={';'.join([str(x) for x in sample[:3]])}"
+        _add(
+            rows,
+            "token_allocated_on_canceled_orders",
+            "fail" if canceled_units > 0 else "ok",
+            str(canceled_rows),
+            f"units={canceled_units}{sample_text}",
+        )
 
     # Recent log health
     log_path = _first_existing_path(B_CYCLE_LOG_PATH_CANDIDATES)
@@ -2752,6 +4921,9 @@ def main() -> None:
         raw_fail_count = int(fail_stats.get("raw_fail_count", 0))
         recovered_count = int(fail_stats.get("recovered_count", 0))
         ignored_non_actionable = int(fail_stats.get("ignored_non_actionable", 0))
+        maintenance_context = int(fail_stats.get("maintenance_context", 0))
+        maintenance_markers_active = str(fail_stats.get("maintenance_markers_active", "")).strip()
+        maintenance_marker_lines = int(fail_stats.get("maintenance_marker_lines", 0))
         unresolved_sample = fail_stats.get("unresolved_sample", [])
         sample_text = ""
         if isinstance(unresolved_sample, list) and unresolved_sample:
@@ -2765,6 +4937,9 @@ def main() -> None:
                 f"latest_cycle={latest_cycle}; raw_fail_count={raw_fail_count}; "
                 f"recovered_count={recovered_count}; unresolved_count={unresolved_count}; "
                 f"ignored_non_actionable={ignored_non_actionable}; "
+                f"maintenance_context={maintenance_context}; "
+                f"maintenance_marker_lines={maintenance_marker_lines}; "
+                f"maintenance_markers_active={maintenance_markers_active}; "
                 f"path={log_path}{sample_text}"
             ),
         )
@@ -2786,8 +4961,23 @@ def main() -> None:
                 # B cycle intentionally treats SystemExit(130) as nonfatal boundary interruption.
                 # Do not keep B health blocked when the collector reports this known nonfatal exit.
                 nonfatal_130 = rc_int == 130 and "system_exit_nonfatal" in notes.lower()
-                is_warn = (status_text in warn_statuses or (rc_int not in {0} and rc_int != -1)) and not nonfatal_130
-                notes_out = notes if not nonfatal_130 else f"{notes};classified_nonfatal_130=1"
+                active_maintenance_markers = _b_maintenance_marker_paths_present()
+                maintenance_context = bool(active_maintenance_markers)
+                if not maintenance_context and isinstance(log_path, Path) and log_path.exists():
+                    maintenance_context = bool(_b_cycle_latest_cycle_context(log_path).get("maintenance_context", False))
+                nonfatal_maintenance = rc_int == 125 and maintenance_context
+                is_warn = (
+                    status_text in warn_statuses or (rc_int not in {0} and rc_int != -1)
+                ) and not (nonfatal_130 or nonfatal_maintenance)
+                notes_out = notes
+                if nonfatal_130:
+                    notes_out = f"{notes_out};classified_nonfatal_130=1"
+                if nonfatal_maintenance:
+                    marker_text = ",".join([path.name for path in active_maintenance_markers])
+                    suffix = "classified_nonfatal_maintenance=1"
+                    if marker_text:
+                        suffix += f";maintenance_markers={marker_text}"
+                    notes_out = f"{notes_out};{suffix}" if notes_out else suffix
                 _add(
                     rows,
                     "b_listing_offer_collection",
@@ -2893,6 +5083,13 @@ def main() -> None:
         "b_schema_orders_missing_items_window",
         DETAIL_ORDERS_MISSING_ITEMS,
         ["amazon_order_id", "purchase_date"],
+        optional=False,
+    )
+    _schema_check(
+        rows,
+        "b_schema_allocated_tokens_on_canceled_orders",
+        DETAIL_ALLOCATED_TOKENS_ON_CANCELED_ORDERS,
+        ["order_id", "seller_sku", "quantity", "token_id", "allocation_date", "order_status"],
         optional=False,
     )
     # Ensure the unknown-fee-country detail file exists (empty is OK).
@@ -3227,6 +5424,13 @@ def main() -> None:
             "reorder_flag",
             "value_velocity_gbp_per_day",
             "asof_date",
+            "units_sold_truth_30d",
+            "units_sold_velocity_30d",
+            "units_sold_source",
+            "latest_daily_truth_date",
+            "latest_daily_truth_state",
+            "latest_daily_truth_units",
+            "latest_daily_truth_profit_gbp",
         ],
         optional=True,
     )
@@ -3268,6 +5472,192 @@ def main() -> None:
         ],
         optional=True,
     )
+    _schema_check(
+        rows,
+        "e_schema_sales_truth_sku_30d",
+        OUT / "sales_truth_sku_30d_latest.csv",
+        ["sku", "window_days", "asof_date", "units_b_source", "revenue_b_source_gbp", "profit_b_source_gbp"],
+        optional=True,
+    )
+    _schema_check(
+        rows,
+        "e_schema_sales_truth_reconciliation",
+        OUT / "sales_truth_reconciliation_latest.csv",
+        [
+            "sku",
+            "window_days",
+            "asof_date",
+            "units_b_source",
+            "revenue_b_source_gbp",
+            "profit_b_source_gbp",
+            "units_e_output",
+            "revenue_e_output_gbp",
+            "profit_e_output_gbp",
+            "revenue_delta_gbp",
+            "profit_delta_gbp",
+            "confidence_status",
+            "root_cause_hint",
+        ],
+        optional=True,
+    )
+    _schema_check(
+        rows,
+        "e_schema_sku_daily_sales_truth",
+        OUT / "sku_daily_sales_truth_latest.csv",
+        [
+            "sku",
+            "date",
+            "source_state",
+            "units",
+            "revenue_gbp",
+            "profit_gbp",
+            "fees_gbp",
+            "cogs_gbp",
+            "confidence_status",
+            "notes",
+        ],
+        optional=True,
+    )
+    roi_truth_stats = _e_sales_truth_roi_integrity_stats(OUT / "sku_roi_snapshot.csv")
+    if not bool(roi_truth_stats.get("ready", False)):
+        missing_status = str(roi_truth_stats.get("status", "warn") or "warn")
+        missing_reason = str(roi_truth_stats.get("reason", "n/a") or "n/a")
+        missing_notes = str(roi_truth_stats.get("notes", "") or "")
+        _add(rows, "e_sales_truth_selling_rows_revenue_zero", missing_status, missing_reason, missing_notes)
+        _add(rows, "e_sales_truth_zero_profit_with_revenue", missing_status, missing_reason, missing_notes)
+        _add(rows, "e_sales_truth_missing_cogs_equals_units", missing_status, missing_reason, missing_notes)
+    else:
+        roi_notes = str(roi_truth_stats.get("notes", "") or "")
+        zero_revenue_rows = _safe_int(roi_truth_stats.get("zero_revenue_rows", 0))
+        zero_profit_with_revenue_rows = _safe_int(roi_truth_stats.get("zero_profit_with_revenue_rows", 0))
+        missing_cogs_equals_units_rows = _safe_int(roi_truth_stats.get("missing_cogs_equals_units_rows", 0))
+        _add(
+            rows,
+            "e_sales_truth_selling_rows_revenue_zero",
+            "fail" if zero_revenue_rows > 0 else "ok",
+            str(zero_revenue_rows),
+            roi_notes,
+        )
+        _add(
+            rows,
+            "e_sales_truth_zero_profit_with_revenue",
+            "fail" if zero_profit_with_revenue_rows > 0 else "ok",
+            str(zero_profit_with_revenue_rows),
+            roi_notes,
+        )
+        _add(
+            rows,
+            "e_sales_truth_missing_cogs_equals_units",
+            "fail" if missing_cogs_equals_units_rows > 0 else "ok",
+            str(missing_cogs_equals_units_rows),
+            roi_notes,
+        )
+    recon_stats = _e_sales_truth_reconciliation_stats(OUT / "sales_truth_reconciliation_latest.csv")
+    if not bool(recon_stats.get("ready", False)):
+        _add(
+            rows,
+            "e_sales_truth_reconciliation_mismatch_rows",
+            str(recon_stats.get("status", "warn") or "warn"),
+            str(recon_stats.get("reason", "n/a") or "n/a"),
+            str(recon_stats.get("notes", "") or ""),
+        )
+    else:
+        _add(
+            rows,
+            "e_sales_truth_reconciliation_mismatch_rows",
+            str(recon_stats.get("status", "warn") or "warn"),
+            str(_safe_int(recon_stats.get("mismatch_rows", 0))),
+            str(recon_stats.get("notes", "") or ""),
+        )
+    perf_units_stats = _e_performance_units_alignment_stats(OUT / "sku_performance_summary.csv")
+    if not bool(perf_units_stats.get("ready", False)):
+        _add(
+            rows,
+            "e_sales_truth_performance_units_align_roi",
+            str(perf_units_stats.get("status", "warn") or "warn"),
+            str(perf_units_stats.get("reason", "n/a") or "n/a"),
+            str(perf_units_stats.get("notes", "") or ""),
+        )
+    else:
+        _add(
+            rows,
+            "e_sales_truth_performance_units_align_roi",
+            str(perf_units_stats.get("status", "warn") or "warn"),
+            str(_safe_int(perf_units_stats.get("mismatch_rows", 0))),
+            str(perf_units_stats.get("notes", "") or ""),
+        )
+    daily_truth_stats = _e_daily_sales_truth_stats(OUT / "sku_daily_sales_truth_latest.csv")
+    if not bool(daily_truth_stats.get("ready", False)):
+        _add(
+            rows,
+            "e_sales_truth_daily_state_explicit",
+            str(daily_truth_stats.get("status", "warn") or "warn"),
+            str(daily_truth_stats.get("reason", "n/a") or "n/a"),
+            str(daily_truth_stats.get("notes", "") or ""),
+        )
+        _add(
+            rows,
+            "e_sales_truth_daily_confidence_state_alignment",
+            str(daily_truth_stats.get("status", "warn") or "warn"),
+            str(daily_truth_stats.get("reason", "n/a") or "n/a"),
+            str(daily_truth_stats.get("notes", "") or ""),
+        )
+    else:
+        bad_source_count = _safe_int(daily_truth_stats.get("invalid_source_rows", 0)) + _safe_int(
+            daily_truth_stats.get("blank_source_rows", 0)
+        )
+        bad_conf_count = _safe_int(daily_truth_stats.get("provisional_bad_confidence_rows", 0)) + _safe_int(
+            daily_truth_stats.get("finalized_bad_confidence_rows", 0)
+        )
+        _add(
+            rows,
+            "e_sales_truth_daily_state_explicit",
+            "fail" if bad_source_count > 0 else "ok",
+            str(bad_source_count),
+            str(daily_truth_stats.get("notes", "") or ""),
+        )
+        _add(
+            rows,
+            "e_sales_truth_daily_confidence_state_alignment",
+            "fail" if bad_conf_count > 0 else "ok",
+            str(bad_conf_count),
+            str(daily_truth_stats.get("notes", "") or ""),
+        )
+    study_fresh_stats = _e_study_report_fresh_vs_summary_stats(OUT / "sku_performance_summary.csv", OUT / "e_study_report.csv")
+    if not bool(study_fresh_stats.get("ready", False)):
+        _add(
+            rows,
+            "e_study_report_fresh_vs_summary",
+            str(study_fresh_stats.get("status", "warn") or "warn"),
+            str(study_fresh_stats.get("reason", "n/a") or "n/a"),
+            str(study_fresh_stats.get("notes", "") or ""),
+        )
+    else:
+        _add(
+            rows,
+            "e_study_report_fresh_vs_summary",
+            str(study_fresh_stats.get("status", "warn") or "warn"),
+            str(int(float(study_fresh_stats.get("lag_seconds", 0) or 0))),
+            str(study_fresh_stats.get("notes", "") or ""),
+        )
+    study_align_stats = _e_study_report_truth_alignment_stats(OUT / "sku_performance_summary.csv", OUT / "e_study_report.csv")
+    if not bool(study_align_stats.get("ready", False)):
+        _add(
+            rows,
+            "e_study_report_truth_alignment",
+            str(study_align_stats.get("status", "warn") or "warn"),
+            str(study_align_stats.get("reason", "n/a") or "n/a"),
+            str(study_align_stats.get("notes", "") or ""),
+        )
+    else:
+        _add(
+            rows,
+            "e_study_report_truth_alignment",
+            str(study_align_stats.get("status", "warn") or "warn"),
+            str(_safe_int(study_align_stats.get("mismatch_rows", 0))),
+            str(study_align_stats.get("notes", "") or ""),
+        )
+    _o_net_fee_bridge_check(rows)
     today_utc = datetime.now(timezone.utc).date().isoformat()
     input_asof = {
         "listing_offer_history": _today_listing_offer_snapshot_asof(today_utc),
@@ -3742,6 +6132,327 @@ def main() -> None:
             "tier",
             "tier_reason",
             "source",
+        ],
+        optional=True,
+    )
+    _schema_check(
+        rows,
+        "h_schema_ceiling_events",
+        H_CEILING_EVENTS_PATH,
+        [
+            "event_ts_utc",
+            "run_id",
+            "sku",
+            "ceiling_event_id",
+            "compliance_ceiling_gbp",
+            "eligibility_ceiling_gbp",
+            "demand_ceiling_gbp",
+            "suppression_ceiling_gbp",
+            "true_binding_ceiling_gbp",
+            "true_binding_ceiling_type",
+            "target_price_gbp",
+            "hard_floor_gbp",
+            "ceiling_conflict_flag",
+            "reason_codes_json",
+        ],
+        optional=False,
+    )
+    _required_non_blank_check(
+        rows,
+        "h_ceiling_events_required_fields_non_blank",
+        H_CEILING_EVENTS_PATH,
+        [
+            "run_id",
+            "ceiling_event_id",
+            "true_binding_ceiling_gbp",
+            "true_binding_ceiling_type",
+            "target_price_gbp",
+            "hard_floor_gbp",
+            "ceiling_conflict_flag",
+            "reason_codes_json",
+        ],
+        optional=False,
+    )
+    _schema_check(
+        rows,
+        "h_schema_strategy_outcome_log",
+        H_STRATEGY_OUTCOME_LOG_PATH,
+        [
+            "event_ts_utc",
+            "run_id",
+            "sku",
+            "asin",
+            "scenario_type",
+            "chosen_tactic",
+            "buy_box_state_before",
+            "buy_box_state_after",
+            "seller_count",
+            "lowest_price_1_gbp",
+            "lowest_price_2_gbp",
+            "lowest_price_3_gbp",
+            "our_price_before_gbp",
+            "target_price_gbp",
+            "price_written_gbp",
+            "hold_until_utc",
+            "response_window_minutes",
+            "retry_budget_remaining",
+            "stop_rule_code",
+            "writer_outcome",
+            "tactic_success_state",
+            "reason_codes_json",
+            "tactic_case_id",
+        ],
+        optional=False,
+    )
+    _required_non_blank_check(
+        rows,
+        "h_strategy_outcome_log_required_fields_non_blank",
+        H_STRATEGY_OUTCOME_LOG_PATH,
+        [
+            "run_id",
+            "scenario_type",
+            "chosen_tactic",
+            "seller_count",
+            "our_price_before_gbp",
+            "target_price_gbp",
+            "response_window_minutes",
+            "retry_budget_remaining",
+            "writer_outcome",
+            "reason_codes_json",
+            "tactic_case_id",
+        ],
+        optional=False,
+    )
+    _schema_check(
+        rows,
+        "h_schema_strategy_outcome_daily",
+        H_STRATEGY_OUTCOME_DAILY_PATH,
+        [
+            "asof_date",
+            "scenario_type",
+            "chosen_tactic",
+            "decision_rows",
+            "applied_rows",
+            "no_write_rows",
+            "resolved_rows",
+            "pending_rows",
+            "success_rows",
+            "failed_rows",
+            "expired_rows",
+            "aborted_rows",
+            "success_rate_pct",
+            "failed_rate_pct",
+            "sample_min_rows",
+            "provisional_sample_flag",
+            "avg_seller_count",
+            "avg_price_gap_to_lowest_gbp",
+            "below_break_even_rows",
+            "at_floor_rows",
+            "notes",
+        ],
+        optional=False,
+    )
+    _required_non_blank_check(
+        rows,
+        "h_strategy_outcome_daily_required_fields_non_blank",
+        H_STRATEGY_OUTCOME_DAILY_PATH,
+        [
+            "decision_rows",
+            "applied_rows",
+            "no_write_rows",
+            "resolved_rows",
+            "pending_rows",
+            "success_rows",
+            "failed_rows",
+            "expired_rows",
+            "aborted_rows",
+            "success_rate_pct",
+            "failed_rate_pct",
+            "sample_min_rows",
+            "provisional_sample_flag",
+            "avg_seller_count",
+            "avg_price_gap_to_lowest_gbp",
+            "below_break_even_rows",
+            "at_floor_rows",
+        ],
+        optional=False,
+    )
+    try:
+        ceiling_df = _read_csv(H_CEILING_EVENTS_PATH)
+        result = _h_ceiling_effective_floor_integrity_result(ceiling_df, path=H_CEILING_EVENTS_PATH)
+        _add(
+            rows,
+            "h_ceiling_effective_floor_integrity",
+            result.get("status", "warn"),
+            result.get("value", "read_error"),
+            result.get("notes", ""),
+        )
+    except Exception as exc:
+        _add(
+            rows,
+            "h_ceiling_effective_floor_integrity",
+            "warn",
+            "read_error",
+            str(exc),
+        )
+
+    try:
+        daily_df = _read_csv(H_STRATEGY_OUTCOME_DAILY_PATH)
+        if daily_df.empty:
+            _add(
+                rows,
+                "h_strategy_outcome_daily_count_integrity",
+                "warn",
+                "missing_or_empty",
+                f"path={H_STRATEGY_OUTCOME_DAILY_PATH}",
+            )
+        else:
+            invalid_count = 0
+            checked_rows = 0
+            samples: list[str] = []
+            for _, row in daily_df.iterrows():
+                checked_rows += 1
+                decision_rows = max(_safe_int(row.get("decision_rows", "0")), 0)
+                applied_rows = max(_safe_int(row.get("applied_rows", "0")), 0)
+                no_write_rows = max(_safe_int(row.get("no_write_rows", "0")), 0)
+                resolved_rows = max(_safe_int(row.get("resolved_rows", "0")), 0)
+                pending_rows = max(_safe_int(row.get("pending_rows", "0")), 0)
+                success_rows = max(_safe_int(row.get("success_rows", "0")), 0)
+                failed_rows = max(_safe_int(row.get("failed_rows", "0")), 0)
+                expired_rows = max(_safe_int(row.get("expired_rows", "0")), 0)
+                aborted_rows = max(_safe_int(row.get("aborted_rows", "0")), 0)
+                below_break_even_rows = max(_safe_int(row.get("below_break_even_rows", "0")), 0)
+                at_floor_rows = max(_safe_int(row.get("at_floor_rows", "0")), 0)
+
+                row_issues: list[str] = []
+                if applied_rows + no_write_rows != decision_rows:
+                    row_issues.append("apply_split")
+                if resolved_rows + pending_rows != decision_rows:
+                    row_issues.append("resolve_split")
+                if success_rows + failed_rows + expired_rows + aborted_rows > decision_rows:
+                    row_issues.append("terminal_over_decision")
+                if at_floor_rows > decision_rows:
+                    row_issues.append("at_floor_over_decision")
+                if below_break_even_rows > decision_rows:
+                    row_issues.append("break_even_over_decision")
+                if row_issues:
+                    invalid_count += 1
+                    if len(samples) < 5:
+                        asof = str(row.get("asof_date", "")).strip() or "na"
+                        scenario = str(row.get("scenario_type", "")).strip() or "na"
+                        tactic = str(row.get("chosen_tactic", "")).strip() or "na"
+                        samples.append(f"{asof}|{scenario}|{tactic}|{'+'.join(row_issues)}")
+
+            _add(
+                rows,
+                "h_strategy_outcome_daily_count_integrity",
+                "fail" if invalid_count > 0 else "ok",
+                str(invalid_count),
+                (
+                    f"checked_rows={checked_rows};"
+                    + (f"samples={','.join(samples)}" if samples else "samples=none")
+                ),
+            )
+    except Exception as exc:
+        _add(
+            rows,
+            "h_strategy_outcome_daily_count_integrity",
+            "warn",
+            "read_error",
+            str(exc),
+        )
+
+    strategy_focus_scenarios = [
+        "multi_seller_ladder_cap",
+        "single_rival_reset",
+        "suppression_reactivation",
+    ]
+    no_write_failed_threshold = max(
+        _safe_int(os.environ.get("H_STRATEGY_NO_WRITE_FAILED_STREAK_WARN", "5")),
+        1,
+    )
+    streak_stats = _strategy_no_write_failed_streaks(H_STRATEGY_OUTCOME_LOG_PATH)
+    for scenario in strategy_focus_scenarios:
+        scenario_stat = streak_stats.get(scenario, {})
+        streak = int(scenario_stat.get("streak", 0) or 0)
+        sample_cases = scenario_stat.get("sample_case_ids", [])
+        sample_text = ",".join([str(item) for item in sample_cases[:3]]) if isinstance(sample_cases, list) else ""
+        _add(
+            rows,
+            f"h_strategy_no_write_failed_streak_{scenario}",
+            "warn" if streak >= no_write_failed_threshold else "ok",
+            str(streak),
+            f"scenario={scenario};warn_threshold={no_write_failed_threshold};sample_case_ids={sample_text}",
+        )
+
+    sample_snapshot = _strategy_sample_size_snapshot(H_STRATEGY_OUTCOME_DAILY_PATH)
+    latest_asof = str(sample_snapshot.get("asof_date", "") or "")
+    rows_by_scenario = sample_snapshot.get("rows_by_scenario", {})
+    if not isinstance(rows_by_scenario, dict):
+        rows_by_scenario = {}
+    expired_share_warn_pct = _safe_float(os.environ.get("H_STRATEGY_EXPIRED_SHARE_WARN_PCT", "70")) or 70.0
+    for scenario in strategy_focus_scenarios:
+        scenario_row = rows_by_scenario.get(scenario, {}) if isinstance(rows_by_scenario, dict) else {}
+        decision_rows = int(scenario_row.get("decision_rows", 0) or 0) if isinstance(scenario_row, dict) else 0
+        sample_min_rows = (
+            int(scenario_row.get("sample_min_rows", 0) or 0) if isinstance(scenario_row, dict) else 0
+        ) or _strategy_sample_min_rows_for_health(scenario)
+        provisional_flag = (
+            int(scenario_row.get("provisional_sample_flag", 0) or 0) if isinstance(scenario_row, dict) else 0
+        )
+        expired_rows = int(scenario_row.get("expired_rows", 0) or 0) if isinstance(scenario_row, dict) else 0
+        terminal_rows = int(scenario_row.get("terminal_rows", 0) or 0) if isinstance(scenario_row, dict) else 0
+        expired_share_pct = (
+            float(scenario_row.get("expired_share_pct", 0.0) or 0.0) if isinstance(scenario_row, dict) else 0.0
+        )
+        chosen_tactic = str(scenario_row.get("chosen_tactic", "") if isinstance(scenario_row, dict) else "").strip()
+        if not scenario_row:
+            provisional_flag = 1
+        _add(
+            rows,
+            f"h_strategy_sample_size_{scenario}",
+            "warn" if provisional_flag == 1 else "ok",
+            str(decision_rows),
+            (
+                f"scenario={scenario};asof_date={latest_asof or 'none'};"
+                f"sample_min_rows={sample_min_rows};provisional_sample_flag={provisional_flag};"
+                f"chosen_tactic={chosen_tactic}"
+            ),
+        )
+        _add(
+            rows,
+            f"h_strategy_expired_share_{scenario}",
+            "warn" if (provisional_flag == 0 and expired_share_pct >= expired_share_warn_pct) else "ok",
+            f"{expired_share_pct:.2f}",
+            (
+                f"scenario={scenario};asof_date={latest_asof or 'none'};"
+                f"expired_rows={expired_rows};terminal_rows={terminal_rows};"
+                f"warn_threshold_pct={expired_share_warn_pct:.2f}"
+            ),
+        )
+    _required_non_blank_check(
+        rows,
+        "h_suppression_cases_required_fields_non_blank",
+        H_SUPPRESSION_CASES_PATH,
+        [
+            "suppression_target_source",
+            "suppression_ceiling_landed_temp",
+            "anchor_floor_price",
+            "action",
+            "notes",
+        ],
+        optional=True,
+    )
+    _required_non_blank_check(
+        rows,
+        "h_suppression_reactivation_required_fields_non_blank",
+        H_SUPPRESSION_REACTIVATION_LOG_PATH,
+        [
+            "suppression_target_source",
+            "suppression_ceiling_landed_temp",
+            "anchor_floor_price",
+            "write_status",
+            "reason_codes_json",
         ],
         optional=True,
     )
@@ -4258,6 +6969,82 @@ def main() -> None:
         ("e_cycle_stale_lock", E_LOCK_PATH_CANDIDATES),
     ]:
         _cycle_stale_lock_check(rows, check_name, candidates)
+    _critical_freshness_check(
+        rows,
+        "h_cycle_log_freshness",
+        H_CYCLE_LOG_PATH_CANDIDATES,
+        warn_after_minutes=float(os.environ.get("H_CYCLE_LOG_WARN_MINUTES", "20")),
+        fail_after_minutes=float(os.environ.get("H_CYCLE_LOG_FAIL_MINUTES", "60")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "h_listing_offer_snapshot_latest_freshness",
+        [LISTING_OFFER_SNAPSHOT_LATEST_PATH],
+        warn_after_minutes=float(os.environ.get("H_LISTING_SNAPSHOT_WARN_MINUTES", "20")),
+        fail_after_minutes=float(os.environ.get("H_LISTING_SNAPSHOT_FAIL_MINUTES", "60")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "h_phase1_runtime_floor_snapshot_latest_freshness",
+        [PHASE1_RUNTIME_FLOOR_SNAPSHOT_LATEST_PATH],
+        warn_after_minutes=float(os.environ.get("H_FLOOR_SNAPSHOT_WARN_MINUTES", "30")),
+        fail_after_minutes=float(os.environ.get("H_FLOOR_SNAPSHOT_FAIL_MINUTES", "90")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "h_ceiling_events_current",
+        [H_CEILING_EVENTS_PATH],
+        warn_after_minutes=float(os.environ.get("H_CEILING_EVENTS_WARN_MINUTES", "20")),
+        fail_after_minutes=float(os.environ.get("H_CEILING_EVENTS_FAIL_MINUTES", "60")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "h_strategy_outcome_log_current",
+        [H_STRATEGY_OUTCOME_LOG_PATH],
+        warn_after_minutes=float(os.environ.get("H_STRATEGY_OUTCOME_LOG_WARN_MINUTES", "20")),
+        fail_after_minutes=float(os.environ.get("H_STRATEGY_OUTCOME_LOG_FAIL_MINUTES", "60")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+    )
+    _critical_freshness_check(
+        rows,
+        "h_strategy_outcome_daily_current",
+        [H_STRATEGY_OUTCOME_DAILY_PATH],
+        warn_after_minutes=float(os.environ.get("H_STRATEGY_OUTCOME_DAILY_WARN_MINUTES", "1440")),
+        fail_after_minutes=float(os.environ.get("H_STRATEGY_OUTCOME_DAILY_FAIL_MINUTES", "2880")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+        missing_status="warn",
+    )
+    _critical_freshness_check(
+        rows,
+        "h_terminal_marker_freshness",
+        H_TERMINAL_INFO_PATH_CANDIDATES,
+        warn_after_minutes=float(os.environ.get("H_PUBLISH_MARKER_WARN_MINUTES", "30")),
+        fail_after_minutes=float(os.environ.get("H_PUBLISH_MARKER_FAIL_MINUTES", "90")),
+        owner_cycle="H",
+        recovery_signal="run_H_cycle.bat_guarded_owner",
+        now_utc=now_utc_dt,
+        missing_status="warn",
+    )
+    _h_publish_marker_freshness_check(
+        rows,
+        now_utc=now_utc_dt,
+    )
     snapshot_path = _latest_snapshot(LISTING_OFFER_SNAPSHOT_GLOB)
     if snapshot_path is None:
         _add(rows, "h_schema_listing_offer_snapshot", "warn", "missing", "no snapshot files found")
@@ -4751,7 +7538,11 @@ def main() -> None:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         if LISTING_OFFER_HISTORY.exists():
-            offer_hist = pd.read_csv(LISTING_OFFER_HISTORY, dtype=str).fillna("")
+            offer_hist = read_dataframe_with_sql_fallback(
+                LISTING_OFFER_HISTORY,
+                "h_listing_offer_history",
+                dtype=str,
+            ).fillna("")
             if "asof_date" not in offer_hist.columns:
                 _add(rows, "h_listing_offer_history_idempotent_today", "warn", "missing_col", "asof_date")
             else:
@@ -4848,7 +7639,11 @@ def main() -> None:
 
     try:
         if INVENTORY_HISTORY.exists():
-            inv_hist = pd.read_csv(INVENTORY_HISTORY, dtype=str).fillna("")
+            inv_hist = read_dataframe_with_sql_fallback(
+                INVENTORY_HISTORY,
+                "a_inventory_history",
+                dtype=str,
+            ).fillna("")
             if "asof_date" not in inv_hist.columns:
                 _add(rows, "h_inventory_history_idempotent_today", "warn", "missing_col", "asof_date")
             else:
@@ -4927,6 +7722,7 @@ def main() -> None:
             df_all,
             alert_state_path,
             now_utc_dt,
+            history_path=alert_history_path,
             recompute_source=str(checklist_path),
             profile=profile,
         )
@@ -4936,6 +7732,7 @@ def main() -> None:
             df_profile,
             alert_state_path,
             now_utc_dt,
+            history_path=alert_history_path,
             recompute_source=str(checklist_path),
             profile=profile,
         )
@@ -4943,7 +7740,7 @@ def main() -> None:
         df_profile["status"] = ""
     if "check" not in df_profile.columns:
         df_profile["check"] = ""
-    df_profile.to_csv(checklist_path, index=False)
+    _write_health_checklist_csv(df_profile, checklist_path)
     if profile == "global":
         _write_cycle_alert_files(df_all)
 
@@ -5036,11 +7833,13 @@ def _write_runtime_exception_snapshot(
     profile: str = "global",
     checklist_path: Path | None = None,
     alert_state_path: Path | None = None,
+    alert_history_path: Path | None = None,
     health_status_path: Path | None = None,
 ) -> None:
     profile_norm = _normalize_profile(profile)
     checklist = checklist_path or _default_checklist_for_profile(profile_norm)
     alert_state = alert_state_path or _default_alert_state_for_profile(profile_norm)
+    alert_history = alert_history_path or _default_alert_history_for_profile(profile_norm)
     health_status = health_status_path or _default_health_status_for_profile(profile_norm)
     now_utc_dt = datetime.now(timezone.utc)
     tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
@@ -5072,6 +7871,7 @@ def _write_runtime_exception_snapshot(
     try:
         checklist.parent.mkdir(parents=True, exist_ok=True)
         alert_state.parent.mkdir(parents=True, exist_ok=True)
+        alert_history.parent.mkdir(parents=True, exist_ok=True)
         health_status.parent.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
@@ -5096,12 +7896,12 @@ def _write_runtime_exception_snapshot(
             pass
 
     try:
-        df_out = _apply_alert_aging(df_out, alert_state, now_utc_dt)
+        df_out = _apply_alert_aging(df_out, alert_state, now_utc_dt, history_path=alert_history)
     except Exception:
         pass
 
     try:
-        df_out.to_csv(checklist, index=False)
+        _write_health_checklist_csv(df_out, checklist)
     except Exception:
         pass
     try:
@@ -5159,6 +7959,7 @@ def _run_main_fail_closed(main_fn) -> int:
             profile=str(runtime["profile"]),
             checklist_path=Path(runtime["checklist_path"]),
             alert_state_path=Path(runtime["alert_state_path"]),
+            alert_history_path=Path(runtime["alert_history_path"]),
             health_status_path=Path(runtime["health_status_path"]),
         )
         return 2

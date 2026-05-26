@@ -1,0 +1,2 @@
+observed_utc,policy_id,seller_sku,asin,day,replay_status,competition_scenario,replay_mode,price_zone,sales_share_pct,estimated_units_ours,estimated_profit_gbp,failure_event_flag
+2026-04-10T08:00:00Z,f_backtest_policy_v1,SKU-BT-001,B000TEST01,2026-03-15,ok,sharing_with_fba,normal_sell,normal,50,0.75,1.49,0

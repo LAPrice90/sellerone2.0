@@ -308,7 +308,12 @@ def acquire_spapi_lock(run_id: str, script_name: str) -> bool:
             except Exception:
                 return False
 
-        if pid is not None and os.environ.get("SPAPI_STEAL_LOCK", "0").strip() == "1":
+        steal_lock_enabled = False
+        try:
+            steal_lock_enabled = str(os.environ.get("SPAPI_STEAL_LOCK", "0")).strip() == "1"
+        except OSError:
+            steal_lock_enabled = False
+        if pid is not None and steal_lock_enabled:
             if _terminate_pid(pid):
                 _archive_spapi_lock(existing, reason=f"stolen_lock pid={pid}")
                 try:
@@ -385,6 +390,32 @@ def spapi_patch_json(
     return _spapi_request(
         ctx=ctx,
         method="PATCH",
+        url=url,
+        spapi_base_url=spapi_base_url,
+        headers=headers,
+        params=params,
+        timeout=timeout,
+        min_interval_sec=min_interval_sec,
+        max_retries=max_retries,
+        body=body,
+    )
+
+
+def spapi_put_json(
+    *,
+    ctx: SpApiCallContext,
+    url: str,
+    spapi_base_url: str,
+    headers: Dict[str, str],
+    body: str,
+    params: Optional[Dict[str, str]] = None,
+    timeout: float | tuple[float, float] = DEFAULT_TIMEOUT,
+    min_interval_sec: float = 1.0,
+    max_retries: int = DEFAULT_MAX_ATTEMPTS,
+) -> requests.Response:
+    return _spapi_request(
+        ctx=ctx,
+        method="PUT",
         url=url,
         spapi_base_url=spapi_base_url,
         headers=headers,
@@ -494,6 +525,8 @@ def _spapi_request(
                     resp = requests.get(signed_url, headers=signed, timeout=timeout)
                 elif method.upper() == "POST":
                     resp = requests.post(signed_url, headers=signed, data=body, timeout=timeout)
+                elif method.upper() == "PUT":
+                    resp = requests.put(signed_url, headers=signed, data=body, timeout=timeout)
                 elif method.upper() == "PATCH":
                     resp = requests.patch(signed_url, headers=signed, data=body, timeout=timeout)
                 else:

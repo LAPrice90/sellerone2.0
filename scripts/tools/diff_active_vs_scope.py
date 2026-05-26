@@ -3,9 +3,12 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from scripts.core.storage import read_dataframe_with_sql_fallback
+
 
 ACTIVE_LISTINGS_PATH = Path("out/active_listings.csv")
 SCOPE_PATH = Path("out/phase1_sku_scope.csv")
+SQL_TABLE_PHASE1_SKU_SCOPE = "b_phase1_sku_scope"
 OUT_EXCLUDED = Path("out/DIFF_active_excluded_by_scope.csv")
 OUT_MISSING = Path("out/DIFF_active_missing_from_scope.csv")
 
@@ -19,6 +22,9 @@ def _truthy_flag(text: object) -> bool:
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
+    if path == SCOPE_PATH:
+        df = read_dataframe_with_sql_fallback(path, SQL_TABLE_PHASE1_SKU_SCOPE, dtype=str).fillna("")
+        return [{str(k): _norm(v) for k, v in row.items()} for row in df.to_dict("records")]
     with path.open("r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         return [{str(k): _norm(v) for k, v in row.items()} for row in reader]
@@ -40,12 +46,12 @@ def main() -> int:
             "Run scripts/tools/build_active_listings_csv.py first."
         )
         return 2
-    if not SCOPE_PATH.exists():
+    active_rows = _read_csv(ACTIVE_LISTINGS_PATH)
+    try:
+        scope_rows = _read_csv(SCOPE_PATH)
+    except FileNotFoundError:
         print("[ERROR] Missing scope file: out/phase1_sku_scope.csv")
         return 2
-
-    active_rows = _read_csv(ACTIVE_LISTINGS_PATH)
-    scope_rows = _read_csv(SCOPE_PATH)
 
     active_skus = []
     seen_active: set[str] = set()
@@ -113,4 +119,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

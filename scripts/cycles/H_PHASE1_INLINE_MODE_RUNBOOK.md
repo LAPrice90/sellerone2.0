@@ -35,6 +35,84 @@ If a mode variable is unset or invalid, it falls back to `inline`.
    - Set `H_PHASE1_PILOT_MODE=subprocess`
    - Re-run and confirm `phase1 pilot_step child_started pid=...` appears again.
 
+## Controlled Isolation Validation (SELLERONE-ARCH-RESET-005)
+
+Use this when H is scheduler-owned and you need isolated guarded validation.
+
+### Operator-safe entrypoints
+- `run_H_isolation_status.bat`
+- `run_H_isolation_pause.bat`
+- `run_H_isolation_success.bat`
+- `run_H_isolation_failure.bat`
+- `run_H_isolation_resume.bat`
+
+### Required safety model
+- `pause` and `resume` require elevated shell (`Run as administrator`).
+- `run-success` and `run-failure` fail closed unless all are true:
+- task `AMZ H Cycle` is not running
+- task `AMZ H Cycle` is disabled
+- no active H owner process remains
+- `out/locks/h_controlled_mode.active` exists
+- stale lock reconciliation has completed (confirmed-dead lock artifacts are archived under `out/locks/archive` and removed)
+- isolated run exits with explicit terminal truth in `H_run_state.json` or `H_worker_lifecycle.json`
+
+### Sequence for isolated validation
+1. Baseline status:
+- run `run_H_isolation_status.bat`
+2. Pause scheduler ownership (elevated):
+- run `run_H_isolation_pause.bat`
+3. Isolated guarded success path:
+- run `run_H_isolation_success.bat`
+4. Isolated guarded induced-failure path:
+- run `run_H_isolation_failure.bat`
+- failure injection mode is `--skip-stage phase1_publish`
+5. Resume normal ownership (elevated):
+- run `run_H_isolation_resume.bat`
+6. Confirm post-resume status:
+- run `run_H_isolation_status.bat`
+
+### Main evidence files
+- `out/systems/H/live/H_run_state.json`
+- `out/systems/H/live/H_worker_lifecycle.json`
+- `out/systems/H/live/H_runtime_status.json`
+- `out/systems/H/live/H_pricing_cycle.EXIT_STATUS.txt`
+- `out/systems/H/live/H_pricing_cycle.HEARTBEAT.txt`
+- `out/systems/H/live/H_cycle.log`
+
+## Owner Termination Audit Readiness (SELLERONE-ARCH-RESET-022)
+
+Use this before the next failing isolated capture when provenance still reports `win32_process_disappearance_only`.
+
+### Operator entrypoints
+- `run_H_owner_audit_status.bat`
+- `run_H_owner_audit_enable.bat` (requires elevated shell)
+- `run_H_owner_audit_revert.bat` (requires elevated shell, optional)
+
+### Required sequence
+1. Check readiness:
+- run `run_H_owner_audit_status.bat`
+- confirm output includes:
+  - `readiness.assessment.process_creation_success_enabled=true`
+  - `readiness.assessment.process_termination_success_enabled=true`
+  - `readiness.assessment.security_channel_readable=true`
+  - `readiness.assessment.ready_for_owner_termination_capture=true`
+2. If not ready, enable minimum policy (elevated):
+- run `run_H_owner_audit_enable.bat`
+3. Verify readiness again:
+- run `run_H_owner_audit_status.bat`
+4. Run failing isolated capture sequence for owner provenance.
+5. Optional revert to pre-enable baseline (elevated):
+- run `run_H_owner_audit_revert.bat`
+
+### Baseline and reversibility
+- Enable action writes baseline to:
+  - `out/systems/H/live/H_owner_audit_policy_baseline.json`
+- Revert action restores audit settings from that baseline file.
+
+### Notes
+- If `auditpol` query reports privilege or access errors, re-run from elevated shell.
+- This step changes host audit policy only. It does not change H runtime behavior.
+
 ## Stage Bisect Controls
 - Stage env toggles (default `1`):
   - `H_STAGE_SNAPSHOT_REFRESH`

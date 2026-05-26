@@ -18,11 +18,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import pandas as pd
-import gspread
-from gspread.exceptions import APIError
 
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
@@ -33,23 +31,65 @@ from scripts.api.get_financial_events import (  # noqa: E402
     list_financial_events,
     load_dotenv_if_missing,
 )
+try:
+    from scripts.core.storage import (
+        StorageConfig,
+        connect_store,
+        coalesce_duplicate_header_rows,
+        dataframe_from_product_db_sheet_rows,
+        parse_storage_mode,
+        replace_table_from_dataframe,
+        write_dataframe_with_sql_compat,
+    )
+    from scripts.flows.B._finance_io import read_finance_frame, replace_finance_table, write_finance_frame
+except ModuleNotFoundError:
+    from core.storage import (
+        StorageConfig,
+        connect_store,
+        coalesce_duplicate_header_rows,
+        dataframe_from_product_db_sheet_rows,
+        parse_storage_mode,
+        replace_table_from_dataframe,
+        write_dataframe_with_sql_compat,
+    )
+    from flows.B._finance_io import read_finance_frame, replace_finance_table, write_finance_frame
+
+if TYPE_CHECKING:
+    import gspread
 
 OUT_RAW = Path("out/financial_events_level3_raw.csv")
+SQL_TABLE_RAW = "b_financial_events_level3_raw"
 OUT_RAW_DEDUP = Path("out/financial_events_level3_raw_dedup.csv")
+SQL_TABLE_RAW_DEDUP = "b_financial_events_level3_raw_dedup"
 OUT_SUM = Path("out/financial_events_level3_summary.csv")
+SQL_TABLE_SUMMARY = "b_financial_events_level3_summary"
 OUT_OFFICIAL = Path("out/financial_events_level3_official.csv")
+SQL_TABLE_OFFICIAL = "b_financial_events_level3_official"
+PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 OUT_ACCOUNT = Path("out/financial_events_account_ledger.csv")
+SQL_TABLE_ACCOUNT = "b_financial_events_account_ledger"
 OUT_REFUNDS = Path("out/financial_events_refunds.csv")
+SQL_TABLE_REFUNDS = "b_financial_events_refunds"
 OUT_REFUNDS_OFFICIAL = Path("out/financial_events_refunds_official.csv")
+SQL_TABLE_REFUNDS_OFFICIAL = "b_financial_events_refunds_official"
 OUT_SHIPMENTS = Path("out/financial_events_shipments.csv")
+SQL_TABLE_SHIPMENTS = "b_financial_events_shipments"
 OUT_INBOUND_SUM = Path("out/financial_events_inbound_summary.csv")
+SQL_TABLE_INBOUND_SUMMARY = "b_financial_events_inbound_summary"
 OUT_STORAGE = Path("out/financial_events_storage.csv")
+SQL_TABLE_STORAGE = "b_financial_events_storage"
 OUT_STORAGE_SUM = Path("out/financial_events_storage_summary.csv")
+SQL_TABLE_STORAGE_SUMMARY = "b_financial_events_storage_summary"
 OUT_ACCOUNT_SUM = Path("out/financial_events_account_summary.csv")
+SQL_TABLE_ACCOUNT_SUMMARY = "b_financial_events_account_summary"
 OUT_L2_VS_L3 = Path("out/l2_vs_l3_discrepancies.csv")
+SQL_TABLE_L2_VS_L3 = "b_l2_vs_l3_discrepancies"
 OUT_VAT_MODEL = Path("out/vat_country_model.csv")
+SQL_TABLE_VAT_MODEL = "b_vat_country_model"
 FEE_RULES_PATH = Path("reference/fee_vat_rules.csv")
 OUT_FEE_MODEL = Path("out/fee_country_model.csv")
+SQL_TABLE_FEE_MODEL = "b_fee_country_model"
 MARKER_PATH = Path("out/financial_events_level3_last_posted.txt")
 ITEMS_ALL = Path("out/order_items_all.csv")
 ORDERS_ALL = Path("out/orders_all.csv")
@@ -109,6 +149,10 @@ def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    return write_finance_frame(df, path, sql_table)
+
+
 def _load_marker() -> Optional[str]:
     if POSTED_AFTER_ENV:
         return POSTED_AFTER_ENV
@@ -133,14 +177,19 @@ def _backoff_sleep(attempt: int) -> None:
     time.sleep(min(BASE_SLEEP * (2 ** (attempt - 1)), 60))
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread.Client":
+    import gspread
+
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not cred_path:
         cred_path = str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=cred_path)
 
 
-def write_tab_with_retry(sheet: gspread.Spreadsheet, tab_name: str, df: pd.DataFrame) -> None:
+def write_tab_with_retry(sheet: "gspread.Spreadsheet", tab_name: str, df: pd.DataFrame) -> None:
+    import gspread
+    from gspread.exceptions import APIError
+
     payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
     for attempt in range(1, SHEETS_MAX_RETRIES + 1):
         try:
@@ -166,8 +215,10 @@ def _too_big_for_sheets(df: pd.DataFrame) -> bool:
     return rows * max(cols, 1) > SHEETS_MAX_CELLS
 
 
-def export_product_db(sheet: gspread.Spreadsheet) -> None:
+def export_product_db(sheet: "gspread.Spreadsheet") -> None:
     """Dump Product_DB to out/product_db_preview.csv so downstream jobs see latest overrides."""
+    import gspread
+
     try:
         ws = sheet.worksheet(PRODUCT_DB_TAB)
     except gspread.WorksheetNotFound:
@@ -175,8 +226,15 @@ def export_product_db(sheet: gspread.Spreadsheet) -> None:
     rows = ws.get_all_values()
     if not rows:
         return
+    df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
     Path("out").mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows[1:], columns=rows[0]).to_csv("out/product_db_preview.csv", index=False)
+    write_dataframe_with_sql_compat(
+        df,
+        PRODUCT_DB_PREVIEW,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
 
 
 def update_product_db_last_fba_fee(df_official: pd.DataFrame, df_raw: Optional[pd.DataFrame] = None) -> None:
@@ -199,6 +257,9 @@ def update_product_db_last_fba_fee(df_official: pd.DataFrame, df_raw: Optional[p
     prod_rows = ws.get_all_values()
     if not prod_rows:
         return
+    prod_rows, repaired_headers = coalesce_duplicate_header_rows(prod_rows)
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before B003 update: " + ",".join(repaired_headers))
     headers = prod_rows[0]
     idx_map = {h: i for i, h in enumerate(headers)}
     required_cols = [
@@ -245,7 +306,7 @@ def update_product_db_last_fba_fee(df_official: pd.DataFrame, df_raw: Optional[p
     df = df_official.copy()
     if ORDERS_ALL.exists():
         try:
-            orders = pd.read_csv(ORDERS_ALL, dtype=str)[["amazon_order_id", "marketplace_id"]].rename(
+            orders = read_finance_frame(ORDERS_ALL, dtype=str)[["amazon_order_id", "marketplace_id"]].rename(
                 columns={"amazon_order_id": "Order ID"}
             )
             df = df.merge(orders, on="Order ID", how="left")
@@ -254,7 +315,7 @@ def update_product_db_last_fba_fee(df_official: pd.DataFrame, df_raw: Optional[p
     # Backfill Quantity Ordered from archived items when missing.
     if "Quantity Ordered" in df.columns and ITEMS_ALL.exists():
         try:
-            items = pd.read_csv(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
+            items = read_finance_frame(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
                 columns={"amazon_order_id": "Order ID", "seller_sku": "SKU", "quantity_ordered": "Quantity Ordered_src"}
             )
             df = df.merge(items, on=["Order ID", "SKU"], how="left")
@@ -528,31 +589,27 @@ def write_l2_vs_l3_discrepancies(df_official: pd.DataFrame) -> pd.DataFrame:
     ]
     if df_official.empty:
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     l2_path = Path("out/financial_events_level2.csv")
-    if not l2_path.exists():
+    try:
+        df_l2 = read_finance_frame(l2_path, "b_financial_events_level2", dtype=str)
+    except Exception:
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
-    df_l2 = pd.read_csv(l2_path, dtype=str)
     if df_l2.empty:
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     key_cols = ["Order ID", "SKU"]
     if any(c not in df_official.columns for c in key_cols):
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     if any(c not in df_l2.columns for c in key_cols):
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     fields = [
         "Price_Total",
@@ -584,7 +641,9 @@ def write_l2_vs_l3_discrepancies(df_official: pd.DataFrame) -> pd.DataFrame:
     df_l3 = df_official[key_cols + ["Date"] + [c for c in fields if c in df_official.columns]].copy()
     df = df_l2.merge(df_l3, on=key_cols, how="inner", suffixes=("_l2", "_l3"))
     if df.empty:
-        return
+        out = pd.DataFrame(columns=empty_cols)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
+        return out
     rows = []
     for field in fields:
         l2_col = f"{field}_l2"
@@ -605,8 +664,7 @@ def write_l2_vs_l3_discrepancies(df_official: pd.DataFrame) -> pd.DataFrame:
         rows.append(sub)
     if not rows:
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     out = pd.concat(rows, ignore_index=True)
     out["date_l3"] = pd.to_datetime(out["Date_l3"], errors="coerce", utc=True)
@@ -614,12 +672,10 @@ def write_l2_vs_l3_discrepancies(df_official: pd.DataFrame) -> pd.DataFrame:
     out = out[out["date_l3"].dt.date >= today]
     if out.empty:
         out = pd.DataFrame(columns=empty_cols)
-        OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-        out.to_csv(OUT_L2_VS_L3, index=False)
+        _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
         return out
     out = out.sort_values(by=["date_l3", "Order ID", "SKU", "field"]).drop(columns=["date_l3"])
-    OUT_L2_VS_L3.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(OUT_L2_VS_L3, index=False)
+    _write_output_frame(out, OUT_L2_VS_L3, SQL_TABLE_L2_VS_L3)
     return out
 
 
@@ -663,7 +719,7 @@ def build_official(df_raw: pd.DataFrame) -> pd.DataFrame:
     items_map = {}
     if ITEMS_ALL.exists():
         try:
-            items = pd.read_csv(ITEMS_ALL, dtype=str)[
+            items = read_finance_frame(ITEMS_ALL, dtype=str)[
                 [
                     "amazon_order_id",
                     "seller_sku",
@@ -700,7 +756,7 @@ def build_official(df_raw: pd.DataFrame) -> pd.DataFrame:
     # Order -> country map for fee VAT rules
     orders_map = {}
     try:
-        orders_df = pd.read_csv(ORDERS_ALL, dtype=str).fillna("")
+        orders_df = read_finance_frame(ORDERS_ALL, dtype=str).fillna("")
         orders_map = {
             str(r.get("amazon_order_id", "")).strip(): str(r.get("ship_country_code", "")).strip().upper()
             for _, r in orders_df.iterrows()
@@ -1031,7 +1087,7 @@ def build_vat_country_model(df_raw: pd.DataFrame) -> pd.DataFrame:
 
     if ORDERS_ALL.exists():
         try:
-            ord_map = pd.read_csv(ORDERS_ALL, dtype=str)[
+            ord_map = read_finance_frame(ORDERS_ALL, dtype=str)[
                 ["amazon_order_id", "marketplace_id", "ship_country_code"]
             ].rename(columns={"amazon_order_id": "order_id"})
             orders = orders.merge(ord_map, on="order_id", how="left")
@@ -1164,7 +1220,7 @@ def build_fee_country_model(df_raw: pd.DataFrame, df_official: pd.DataFrame) -> 
     # Attach marketplace and country
     if ORDERS_ALL.exists():
         try:
-            ord_map = pd.read_csv(ORDERS_ALL, dtype=str)[
+            ord_map = read_finance_frame(ORDERS_ALL, dtype=str)[
                 ["amazon_order_id", "marketplace_id", "ship_country_code"]
             ].rename(columns={"amazon_order_id": "order_id"})
             fees = fees.merge(ord_map, on="order_id", how="left")
@@ -1644,6 +1700,7 @@ def main() -> None:
     # Build summary from full raw (and de-dupe in-memory only).
     if OUT_RAW.exists():
         df_raw = pd.read_csv(OUT_RAW, dtype=str)
+        replace_finance_table(df_raw.fillna(""), SQL_TABLE_RAW)
         dedup_subset = [
             "order_id",
             "sku",
@@ -1658,7 +1715,7 @@ def main() -> None:
         qty_map = {}
         qty_cap_map = {}
         if ITEMS_ALL.exists():
-            items = pd.read_csv(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]]
+            items = read_finance_frame(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]]
             items["quantity_ordered"] = pd.to_numeric(items["quantity_ordered"], errors="coerce").fillna(0).astype(int)
             qty_map = (
                 items.groupby(["amazon_order_id", "seller_sku"])["quantity_ordered"]
@@ -1673,7 +1730,7 @@ def main() -> None:
             # If order total is available and per-line amounts already represent total,
             # cap duplicates to 1 even when qty > 1.
             if ORDERS_ALL.exists():
-                orders = pd.read_csv(ORDERS_ALL, dtype=str)[["amazon_order_id", "order_total_amount"]]
+                orders = read_finance_frame(ORDERS_ALL, dtype=str)[["amazon_order_id", "order_total_amount"]]
                 orders["order_total_amount"] = pd.to_numeric(orders["order_total_amount"], errors="coerce").fillna(0.0)
                 order_total_map = orders.set_index("amazon_order_id")["order_total_amount"].to_dict()
                 # Build principal/tax lookup from raw for each order+sku.
@@ -1704,11 +1761,11 @@ def main() -> None:
                 df_raw = df_raw.drop_duplicates(subset=dedup_subset)
                 print({"status": "warn", "reason": "dedup_limited_no_unique_id", "rows": len(df_raw)})
         # Keep raw append-only; write de-duplicated view to a separate file.
-        df_raw.to_csv(OUT_RAW_DEDUP, index=False)
+        _write_output_frame(df_raw, OUT_RAW_DEDUP, SQL_TABLE_RAW_DEDUP)
     else:
         df_raw = pd.DataFrame()
     df_sum = summarize(df_raw)
-    df_sum.to_csv(OUT_SUM, index=False)
+    _write_output_frame(df_sum, OUT_SUM, SQL_TABLE_SUMMARY)
     if OUT_ACCOUNT.exists():
         df_shipments = pd.read_csv(OUT_ACCOUNT, dtype=str)
         for col in [
@@ -1765,7 +1822,7 @@ def main() -> None:
                 "parsed_fba_shipment_id",
             ]
         )
-    df_shipments.to_csv(OUT_SHIPMENTS, index=False)
+    _write_output_frame(df_shipments, OUT_SHIPMENTS, SQL_TABLE_SHIPMENTS)
     if not df_shipments.empty:
         inbound = df_shipments.copy()
         inbound["__date"] = pd.to_datetime(inbound["posted_date"], errors="coerce", utc=True).dt.strftime("%Y-%m-%d")
@@ -1795,7 +1852,7 @@ def main() -> None:
                 "total_amount",
             ]
         )
-    inbound_sum.to_csv(OUT_INBOUND_SUM, index=False)
+    _write_output_frame(inbound_sum, OUT_INBOUND_SUM, SQL_TABLE_INBOUND_SUMMARY)
     if OUT_ACCOUNT.exists():
         df_storage = pd.read_csv(OUT_ACCOUNT, dtype=str)
         for col in [
@@ -1870,8 +1927,8 @@ def main() -> None:
         storage_sum = pd.DataFrame(
             columns=["date", "date_source", "amount_type", "fee_reason", "fee_description", "currency", "total_amount"]
         )
-    df_storage.to_csv(OUT_STORAGE, index=False)
-    storage_sum.to_csv(OUT_STORAGE_SUM, index=False)
+    _write_output_frame(df_storage, OUT_STORAGE, SQL_TABLE_STORAGE)
+    _write_output_frame(storage_sum, OUT_STORAGE_SUM, SQL_TABLE_STORAGE_SUMMARY)
     if not df_raw.empty and "amount_type" in df_raw.columns:
         df_refunds = df_raw[df_raw["amount_type"].astype(str).str.startswith("Refund", na=False)].copy()
         if not df_refunds.empty:
@@ -1896,10 +1953,10 @@ def main() -> None:
                 "tax_currency",
             ]
         )
-    df_refunds.to_csv(OUT_REFUNDS, index=False)
+    _write_output_frame(df_refunds, OUT_REFUNDS, SQL_TABLE_REFUNDS)
     df_refunds_official = build_refunds_official(df_raw)
     if not df_refunds_official.empty and ITEMS_ALL.exists():
-        items = pd.read_csv(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
+        items = read_finance_frame(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
             columns={"amazon_order_id": "Order ID", "seller_sku": "SKU", "quantity_ordered": "Quantity Ordered"}
         )
         if "Quantity Ordered" in df_refunds_official.columns:
@@ -1914,7 +1971,7 @@ def main() -> None:
         df_refunds_official = df_refunds_official.assign(_sort=sort_key).sort_values(by=["_sort", "Order ID"]).drop(
             columns=["_sort"]
         )
-    df_refunds_official.to_csv(OUT_REFUNDS_OFFICIAL, index=False)
+    _write_output_frame(df_refunds_official, OUT_REFUNDS_OFFICIAL, SQL_TABLE_REFUNDS_OFFICIAL)
     if OUT_ACCOUNT.exists():
         df_account = pd.read_csv(OUT_ACCOUNT, dtype=str)
         for col in [
@@ -1977,12 +2034,13 @@ def main() -> None:
         account_summary = pd.DataFrame(
             columns=["date", "date_source", "transaction_type", "amount_type", "currency", "total_amount"]
         )
-    account_summary.to_csv(OUT_ACCOUNT_SUM, index=False)
+    replace_finance_table(df_account.fillna(""), SQL_TABLE_ACCOUNT)
+    _write_output_frame(account_summary, OUT_ACCOUNT_SUM, SQL_TABLE_ACCOUNT_SUMMARY)
     # Build official (Level_2-like) and sort by Date then Order ID
     df_official = build_official(df_raw)
     # Backfill Quantity Ordered from archived order items if available
     if not df_official.empty and ITEMS_ALL.exists():
-        items = pd.read_csv(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
+        items = read_finance_frame(ITEMS_ALL, dtype=str)[["amazon_order_id", "seller_sku", "quantity_ordered"]].rename(
             columns={"amazon_order_id": "Order ID", "seller_sku": "SKU", "quantity_ordered": "Quantity Ordered"}
         )
         if "Quantity Ordered" in df_official.columns:
@@ -1993,15 +2051,13 @@ def main() -> None:
     if not df_official.empty:
         sort_key = pd.to_datetime(df_official["Date"], errors="coerce")
         df_official = df_official.assign(_sort=sort_key).sort_values(by=["_sort", "Order ID"]).drop(columns=["_sort"])
-    df_official.to_csv(OUT_OFFICIAL, index=False)
+    _write_output_frame(df_official, OUT_OFFICIAL, SQL_TABLE_OFFICIAL)
     df_l2_vs_l3 = write_l2_vs_l3_discrepancies(df_official)
 
     df_vat_model = build_vat_country_model(df_raw)
-    OUT_VAT_MODEL.parent.mkdir(parents=True, exist_ok=True)
-    df_vat_model.to_csv(OUT_VAT_MODEL, index=False)
+    _write_output_frame(df_vat_model, OUT_VAT_MODEL, SQL_TABLE_VAT_MODEL)
     df_fee_model = build_fee_country_model(df_raw, df_official)
-    OUT_FEE_MODEL.parent.mkdir(parents=True, exist_ok=True)
-    df_fee_model.to_csv(OUT_FEE_MODEL, index=False)
+    _write_output_frame(df_fee_model, OUT_FEE_MODEL, SQL_TABLE_FEE_MODEL)
 
     if latest_posted and save_marker:
         _save_marker(latest_posted)

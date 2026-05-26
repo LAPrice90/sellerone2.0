@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 from scripts.core.out_paths import resolve_compat_path, write_csv_with_compat
+from scripts.flows.B._finance_io import read_finance_frame
 
 
 ORDERS_PATH = Path("out/orders_sheet_orders.csv")
@@ -33,8 +34,6 @@ def _ensure_lot_id(row: pd.Series, idx: int) -> str:
 def main() -> None:
     token_paths = resolve_compat_path(TOKEN_LEDGER_REL, default_system="B")
     token_path = token_paths.live_path if token_paths.live_path.exists() else token_paths.legacy_path
-    if not ORDERS_PATH.exists():
-        raise SystemExit("missing out/orders_sheet_orders.csv")
     if not token_path.exists():
         raise SystemExit("missing out/token_ledger_live.csv")
 
@@ -43,7 +42,10 @@ def main() -> None:
         sys.path.insert(0, repo_root)
     from scripts.A003_run_inventory_to_sheet import get_gspread_client
 
-    orders = pd.read_csv(ORDERS_PATH, dtype=str).fillna("")
+    try:
+        orders = read_finance_frame(ORDERS_PATH, "b_orders_sheet_orders", dtype=str).fillna("")
+    except Exception:
+        raise SystemExit("missing out/orders_sheet_orders.csv")
     if "SKU" not in orders.columns:
         raise SystemExit("orders_sheet_orders.csv missing SKU column")
     if "Unnamed: 1" not in orders.columns:

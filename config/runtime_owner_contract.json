@@ -1,0 +1,59 @@
+{
+  "version": "runtime_owner_contract.v1",
+  "updated_utc": "2026-04-01T09:30:00Z",
+  "notes": "Single owner contract for core runtime flows. Worker scripts are not scheduler targets unless explicit override is set.",
+  "flows": {
+    "A": {
+      "launcher_entrypoint": "run_A_all.bat",
+      "runtime_owner": "scripts/cycles/run_A_all.py",
+      "worker_entrypoint": "scripts/cycles/run_A_all.py",
+      "owner_chain": [
+        "run_A_all.bat",
+        "scripts/cycles/run_A_all.py"
+      ],
+      "allow_direct_worker_start": true
+    },
+    "B": {
+      "launcher_entrypoint": "run_B_cycle.bat",
+      "runtime_owner": "scripts/cycles/run_B_supervisor.py",
+      "worker_entrypoint": "scripts/cycles/run_B_cycle.py",
+      "owner_chain": [
+        "run_B_cycle.bat",
+        "scripts/cycles/run_B_supervisor.py",
+        "scripts/cycles/run_B_cycle.py"
+      ],
+      "allow_direct_worker_start": false
+    },
+    "E": {
+      "launcher_entrypoint": "scripts/cycles/run_E_cycle.py",
+      "runtime_owner": "scripts/cycles/run_E_cycle.py",
+      "worker_entrypoint": "scripts/cycles/run_E_cycle.py",
+      "owner_chain": [
+        "scripts/cycles/run_E_cycle.py"
+      ],
+      "allow_direct_worker_start": true
+    },
+    "H": {
+      "launcher_entrypoint": "run_H_cycle.bat",
+      "runtime_owner": "scripts/cycles/run_H_pricing_cycle_guarded.py",
+      "worker_entrypoint": "scripts/cycles/run_H_pricing_cycle.py",
+      "owner_chain": [
+        "run_H_cycle.bat",
+        "scripts/cycles/run_H_pricing_cycle_guarded.py",
+        "scripts/cycles/run_H_pricing_cycle.py"
+      ],
+      "allow_direct_worker_start": false
+    },
+    "F_price_list_manager": {
+      "launcher_entrypoint": "run_F_price_list_manager_cycle.bat",
+      "runtime_owner": "scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py",
+      "worker_entrypoint": "scripts/flows/F/F061_run_legacy_first_checks_local.py",
+      "owner_chain": [
+        "run_F_price_list_manager_cycle.bat",
+        "scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py",
+        "scripts/flows/F/F061_run_legacy_first_checks_local.py"
+      ],
+      "allow_direct_worker_start": false
+    }
+  }
+}

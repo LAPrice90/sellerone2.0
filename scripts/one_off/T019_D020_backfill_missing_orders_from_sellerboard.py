@@ -30,12 +30,15 @@ from scripts.api.get_orders import (
     list_order_items,
     load_dotenv_if_missing,
 )
-from scripts.B001_run_orders_to_sheet import flatten_orders, flatten_items
+from scripts.flows.B.B001_run_orders_to_sheet import flatten_orders, flatten_items
+from scripts.core.storage import write_dataframe_with_sql_compat
 
 
 MISSING_REPORT = Path("out/analysis_reports/missing_orders_vs_sellerboard.csv")
 ORDERS_ALL = Path("out/orders_all.csv")
 ITEMS_ALL = Path("out/order_items_all.csv")
+SQL_TABLE_ORDERS_ALL = "b_orders_all"
+SQL_TABLE_ORDER_ITEMS_ALL = "b_order_items_all"
 OUT_REPORT = Path("out/analysis_reports/missing_orders_backfill_results.csv")
 
 
@@ -134,7 +137,7 @@ def main() -> None:
         if not existing_orders.empty:
             df_orders = pd.concat([existing_orders, df_orders], ignore_index=True)
             df_orders = df_orders.drop_duplicates(subset=["amazon_order_id"])
-        df_orders.to_csv(ORDERS_ALL, index=False)
+        write_dataframe_with_sql_compat(df_orders, ORDERS_ALL, SQL_TABLE_ORDERS_ALL)
 
     # Append items
     if new_items:
@@ -143,7 +146,7 @@ def main() -> None:
             df_items = pd.concat([existing_items, df_items], ignore_index=True)
             if "order_item_id" in df_items.columns:
                 df_items = df_items.drop_duplicates(subset=["order_item_id"])
-        df_items.to_csv(ITEMS_ALL, index=False)
+        write_dataframe_with_sql_compat(df_items, ITEMS_ALL, SQL_TABLE_ORDER_ITEMS_ALL)
 
     OUT_REPORT.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(results).to_csv(OUT_REPORT, index=False)

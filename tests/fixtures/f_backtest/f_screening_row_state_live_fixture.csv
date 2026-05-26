@@ -1,0 +1,2 @@
+observed_utc,supplier_id,supplier_name,supplier_sku,candidate_id,row_status,last_stage,fail_code,attempt_count,timeout_until_utc,mode,updated_at_utc
+2026-04-13T09:00:00Z,shure_cosmetics,Shure Cosmetics,SKU-1,rk_1,timeout,catalog,NOASIN,2,2026-04-13T10:00:00Z,screening,2026-04-13T09:00:00Z

@@ -1,0 +1,16 @@
+fail_code,enabled,timeout_mode,timeout_days,max_timeout_days,cost_change_resets_flag,source_change_resets_flag,manual_review_required_flag,notes,updated_at_utc
+NOASIN,1,fixed_days,90,90,0,0,0,Balanced default: retry unchanged barcode-to-ASIN misses after 90 days,2026-05-01T10:20:44Z
+OVER50K,1,fixed_days,90,90,0,0,0,Balanced default: retry weak rank or demand rows after 90 days,2026-05-01T10:20:44Z
+HAZMATFAIL,1,fixed_days,365,365,0,0,0,Balanced default: hazmat or FBA eligibility rarely changes so wait 365 days,2026-05-01T10:20:44Z
+NOCOST,1,until_cost_changes,,90,1,0,0,Balanced default: rescan on cost change otherwise retry after 90 days,2026-05-01T10:20:44Z
+ROIFAIL,1,until_cost_changes,,90,1,0,0,Balanced default: rescan on cost change otherwise retry ROI fails after 90 days,2026-05-01T10:20:44Z
+LOWROI,1,until_cost_changes,,60,1,0,0,Balanced default: near-threshold weak ROI retries after 60 days unless cost changes sooner,2026-05-01T10:20:44Z
+BRANDFAIL,1,fixed_days,180,180,0,0,0,Balanced default: brand or seller conflict rows wait 180 days,2026-05-01T10:20:44Z
+NODATE,1,fixed_days,90,90,0,0,0,Balanced default: missing date evidence retries after 90 days,2026-05-01T10:20:44Z
+REVIEWFAIL,1,fixed_days,90,90,0,0,0,Balanced default: review evidence failures retry after 90 days,2026-05-01T10:20:44Z
+SCRAPEFAIL,1,fixed_days,30,30,0,0,0,Balanced default: unknown technical scrape failures retry after 30 days,2026-05-01T10:20:44Z
+LOWSALESFAIL,1,fixed_days,90,90,0,0,0,Balanced default: low sales evidence retries after 90 days,2026-05-01T10:20:44Z
+SELLERHISTORYFAIL,1,fixed_days,180,180,0,0,0,Balanced default: seller history risk waits 180 days,2026-05-01T10:20:44Z
+PRICEHISTORYFAIL,1,fixed_days,180,180,0,0,0,Balanced default: missing 365 day price history waits 180 days,2026-05-01T10:20:44Z
+RESCAN,1,fixed_days,30,30,0,0,0,Balanced default: technical retry rows wait 30 days,2026-05-01T10:20:44Z
+FAIL,1,fixed_days,90,90,0,0,0,Balanced default: generic fails retry after 90 days and should be investigated,2026-05-01T10:20:44Z

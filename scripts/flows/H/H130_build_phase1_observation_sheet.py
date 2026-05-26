@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -17,6 +18,16 @@ if str(ROOT) not in sys.path:
 
 from scripts.h.h_floor_truth import has_blocking_reason_codes, load_h_floor_context, resolve_h_floor_inputs
 from scripts.h.h_suppression_truth import resolve_unified_truth
+from scripts.tools.network_resilience import (
+    assess_network_health,
+    call_with_transient_retry,
+    wait_for_network_recovery,
+    write_network_health,
+)
+try:
+    from scripts.core.flow_health_gate import flow_gate_checklist_path
+except ModuleNotFoundError:
+    from core.flow_health_gate import flow_gate_checklist_path
 
 OUT = ROOT / "out"
 DATA = ROOT / "data"
@@ -28,12 +39,77 @@ DEFAULT_OFFER_SNAPSHOT_FACTS_PATH = DATA / "offer_snapshot_facts.csv"
 DEFAULT_PRODUCT_DB_PATH = OUT / "product_db_preview.csv"
 DEFAULT_INVENTORY_SUMMARIES_PATH = OUT / "inventory_summaries.csv"
 DEFAULT_ORDER_MASTER_PATH = OUT / "order_master.csv"
+DEFAULT_ORDERS_ALL_PATH = OUT / "orders_all.csv"
+DEFAULT_ORDER_ITEMS_ALL_PATH = OUT / "order_items_all.csv"
+DEFAULT_TOKEN_LEDGER_PATH = OUT / "token_ledger_live.csv"
 DEFAULT_SKU_SCAN_STATE_PATH = OUT / "phase1_sku_scan_state.json"
 DEFAULT_EXECUTION_LOG_PATH = DATA / "execution_log.csv"
 DEFAULT_SHEET_ID = "18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY"
 DEFAULT_CREDS = ROOT / "secrets" / "sellerone-2-0d3642b951a0.json"
 VIEW_COLUMN_COUNT = 25
 HIDDEN_LAST_SCAN_COLUMN_LETTER = "Y"
+DEFAULT_SHEET_TIMEZONE = "Europe/London"
+DEFAULT_OPS_STATUS_TAB = "OPS_STATUS"
+DEFAULT_OPS_ALERTS_TAB = "OPS_ALERTS"
+DEFAULT_OPS_STATUS_JSON = OUT / "ops_runtime_status.json"
+DEFAULT_OPS_STATUS_CSV = OUT / "ops_runtime_status.csv"
+DEFAULT_OPS_ALERTS_CSV = OUT / "ops_active_alerts.csv"
+DEFAULT_NETWORK_HEALTH_PATH = OUT / "network_health.json"
+H_RUNTIME_STATUS_PATH = OUT / "systems" / "H" / "live" / "H_runtime_status.json"
+H_RUN_STATE_PATH = OUT / "systems" / "H" / "live" / "H_run_state.json"
+H_WORKER_LIFECYCLE_PATH = OUT / "systems" / "H" / "live" / "H_worker_lifecycle.json"
+H_CYCLE_LAST_PUBLISH_INFO_PATH = OUT / "systems" / "H" / "live" / "H_cycle_last_publish_info.txt"
+H_CYCLE_LAST_PUBLISH_RUN_PATH = OUT / "systems" / "H" / "live" / "H_cycle_last_publish_run_id.txt"
+A_SPLIT_CHECKLIST_PATH = OUT / "cycle_alerts" / "checklist_A_split.csv"
+B_SPLIT_CHECKLIST_PATH = OUT / "cycle_alerts" / "checklist_B_split.csv"
+E_SPLIT_CHECKLIST_PATH = OUT / "cycle_alerts" / "checklist_E_split.csv"
+# Keep metric names stable for downstream consumers, but use H flow-gate truth source.
+H_SPLIT_CHECKLIST_PATH = flow_gate_checklist_path("H")
+OPS_ALERT_ACTIVE_MAX_AGE_SECONDS = max(
+    float(os.environ.get("H130_OPS_ALERT_ACTIVE_MAX_AGE_SECONDS", "1800") or "1800"),
+    60.0,
+)
+DEFAULT_H130_NETWORK_WAIT_MAX_SECONDS = max(
+    float(os.environ.get("H130_NETWORK_WAIT_MAX_SECONDS", "3600") or "3600"),
+    60.0,
+)
+DEFAULT_H130_NETWORK_RECHECK_SECONDS = max(
+    float(os.environ.get("H130_NETWORK_RECHECK_SECONDS", "30") or "30"),
+    5.0,
+)
+DEFAULT_H130_NETWORK_PROBE_TIMEOUT_SECONDS = max(
+    float(os.environ.get("H130_NETWORK_PROBE_TIMEOUT_SECONDS", "5") or "5"),
+    1.0,
+)
+DEFAULT_H130_API_RETRY_MAX_SECONDS = max(
+    float(os.environ.get("H130_API_RETRY_MAX_SECONDS", "3600") or "3600"),
+    60.0,
+)
+DEFAULT_H130_API_RETRY_INITIAL_BACKOFF_SECONDS = max(
+    float(os.environ.get("H130_API_RETRY_INITIAL_BACKOFF_SECONDS", "5") or "5"),
+    0.5,
+)
+DEFAULT_H130_API_RETRY_MAX_BACKOFF_SECONDS = max(
+    float(os.environ.get("H130_API_RETRY_MAX_BACKOFF_SECONDS", "120") or "120"),
+    1.0,
+)
+DEFAULT_H130_NETWORK_ENDPOINTS = [
+    "https://www.google.com/generate_204",
+    "https://sheets.googleapis.com/$discovery/rest?version=v4",
+]
+
+
+def _resolve_sheet_timezone() -> datetime.tzinfo:
+    tz_name = str(os.environ.get("H130_SHEET_TIMEZONE", DEFAULT_SHEET_TIMEZONE) or "").strip()
+    if tz_name == "":
+        return timezone.utc
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return timezone.utc
+
+
+SHEET_TIMEZONE = _resolve_sheet_timezone()
 
 
 def _utc_now() -> datetime:
@@ -42,6 +118,13 @@ def _utc_now() -> datetime:
 
 def _today_utc_str() -> str:
     return _utc_now().strftime("%Y-%m-%d")
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return default
 
 
 def _safe_float(value: Any) -> float | None:
@@ -64,6 +147,13 @@ def _safe_int_flag(value: Any) -> int:
     if text in {"1", "true", "yes", "y", "on"}:
         return 1
     return 0
+
+
+def _first_existing_column(df: pd.DataFrame, names: list[str]) -> str:
+    for name in names:
+        if name in df.columns:
+            return name
+    return ""
 
 
 def _authoritative_write_enabled(row: pd.Series) -> bool:
@@ -146,7 +236,223 @@ def _sheet_datetime_text(value: str) -> str:
     dt = _parse_iso_utc(value)
     if dt is None:
         return ""
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+    return dt.astimezone(SHEET_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _read_json_dict(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _read_key_value_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    out: dict[str, str] = {}
+    try:
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = str(raw or "").strip()
+            if line == "" or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key_text = str(key or "").strip()
+            if key_text == "":
+                continue
+            out[key_text] = str(value or "").strip()
+    except Exception:
+        return {}
+    return out
+
+
+def _path_mtime_utc_text(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return ""
+
+
+def _split_checklist_counts(path: Path) -> dict[str, str]:
+    out = {
+        "ok": "0",
+        "warn": "0",
+        "fail": "0",
+        "mtime_utc": _path_mtime_utc_text(path),
+    }
+    if not path.exists():
+        return out
+    df = _load_csv(path)
+    if df.empty or "status" not in df.columns:
+        return out
+    status = df["status"].astype(str).str.strip().str.lower()
+    out["ok"] = str(int(status.eq("ok").sum()))
+    out["warn"] = str(int(status.eq("warn").sum()))
+    out["fail"] = str(int(status.eq("fail").sum()))
+    return out
+
+
+def _build_ops_status_df(
+    *,
+    now_utc: datetime | None = None,
+    runtime_status_path: Path = H_RUNTIME_STATUS_PATH,
+    run_state_path: Path = H_RUN_STATE_PATH,
+    worker_lifecycle_path: Path = H_WORKER_LIFECYCLE_PATH,
+    publish_info_path: Path = H_CYCLE_LAST_PUBLISH_INFO_PATH,
+    publish_run_path: Path = H_CYCLE_LAST_PUBLISH_RUN_PATH,
+    a_split_path: Path = A_SPLIT_CHECKLIST_PATH,
+    b_split_path: Path = B_SPLIT_CHECKLIST_PATH,
+    e_split_path: Path = E_SPLIT_CHECKLIST_PATH,
+    h_split_path: Path = H_SPLIT_CHECKLIST_PATH,
+) -> pd.DataFrame:
+    now = now_utc or _utc_now()
+    runtime = _read_json_dict(runtime_status_path)
+    run_state = _read_json_dict(run_state_path)
+    worker = _read_json_dict(worker_lifecycle_path)
+    publish_info = _read_key_value_file(publish_info_path)
+    publish_run_id = ""
+    if publish_run_path.exists():
+        try:
+            publish_run_id = str(publish_run_path.read_text(encoding="utf-8").strip())
+        except Exception:
+            publish_run_id = ""
+    publish_utc = str(publish_info.get("utc", "")).strip()
+    publish_age_minutes = ""
+    publish_dt = _parse_iso_utc(publish_utc)
+    if publish_dt is not None:
+        publish_age_minutes = f"{max((now - publish_dt).total_seconds() / 60.0, 0.0):.2f}"
+
+    a_counts = _split_checklist_counts(a_split_path)
+    b_counts = _split_checklist_counts(b_split_path)
+    e_counts = _split_checklist_counts(e_split_path)
+    h_counts = _split_checklist_counts(h_split_path)
+    active_blocker = (
+        str(run_state.get("failure_detail", "") or "").strip()
+        or str(worker.get("reason_detail", "") or "").strip()
+        or str(runtime.get("error", "") or "").strip()
+    )
+    rows = [
+        {"metric": "generated_utc", "value": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "notes": ""},
+        {"metric": "runtime_mode", "value": str(runtime.get("mode", "") or "").strip(), "notes": ""},
+        {"metric": "runtime_run_id", "value": str(runtime.get("run_id", "") or "").strip(), "notes": ""},
+        {"metric": "runtime_stage", "value": str(runtime.get("stage", "") or "").strip(), "notes": str(runtime.get("detail", "") or "").strip()},
+        {"metric": "run_state", "value": str(run_state.get("state", "") or "").strip(), "notes": str(run_state.get("stage", "") or "").strip()},
+        {"metric": "worker_state", "value": str(worker.get("state", "") or "").strip(), "notes": str(worker.get("reason_code", "") or "").strip()},
+        {"metric": "last_publish_run_id", "value": publish_run_id, "notes": ""},
+        {"metric": "last_publish_utc", "value": publish_utc, "notes": ""},
+        {"metric": "last_publish_view_tab", "value": str(publish_info.get("view_tab", "") or "").strip(), "notes": ""},
+        {"metric": "last_publish_rows", "value": str(publish_info.get("rows", "") or "").strip(), "notes": ""},
+        {"metric": "last_publish_age_minutes", "value": publish_age_minutes, "notes": ""},
+        {"metric": "active_blocker", "value": active_blocker, "notes": ""},
+        {"metric": "a_split_fail_count", "value": a_counts["fail"], "notes": f"warn={a_counts['warn']};mtime_utc={a_counts['mtime_utc']}"},
+        {"metric": "b_split_fail_count", "value": b_counts["fail"], "notes": f"warn={b_counts['warn']};mtime_utc={b_counts['mtime_utc']}"},
+        {"metric": "e_split_fail_count", "value": e_counts["fail"], "notes": f"warn={e_counts['warn']};mtime_utc={e_counts['mtime_utc']}"},
+        {"metric": "h_split_fail_count", "value": h_counts["fail"], "notes": f"warn={h_counts['warn']};mtime_utc={h_counts['mtime_utc']}"},
+    ]
+    return pd.DataFrame(rows, columns=["metric", "value", "notes"])
+
+
+def _build_ops_alerts_df(
+    *,
+    checklist_paths: list[tuple[str, Path]] | None = None,
+    now_utc: datetime | None = None,
+    active_age_seconds: float = OPS_ALERT_ACTIVE_MAX_AGE_SECONDS,
+) -> pd.DataFrame:
+    now = now_utc or _utc_now()
+    active_age = max(float(active_age_seconds or 0.0), 60.0)
+    paths = checklist_paths or [
+        ("A", A_SPLIT_CHECKLIST_PATH),
+        ("B", B_SPLIT_CHECKLIST_PATH),
+        ("E", E_SPLIT_CHECKLIST_PATH),
+        ("H", H_SPLIT_CHECKLIST_PATH),
+    ]
+    records: list[dict[str, str]] = []
+    for flow, path in paths:
+        if not path.exists():
+            continue
+        source_mtime = _path_mtime_utc_text(path)
+        source_mtime_dt = _parse_iso_utc(source_mtime)
+        source_age_seconds = None
+        if source_mtime_dt is not None:
+            source_age_seconds = max((now - source_mtime_dt).total_seconds(), 0.0)
+        source_stale = bool(source_age_seconds is None or source_age_seconds > active_age)
+        df = _load_csv(path)
+        if df.empty or "status" not in df.columns:
+            continue
+        status_series = df["status"].astype(str).str.strip().str.lower()
+        issues = df.loc[~status_series.eq("ok")].copy()
+        if issues.empty:
+            continue
+        for _, row in issues.iterrows():
+            status_origin = str(row.get("status", "") or "").strip().lower()
+            if status_origin == "":
+                continue
+            status_text = status_origin
+            notes_text = str(row.get("notes", "") or "").strip()
+            if source_stale and status_origin in {"fail", "warn"}:
+                status_text = "pending_recheck"
+                age_minutes = ""
+                if source_age_seconds is not None:
+                    age_minutes = f"{(source_age_seconds / 60.0):.2f}"
+                stale_note = (
+                    f"pending_from={status_origin};"
+                    f"source_age_minutes={age_minutes};"
+                    f"active_age_minutes={(active_age / 60.0):.2f}"
+                )
+                notes_text = f"{notes_text};{stale_note}" if notes_text else stale_note
+            records.append(
+                {
+                    "flow": str(flow),
+                    "check": str(row.get("check", "") or "").strip(),
+                    "status": status_text,
+                    "status_origin": status_origin,
+                    "value": str(row.get("value", "") or "").strip(),
+                    "notes": notes_text,
+                    "source_path": str(path),
+                    "source_mtime_utc": source_mtime,
+                }
+            )
+    return pd.DataFrame(
+        records,
+        columns=["flow", "check", "status", "status_origin", "value", "notes", "source_path", "source_mtime_utc"],
+    )
+
+
+def _write_ops_artifacts(
+    *,
+    status_df: pd.DataFrame,
+    alerts_df: pd.DataFrame,
+    status_json_path: Path,
+    status_csv_path: Path,
+    alerts_csv_path: Path,
+) -> None:
+    status_json_path.parent.mkdir(parents=True, exist_ok=True)
+    status_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    alerts_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    status_rows = status_df.fillna("").to_dict(orient="records")
+    payload = {
+        "generated_utc": _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "metrics": status_rows,
+    }
+    status_json_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
+    status_df.to_csv(status_csv_path, index=False)
+    alerts_df.to_csv(alerts_csv_path, index=False)
+
+
+def _publish_ops_tabs(
+    *,
+    sheet,
+    status_df: pd.DataFrame,
+    alerts_df: pd.DataFrame,
+    status_tab: str,
+    alerts_tab: str,
+) -> None:
+    _upsert_tab(sheet, status_tab, _sheet_payload(status_df))
+    _upsert_tab(sheet, alerts_tab, _sheet_payload(alerts_df))
 
 
 def _latest_file(pattern: str) -> Path | None:
@@ -277,12 +583,74 @@ def _build_inventory_stock_df(inventory_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _build_inventory_activity_df(inventory_summaries_df: pd.DataFrame) -> pd.DataFrame:
+def _build_inventory_activity_df(
+    inventory_summaries_df: pd.DataFrame,
+    order_master_df: pd.DataFrame,
+) -> pd.DataFrame:
     if inventory_summaries_df.empty:
         return pd.DataFrame(columns=["sku", "available_stock_qty", "inbound_total_qty"])
     sku_col = "seller_sku" if "seller_sku" in inventory_summaries_df.columns else ("sku" if "sku" in inventory_summaries_df.columns else "")
     if sku_col == "":
         return pd.DataFrame(columns=["sku", "available_stock_qty", "inbound_total_qty"])
+
+    token_available_by_sku: dict[str, int] = {}
+    if DEFAULT_TOKEN_LEDGER_PATH.exists():
+        try:
+            token_df = pd.read_csv(DEFAULT_TOKEN_LEDGER_PATH, dtype=str).fillna("")
+        except Exception:
+            token_df = pd.DataFrame()
+        if not token_df.empty:
+            token_sku_col = _first_existing_column(token_df, ["seller_sku", "sku", "SellerSKU", "seller-sku"])
+            token_status_col = _first_existing_column(token_df, ["status", "Status"])
+            if token_sku_col and token_status_col:
+                token_work = token_df[[token_sku_col, token_status_col]].copy()
+                token_work["sku_key"] = token_work[token_sku_col].astype(str).str.strip().str.upper()
+                token_work["status_key"] = token_work[token_status_col].astype(str).str.strip().str.lower()
+                token_work = token_work.loc[
+                    token_work["sku_key"].ne("")
+                    & token_work["status_key"].eq("available")
+                ].copy()
+                if not token_work.empty:
+                    token_counts = token_work.groupby("sku_key", as_index=False).size()
+                    token_available_by_sku = {
+                        str(r["sku_key"]): int(r["size"])
+                        for _, r in token_counts.iterrows()
+                    }
+
+    row_stale_hours = max(float(os.environ.get("H_STOCK_ROW_STALE_HOURS", "24") or "24"), 1.0)
+    now_utc = _utc_now()
+    last_updated_by_sku: dict[str, datetime] = {}
+    for _, row in inventory_summaries_df.iterrows():
+        sku = str(row.get(sku_col, "")).strip().upper()
+        if sku == "":
+            continue
+        updated_dt = _parse_iso_utc(str(row.get("last_updated_time", "")).strip())
+        if updated_dt is None:
+            continue
+        prev = last_updated_by_sku.get(sku)
+        if prev is None or updated_dt > prev:
+            last_updated_by_sku[sku] = updated_dt
+
+    sold_after_update_by_sku: dict[str, float] = {}
+    if not order_master_df.empty and last_updated_by_sku:
+        order_sku_col = _first_existing_column(order_master_df, ["SKU", "sku", "seller_sku", "SellerSKU"])
+        order_qty_col = _first_existing_column(order_master_df, ["Quantity Ordered", "quantity_ordered", "qty", "quantity"])
+        order_date_col = _first_existing_column(order_master_df, ["Date", "order_date", "purchase_date", "date_utc"])
+        if order_sku_col and order_qty_col and order_date_col:
+            for _, row in order_master_df.iterrows():
+                sku = str(row.get(order_sku_col, "")).strip().upper()
+                if sku == "":
+                    continue
+                cutoff_dt = last_updated_by_sku.get(sku)
+                if cutoff_dt is None:
+                    continue
+                qty = _safe_float(row.get(order_qty_col, ""))
+                if qty is None or qty <= 0:
+                    continue
+                order_dt = _parse_iso_utc(str(row.get(order_date_col, "")).strip())
+                if order_dt is None or order_dt <= cutoff_dt:
+                    continue
+                sold_after_update_by_sku[sku] = float(sold_after_update_by_sku.get(sku, 0.0)) + float(qty)
 
     rows: list[dict[str, Any]] = []
     for _, row in inventory_summaries_df.iterrows():
@@ -295,7 +663,21 @@ def _build_inventory_activity_df(inventory_summaries_df: pd.DataFrame) -> pd.Dat
         in_shipped = _safe_float(row.get("inbound_shipped", "")) or 0.0
         in_receiving = _safe_float(row.get("inbound_receiving", "")) or 0.0
         inbound_total = in_working + in_shipped + in_receiving
-        if (available is None or available <= 0) and total_qty is not None and total_qty > 0:
+
+        # Align sheet stock truth with H110 stale-row guard: if a row is old,
+        # sold-through since last update, and no available token units remain,
+        # force available stock to zero in the same cycle.
+        sku_key = sku.upper()
+        if available is not None and available > 0:
+            updated_dt = last_updated_by_sku.get(sku_key)
+            if updated_dt is not None:
+                age_hours = max((now_utc - updated_dt).total_seconds() / 3600.0, 0.0)
+                sold_after_update = float(sold_after_update_by_sku.get(sku_key, 0.0))
+                token_available = int(token_available_by_sku.get(sku_key, 0))
+                if age_hours >= row_stale_hours and sold_after_update >= float(available) and token_available <= 0:
+                    available = 0.0
+
+        if available is None and total_qty is not None and total_qty > 0:
             available = total_qty
         rows.append(
             {
@@ -356,6 +738,62 @@ def _build_sales_velocity_df(order_df: pd.DataFrame, now_utc: datetime) -> pd.Da
         grouped["sales_units_today"] = 0.0
     grouped["sales_units_today"] = pd.to_numeric(grouped.get("sales_units_today", 0), errors="coerce").fillna(0.0).round(2)
     return grouped
+
+
+def _build_sales_today_from_live_orders_df(
+    orders_df: pd.DataFrame,
+    order_items_df: pd.DataFrame,
+    now_utc: datetime,
+) -> pd.DataFrame:
+    if orders_df.empty or order_items_df.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+    if "amazon_order_id" not in orders_df.columns or "purchase_date" not in orders_df.columns:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+    if "amazon_order_id" not in order_items_df.columns or "seller_sku" not in order_items_df.columns:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+
+    orders = orders_df.copy()
+    orders["amazon_order_id"] = orders.get("amazon_order_id", "").astype(str).str.strip()
+    orders = orders.loc[orders["amazon_order_id"].ne("")].copy()
+    if orders.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+    orders["purchase_dt"] = pd.to_datetime(orders.get("purchase_date", ""), errors="coerce", utc=True)
+    orders["order_status_norm"] = orders.get("order_status", "").astype(str).str.strip().str.lower()
+    orders = orders.loc[
+        orders["purchase_dt"].notna()
+        & orders["order_status_norm"].ne("canceled")
+    ].copy()
+    if orders.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+
+    items = order_items_df.copy()
+    items["amazon_order_id"] = items.get("amazon_order_id", "").astype(str).str.strip()
+    items["sku"] = items.get("seller_sku", "").astype(str).str.strip()
+    items = items.loc[items["amazon_order_id"].ne("") & items["sku"].ne("")].copy()
+    if items.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+    items["qty"] = pd.to_numeric(items.get("quantity_ordered", ""), errors="coerce").fillna(0.0)
+    items = items.loc[items["qty"].gt(0)].copy()
+    if items.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+
+    merged = items.merge(
+        orders[["amazon_order_id", "purchase_dt"]],
+        on="amazon_order_id",
+        how="inner",
+    )
+    if merged.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+
+    today_start = datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc)
+    today_end = today_start + pd.Timedelta(days=1)
+    merged = merged.loc[merged["purchase_dt"].ge(today_start) & merged["purchase_dt"].lt(today_end)].copy()
+    if merged.empty:
+        return pd.DataFrame(columns=["sku", "sales_units_today"])
+
+    grouped = merged.groupby("sku", as_index=False)["qty"].sum()
+    grouped["sales_units_today"] = grouped["qty"].round(2)
+    return grouped.drop(columns=["qty"])
 
 
 def _latest_daily_intel_by_sku(df: pd.DataFrame) -> pd.DataFrame:
@@ -472,6 +910,8 @@ def _build_combined_df(
     product_df: pd.DataFrame,
     inventory_df: pd.DataFrame,
     order_master_df: pd.DataFrame,
+    orders_df: pd.DataFrame,
+    order_items_df: pd.DataFrame,
     last_scan_utc_by_sku: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     scope = scope_df.copy()
@@ -504,8 +944,9 @@ def _build_combined_df(
     latest_probe = _latest_execution_probe_df(DEFAULT_EXECUTION_LOG_PATH)
     product_stock = _build_product_stock_df(product_df)
     inventory_stock = _build_inventory_stock_df(inventory_df)
-    inventory_activity = _build_inventory_activity_df(inventory_df)
+    inventory_activity = _build_inventory_activity_df(inventory_df, order_master_df)
     sales_velocity = _build_sales_velocity_df(order_master_df, _utc_now())
+    sales_today_live = _build_sales_today_from_live_orders_df(orders_df, order_items_df, _utc_now())
     now_utc = _utc_now()
     run_window_rival_map, recent_rival_map = _build_rival_fallback_maps(runtime, now_utc)
     floor_ctx = load_h_floor_context()
@@ -607,6 +1048,15 @@ def _build_combined_df(
             combined["stock_qty"] = left.where(left.notna(), right)
     if not sales_velocity.empty:
         combined = combined.merge(sales_velocity, on="sku", how="left")
+    if not sales_today_live.empty:
+        sales_today_live = sales_today_live.rename(columns={"sales_units_today": "sales_units_today_live"})
+        combined = combined.merge(sales_today_live, on="sku", how="left")
+        combined["sales_units_today"] = pd.to_numeric(
+            combined.get("sales_units_today_live", combined.get("sales_units_today", 0)),
+            errors="coerce",
+        ).fillna(pd.to_numeric(combined.get("sales_units_today", 0), errors="coerce").fillna(0.0)).round(2)
+        if "sales_units_today_live" in combined.columns:
+            combined = combined.drop(columns=["sales_units_today_live"])
     if "sales_units_today" in combined.columns:
         combined["sales_units_today"] = pd.to_numeric(combined["sales_units_today"], errors="coerce").fillna(0.0).round(2)
 
@@ -750,6 +1200,11 @@ def _build_combined_df(
         truth_buy_box = str(row.get("unified_buy_box_state", "")).strip().upper() or unified_truth["unified_buy_box_state"] or ("NORMAL" if has_buy_box == 1 else "")
         truth_state = str(row.get("unified_strategy_state", "")).strip() or unified_truth["unified_strategy_state"]
         truth_writer_outcome = str(row.get("unified_writer_outcome", "")).strip() or unified_truth["unified_writer_outcome"]
+        if parked == 1:
+            # Parked truth is scope-owned; ignore stale runtime carry-over fields.
+            truth_buy_box = unified_truth["unified_buy_box_state"] or truth_buy_box
+            truth_state = unified_truth["unified_strategy_state"] or truth_state
+            truth_writer_outcome = unified_truth["unified_writer_outcome"]
         truth_ceiling_type = str(row.get("true_binding_ceiling_type", "")).strip().upper() or unified_truth["true_binding_ceiling_type"]
         truth_buy_box_values.append(truth_buy_box)
         truth_state_values.append(truth_state)
@@ -889,6 +1344,22 @@ def _build_combined_df(
     combined["truth_strategy_state"] = truth_state_values
     combined["truth_writer_outcome"] = truth_writer_outcome_values
     combined["truth_ceiling_type"] = truth_ceiling_type_values
+    if "parked_flag" in combined.columns:
+        parked_mask = combined["parked_flag"].astype(str).str.strip().str.lower().isin({"1", "true", "yes", "y", "on"})
+        if bool(parked_mask.any()):
+            for col in ("execution_event_ts_utc", "execution_state", "execution_write_status", "execution_write_error"):
+                if col in combined.columns:
+                    combined.loc[parked_mask, col] = ""
+            combined.loc[parked_mask, "execution_write_status"] = "NO_WRITE_REQUIRED"
+            if "write_attempted_flag" not in combined.columns:
+                combined["write_attempted_flag"] = ""
+            if "write_applied_flag" not in combined.columns:
+                combined["write_applied_flag"] = ""
+            if "unified_writer_outcome" not in combined.columns:
+                combined["unified_writer_outcome"] = ""
+            combined.loc[parked_mask, "write_attempted_flag"] = "0"
+            combined.loc[parked_mask, "write_applied_flag"] = "0"
+            combined.loc[parked_mask, "unified_writer_outcome"] = "NO_WRITE_REQUIRED"
     combined["model_ceiling_gbp"] = truth_model_ceiling_values
     combined["roi_floor_pct"] = roi_floor_values
     combined["roi_cpt_pct"] = roi_cpt_values
@@ -1028,6 +1499,59 @@ def _ensure_creds_readable(creds_path: Path) -> Path:
     with creds_path.open("r", encoding="utf-8") as fh:
         fh.read(1)
     return creds_path
+
+
+def _network_log_line(message: str) -> None:
+    print(f"phase1_network {message}")
+
+
+def _resolve_network_endpoints(raw_endpoints: str) -> list[str]:
+    text = str(raw_endpoints or "").strip()
+    if text == "":
+        return list(DEFAULT_H130_NETWORK_ENDPOINTS)
+    parts = [str(part or "").strip() for part in text.split(",")]
+    cleaned = [part for part in parts if part != ""]
+    return cleaned or list(DEFAULT_H130_NETWORK_ENDPOINTS)
+
+
+def _network_gate_for_publish(
+    *,
+    endpoints: list[str],
+    health_path: Path,
+    max_wait_seconds: float,
+    recheck_seconds: float,
+    probe_timeout_seconds: float,
+) -> dict[str, Any]:
+    snapshot = assess_network_health(endpoints, timeout_seconds=probe_timeout_seconds)
+    snapshot["stage"] = "pre_publish_gate"
+    write_network_health(health_path, snapshot)
+    _network_log_line(
+        "gate "
+        f"status={snapshot.get('status', '')} "
+        f"success={snapshot.get('success_count', 0)}/{snapshot.get('total_count', 0)}"
+    )
+    if str(snapshot.get("status", "")).upper() != "RED":
+        return snapshot
+    _network_log_line(
+        f"gate_wait_enter max_wait_seconds={max_wait_seconds:.1f} recheck_seconds={recheck_seconds:.1f}"
+    )
+    recovered = wait_for_network_recovery(
+        endpoints=endpoints,
+        max_wait_seconds=max_wait_seconds,
+        recheck_seconds=recheck_seconds,
+        probe_timeout_seconds=probe_timeout_seconds,
+        acceptable_statuses={"GREEN", "AMBER"},
+        health_path=health_path,
+        log=_network_log_line,
+    )
+    recovered["stage"] = "pre_publish_gate_recovered"
+    write_network_health(health_path, recovered)
+    _network_log_line(
+        "gate_recovered "
+        f"status={recovered.get('status', '')} "
+        f"success={recovered.get('success_count', 0)}/{recovered.get('total_count', 0)}"
+    )
+    return recovered
 
 
 def _upsert_tab(sheet, tab_name: str, values: list[list[Any]], *, start_cell: str = "A1"):
@@ -1178,6 +1702,7 @@ def _apply_view_formatting(sheet, view_ws) -> None:
         _cf_rule(sheet_id, '=$A2="WRITE_CAPABLE"', 0, 1, amber, start_row=1),
         _cf_rule(sheet_id, '=$A2="READ_ONLY"', 0, 1, amber, start_row=1),
         _cf_rule(sheet_id, '=$A2="SUPP_APPLIED"', 0, 1, amber, start_row=1),
+        _cf_rule(sheet_id, '=$A2="SUPP_GATED_DETAIL"', 0, 1, amber, start_row=1),
         _cf_rule(sheet_id, '=OR($A2="SUPPRESSED",$A2="SUPP_BLOCKED")', 0, 1, red, start_row=1),
         _cf_rule(sheet_id, '=$A2="PARKED"', 0, 1, grey, start_row=1),
         # Minutes in front section.
@@ -1794,6 +2319,8 @@ def main() -> int:
     parser.add_argument("--product-db-path", default=str(DEFAULT_PRODUCT_DB_PATH))
     parser.add_argument("--inventory-path", default="")
     parser.add_argument("--order-master-path", default=str(DEFAULT_ORDER_MASTER_PATH))
+    parser.add_argument("--orders-all-path", default=str(DEFAULT_ORDERS_ALL_PATH))
+    parser.add_argument("--order-items-all-path", default=str(DEFAULT_ORDER_ITEMS_ALL_PATH))
     parser.add_argument("--listing-snapshot-path", default="")
     parser.add_argument("--sku-scan-state-path", default=str(DEFAULT_SKU_SCAN_STATE_PATH))
     parser.add_argument("--out-combined-csv", default="")
@@ -1809,6 +2336,24 @@ def main() -> int:
     parser.add_argument("--raw-daily-intel-tab", default="RAW_DAILY_INTEL")
     parser.add_argument("--raw-listing-snapshot-tab", default="RAW_LISTING_SNAPSHOT")
     parser.add_argument("--debug-tabs", action="store_true")
+    parser.add_argument("--status-only", action="store_true")
+    parser.add_argument("--ops-status-tab", default=DEFAULT_OPS_STATUS_TAB)
+    parser.add_argument("--ops-alerts-tab", default=DEFAULT_OPS_ALERTS_TAB)
+    parser.add_argument("--ops-status-json", default=str(DEFAULT_OPS_STATUS_JSON))
+    parser.add_argument("--ops-status-csv", default=str(DEFAULT_OPS_STATUS_CSV))
+    parser.add_argument("--ops-alerts-csv", default=str(DEFAULT_OPS_ALERTS_CSV))
+    parser.add_argument("--network-health-path", default=str(DEFAULT_NETWORK_HEALTH_PATH))
+    parser.add_argument("--network-endpoints", default="")
+    parser.add_argument("--network-wait-max-seconds", type=float, default=DEFAULT_H130_NETWORK_WAIT_MAX_SECONDS)
+    parser.add_argument("--network-recheck-seconds", type=float, default=DEFAULT_H130_NETWORK_RECHECK_SECONDS)
+    parser.add_argument("--network-probe-timeout-seconds", type=float, default=DEFAULT_H130_NETWORK_PROBE_TIMEOUT_SECONDS)
+    parser.add_argument("--api-retry-max-seconds", type=float, default=DEFAULT_H130_API_RETRY_MAX_SECONDS)
+    parser.add_argument(
+        "--api-retry-initial-backoff-seconds",
+        type=float,
+        default=DEFAULT_H130_API_RETRY_INITIAL_BACKOFF_SECONDS,
+    )
+    parser.add_argument("--api-retry-max-backoff-seconds", type=float, default=DEFAULT_H130_API_RETRY_MAX_BACKOFF_SECONDS)
     args = parser.parse_args()
     date_tab = str(args.date_utc or "").strip() or _today_utc_str()
     requested_view_tab = str(args.view_tab or "").strip()
@@ -1820,6 +2365,79 @@ def main() -> int:
     else:
         view_tab = requested_view_tab or date_tab
 
+    ops_status_tab = str(args.ops_status_tab or "").strip() or DEFAULT_OPS_STATUS_TAB
+    ops_alerts_tab = str(args.ops_alerts_tab or "").strip() or DEFAULT_OPS_ALERTS_TAB
+    ops_status_json_path = Path(str(args.ops_status_json or "").strip() or str(DEFAULT_OPS_STATUS_JSON))
+    ops_status_csv_path = Path(str(args.ops_status_csv or "").strip() or str(DEFAULT_OPS_STATUS_CSV))
+    ops_alerts_csv_path = Path(str(args.ops_alerts_csv or "").strip() or str(DEFAULT_OPS_ALERTS_CSV))
+    network_health_path = Path(str(args.network_health_path or "").strip() or str(DEFAULT_NETWORK_HEALTH_PATH))
+    network_endpoints = _resolve_network_endpoints(args.network_endpoints)
+    network_wait_max_seconds = max(float(args.network_wait_max_seconds), 60.0)
+    network_recheck_seconds = max(float(args.network_recheck_seconds), 1.0)
+    network_probe_timeout_seconds = max(float(args.network_probe_timeout_seconds), 1.0)
+    api_retry_max_seconds = max(float(args.api_retry_max_seconds), 60.0)
+    api_retry_initial_backoff_seconds = max(float(args.api_retry_initial_backoff_seconds), 0.5)
+    api_retry_max_backoff_seconds = max(float(args.api_retry_max_backoff_seconds), 1.0)
+    ops_now_utc = _utc_now()
+    ops_status_df = _build_ops_status_df(now_utc=ops_now_utc)
+    ops_alerts_df = _build_ops_alerts_df()
+    _write_ops_artifacts(
+        status_df=ops_status_df,
+        alerts_df=ops_alerts_df,
+        status_json_path=ops_status_json_path,
+        status_csv_path=ops_status_csv_path,
+        alerts_csv_path=ops_alerts_csv_path,
+    )
+    print(f"phase1_observation_ops_status_out_json={ops_status_json_path}")
+    print(f"phase1_observation_ops_status_out_csv={ops_status_csv_path}")
+    print(f"phase1_observation_ops_alerts_out_csv={ops_alerts_csv_path}")
+    print(f"phase1_observation_ops_status_rows={len(ops_status_df.index)}")
+    print(f"phase1_observation_ops_alert_rows={len(ops_alerts_df.index)}")
+    print(f"phase1_network_health_path={network_health_path}")
+    print(f"phase1_network_endpoint_count={len(network_endpoints)}")
+    print(f"phase1_network_wait_max_seconds={network_wait_max_seconds:.1f}")
+    print(f"phase1_network_recheck_seconds={network_recheck_seconds:.1f}")
+    print(f"phase1_api_retry_max_seconds={api_retry_max_seconds:.1f}")
+
+    if args.status_only:
+        if not args.publish:
+            print("phase1_observation_publish=skipped_status_only_local")
+            return 0
+        _network_gate_for_publish(
+            endpoints=network_endpoints,
+            health_path=network_health_path,
+            max_wait_seconds=network_wait_max_seconds,
+            recheck_seconds=network_recheck_seconds,
+            probe_timeout_seconds=network_probe_timeout_seconds,
+        )
+
+        def _status_only_publish_action() -> None:
+            creds_path = _ensure_creds_readable(_resolve_creds_path(args.creds_path))
+            client = _get_gspread_client(creds_path)
+            sheet = client.open_by_key(args.sheet_id)
+            _set_minute_recalc(sheet)
+            _publish_ops_tabs(
+                sheet=sheet,
+                status_df=ops_status_df,
+                alerts_df=ops_alerts_df,
+                status_tab=ops_status_tab,
+                alerts_tab=ops_alerts_tab,
+            )
+
+        call_with_transient_retry(
+            action=_status_only_publish_action,
+            operation_name="phase1_observation_status_only_publish",
+            max_wait_seconds=api_retry_max_seconds,
+            initial_backoff_seconds=api_retry_initial_backoff_seconds,
+            max_backoff_seconds=api_retry_max_backoff_seconds,
+            log=_network_log_line,
+        )
+        print("phase1_observation_publish=status_only_ok")
+        print(f"phase1_observation_sheet_id={args.sheet_id}")
+        print(f"phase1_observation_ops_status_tab={ops_status_tab}")
+        print(f"phase1_observation_ops_alerts_tab={ops_alerts_tab}")
+        return 0
+
     scope_path = Path(args.scope_path)
     runtime_path = Path(args.runtime_path)
     floor_table_path = Path(args.floor_table_path)
@@ -1827,6 +2445,8 @@ def main() -> int:
     product_db_path = Path(args.product_db_path)
     inventory_path = Path(args.inventory_path) if str(args.inventory_path).strip() else _latest_inventory_path()
     order_master_path = Path(args.order_master_path)
+    orders_all_path = Path(args.orders_all_path)
+    order_items_all_path = Path(args.order_items_all_path)
     listing_snapshot_path = Path(args.listing_snapshot_path) if str(args.listing_snapshot_path).strip() else _latest_file("listing_offer_snapshot_*.csv")
     sku_scan_state_path = Path(args.sku_scan_state_path)
 
@@ -1843,6 +2463,8 @@ def main() -> int:
     product_df = _load_csv(product_db_path)
     inventory_df = _load_csv(inventory_path)
     order_master_df = _load_csv(order_master_path)
+    orders_df = _load_csv(orders_all_path)
+    order_items_df = _load_csv(order_items_all_path)
     last_scan_utc_by_sku = _load_last_scan_utc_by_sku(sku_scan_state_path)
 
     combined_df = _build_combined_df(
@@ -1854,6 +2476,8 @@ def main() -> int:
         product_df=product_df,
         inventory_df=inventory_df,
         order_master_df=order_master_df,
+        orders_df=orders_df,
+        order_items_df=order_items_df,
         last_scan_utc_by_sku=last_scan_utc_by_sku,
     )
     view_df = _build_view_df(combined_df)
@@ -1897,47 +2521,72 @@ def main() -> int:
         print("phase1_observation_publish=skipped")
         return 0
 
-    creds_path = _ensure_creds_readable(_resolve_creds_path(args.creds_path))
-    client = _get_gspread_client(creds_path)
-    sheet = client.open_by_key(args.sheet_id)
-    _set_minute_recalc(sheet)
+    _network_gate_for_publish(
+        endpoints=network_endpoints,
+        health_path=network_health_path,
+        max_wait_seconds=network_wait_max_seconds,
+        recheck_seconds=network_recheck_seconds,
+        probe_timeout_seconds=network_probe_timeout_seconds,
+    )
 
-    combined_ws = None
-    if args.debug_tabs:
-        _upsert_tab(sheet, args.raw_scope_tab, _sheet_payload(scope_df))
-        _upsert_tab(sheet, args.raw_runtime_tab, _sheet_payload(runtime_df))
-        if not daily_intel_df.empty:
-            _upsert_tab(sheet, args.raw_daily_intel_tab, _sheet_payload(daily_intel_df))
-        if not listing_df.empty:
-            _upsert_tab(sheet, args.raw_listing_snapshot_tab, _sheet_payload(listing_df))
-        combined_ws = _upsert_tab(sheet, args.combined_tab, _sheet_payload(combined_df))
-    # Publish viewer data from row 3 so rows 1-2 remain dedicated to grouped/sub headers.
-    view_payload = _sheet_payload(view_df)
-    view_data_payload = view_payload[1:] if len(view_payload) > 1 else []
-    view_ws = _upsert_tab(sheet, view_tab, view_data_payload, start_cell="A3")
-    view_ws = _ensure_sheet_grid(sheet, view_ws, rows=2000, cols=VIEW_COLUMN_COUNT)
-    _apply_view_formatting(sheet, view_ws)
-    view_ws = _ensure_sheet_grid(sheet, sheet.worksheet(view_tab), rows=2000, cols=VIEW_COLUMN_COUNT)
-    _apply_live_minutes_formula(view_ws)
-    if combined_ws is not None:
-        try:
-            combined_ws.hide()
-        except Exception:
-            pass
+    def _publish_action() -> None:
+        creds_path = _ensure_creds_readable(_resolve_creds_path(args.creds_path))
+        client = _get_gspread_client(creds_path)
+        sheet = client.open_by_key(args.sheet_id)
+        _set_minute_recalc(sheet)
+        _publish_ops_tabs(
+            sheet=sheet,
+            status_df=ops_status_df,
+            alerts_df=ops_alerts_df,
+            status_tab=ops_status_tab,
+            alerts_tab=ops_alerts_tab,
+        )
 
-    if not args.debug_tabs:
-        tabs_to_prune = {
-            "VIEW",
-            str(args.combined_tab or "").strip(),
-            str(args.raw_scope_tab or "").strip(),
-            str(args.raw_runtime_tab or "").strip(),
-            str(args.raw_daily_intel_tab or "").strip(),
-            str(args.raw_listing_snapshot_tab or "").strip(),
-        }
-        tabs_to_prune.discard("")
-        tabs_to_prune.discard(view_tab)
-        for tab in sorted(tabs_to_prune):
-            _delete_tab_if_exists(sheet, tab)
+        combined_ws = None
+        if args.debug_tabs:
+            _upsert_tab(sheet, args.raw_scope_tab, _sheet_payload(scope_df))
+            _upsert_tab(sheet, args.raw_runtime_tab, _sheet_payload(runtime_df))
+            if not daily_intel_df.empty:
+                _upsert_tab(sheet, args.raw_daily_intel_tab, _sheet_payload(daily_intel_df))
+            if not listing_df.empty:
+                _upsert_tab(sheet, args.raw_listing_snapshot_tab, _sheet_payload(listing_df))
+            combined_ws = _upsert_tab(sheet, args.combined_tab, _sheet_payload(combined_df))
+        # Publish viewer data from row 3 so rows 1-2 remain dedicated to grouped/sub headers.
+        view_payload = _sheet_payload(view_df)
+        view_data_payload = view_payload[1:] if len(view_payload) > 1 else []
+        view_ws = _upsert_tab(sheet, view_tab, view_data_payload, start_cell="A3")
+        view_ws = _ensure_sheet_grid(sheet, view_ws, rows=2000, cols=VIEW_COLUMN_COUNT)
+        _apply_view_formatting(sheet, view_ws)
+        view_ws = _ensure_sheet_grid(sheet, sheet.worksheet(view_tab), rows=2000, cols=VIEW_COLUMN_COUNT)
+        _apply_live_minutes_formula(view_ws)
+        if combined_ws is not None:
+            try:
+                combined_ws.hide()
+            except Exception:
+                pass
+
+        if not args.debug_tabs:
+            tabs_to_prune = {
+                "VIEW",
+                str(args.combined_tab or "").strip(),
+                str(args.raw_scope_tab or "").strip(),
+                str(args.raw_runtime_tab or "").strip(),
+                str(args.raw_daily_intel_tab or "").strip(),
+                str(args.raw_listing_snapshot_tab or "").strip(),
+            }
+            tabs_to_prune.discard("")
+            tabs_to_prune.discard(view_tab)
+            for tab in sorted(tabs_to_prune):
+                _delete_tab_if_exists(sheet, tab)
+
+    call_with_transient_retry(
+        action=_publish_action,
+        operation_name="phase1_observation_publish",
+        max_wait_seconds=api_retry_max_seconds,
+        initial_backoff_seconds=api_retry_initial_backoff_seconds,
+        max_backoff_seconds=api_retry_max_backoff_seconds,
+        log=_network_log_line,
+    )
 
     print("phase1_observation_publish=ok")
     print(f"phase1_observation_sheet_id={args.sheet_id}")

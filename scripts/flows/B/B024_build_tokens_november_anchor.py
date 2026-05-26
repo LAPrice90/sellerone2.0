@@ -17,6 +17,8 @@ import re
 
 import pandas as pd
 from scripts.core.out_paths import resolve_compat_path, write_csv_with_compat
+from scripts.core.storage import read_dataframe_with_sql_fallback
+from scripts.flows.B._finance_io import read_finance_frame
 
 
 OUT_DIR = Path("out")
@@ -24,6 +26,7 @@ OUT_DIR = Path("out")
 PURCHASES_CSV = OUT_DIR / "orders_sheet_orders.csv"
 ORDERS_CSV = OUT_DIR / "order_master.csv"
 INVENTORY_CSV = OUT_DIR / "inventory_summaries.csv"
+SQL_TABLE_INVENTORY_SUMMARIES = "a_inventory_summaries"
 REFUNDS_CSV = OUT_DIR / "financial_events_refunds_official.csv"
 
 TOKEN_LEDGER_OUT = resolve_compat_path("token_ledger_live.csv", default_system="B").live_path
@@ -63,9 +66,12 @@ def parse_date(value: str) -> datetime | None:
 
 
 def load_purchases() -> pd.DataFrame:
-    if not PURCHASES_CSV.exists():
+    try:
+        df = read_finance_frame(PURCHASES_CSV, "b_orders_sheet_orders", dtype=str).fillna("")
+    except Exception as exc:
         raise RuntimeError("Missing out/orders_sheet_orders.csv")
-    df = pd.read_csv(PURCHASES_CSV, dtype=str).fillna("")
+    if df.empty:
+        raise RuntimeError("Missing out/orders_sheet_orders.csv")
     df["_row_idx"] = df.index.astype(int)
     # Normalize columns by expected names.
     cols = {c.strip(): c for c in df.columns}
@@ -93,9 +99,10 @@ def load_purchases() -> pd.DataFrame:
 
 
 def load_orders() -> pd.DataFrame:
-    if not ORDERS_CSV.exists():
+    try:
+        df = read_finance_frame(ORDERS_CSV, "b_order_master", dtype=str).fillna("")
+    except Exception as exc:
         raise RuntimeError("Missing out/order_master.csv")
-    df = pd.read_csv(ORDERS_CSV, dtype=str).fillna("")
     df["Quantity Ordered"] = df["Quantity Ordered"].apply(parse_int)
     df = df[df["Quantity Ordered"] > 0].copy()
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce", utc=True)
@@ -105,9 +112,10 @@ def load_orders() -> pd.DataFrame:
 
 
 def load_refunds() -> pd.DataFrame:
-    if not REFUNDS_CSV.exists():
+    try:
+        df = read_finance_frame(REFUNDS_CSV, "b_financial_events_refunds_official", dtype=str).fillna("")
+    except Exception:
         return pd.DataFrame()
-    df = pd.read_csv(REFUNDS_CSV, dtype=str).fillna("")
     if df.empty:
         return df
     df["Quantity Ordered"] = df["Quantity Ordered"].apply(parse_int)
@@ -116,9 +124,14 @@ def load_refunds() -> pd.DataFrame:
 
 
 def load_inventory() -> pd.DataFrame:
-    if not INVENTORY_CSV.exists():
-        raise RuntimeError("Missing out/inventory_summaries.csv")
-    df = pd.read_csv(INVENTORY_CSV, dtype=str).fillna("")
+    try:
+        df = read_dataframe_with_sql_fallback(
+            INVENTORY_CSV,
+            SQL_TABLE_INVENTORY_SUMMARIES,
+            dtype=str,
+        ).fillna("")
+    except FileNotFoundError as exc:
+        raise RuntimeError("Missing out/inventory_summaries.csv") from exc
     if "available" not in df.columns:
         raise RuntimeError("inventory_summaries.csv missing 'available'")
     # Treat inbound + FC processing/transfer as stock for token coverage.

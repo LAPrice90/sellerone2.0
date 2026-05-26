@@ -17,8 +17,12 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-import gspread
-from gspread.exceptions import APIError
+try:
+    import gspread
+    from gspread.exceptions import APIError
+except Exception:
+    gspread = None
+    APIError = Exception
 
 
 ORDER_LEDGER_FX = Path("out/order_ledger_fx.csv")
@@ -874,6 +878,8 @@ def main() -> None:
     df_out.to_csv(OUT_PNL, index=False)
 
     try:
+        if gspread is None:
+            raise RuntimeError("gspread not available")
         client = get_gspread_client()
         sheet = client.open_by_key(PNL_SHEET_ID)
         if PNL_WRITE_DAILY and not PNL_SUMMARY_ONLY:

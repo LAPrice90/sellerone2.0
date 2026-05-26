@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.api.spapi_signed import sign_spapi_request
+from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
 LWA_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
@@ -60,6 +61,8 @@ MARKETPLACE_ID = os.environ.get("MARKETPLACE_ID")
 
 OUT_RAW = Path("out/inbound_shipment_contents_raw.csv")
 OUT_MAP = Path("out/inbound_shipment_contents.csv")
+SQL_TABLE_INBOUND_SHIPMENT_CONTENTS_RAW = "sys_inbound_shipment_contents_raw"
+SQL_TABLE_INBOUND_SHIPMENT_CONTENTS = "sys_inbound_shipment_contents"
 
 
 class MissingEnvError(RuntimeError):
@@ -209,6 +212,27 @@ def _pick_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
     return None
 
 
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE"))
+    sql_rows = 0
+    if mode in {"sql_shadow", "sql_primary_csv_export"}:
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, sql_table, df)
+            sql_rows = int(result["rows"])
+        finally:
+            store.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return {
+        "mode": mode,
+        "path": str(path),
+        "csv_rows": int(len(df.index)),
+        "sql_table": sql_table if mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
+
+
 def main() -> None:
     load_dotenv_if_missing()
     refresh_token = require_env("LWA_REFRESH_TOKEN")
@@ -239,7 +263,7 @@ def main() -> None:
     df = parse_tsv(raw_bytes)
 
     OUT_RAW.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(OUT_RAW, index=False)
+    _write_output_frame(df, OUT_RAW, SQL_TABLE_INBOUND_SHIPMENT_CONTENTS_RAW)
 
     shipment_col = _pick_col(df, ["inbound-shipment-id", "shipment-id", "Shipment ID", "FBA Shipment ID"])
     sku_col = _pick_col(df, ["seller-sku", "sku", "Seller SKU"])
@@ -264,7 +288,7 @@ def main() -> None:
     out = out.groupby(["inbound_shipment_id", "sku"], dropna=False)["quantity"].sum().reset_index()
 
     OUT_MAP.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(OUT_MAP, index=False)
+    _write_output_frame(out, OUT_MAP, SQL_TABLE_INBOUND_SHIPMENT_CONTENTS)
 
     print(
         json.dumps(

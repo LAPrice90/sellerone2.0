@@ -1,0 +1,2 @@
+feeder_candidate_id,supplier_id,supplier_name,supplier_sku,supplier_title,barcode,unit_cost,currency,vat_rate,pass_logic_status,pass_logic_reason_codes,legacy_status_code,ready_for_amazon_checks_flag,manual_review_flag,hold_flag,pass_logic_utc,source_row_hash,source_file_path,source_seen_at_utc
+F-shure-000000000001,shure_cosmetics,Shure Cosmetics,SCS-READY,Ready Product,5012345678901,9.99,GBP,20,ready_for_amazon_checks,,PASS,1,0,0,2026-04-07T16:00:00Z,hash-ready,tests/raw.csv,2026-04-07T15:59:00Z

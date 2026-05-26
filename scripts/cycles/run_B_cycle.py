@@ -41,6 +41,36 @@ try:
     from scripts.core.script_locator import resolve_script_path
 except ModuleNotFoundError:
     from core.script_locator import resolve_script_path
+try:
+    from scripts.core.flow_health_gate import flow_gate_checklist_path
+except ModuleNotFoundError:
+    from core.flow_health_gate import flow_gate_checklist_path
+try:
+    from scripts.core.runtime_owner_contract import (
+        RuntimeOwnerContractError,
+        assert_flow_owner_mapping,
+        is_truthy,
+    )
+except ModuleNotFoundError:
+    from core.runtime_owner_contract import (
+        RuntimeOwnerContractError,
+        assert_flow_owner_mapping,
+        is_truthy,
+    )
+try:
+    from scripts.core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+        replace_lock_heartbeat as replace_stream_lock_heartbeat,
+    )
+except ModuleNotFoundError:
+    from core.runtime_stream import (
+        build_lock_payload,
+        parse_lock_fields as parse_stream_lock_fields,
+        parse_lock_pid as parse_stream_lock_pid,
+        replace_lock_heartbeat as replace_stream_lock_heartbeat,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,6 +88,7 @@ RUN_ORDER = [
     "B007_allocate_tokens_live.py",
     "B025_build_token_cogs_ledger.py",
     "B004_build_order_master.py",
+    "B006_build_fx_ledgers.py",
     "B011_recover_l3_orphans.py",
 ]
 
@@ -92,6 +123,7 @@ STEP_TIMEOUT_SECONDS = {
         float(os.environ.get("B_STEP_TIMEOUT_B002_SECONDS", "1800") or "1800"), 0.0
     ),
     "B004_build_order_master.py": max(float(os.environ.get("B_STEP_TIMEOUT_B004_SECONDS", "1800") or "1800"), 0.0),
+    "B006_build_fx_ledgers.py": max(float(os.environ.get("B_STEP_TIMEOUT_B006_SECONDS", "900") or "900"), 0.0),
     "B007_allocate_tokens_live.py": max(float(os.environ.get("B_STEP_TIMEOUT_B007_SECONDS", "900") or "900"), 0.0),
     "B011_recover_l3_orphans.py": max(float(os.environ.get("B_STEP_TIMEOUT_B011_SECONDS", "900") or "900"), 0.0),
     "B025_build_token_cogs_ledger.py": max(float(os.environ.get("B_STEP_TIMEOUT_B025_SECONDS", "900") or "900"), 0.0),
@@ -111,6 +143,10 @@ STEP_TIMEOUT_SECONDS = {
 }
 ORDER_MASTER_PREWAIT_SECONDS = float(os.environ.get("ORDER_MASTER_PREWAIT_SECONDS", "60"))
 ORDER_MASTER_PREWAIT_POLL_SECONDS = float(os.environ.get("ORDER_MASTER_PREWAIT_POLL_SECONDS", "5"))
+ORDER_MASTER_L1_STABLE_SECONDS = max(
+    float(os.environ.get("ORDER_MASTER_L1_STABLE_SECONDS", "60") or "60"),
+    0.0,
+)
 B002_INTERVAL_MINUTES = float(os.environ.get("B002_INTERVAL_MINUTES", "60"))
 B002_MAX_SECONDS_DEFAULT = os.environ.get("B002_MAX_SECONDS_DEFAULT", "1200")  # 20 minutes
 B002_STATE_PATH = Path(os.environ.get("B002_STATE_PATH", ROOT / "out" / "B002_last_run.txt"))
@@ -133,7 +169,16 @@ HEALTH_CHECKLIST_PATH = Path(os.environ.get("HEALTH_CHECKLIST_PATH", ROOT / "out
 HEALTH_CHECKLIST_B_PATH = Path(
     os.environ.get("HEALTH_CHECKLIST_B_PATH", ROOT / "out" / "cycle_alerts" / "checklist_B.csv")
 )
+B_GATE_CHECKLIST_PATH = flow_gate_checklist_path("B")
 L1_PATH = ROOT / "out" / "financial_events_level1.csv"
+B004_GUARD_INPUTS = [
+    ROOT / "out" / "financial_events_level1.csv",
+    ROOT / "out" / "financial_events_level2.csv",
+    ROOT / "out" / "financial_events_level3_official.csv",
+    ROOT / "out" / "orders_all.csv",
+    ROOT / "out" / "token_cogs_ledger.csv",
+    ROOT / "out" / "l3_orphans.csv",
+]
 B_SPLIT_CHECKLIST_PATH = Path(
     os.environ.get("B_SPLIT_CHECKLIST_PATH", ROOT / "out" / "cycle_alerts" / "checklist_B_split.csv")
 )
@@ -178,6 +223,15 @@ MAINTENANCE_READY_PATH = Path(
 MAINTENANCE_ACTIVE_PATH = Path(
     os.environ.get("MAINTENANCE_ACTIVE_PATH", LOCKS_DIR / "maintenance.active")
 )
+A_RUN_LOCK_PATH = Path(
+    os.environ.get(
+        "A_RUN_LOCK_PATH",
+        ROOT / "out" / "systems" / "A" / "live" / "run_cycle.lock",
+    )
+)
+A_LEGACY_RUN_LOCK_PATH = Path(
+    os.environ.get("A_LEGACY_RUN_LOCK_PATH", ROOT / "out" / "run_cycle.lock")
+)
 MAINTENANCE_REASON = os.environ.get("B_CYCLE_MAINTENANCE_REASON", "").strip()
 try:
     MAINTENANCE_ETA_MINUTES = int(float(os.environ.get("B_CYCLE_MAINTENANCE_ETA_MINUTES", "13") or "13"))
@@ -194,15 +248,17 @@ _FATAL_RECORDED = False
 _HEARTBEAT_THREAD: threading.Thread | None = None
 _HEARTBEAT_STOP = threading.Event()
 HEARTBEAT_THREAD_SECONDS = max(float(os.environ.get("B_LOCK_HEARTBEAT_SECONDS", "5") or "5"), 1.0)
+_SIGNAL_EXIT_CODE: int | None = None
 STEP_ARTIFACTS = {
-    "B001_run_orders_to_sheet.py": ["out/orders_sheet_orders.csv", "out/orders_sheet_order_items.csv"],
-    "B002_run_pending_orders_to_sheet.py": ["out/orders_pending_orders.csv", "out/orders_pending_order_items.csv"],
+    "B001_run_orders_to_sheet.py": ["out/orders_all.csv", "out/order_items_all.csv"],
+    "B002_run_pending_orders_to_sheet.py": ["out/orders_pending_raw.csv", "out/order_items_pending_raw.csv"],
     "B030_sync_token_allocations_from_sheet.py": ["out/token_allocation_queue.csv"],
     "B007_allocate_tokens_live.py": ["out/token_ledger_live.csv", "out/token_allocation_skipped.csv"],
     "B025_build_token_cogs_ledger.py": ["out/token_cogs_ledger.csv"],
     "B004_build_order_master.py": ["out/order_master.csv"],
+    "B006_build_fx_ledgers.py": ["out/order_ledger_fx.csv", "out/financial_ledger_fx.csv", "out/fx_rates_daily.csv"],
     "B011_recover_l3_orphans.py": ["out/l3_orphans.csv", "out/orphan_order_items_recovered.csv"],
-    "A015_build_system_health_check.py": ["out/system_health_checklist.csv"],
+    "A015_build_system_health_check.py": ["out/cycle_alerts/checklist_B.csv"],
     "run_api_collection.py:listing_offer": [
         "out/listing_offer_snapshot_latest.csv",
         "out/listing_offer_seller_snapshot_latest.csv",
@@ -210,6 +266,56 @@ STEP_ARTIFACTS = {
     "run_api_collection.py:refunds_adjustments": ["out/refund_adjustment_snapshot_latest.csv"],
     "D001_build_pnl_daily.py": ["out/pnl_daily.csv"],
 }
+
+
+def _ignore_sigint_enabled() -> bool:
+    raw = str(os.environ.get("B_IGNORE_SIGINT", "")).strip().lower()
+    if raw:
+        return raw in {"1", "true", "yes", "on"}
+    return str(os.environ.get("B_SUPERVISOR_ACTIVE", "")).strip() == "1"
+
+
+def _owner_contract_enforced() -> bool:
+    return is_truthy(os.environ.get("B_OWNER_CONTRACT_ENFORCE", "1"))
+
+
+def _direct_worker_override_enabled() -> bool:
+    return is_truthy(os.environ.get("B_ALLOW_DIRECT_WORKER_START", "0"))
+
+
+def _enforce_owner_start_chain() -> None:
+    if _owner_contract_enforced():
+        assert_flow_owner_mapping(
+            "B",
+            runtime_owner=ROOT / "scripts" / "cycles" / "run_B_supervisor.py",
+            worker_entry=Path(__file__),
+            launcher_entrypoint=ROOT / "run_B_cycle.bat",
+        )
+
+    if _direct_worker_override_enabled():
+        _log("owner_chain override=B_ALLOW_DIRECT_WORKER_START")
+        return
+
+    supervisor_pid = str(os.environ.get("B_SUPERVISOR_PID", "")).strip()
+    supervisor_active = str(os.environ.get("B_SUPERVISOR_ACTIVE", "")).strip()
+    if not supervisor_pid and supervisor_active != "1":
+        raise RuntimeError(
+            "direct_worker_start_blocked missing_supervisor_owner; "
+            "use run_B_cycle.bat or set B_ALLOW_DIRECT_WORKER_START=1"
+        )
+    if supervisor_pid:
+        try:
+            pid_int = int(supervisor_pid)
+        except Exception:
+            raise RuntimeError(
+                "direct_worker_start_blocked invalid_supervisor_pid; "
+                "use run_B_cycle.bat or set B_ALLOW_DIRECT_WORKER_START=1"
+            )
+        if pid_int <= 0 or not _pid_alive(pid_int):
+            raise RuntimeError(
+                "direct_worker_start_blocked supervisor_pid_not_alive; "
+                "use run_B_cycle.bat or set B_ALLOW_DIRECT_WORKER_START=1"
+            )
 
 
 def _tail(text: str | None, lines: int, max_chars: int = 4000) -> str:
@@ -410,7 +516,7 @@ def _update_b_shadow_streak(match: bool) -> dict:
 
 
 def _health_snapshot_counts(path: Path | None = None) -> tuple[int, int] | None:
-    gate_path = path or (HEALTH_CHECKLIST_B_PATH if HEALTH_CHECKLIST_B_PATH.exists() else HEALTH_CHECKLIST_PATH)
+    gate_path = path or B_GATE_CHECKLIST_PATH
     if not gate_path.exists():
         return None
     fail = 0
@@ -429,7 +535,34 @@ def _health_snapshot_counts(path: Path | None = None) -> tuple[int, int] | None:
         return None
 
 
-def _health_snapshot_details(path: Path = HEALTH_CHECKLIST_PATH) -> dict | None:
+def _b_gate_state_payload(path: Path | None = None, *, health_rc: int | None = None) -> dict[str, object]:
+    gate_path = path or B_GATE_CHECKLIST_PATH
+    counts = _health_snapshot_counts(gate_path)
+    failed_checks = sorted(_failed_health_checks(gate_path)) if counts is not None else []
+    if counts is None:
+        gate_state = "not_run"
+        fail_count = None
+        warn_count = None
+    else:
+        fail_count, warn_count = counts
+        if int(health_rc if health_rc is not None else 0) >= 2 or fail_count > 0:
+            gate_state = "fail"
+        elif int(health_rc if health_rc is not None else 0) == 1 or warn_count > 0:
+            gate_state = "warn"
+        else:
+            gate_state = "pass"
+    return {
+        "gate_state": gate_state,
+        "gate_path": str(gate_path),
+        "gate_rc": "" if health_rc is None else int(health_rc),
+        "gate_fail_count": fail_count,
+        "gate_warn_count": warn_count,
+        "completed_with_gate_fail": False,
+        "blocking_checks": failed_checks,
+    }
+
+
+def _health_snapshot_details(path: Path = B_GATE_CHECKLIST_PATH) -> dict | None:
     if not path.exists():
         return None
     fail_checks: list[str] = []
@@ -461,7 +594,7 @@ def _health_snapshot_details(path: Path = HEALTH_CHECKLIST_PATH) -> dict | None:
         return None
 
 
-def _failed_health_checks(path: Path = HEALTH_CHECKLIST_PATH) -> set[str]:
+def _failed_health_checks(path: Path = B_GATE_CHECKLIST_PATH) -> set[str]:
     if not path.exists():
         return set()
     failed: set[str] = set()
@@ -508,6 +641,25 @@ def _run_subprocess_with_watchdog(
         kwargs["stderr"] = subprocess.PIPE
     proc = subprocess.Popen(cmd, **kwargs)
     while True:
+        signal_exit_code = _SIGNAL_EXIT_CODE
+        if signal_exit_code is not None:
+            try:
+                if proc.poll() is None:
+                    proc.kill()
+            except Exception:
+                pass
+            out_text, err_text = proc.communicate()
+            signal_note = f"aborted_for_signal;signal_rc={int(signal_exit_code)};step={step_name}"
+            if capture_output:
+                err_text = ((err_text or "") + ("\n" if err_text else "") + signal_note).strip()
+            else:
+                _console_write(f"[B_cycle] {signal_note}", error=True)
+            return subprocess.CompletedProcess(
+                cmd,
+                returncode=int(signal_exit_code),
+                stdout=out_text,
+                stderr=err_text,
+            )
         wait_seconds = SUBPROCESS_HEARTBEAT_SECONDS
         if timeout_seconds > 0:
             remaining = timeout_seconds - (time.time() - started)
@@ -526,6 +678,24 @@ def _run_subprocess_with_watchdog(
             return subprocess.CompletedProcess(cmd, returncode=int(proc.returncode or 0), stdout=out_text, stderr=err_text)
         except subprocess.TimeoutExpired:
             _touch_lock_heartbeat()
+            signal_exit_code = _SIGNAL_EXIT_CODE
+            if signal_exit_code is not None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                out_text, err_text = proc.communicate()
+                signal_note = f"aborted_for_signal;signal_rc={int(signal_exit_code)};step={step_name}"
+                if capture_output:
+                    err_text = ((err_text or "") + ("\n" if err_text else "") + signal_note).strip()
+                else:
+                    _console_write(f"[B_cycle] {signal_note}", error=True)
+                return subprocess.CompletedProcess(
+                    cmd,
+                    returncode=int(signal_exit_code),
+                    stdout=out_text,
+                    stderr=err_text,
+                )
             # If maintenance is requested mid-step, abort promptly so the cycle can enter
             # the boundary-safe maintenance pause instead of appearing "not running" to A.
             try:
@@ -549,7 +719,7 @@ def _run_health_check_once(
     extra_args: list[str] | None = None,
     freshness_path: Path | None = None,
 ) -> tuple[int, bool]:
-    target_path = freshness_path or HEALTH_CHECKLIST_PATH
+    target_path = freshness_path or B_GATE_CHECKLIST_PATH
     before_mtime = _mtime_seconds(target_path)
     cmd = [sys.executable, str(health_path)]
     if extra_args:
@@ -571,14 +741,14 @@ def _run_health_check_once(
 
 def _run_global_health_check_end_of_cycle(health_path: Path, *, emit_event_lines: bool = True) -> int:
     _log("run A015_build_system_health_check.py end_of_cycle attempt 1")
-    rc, health_snapshot_fresh = _run_health_check_once(health_path, freshness_path=HEALTH_CHECKLIST_PATH)
+    rc, health_snapshot_fresh = _run_health_check_once(health_path, freshness_path=B_GATE_CHECKLIST_PATH)
     stale_warn_promoted = False
     if rc == 1 and not health_snapshot_fresh:
         _log("health_check warn with stale snapshot - treating as fail")
         rc = 2
         stale_warn_promoted = True
     if rc == 2 and not stale_warn_promoted:
-        failed_checks = _failed_health_checks(HEALTH_CHECKLIST_PATH)
+        failed_checks = _failed_health_checks(B_GATE_CHECKLIST_PATH)
         if failed_checks == {"l1_keys_missing_in_master"}:
             _log("health_check fail on l1_keys_missing_in_master only - run B004 repair and retry A015")
             repair = _run_with_retries(
@@ -592,7 +762,7 @@ def _run_global_health_check_end_of_cycle(health_path: Path, *, emit_event_lines
                 _log("run A015_build_system_health_check.py end_of_cycle attempt 2")
                 rc, health_snapshot_fresh = _run_health_check_once(
                     health_path,
-                    freshness_path=HEALTH_CHECKLIST_PATH,
+                    freshness_path=B_GATE_CHECKLIST_PATH,
                 )
                 if rc == 1 and not health_snapshot_fresh:
                     _log("health_check warn with stale snapshot after retry - treating as fail")
@@ -651,7 +821,7 @@ def _run_health_check_end_of_cycle(*, mode_effective: str, mode_requested: str) 
     mode = _normalize_split_mode(mode_effective, default="shadow")
     if mode == "legacy":
         rc = _run_global_health_check_end_of_cycle(health_path, emit_event_lines=True)
-        _log_health_snapshot(path=HEALTH_CHECKLIST_B_PATH if HEALTH_CHECKLIST_B_PATH.exists() else HEALTH_CHECKLIST_PATH, tag="health_snapshot")
+        _log_health_snapshot(path=B_GATE_CHECKLIST_PATH, tag="health_snapshot")
         _manifest_add_step(
             name="A015_build_system_health_check.py",
             script_or_function="A015_build_system_health_check.py",
@@ -694,8 +864,8 @@ def _run_health_check_end_of_cycle(*, mode_effective: str, mode_requested: str) 
     _log("run A015_build_system_health_check.py profile=b end_of_cycle shadow_legacy")
     rc_legacy, legacy_fresh = _run_health_check_once(
         health_path,
-        extra_args=["--profile", "b", "--checklist-path", str(HEALTH_CHECKLIST_B_PATH), "--no-toast"],
-        freshness_path=HEALTH_CHECKLIST_B_PATH,
+        extra_args=["--profile", "b", "--checklist-path", str(B_GATE_CHECKLIST_PATH), "--no-toast"],
+        freshness_path=B_GATE_CHECKLIST_PATH,
     )
     if rc_legacy == 1 and not legacy_fresh:
         _log("health_check warn with stale B snapshot - treating as fail")
@@ -706,7 +876,7 @@ def _run_health_check_end_of_cycle(*, mode_effective: str, mode_requested: str) 
         _log("warn A015_build_system_health_check.py profile=b end_of_cycle shadow_legacy")
     else:
         _log(f"fail A015_build_system_health_check.py profile=b end_of_cycle shadow_legacy rc={rc_legacy}")
-    legacy_path = HEALTH_CHECKLIST_B_PATH
+    legacy_path = B_GATE_CHECKLIST_PATH
     _log_health_snapshot(path=legacy_path, tag="health_snapshot")
     _log("run A015_build_system_health_check.py profile=b shadow_compare")
     rc_split, split_fresh = _run_health_check_once(
@@ -772,8 +942,8 @@ def _run_health_check_end_of_cycle(*, mode_effective: str, mode_requested: str) 
             f"split_mode=shadow;split_rc={rc_split};split_fresh={'1' if split_fresh else '0'};"
             f"legacy_fail={legacy_fail};legacy_warn={legacy_warn};split_fail={split_fail};split_warn={split_warn}"
         ),
-        inputs=[str(HEALTH_CHECKLIST_PATH), str(B_SPLIT_CHECKLIST_PATH)],
-        outputs=[str(HEALTH_CHECKLIST_PATH), str(B_SPLIT_CHECKLIST_PATH)],
+        inputs=[str(B_GATE_CHECKLIST_PATH), str(B_SPLIT_CHECKLIST_PATH)],
+        outputs=[str(B_GATE_CHECKLIST_PATH), str(B_SPLIT_CHECKLIST_PATH)],
     )
     return rc_legacy
 
@@ -830,6 +1000,17 @@ def _run_with_retries(path: Path, env_override: dict | None = None) -> int:
                 notes=f"attempts={attempt}",
             )
             return 0
+        signal_abort = _SIGNAL_EXIT_CODE is not None and int(result.returncode) == int(_SIGNAL_EXIT_CODE)
+        if signal_abort:
+            _log(f"signal_abort {path.name} no_retry rc={int(result.returncode)}")
+            _manifest_add_step(
+                name=path.name,
+                script_or_function=path.name,
+                rc=int(result.returncode),
+                started_at=step_started,
+                notes=f"attempts={attempt};signal_abort_no_retry",
+            )
+            raise SystemExit(int(result.returncode))
         stderr_text = str(result.stderr or "")
         maintenance_abort = int(result.returncode) == 125 or "aborted_for_maintenance" in stderr_text
         if maintenance_abort and _maintenance_requested():
@@ -840,6 +1021,8 @@ def _run_with_retries(path: Path, env_override: dict | None = None) -> int:
                 rc=int(result.returncode),
                 started_at=step_started,
                 notes=f"attempts={attempt};maintenance_abort_no_retry",
+                step_status="maintenance_aborted",
+                verification_status="maintenance_abort",
             )
             return int(result.returncode)
         if MAX_RETRIES > 0 and attempt >= MAX_RETRIES:
@@ -880,36 +1063,80 @@ def _run_with_retries(path: Path, env_override: dict | None = None) -> int:
 
 def _wait_for_order_master_l1_stability() -> None:
     max_wait = max(float(ORDER_MASTER_PREWAIT_SECONDS), 0.0)
+    required_stable_seconds = max(float(ORDER_MASTER_L1_STABLE_SECONDS), 0.0)
+    poll = max(float(ORDER_MASTER_PREWAIT_POLL_SECONDS), 1.0)
+
     if max_wait <= 0:
+        _log("order_master prewait_skipped reason=disabled max_wait_seconds=0.0")
+        return
+    if required_stable_seconds <= 0:
+        _log("order_master prewait_skipped reason=stable_threshold_disabled required_stable_seconds=0.0")
         return
     if not L1_PATH.exists():
+        _log("order_master prewait_skipped reason=l1_missing")
         return
-    poll = max(float(ORDER_MASTER_PREWAIT_POLL_SECONDS), 1.0)
+
+    started = time.time()
     deadline = time.time() + max_wait
     while True:
         try:
             age_seconds = time.time() - L1_PATH.stat().st_mtime
         except Exception:
+            _log("order_master prewait_skipped reason=l1_stat_failed")
             return
-        if age_seconds >= 60.0:
-            if age_seconds < (60.0 + poll):
-                _log(f"order_master prewait complete l1_age_seconds={age_seconds:.1f}")
+
+        waited_seconds = max(time.time() - started, 0.0)
+        if age_seconds >= required_stable_seconds:
+            if waited_seconds <= 0.01:
+                _log(
+                    "order_master prewait_skipped "
+                    f"reason=already_ready l1_age_seconds={age_seconds:.1f} "
+                    f"required_stable_seconds={required_stable_seconds:.1f}"
+                )
+            else:
+                _log(
+                    "order_master prewait_shortened "
+                    f"waited_seconds={waited_seconds:.1f} "
+                    f"l1_age_seconds={age_seconds:.1f} "
+                    f"required_stable_seconds={required_stable_seconds:.1f}"
+                )
             return
+
         remaining = deadline - time.time()
         if remaining <= 0:
             _log(
                 "order_master prewait timeout "
                 f"l1_age_seconds={age_seconds:.1f} "
+                f"required_stable_seconds={required_stable_seconds:.1f} "
                 f"max_wait_seconds={max_wait:.1f}"
             )
             return
-        sleep_for = min(poll, max(remaining, 0.0))
+
+        remaining_until_ready = max(required_stable_seconds - age_seconds, 0.0)
+        sleep_for = min(poll, max(remaining, 0.0), max(remaining_until_ready, 0.0))
+        if sleep_for <= 0:
+            sleep_for = min(poll, max(remaining, 0.0))
         _log(
             "order_master prewait "
             f"l1_age_seconds={age_seconds:.1f} "
+            f"required_stable_seconds={required_stable_seconds:.1f} "
             f"sleep_seconds={sleep_for:.1f}"
         )
         time.sleep(sleep_for)
+
+
+def _fingerprint_file(path: Path) -> str:
+    try:
+        st = path.stat()
+        return f"{path.name}:1:{int(st.st_mtime_ns)}:{int(st.st_size)}"
+    except FileNotFoundError:
+        return f"{path.name}:0:0:0"
+    except Exception:
+        return f"{path.name}:error:0:0"
+
+
+def _b004_inputs_fingerprint() -> str:
+    return "|".join(_fingerprint_file(path) for path in B004_GUARD_INPUTS)
 
 
 def _run_refund_collection_if_due() -> None:
@@ -1267,6 +1494,16 @@ def _refresh_stock_and_parking_state() -> None:
 
 def main() -> int:
     global EXIT_CODE
+    try:
+        _enforce_owner_start_chain()
+    except RuntimeOwnerContractError as exc:
+        _console_write(f"[B_cycle] owner contract violation: {exc}")
+        _log(f"FATAL owner_contract_violation detail={exc}")
+        return 2
+    except RuntimeError as exc:
+        _console_write(f"[B_cycle] {exc}")
+        _log(f"FATAL {exc}")
+        return 2
     _install_process_lifecycle_hooks()
     _acquire_lock()
     _install_lock_cleanup_handlers()
@@ -1308,6 +1545,8 @@ def _main_loop() -> int:
         mode_effective = _effective_b_split_mode()
         _log(f"split_health mode_requested={mode_requested} mode_effective={mode_effective}")
         wrote_health = False
+        first_b004_succeeded = False
+        first_b004_inputs_fingerprint = ""
         try:
             for name in RUN_ORDER:
                 path = resolve_script_path(SCRIPTS, name)
@@ -1348,7 +1587,13 @@ def _main_loop() -> int:
                     env_override = {}
                     if "ORDER_MASTER_INCREMENTAL" not in os.environ:
                         env_override["ORDER_MASTER_INCREMENTAL"] = "1"
-                    _run_with_retries(path, env_override=env_override)
+                    rc_b004_first = _run_with_retries(path, env_override=env_override)
+                    if rc_b004_first == 0:
+                        first_b004_succeeded = True
+                        first_b004_inputs_fingerprint = _b004_inputs_fingerprint()
+                    else:
+                        first_b004_succeeded = False
+                        first_b004_inputs_fingerprint = ""
                     continue
                 _run_with_retries(path)
             try:
@@ -1413,7 +1658,7 @@ def _main_loop() -> int:
                 if mode_effective == "split":
                     gate_path = B_SPLIT_CHECKLIST_PATH
                 else:
-                    gate_path = HEALTH_CHECKLIST_B_PATH if HEALTH_CHECKLIST_B_PATH.exists() else HEALTH_CHECKLIST_PATH
+                    gate_path = B_GATE_CHECKLIST_PATH
                 snapshot = _health_snapshot_counts(gate_path)
                 gate_block = False
                 if snapshot is None:
@@ -1430,14 +1675,38 @@ def _main_loop() -> int:
                 else:
                     _console_write("[B_cycle] publish: Order_Master")
                     _log("publish Order_Master")
+                    b004_publish_env = {
+                        "ORDER_MASTER_SKIP_SHEETS": "0",
+                        "B_CYCLE_QUIET": "0",
+                        "ORDER_MASTER_INCREMENTAL": "1",
+                    }
+                    if first_b004_succeeded and first_b004_inputs_fingerprint:
+                        publish_fingerprint = _b004_inputs_fingerprint()
+                        if publish_fingerprint == first_b004_inputs_fingerprint:
+                            _log(
+                                "b004_second_run_skipped reason=no_input_change "
+                                "publish_mode=existing_artifact "
+                                f"run_id={CURRENT_CYCLE_ID or '-'}"
+                            )
+                            b004_publish_env["ORDER_MASTER_PUBLISH_EXISTING_ONLY"] = "1"
+                        else:
+                            _log(
+                                "b004_second_run_required reason=input_changed "
+                                f"run_id={CURRENT_CYCLE_ID or '-'}"
+                            )
+                    else:
+                        _log(
+                            "b004_second_run_required reason=first_run_unavailable "
+                            f"run_id={CURRENT_CYCLE_ID or '-'}"
+                        )
+                    _wait_for_order_master_l1_stability()
                     _run_with_retries(
                         resolve_script_path(SCRIPTS, "B004_build_order_master.py"),
-                        env_override={
-                            "ORDER_MASTER_SKIP_SHEETS": "0",
-                            "B_CYCLE_QUIET": "0",
-                            "ORDER_MASTER_INCREMENTAL": "1",
-                        },
+                        env_override=b004_publish_env,
                     )
+                    _console_write("[B_cycle] publish: Order_Ledger_FX")
+                    _log("publish Order_Ledger_FX")
+                    _run_with_retries(resolve_script_path(SCRIPTS, "B006_build_fx_ledgers.py"))
                     _console_write("[B_cycle] publish: P&L")
                     _log("publish P&L")
                     _run_with_retries(
@@ -1468,16 +1737,19 @@ def _main_loop() -> int:
                 finalize_reason = "restart_drain_boundary_exit_after_cycle"
                 return 0
         finally:
+            manifest_final_state = "completed" if cycle_rc == 0 else "failed"
+            health_rc = None
+            gate_path = B_SPLIT_CHECKLIST_PATH if mode_effective == "split" else B_GATE_CHECKLIST_PATH
             if cycle_rc == 0:
-                _run_health_check_end_of_cycle(mode_effective=mode_effective, mode_requested=mode_requested)
+                health_rc = _run_health_check_end_of_cycle(mode_effective=mode_effective, mode_requested=mode_requested)
                 wrote_health = True
             _log(
                 "B_FINALIZE "
                 f"ran rc={cycle_rc} wrote_health={'true' if wrote_health else 'false'} "
-                f"reason={finalize_reason}"
+                f"reason={finalize_reason} gate_rc={health_rc if health_rc is not None else 'not_run'}"
             )
-            _manifest_flush()
-    _manifest_flush()
+            _manifest_flush(final_state=manifest_final_state, gate_path=gate_path, health_rc=health_rc)
+    _manifest_flush(final_state="completed")
     return 0
 
 
@@ -1491,29 +1763,41 @@ def _log(msg: str) -> None:
 def _maintenance_requested() -> bool:
     if MAINTENANCE_MODE:
         return True
-    return MAINTENANCE_FLAG_PATH.exists() or MAINTENANCE_REQUEST_PATH.exists()
+    return _path_exists_safe(MAINTENANCE_FLAG_PATH) or _path_exists_safe(MAINTENANCE_REQUEST_PATH)
 
 
 def _maintenance_request_text() -> str:
-    if not MAINTENANCE_REQUEST_PATH.exists():
-        return ""
-    try:
-        return MAINTENANCE_REQUEST_PATH.read_text(encoding="utf-8", errors="replace").strip()
-    except Exception:
-        return ""
+    parts: list[str] = []
+    for path in (MAINTENANCE_FLAG_PATH, MAINTENANCE_REQUEST_PATH):
+        if not _path_exists_safe(path):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace").strip()
+        except Exception:
+            continue
+        if text:
+            parts.append(text)
+    return "\n".join(parts)
 
 
 def _restart_drain_requested() -> bool:
-    text = _maintenance_request_text()
-    if not text:
+    global_text = _read_marker_text(MAINTENANCE_REQUEST_PATH)
+    if "requested_by=controlled_restart_gate" in global_text and "reason=overnight_restart_eval" in global_text:
+        return True
+    b_text = _read_marker_text(MAINTENANCE_FLAG_PATH).lower()
+    if not b_text:
         return False
-    return "requested_by=controlled_restart_gate" in text and "reason=overnight_restart_eval" in text
+    return (
+        "action=restart_drain" in b_text
+        or "exit_after_drain=1" in b_text
+        or "restart_drain=1" in b_text
+    )
 
 
 def _maintenance_reason() -> str:
     if MAINTENANCE_REASON:
         return MAINTENANCE_REASON
-    if not MAINTENANCE_FLAG_PATH.exists():
+    if not _path_exists_safe(MAINTENANCE_FLAG_PATH):
         return ""
     try:
         text = MAINTENANCE_FLAG_PATH.read_text(encoding="utf-8").strip()
@@ -1523,20 +1807,107 @@ def _maintenance_reason() -> str:
         return ""
 
 
+def _path_exists_safe(path: Path) -> bool:
+    try:
+        return path.exists()
+    except Exception as exc:
+        _log(f"warn path_exists_failed path={path} error={exc}")
+        return False
+
+
+def _read_marker_text(path: Path) -> str:
+    if not _path_exists_safe(path):
+        return ""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except Exception:
+        return ""
+
+
+def _parse_marker_field(payload: str, key: str) -> str:
+    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
+    for part in parts:
+        part_clean = str(part).lstrip("\ufeff").strip()
+        if part_clean.startswith(f"{key}="):
+            return part_clean.split("=", 1)[1].strip()
+    return ""
+
+
+def _a_run_lock_alive() -> bool:
+    seen: set[Path] = set()
+    for lock_path in (A_RUN_LOCK_PATH, A_LEGACY_RUN_LOCK_PATH):
+        if lock_path in seen:
+            continue
+        seen.add(lock_path)
+        payload = _read_marker_text(lock_path)
+        if not payload:
+            continue
+        pid = _parse_lock_pid(payload)
+        if pid is not None and _pid_alive(pid):
+            return True
+    return False
+
+
+def _recover_stale_a_maintenance(context: str) -> bool:
+    request_text = _read_marker_text(MAINTENANCE_REQUEST_PATH)
+    active_text = _read_marker_text(MAINTENANCE_ACTIVE_PATH)
+    if not request_text and not active_text:
+        return False
+
+    request_owner = _parse_marker_field(request_text, "requested_by")
+    active_owner = _parse_marker_field(active_text, "active_by")
+    # Never clear non-A ownership markers from B.
+    if request_owner not in {"", "A"}:
+        return False
+    if active_owner not in {"", "A"}:
+        return False
+    if request_owner != "A" and active_owner != "A":
+        return False
+
+    owner_pids: list[int] = []
+    for marker_text in (request_text, active_text):
+        pid = _parse_lock_pid(marker_text)
+        if pid is not None:
+            owner_pids.append(pid)
+    if any(_pid_alive(pid) for pid in owner_pids):
+        return False
+    if _a_run_lock_alive():
+        return False
+
+    for path in (MAINTENANCE_ACTIVE_PATH, MAINTENANCE_REQUEST_PATH, MAINTENANCE_READY_PATH):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
+    _log(
+        "maintenance stale_owner_recovered "
+        f"context={context} owners=requested_by:{request_owner or '-'} "
+        f"active_by:{active_owner or '-'} owner_pids={','.join(str(pid) for pid in owner_pids) or '-'}"
+    )
+    return True
+
+
 def _pause_for_maintenance_at_boundary(context: str) -> bool:
     if not _maintenance_requested():
         return False
     MAINTENANCE_READY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    ready_payload = f"B_READY|pid={os.getpid()}|ts={_ts()}|context={context}\n"
+    request_id = _parse_marker_field(_maintenance_request_text(), "request_id")
+    ready_payload = f"B_READY|pid={os.getpid()}|ts={_ts()}|context={context}"
+    if request_id:
+        ready_payload += f"|request_id={request_id}"
+    ready_payload += "\n"
     try:
         MAINTENANCE_READY_PATH.write_text(ready_payload, encoding="utf-8")
     except Exception:
         pass
-    _log(f"maintenance ready ({context}); current cycle finished")
+    request_id_suffix = f" request_id={request_id}" if request_id else ""
+    _log(f"maintenance ready ({context}); current cycle finished{request_id_suffix}")
     if _restart_drain_requested():
         _log(f"restart_drain boundary_ready ({context}); exiting B loop for controlled restart")
         return True
-    while _maintenance_requested() or MAINTENANCE_ACTIVE_PATH.exists():
+    while _maintenance_requested() or _path_exists_safe(MAINTENANCE_ACTIVE_PATH):
+        if _recover_stale_a_maintenance(context):
+            continue
         reason = _maintenance_reason()
         reason_suffix = f"; reason={reason}" if reason else ""
         msg = (
@@ -1547,7 +1918,7 @@ def _pause_for_maintenance_at_boundary(context: str) -> bool:
         _log(msg)
         time.sleep(max(MAINTENANCE_SLEEP_SECONDS, 1.0))
     try:
-        if MAINTENANCE_READY_PATH.exists():
+        if _path_exists_safe(MAINTENANCE_READY_PATH):
             MAINTENANCE_READY_PATH.unlink()
     except Exception:
         pass
@@ -1582,11 +1953,22 @@ def _acquire_lock() -> None:
     _write_lock()
 
 
-def _write_lock() -> None:
+def _write_lock(*, heartbeat_only: bool = False) -> None:
     now = _ts()
-    payload = f"B|pid={os.getpid()}|start={now}|heartbeat={now}\n"
     for path in _lock_paths():
         path.parent.mkdir(parents=True, exist_ok=True)
+        payload = ""
+        if heartbeat_only:
+            try:
+                existing = _norm(path.read_text(encoding="utf-8"))
+            except Exception:
+                existing = ""
+            if existing:
+                existing_pid = _parse_lock_pid(existing)
+                if existing_pid == os.getpid():
+                    payload = replace_stream_lock_heartbeat(existing, heartbeat_utc=now)
+        if not payload:
+            payload = build_lock_payload(owner="B", pid=os.getpid(), start_utc=now, heartbeat_utc=now)
         path.write_text(payload, encoding="utf-8")
 
 
@@ -1605,7 +1987,7 @@ def _release_lock() -> None:
 
 def _touch_lock_heartbeat() -> None:
     try:
-        _write_lock()
+        _write_lock(heartbeat_only=True)
     except Exception:
         pass
 
@@ -1625,30 +2007,18 @@ def _lock_probe_paths() -> list[Path]:
 
 
 def _parse_lock_pid(payload: str) -> int | None:
-    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
-    for part in parts:
-        if part.startswith("pid="):
-            try:
-                return int(part.split("=", 1)[1].strip())
-            except Exception:
-                return None
-    return None
+    return parse_stream_lock_pid(payload)
 
 
 def _parse_lock_utc(payload: str, key: str) -> datetime | None:
-    parts = [p.strip() for p in str(payload).split("|") if p.strip()]
-    for part in parts:
-        if not part.startswith(f"{key}="):
-            continue
-        raw = part.split("=", 1)[1].strip()
-        if not raw:
-            continue
+    fields = parse_stream_lock_fields(payload)
+    raw = str(fields.get(str(key or "").strip(), "")).strip()
+    if raw:
         text = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
         try:
-            dt = datetime.fromisoformat(text)
+            return datetime.fromisoformat(text)
         except Exception:
             return None
-        return dt
     return None
 
 
@@ -1669,11 +2039,29 @@ def _norm(value: object) -> str:
 def _install_lock_cleanup_handlers() -> None:
     atexit.register(_release_lock)
 
-    def _handle_signal(signum, _frame) -> None:
-        _release_lock()
-        raise SystemExit(128 + int(signum))
+    def _handle_runtime_signal(signum: int) -> None:
+        global _SIGNAL_EXIT_CODE
+        signum_int = int(signum)
+        sigint_value = int(getattr(signal, "SIGINT", 2))
+        if signum_int == sigint_value and _ignore_sigint_enabled():
+            try:
+                _log(f"signal_received signum={signum_int}; ignored")
+            except Exception:
+                pass
+            return
+        _SIGNAL_EXIT_CODE = 128 + signum_int
+        try:
+            _log(f"signal_received signum={signum_int}; graceful_shutdown_requested")
+        except Exception:
+            pass
 
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    def _handle_signal(signum, _frame) -> None:
+        _handle_runtime_signal(int(signum))
+
+    for sig_name in ("SIGINT", "SIGTERM", "SIGBREAK"):
+        sig = getattr(signal, sig_name, None)
+        if sig is None:
+            continue
         try:
             signal.signal(sig, _handle_signal)
         except Exception:
@@ -1681,8 +2069,24 @@ def _install_lock_cleanup_handlers() -> None:
 
 
 def _pid_alive(pid: int) -> bool:
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception:
+            return False
+        out = (result.stdout or "").strip().lower()
+        if "no tasks are running" in out:
+            return False
+        return str(int(pid)) in out
     try:
         os.kill(pid, 0)
+        return True
+    except PermissionError:
         return True
     except Exception:
         return False
@@ -1701,6 +2105,8 @@ def _manifest_add_step(
     notes: str = "",
     inputs: list[str] | None = None,
     outputs: list[str] | None = None,
+    step_status: str = "",
+    verification_status: str = "",
 ) -> None:
     global CURRENT_MANIFEST
     if CURRENT_MANIFEST is None:
@@ -1716,15 +2122,39 @@ def _manifest_add_step(
         notes=notes,
         started_at=started_at,
         ended_at=utc_now_iso(),
+        step_status=step_status,
+        verification_status=verification_status,
     )
 
 
-def _manifest_flush() -> None:
+def _manifest_flush(
+    *,
+    final_state: str | None = None,
+    gate_path: Path | None = None,
+    health_rc: int | None = None,
+) -> None:
     global CURRENT_MANIFEST
     if CURRENT_MANIFEST is None:
         return
     try:
-        finalize_manifest(CURRENT_MANIFEST, health_checklist_path=HEALTH_CHECKLIST_PATH, end_time=utc_now_iso())
+        gate_payload = _b_gate_state_payload(gate_path or B_GATE_CHECKLIST_PATH, health_rc=health_rc)
+        gate_payload["completed_with_gate_fail"] = (
+            str(final_state or "").strip().lower() == "completed"
+            and str(gate_payload.get("gate_state", "")).lower() == "fail"
+        )
+        CURRENT_MANIFEST["gate_state"] = gate_payload["gate_state"]
+        CURRENT_MANIFEST["gate_path"] = gate_payload["gate_path"]
+        CURRENT_MANIFEST["gate_rc"] = gate_payload["gate_rc"]
+        CURRENT_MANIFEST["gate_fail_count"] = gate_payload["gate_fail_count"]
+        CURRENT_MANIFEST["gate_warn_count"] = gate_payload["gate_warn_count"]
+        CURRENT_MANIFEST["completed_with_gate_fail"] = gate_payload["completed_with_gate_fail"]
+        CURRENT_MANIFEST["blocking_checks"] = gate_payload["blocking_checks"]
+        finalize_manifest(
+            CURRENT_MANIFEST,
+            health_checklist_path=B_GATE_CHECKLIST_PATH,
+            end_time=utc_now_iso(),
+            final_state=final_state,
+        )
         path = write_manifest(ROOT, CURRENT_MANIFEST)
         _log(f"manifest written {path}")
     except Exception as exc:

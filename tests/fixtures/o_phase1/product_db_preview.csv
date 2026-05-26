@@ -1,0 +1,9 @@
+seller_sku,asin,supplier_code,supplier_name,supplier_pack_size,moq,supplier_catalog_price,last_purchase_price,sale_status,vat_rate,bulk_long_lead_flag,lead_time_days,out_of_stock_days,snooze_until_utc
+SKU-FULL,ASINFULL001,SUP-A,Alpha Supply,1,1,5.00,4.90,active,20,0,7,0,
+SKU-TEST,ASINTEST001,SUP-B,Beta Wholesale,1,1,10.00,9.80,active,20,0,9,0,
+SKU-WAIT,ASINWAIT001,SUP-C,Cappa Trade,1,1,10.00,9.90,active,20,0,8,0,
+SKU-FALLBACK,ASINFALL001,SUP-D,Delta Parts,1,1,,6.00,active,20,0,10,0,
+SKU-STALE,ASINSTALE001,SUP-E,Echo Imports,1,1,5.00,4.80,active,20,0,14,45,
+SKU-BULK,ASINBULK001,SUP-F,Foxtrot Bulk,20,40,18.00,18.00,active,20,1,60,0,
+SKU-MISSINGCOST,ASINMISS001,SUP-G,Gamma Goods,1,1,,,active,20,0,12,0,
+SKU-TEST,ASINTEST001,SUP-B,Beta Wholesale Duplicate,1,1,10.00,9.80,active,20,0,9,0,

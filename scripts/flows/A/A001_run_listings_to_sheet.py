@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.api.get_merchant_listings_report import run_live, load_dotenv_if_missing
 from scripts.api.get_marketplace_participations import list_marketplace_participations
+from scripts.core.storage import coalesce_duplicate_header_rows, dataframe_from_product_db_sheet_rows, write_dataframe_with_sql_compat
  
 MODE = os.environ.get("RUN_MODE", "sheet").lower()
 TARGET_SKU = os.environ.get("TARGET_SKU", "0G-JB6S-PN34")
@@ -36,6 +37,8 @@ RUN_STATUS_TAB = "Run_Status"
 MARKETPLACE_ID = os.environ.get("MARKETPLACE_ID", "A1F83G8C2ARO7P")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "24"))
+PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 
 FOCUS_COLUMNS: List[str] = [
     "item-name",
@@ -65,8 +68,15 @@ def export_product_db(sheet: gspread.Spreadsheet) -> None:
     rows = ws.get_all_values()
     if not rows:
         return
+    df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
     Path("out").mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows[1:], columns=rows[0]).to_csv("out/product_db_preview.csv", index=False)
+    write_dataframe_with_sql_compat(
+        df,
+        PRODUCT_DB_PREVIEW,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
     print("Saved Product_DB preview to out/product_db_preview.csv")
 
 
@@ -79,6 +89,9 @@ def update_product_db_listings(sheet: gspread.Spreadsheet, df: pd.DataFrame, run
     prod_rows = ws.get_all_values()
     if not prod_rows:
         return
+    prod_rows, repaired_headers = coalesce_duplicate_header_rows(prod_rows)
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before A001 update: " + ",".join(repaired_headers))
     headers = prod_rows[0]
     idx_map = {h: i for i, h in enumerate(headers)}
     # Ensure required columns exist

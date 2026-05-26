@@ -18,11 +18,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import gspread
+try:
+    import gspread
+    from gspread.exceptions import APIError
+except Exception:
+    gspread = None
+    APIError = Exception
 import requests
 import pandas as pd
 import csv
-from gspread.exceptions import APIError
 from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -34,6 +38,8 @@ from scripts.api.get_orders import (  # noqa: E402
     list_order_items,
     load_dotenv_if_missing,
 )
+from scripts.core.storage import coalesce_duplicate_header_rows, dataframe_from_product_db_sheet_rows, write_dataframe_with_sql_compat  # noqa: E402
+from scripts.flows.B._finance_io import read_finance_frame, sync_csv_to_finance_table, write_finance_frame  # noqa: E402
 
 SHEET_ID = "1BHueJTk4dvvhIXypzh6i2hQTgc0pB3DWj2khQ2IT6_A"
 PRODUCT_DB_SHEET_ID = os.environ.get("PRODUCT_DB_SHEET_ID", "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s")
@@ -49,9 +55,13 @@ SHEETS_MAX_CELLS = 10_000_000
 MARKETPLACE_ID = os.environ.get("MARKETPLACE_ID", "A1F83G8C2ARO7P")
 ORDERS_ALL = Path("out/orders_all.csv")
 ITEMS_ALL = Path("out/order_items_all.csv")
+SQL_TABLE_ORDERS_ALL = "b_orders_all"
+SQL_TABLE_ORDER_ITEMS_ALL = "b_order_items_all"
 LEVEL2_CSV = Path("out/financial_events_level2.csv")
+SQL_TABLE_LEVEL2 = "b_financial_events_level2"
 LEVEL3_OFFICIAL_CSV = Path("out/financial_events_level3_official.csv")
 PRODUCT_DB_PATH = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 REFRESH_PRODUCT_DB = os.environ.get("REFRESH_PRODUCT_DB", "1") == "1"
 FX_RATES_PATH = Path("out/fx_rates_daily.csv")
 VAT_DEFAULT = 0.2
@@ -89,6 +99,11 @@ B002_MIN_AGE_HOURS = float(os.environ.get("B002_MIN_AGE_HOURS", "12"))
 B002_MAX_ORDERS = int(os.environ.get("B002_MAX_ORDERS", "0"))  # 0 = no limit
 B002_MAX_SECONDS = int(os.environ.get("B002_MAX_SECONDS", "0"))  # 0 = no limit
 B002_LIGHT = os.environ.get("B002_LIGHT", "1") == "1"  # avoid full Level2 read/write
+WRITE_SHEETS = os.environ.get("B002_WRITE_SHEETS", "0").strip() == "1"
+if os.environ.get("B_CYCLE_QUIET", "0").strip() == "1":
+    WRITE_SHEETS = False
+if gspread is None:
+    WRITE_SHEETS = False
 FAILED_ORDERS_PATH = Path("out/pending_orders_failed.csv")
 ITEMS_MERGE_SUMMARY_PATH = Path("out/orders_items_recovery_merge_summary.csv")
 FX_API_URL = "https://api.frankfurter.app"
@@ -131,7 +146,11 @@ def _write_compiled_unique(
             out[c] = ""
     out = out.drop_duplicates(subset=dedupe_key_cols, keep="last")
     path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(path, index=False)
+    sql_table = SQL_TABLE_ORDER_ITEMS_ALL if path == ITEMS_ALL else SQL_TABLE_ORDERS_ALL if path == ORDERS_ALL else ""
+    if sql_table:
+        write_dataframe_with_sql_compat(out, path, sql_table)
+    else:
+        out.to_csv(path, index=False)
     return len(out)
 
 
@@ -140,7 +159,10 @@ def _merge_recovered_items_into_items_all(df_items: pd.DataFrame) -> Dict[str, i
         return {"incoming_rows": 0, "before_rows": 0, "after_rows": 0}
     incoming = df_items.copy().fillna("").astype(str)
     incoming["_dedupe_key"] = _compiled_items_dedupe_key(incoming)
-    existing = pd.read_csv(ITEMS_ALL, dtype=str).fillna("") if ITEMS_ALL.exists() else pd.DataFrame()
+    try:
+        existing = read_finance_frame(ITEMS_ALL, dtype=str).fillna("")
+    except Exception:
+        existing = pd.DataFrame()
     before_rows = int(len(existing.index))
     if not existing.empty:
         existing = existing.copy()
@@ -156,7 +178,7 @@ def _merge_recovered_items_into_items_all(df_items: pd.DataFrame) -> Dict[str, i
         cleaned = pd.read_csv(ITEMS_ALL, dtype=str).fillna("")
         if "_dedupe_key" in cleaned.columns:
             cleaned = cleaned.drop(columns=["_dedupe_key"])
-            cleaned.to_csv(ITEMS_ALL, index=False)
+            write_dataframe_with_sql_compat(cleaned, ITEMS_ALL, SQL_TABLE_ORDER_ITEMS_ALL)
             after_rows = int(len(cleaned.index))
     except Exception:
         pass
@@ -187,6 +209,8 @@ def _append_items_merge_summary(row: Dict[str, str]) -> None:
 
 
 def get_gspread_client() -> gspread.Client:
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not cred_path:
         cred_path = str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json")
@@ -1088,12 +1112,21 @@ def export_product_db(sheet: gspread.Spreadsheet) -> None:
     rows = ws.get_all_values()
     if not rows:
         return
+    df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
     PRODUCT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows[1:], columns=rows[0]).to_csv(PRODUCT_DB_PATH, index=False)
+    write_dataframe_with_sql_compat(
+        df,
+        PRODUCT_DB_PATH,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
 
 
 def refresh_product_db() -> None:
     if not REFRESH_PRODUCT_DB:
+        return
+    if not WRITE_SHEETS:
         return
     try:
         client = get_gspread_client()
@@ -1107,6 +1140,8 @@ def update_product_db_last_sold(df_level2: pd.DataFrame) -> None:
     """Update Product_DB with last_sold_price from Level 2 actuals."""
     if df_level2.empty:
         return
+    if not WRITE_SHEETS:
+        return
     try:
         client = get_gspread_client()
         sheet = client.open_by_key(PRODUCT_DB_SHEET_ID)
@@ -1117,6 +1152,9 @@ def update_product_db_last_sold(df_level2: pd.DataFrame) -> None:
     prod_rows = ws.get_all_values()
     if not prod_rows:
         return
+    prod_rows, repaired_headers = coalesce_duplicate_header_rows(prod_rows)
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before B002 update: " + ",".join(repaired_headers))
     headers = prod_rows[0]
     idx_map = {h: i for i, h in enumerate(headers)}
     required_cols = [
@@ -1179,16 +1217,17 @@ def update_product_db_last_sold(df_level2: pd.DataFrame) -> None:
 
 
 def _dedupe_level2_csv() -> int:
-    if not LEVEL2_CSV.exists():
+    try:
+        df = read_finance_frame(LEVEL2_CSV, SQL_TABLE_LEVEL2, dtype=str)
+    except Exception:
         print({"status": "skip", "reason": "level2_missing"})
         return 0
-    df = pd.read_csv(LEVEL2_CSV, dtype=str)
     if "Order ID" not in df.columns or "SKU" not in df.columns:
         print({"status": "error", "error": "missing_order_id_or_sku_cols"})
         return 0
     before = len(df)
     df = df.drop_duplicates(subset=["Order ID", "SKU"], keep="last")
-    df.to_csv(LEVEL2_CSV, index=False)
+    write_finance_frame(df, LEVEL2_CSV, SQL_TABLE_LEVEL2)
     removed = before - len(df)
     print({"status": "success", "action": "dedupe_level2", "rows_before": before, "rows_after": len(df), "removed": removed})
     return removed
@@ -1242,28 +1281,32 @@ def main() -> None:
     existing_items_order_ids: set[str] = set()
     try:
         # Determine orders missing Level 2 (order-based, not date-windowed)
-        if not ORDERS_ALL.exists():
+        print("[B002] loading orders_all.csv ...")
+        try:
+            all_orders = read_finance_frame(ORDERS_ALL, dtype=str)
+        except Exception:
             print({"status": "success", "message": "orders_all.csv not found", "row_count": 0})
             return
-        print("[B002] loading orders_all.csv ...")
-        all_orders = pd.read_csv(ORDERS_ALL, dtype=str)
         print(f"[B002] orders_all rows: {len(all_orders)}")
         all_orders["purchase_date_dt"] = pd.to_datetime(all_orders.get("purchase_date"), errors="coerce")
         level2_accum = pd.DataFrame(columns=LEVEL2_COLUMNS)
         done_ids = set()
-        if LEVEL2_CSV.exists():
+        try:
+            level2_existing = read_finance_frame(LEVEL2_CSV, SQL_TABLE_LEVEL2, dtype=str)
+        except Exception:
+            level2_existing = pd.DataFrame()
+        if not level2_existing.empty:
             if B002_LIGHT:
                 print("[B002] B002_LIGHT=1, reading Level2 Order IDs only ...")
                 try:
-                    for chunk in pd.read_csv(LEVEL2_CSV, dtype=str, usecols=["Order ID"], chunksize=200000):
-                        done_ids.update(chunk["Order ID"].dropna().astype(str).tolist())
+                    done_ids.update(level2_existing["Order ID"].dropna().astype(str).tolist())
                 except Exception:
                     done_ids = set()
                 print(f"[B002] Level2 Order IDs loaded: {len(done_ids)}")
             else:
                 print("[B002] loading full financial_events_level2.csv ...")
                 try:
-                    level2_accum = pd.read_csv(LEVEL2_CSV, dtype=str)
+                    level2_accum = level2_existing.copy()
                 except Exception:
                     level2_accum = pd.DataFrame(columns=LEVEL2_COLUMNS)
                 if not level2_accum.empty:
@@ -1292,7 +1335,7 @@ def main() -> None:
                     if "Order ID" in level2_accum.columns and "SKU" in level2_accum.columns:
                         level2_accum = level2_accum.drop_duplicates(subset=["Order ID", "SKU"], keep="last")
                 # After cleaning, persist and recompute missing set
-                level2_accum.to_csv(LEVEL2_CSV, index=False)
+                write_finance_frame(level2_accum, LEVEL2_CSV, SQL_TABLE_LEVEL2)
                 done_ids = set(level2_accum.get("Order ID", []))
                 print(f"[B002] Level2 rows after clean: {len(level2_accum)}")
 
@@ -1319,12 +1362,11 @@ def main() -> None:
             return
         target = target.sort_values(by="purchase_date_dt")
         print(f"[B002] target orders: {len(target)} (missing + pending)")
-        if ITEMS_ALL.exists():
-            try:
-                item_ids_df = pd.read_csv(ITEMS_ALL, dtype=str, usecols=["amazon_order_id"]).fillna("")
-                existing_items_order_ids = set(item_ids_df["amazon_order_id"].astype(str).str.strip())
-            except Exception:
-                existing_items_order_ids = set()
+        try:
+            item_ids_df = read_finance_frame(ITEMS_ALL, usecols=["amazon_order_id"], dtype=str).fillna("")
+            existing_items_order_ids = set(item_ids_df["amazon_order_id"].astype(str).str.strip())
+        except Exception:
+            existing_items_order_ids = set()
 
         started = datetime.now(timezone.utc)
         processed_count = 0
@@ -1342,12 +1384,11 @@ def main() -> None:
             # Always try fresh SP-API items; fallback to cached Level 1 if it fails
             items: List[Dict[str, object]] = []
             items_from_cache: pd.DataFrame = pd.DataFrame()
-            if ITEMS_ALL.exists():
-                try:
-                    items_from_cache = pd.read_csv(ITEMS_ALL, dtype=str)
-                    items_from_cache = items_from_cache[items_from_cache["amazon_order_id"] == order_id]
-                except Exception:
-                    items_from_cache = pd.DataFrame()
+            try:
+                items_from_cache = read_finance_frame(ITEMS_ALL, dtype=str)
+                items_from_cache = items_from_cache[items_from_cache["amazon_order_id"] == order_id]
+            except Exception:
+                items_from_cache = pd.DataFrame()
 
             used_cache = False
             try:
@@ -1436,6 +1477,7 @@ def main() -> None:
                 new_level2.to_csv(LEVEL2_CSV, mode="a", index=False, header=False)
             else:
                 new_level2.to_csv(LEVEL2_CSV, index=False)
+            sync_csv_to_finance_table(LEVEL2_CSV, SQL_TABLE_LEVEL2)
             # Ensure the on-disk Level2 stays unique across runs.
             _dedupe_level2_csv()
         if not B002_LIGHT:
@@ -1460,26 +1502,27 @@ def main() -> None:
                         level2_accum.at[idx, "Digital_Fee_Total"] = f"{-dsf_total_val:.2f}"
                     except Exception:
                         continue
-            level2_accum.to_csv(LEVEL2_CSV, index=False)
+            write_finance_frame(level2_accum, LEVEL2_CSV, SQL_TABLE_LEVEL2)
 
-        # Single Google Sheets write to avoid 429s
-        client = get_gspread_client()
-        sheet = client.open_by_key(SHEET_ID)
-        if B002_SKIP_MISSING and not B002_LIGHT:
-            update_level2_dsf_only(sheet, level2_accum)
-            sheet_tabs_written = [LEVEL2_TAB]
-        else:
-            if processed_orders_rows:
-                write_tab_with_retry(sheet, ORDERS_TAB, pd.concat(processed_orders_rows, ignore_index=True))
-            if processed_items_rows:
-                write_tab_with_retry(sheet, ITEMS_TAB, pd.concat(processed_items_rows, ignore_index=True))
-            if B002_LIGHT:
-                if processed_level2_rows:
-                    append_tab_rows(sheet, LEVEL2_TAB, pd.concat(processed_level2_rows, ignore_index=True))
-                sheet_tabs_written = [tab for tab in [ORDERS_TAB if processed_orders_rows else None, ITEMS_TAB if processed_items_rows else None, LEVEL2_TAB if processed_level2_rows else None] if tab]
+        # Single Google Sheets write to avoid 429s (optional)
+        if WRITE_SHEETS:
+            client = get_gspread_client()
+            sheet = client.open_by_key(SHEET_ID)
+            if B002_SKIP_MISSING and not B002_LIGHT:
+                update_level2_dsf_only(sheet, level2_accum)
+                sheet_tabs_written = [LEVEL2_TAB]
             else:
-                write_tab_with_retry(sheet, LEVEL2_TAB, level2_accum)
-                sheet_tabs_written = [tab for tab in [ORDERS_TAB if processed_orders_rows else None, ITEMS_TAB if processed_items_rows else None, LEVEL2_TAB] if tab]
+                if processed_orders_rows:
+                    write_tab_with_retry(sheet, ORDERS_TAB, pd.concat(processed_orders_rows, ignore_index=True))
+                if processed_items_rows:
+                    write_tab_with_retry(sheet, ITEMS_TAB, pd.concat(processed_items_rows, ignore_index=True))
+                if B002_LIGHT:
+                    if processed_level2_rows:
+                        append_tab_rows(sheet, LEVEL2_TAB, pd.concat(processed_level2_rows, ignore_index=True))
+                    sheet_tabs_written = [tab for tab in [ORDERS_TAB if processed_orders_rows else None, ITEMS_TAB if processed_items_rows else None, LEVEL2_TAB if processed_level2_rows else None] if tab]
+                else:
+                    write_tab_with_retry(sheet, LEVEL2_TAB, level2_accum)
+                    sheet_tabs_written = [tab for tab in [ORDERS_TAB if processed_orders_rows else None, ITEMS_TAB if processed_items_rows else None, LEVEL2_TAB] if tab]
         if B002_LIGHT and processed_level2_rows:
             update_product_db_last_sold(pd.concat(processed_level2_rows, ignore_index=True))
         else:
@@ -1521,6 +1564,7 @@ def main() -> None:
             "row_count": processed_orders + processed_items,
             "columns": len(LEVEL2_COLUMNS),
             "sheet_tabs": sheet_tabs_written,
+            "write_sheets": WRITE_SHEETS,
         }
     )
 

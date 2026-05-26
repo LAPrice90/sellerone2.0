@@ -81,7 +81,7 @@ Detailed completion and reliability definitions are maintained in `project_contr
 | A | Daily product/inventory orchestration and health gate | In Progress | 50 | To Baseline | Operational and in progress. Next focus: maintain cadence and strengthen reliability baseline. |
 | B | Daytime orders/tokens/sales loop | In Progress | 50 | To Baseline | Operational and in progress. Next focus: maintain boundary-safe loop behavior and reduce warnings. |
 | E | ROI/velocity/performance analytics | In Progress | 50 | To Baseline | Operational and in progress. Next focus: keep output freshness and reliability evidence consistent. |
-| H | Repricing runtime | Needs Stabilising | 46 | Provisional (45) | Active but not stable. Next focus: resolve stability gates and finalization/runtime boundary issues. |
+| H | Repricing runtime | Needs Stabilising | 46 | Provisional (45) | Active but not stable. Due-SKU selector starvation for later-alphabet capped batches was repaired and controlled proof passed on 2026-04-30. Next focus: build the clean-run window and reduce remaining H warnings. |
 | Restock Advisor | Reorder recommendation engine | Planned | 0 | To Baseline | Planned as first step in single operations loop. |
 | Purchase Orders | PO creation and management | Planned | 0 | To Baseline | Planned with human approval before commitment. |
 | Inventory Receiving / Ordered Stock Tracking | Track ordered and received stock | Planned | 0 | To Baseline | Planned to remove manual handoff tracking. |
@@ -141,7 +141,8 @@ flowchart TD
 - Purpose: Live repricing runtime.
 - Current state: Functional but marked `Needs Stabilising`.
 - Replacement position: Not yet replacement-complete due to live stability risk.
-- Next focus: stabilise runtime ownership/finalization behavior and prove consistent clean runs.
+- Latest evidence: controlled proof on 2026-04-30 repaired due-SKU selector starvation for later-alphabet capped batches, H-scoped health showed 0 FAIL / 3 WARN, and scheduler ownership was restored. The next normal live run also recovered seller-detail rows for the SKUs that were temporarily held by rotation.
+- Next focus: build the comparable clean-run window and reduce remaining H checklist warnings.
 
 ## I. Next Major Operations Loop
 This is one connected operational loop, not separate disconnected tools.
@@ -202,8 +203,8 @@ Supplier Discovery planning reference:
 - Keep this document plain-English and non-technical where possible.
 
 ## M. Change Log Header
-- Last Reviewed UTC: 2026-03-13T00:00:00Z
-- Reviewed By: Codex (implementation from PROMPT 003)
-- Evidence Window UTC: up to 2026-03-13
+- Last Reviewed UTC: 2026-04-30T14:56:30Z
+- Reviewed By: Codex
+- Evidence Window UTC: up to 2026-04-30T14:56:30Z
 - Version: v1
-- Notes: Initial permanent roadmap created.
+- Notes: H roadmap note refreshed after controlled proof of the due-SKU selector starvation repair.

@@ -1,0 +1,2 @@
+timestamp_utc,asof_date,sku,asin,our_price,buy_box_price,buy_box_present_flag,lowest_fba_price
+2026-04-10T08:00:00Z,2026-04-10,SKU-BT-001,B000TEST01,12.40,12.49,1,12.49

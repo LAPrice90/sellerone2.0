@@ -7,6 +7,12 @@ from scripts import run_E_cycle as e_cycle
 
 
 class ESplitHealthGateTests(unittest.TestCase):
+    def test_e_cycle_task_contract_includes_e007_daily_truth(self) -> None:
+        task_names = [path.name for path in e_cycle.TASKS]
+        self.assertIn("E007_build_sku_daily_sales_truth.py", task_names)
+        artifacts = e_cycle.STEP_ARTIFACTS.get("E007_build_sku_daily_sales_truth.py", [])
+        self.assertIn("out/sku_daily_sales_truth_latest.csv", artifacts)
+
     def test_split_mode_fail_closed_blocks_publish(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -107,6 +113,79 @@ class ESplitHealthGateTests(unittest.TestCase):
                 self.assertTrue(rows)
                 self.assertIn('"status": "success"', rows[-1])
                 self.assertIn("E010_publish_e_outputs.py", publish_calls)
+                self.assertTrue(e_cycle.FLOW_SELFTEST_COMPARE_PATH.exists())
+            finally:
+                e_cycle.E_RUN_LOG = old_run_log
+                e_cycle.E_DECISION_LOG = old_decision_log
+                e_cycle.E_SPLIT_CHECKLIST_PATH = old_split_checklist
+                e_cycle.E_SPLIT_HEALTH_MODE = old_mode
+                e_cycle.TASKS = old_tasks
+                e_cycle._run = old_run
+                e_cycle._run_a015_profile_e = old_profile_runner
+                e_cycle.FLOW_SELFTEST_COMPARE_PATH = old_compare
+                e_cycle.FLOW_SELFTEST_STATE_PATH = old_state
+                if old_enforce is None:
+                    os.environ.pop("E_ENFORCE_CADENCE", None)
+                else:
+                    os.environ["E_ENFORCE_CADENCE"] = old_enforce
+                if old_write is None:
+                    os.environ.pop("E_WRITE_SHEETS", None)
+                else:
+                    os.environ["E_WRITE_SHEETS"] = old_write
+
+    def test_shadow_mode_refreshes_split_health_without_sheet_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            old_run_log = e_cycle.E_RUN_LOG
+            old_decision_log = e_cycle.E_DECISION_LOG
+            old_split_checklist = e_cycle.E_SPLIT_CHECKLIST_PATH
+            old_mode = e_cycle.E_SPLIT_HEALTH_MODE
+            old_tasks = list(e_cycle.TASKS)
+            old_run = e_cycle._run
+            old_profile_runner = e_cycle._run_a015_profile_e
+            old_compare = e_cycle.FLOW_SELFTEST_COMPARE_PATH
+            old_state = e_cycle.FLOW_SELFTEST_STATE_PATH
+            old_enforce = os.environ.get("E_ENFORCE_CADENCE")
+            old_write = os.environ.get("E_WRITE_SHEETS")
+            publish_calls: list[str] = []
+            split_calls = {"count": 0}
+            try:
+                e_cycle.E_RUN_LOG = root / "e_run_log.jsonl"
+                e_cycle.E_DECISION_LOG = root / "e_decision_log.csv"
+                e_cycle.E_SPLIT_CHECKLIST_PATH = root / "checklist_E_split.csv"
+                e_cycle.FLOW_SELFTEST_COMPARE_PATH = root / "flow_selftest_compare.csv"
+                e_cycle.FLOW_SELFTEST_STATE_PATH = root / "flow_selftest_state.json"
+                e_cycle._write_flow_selftest_state(
+                    {
+                        "a_match_streak": 0,
+                        "b_match_streak": 0,
+                        "e_match_streak": 0,
+                        "ready_for_cutover": False,
+                        "updated_utc": "2026-02-18T00:00:00Z",
+                    }
+                )
+                e_cycle.E_SPLIT_HEALTH_MODE = "shadow"
+                e_cycle.TASKS = []
+
+                def _fake_run(label: str, _script: Path) -> float:
+                    publish_calls.append(label)
+                    return 0.0
+
+                def _fake_profile_runner() -> tuple[int, bool]:
+                    split_calls["count"] += 1
+                    return 0, True
+
+                e_cycle._run = _fake_run
+                e_cycle._run_a015_profile_e = _fake_profile_runner
+                os.environ["E_ENFORCE_CADENCE"] = "0"
+                os.environ["E_WRITE_SHEETS"] = "0"
+
+                e_cycle.main()
+                rows = [ln.strip() for ln in e_cycle.E_RUN_LOG.read_text(encoding="utf-8").splitlines() if ln.strip()]
+                self.assertTrue(rows)
+                self.assertIn('"status": "success"', rows[-1])
+                self.assertEqual(1, split_calls["count"])
+                self.assertNotIn("E010_publish_e_outputs.py", publish_calls)
                 self.assertTrue(e_cycle.FLOW_SELFTEST_COMPARE_PATH.exists())
             finally:
                 e_cycle.E_RUN_LOG = old_run_log

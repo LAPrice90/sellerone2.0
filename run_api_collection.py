@@ -17,7 +17,13 @@ from scripts.api.get_inventory_summaries import (
     load_dotenv_if_missing,
 )
 from scripts.api.get_listing_item_price import run_own_offer_price_lookup
-from scripts.api.get_pricing import run_market_context_lookup_with_offers
+from scripts.api.get_pricing import (
+    DETAIL_STATUS_API_ERROR,
+    DETAIL_STATUS_EMPTY_RESPONSE,
+    DETAIL_STATUS_OK,
+    DETAIL_STATUS_SKIPPED_ROTATION,
+    run_market_context_lookup_with_offers_detail,
+)
 from scripts.api.spapi_owner import SpApiCallContext, acquire_spapi_lock, release_spapi_lock, spapi_get
 try:
     from scripts.tools.f_training_set import load_training_set
@@ -51,6 +57,11 @@ LISTING_REQUIRED_COLUMNS: List[str] = [
     "lowest_fbm_price",
     "offer_count_fba",
     "offer_count_fbm",
+    "seller_detail_status",
+    "seller_detail_attempted_flag",
+    "seller_detail_offer_row_count",
+    "seller_detail_snapshot_ts_utc",
+    "retry_next_run_flag",
     "list_price",
     "list_price_currency",
     "apparent_sale_amount_gbp",
@@ -488,10 +499,85 @@ def _build_base_from_active_merchant(timestamp_utc: str, snapshot_date: str) -> 
     return base
 
 
+def _env_truthy(name: str, default: str = "1") -> bool:
+    raw = str(os.environ.get(name, default) or "").strip().lower()
+    if raw in {"0", "false", "no", "n", "off"}:
+        return False
+    return True
+
+
+def _env_positive_int(name: str, default: int) -> int:
+    try:
+        parsed = int(float(str(os.environ.get(name, str(default)) or default).strip()))
+    except Exception:
+        return default
+    return max(0, parsed)
+
+
+def _build_base_from_o_restock_market_candidates(timestamp_utc: str, snapshot_date: str) -> pd.DataFrame:
+    if not _env_truthy("API_COLLECTION_INCLUDE_O_RESTOCK_CANDIDATES", "1"):
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    candidate_path = OUT / "systems" / "O" / "live" / "restock_market_refresh_candidates_live.csv"
+    if not candidate_path.exists():
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+    try:
+        candidates = pd.read_csv(candidate_path, dtype=str).fillna("")
+    except Exception as exc:
+        print(f"[API_COLLECTION] WARN failed to read O restock market candidates: {exc}")
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    if candidates.empty or not {"seller_sku", "asin"}.issubset(set(candidates.columns)):
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    work = candidates.copy()
+    work["sku"] = work["seller_sku"].astype(str).str.strip()
+    work["asin"] = work["asin"].astype(str).str.strip()
+    if "candidate_status" in work.columns:
+        work = work.loc[work["candidate_status"].astype(str).str.strip().str.lower().eq("ready")].copy()
+    work = work.loc[work["sku"].ne("") & work["asin"].ne("")].copy()
+    if work.empty:
+        return pd.DataFrame(columns=LISTING_REQUIRED_COLUMNS)
+
+    if "priority" in work.columns:
+        priority_rank = {"high": 0, "normal": 1, "low": 2}
+        work["_priority_rank"] = work["priority"].astype(str).str.strip().str.lower().map(priority_rank).fillna(9)
+        work = work.sort_values(["_priority_rank", "sku"], kind="stable")
+    work = work.drop_duplicates(subset=["sku"], keep="first")
+    limit = _env_positive_int("API_COLLECTION_RESTOCK_CANDIDATE_LIMIT", 100)
+    if limit:
+        work = work.head(limit)
+
+    reason = work.get("market_refresh_reason", pd.Series([""] * len(work.index), index=work.index)).astype(str)
+    work["marketplace"] = "UK"
+    work["notes"] = "o_restock_market_refresh_candidate"
+    work.loc[reason.str.strip().ne(""), "notes"] = "o_restock_market_refresh_candidate:" + reason[reason.str.strip().ne("")]
+    work["timestamp_utc"] = timestamp_utc
+    work["asof_date"] = snapshot_date
+    work["source"] = "SPAPI"
+    base = _ensure_columns(work, LISTING_REQUIRED_COLUMNS)
+    print(f"[API_COLLECTION] O restock market candidate rows added to listing base: {len(base.index)}")
+    return base
+
+
 def _build_listing_offer_base(timestamp_utc: str, snapshot_date: str) -> pd.DataFrame:
-    # Listing scan scope is system-derived from active merchant listings.
-    # Do not require a separately maintained scan whitelist.
-    return _build_base_from_active_merchant(timestamp_utc, snapshot_date)
+    # Listing scan scope starts with active merchant listings. Controlled proof
+    # runs can use O restock candidates only to keep API scope narrow.
+    base_mode = str(os.environ.get("API_COLLECTION_LISTING_BASE_MODE", "active_plus_restock") or "").strip().lower()
+    restock = _build_base_from_o_restock_market_candidates(timestamp_utc, snapshot_date)
+    if base_mode in {"restock_candidates", "o_restock_candidates"}:
+        return restock
+
+    active = _build_base_from_active_merchant(timestamp_utc, snapshot_date)
+    if restock.empty:
+        return active
+    combined = pd.concat([active, restock], ignore_index=True)
+    combined["sku"] = combined["sku"].astype(str).str.strip()
+    combined["marketplace"] = combined["marketplace"].astype(str).str.strip().replace("", "UK")
+    combined = combined.loc[combined["sku"].ne("")].copy()
+    combined = combined.drop_duplicates(subset=["marketplace", "sku"], keep="first")
+    return _ensure_columns(combined, LISTING_REQUIRED_COLUMNS)
+
 
 
 def _collect_listing_offer_snapshot(run_id: str, script_name: str) -> Dict[str, int]:
@@ -522,7 +608,7 @@ def _collect_listing_offer_snapshot(run_id: str, script_name: str) -> Dict[str, 
                 (str(rows.at[idx, "sku"]).strip(), str(rows.at[idx, "asin"]).strip())
                 for idx in grp.index
             ]
-            bb_map, offer_rows = run_market_context_lookup_with_offers(
+            bb_map, offer_rows, detail_meta_by_asin = run_market_context_lookup_with_offers_detail(
                 sku_asin_rows,
                 mp_id,
                 snapshot_timestamp_utc=timestamp_utc,
@@ -545,6 +631,19 @@ def _collect_listing_offer_snapshot(run_id: str, script_name: str) -> Dict[str, 
 
         for idx in grp.index:
             sku = str(rows.at[idx, "sku"]).strip()
+            asin = str(rows.at[idx, "asin"]).strip()
+            detail_meta = detail_meta_by_asin.get(asin, {}) if asin else {}
+            detail_status = str(detail_meta.get("detail_status", "") or "").strip() or DETAIL_STATUS_SKIPPED_ROTATION
+            detail_attempted = str(detail_meta.get("attempted_flag", "") or "").strip()
+            if not detail_attempted:
+                detail_attempted = "1" if detail_status in {DETAIL_STATUS_OK, DETAIL_STATUS_EMPTY_RESPONSE, DETAIL_STATUS_API_ERROR} else "0"
+            detail_offer_row_count = str(detail_meta.get("offer_row_count", "") or "").strip() or "0"
+            retry_next_run_flag = "1" if detail_status in {DETAIL_STATUS_SKIPPED_ROTATION, DETAIL_STATUS_EMPTY_RESPONSE, DETAIL_STATUS_API_ERROR} else "0"
+            rows.at[idx, "seller_detail_status"] = detail_status
+            rows.at[idx, "seller_detail_attempted_flag"] = detail_attempted
+            rows.at[idx, "seller_detail_offer_row_count"] = detail_offer_row_count
+            rows.at[idx, "seller_detail_snapshot_ts_utc"] = timestamp_utc if detail_attempted == "1" else ""
+            rows.at[idx, "retry_next_run_flag"] = retry_next_run_flag
             if sku in our_map:
                 rows.at[idx, "our_price"] = our_map[sku].get("price", "")
             if sku not in bb_map:

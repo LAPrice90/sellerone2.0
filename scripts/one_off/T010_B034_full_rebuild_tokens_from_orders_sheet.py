@@ -17,6 +17,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from scripts.core.storage import write_dataframe_with_sql_compat
+
 
 ORDERS_PATH = Path("out/orders_sheet_orders.csv")
 
@@ -26,6 +28,8 @@ ALLOC_TAB = "Token_Allocations"
 
 TOKEN_LEDGER_OUT = Path("out/token_ledger_live.csv")
 ALLOC_OUT = Path("out/token_allocations_live.csv")
+SQL_TABLE_TOKEN_LEDGER_LIVE = "b_token_ledger_live"
+SQL_TABLE_TOKEN_ALLOCATIONS_LIVE = "b_token_allocations_live"
 
 
 def _parse_cost(value: str) -> float:
@@ -66,7 +70,7 @@ def main() -> None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from scripts.A003_run_inventory_to_sheet import get_gspread_client
+    from scripts.flows.A.A003_run_inventory_to_sheet import get_gspread_client
 
     orders = pd.read_csv(ORDERS_PATH, dtype=str).fillna("")
     required = ["SKU", "Cost PU", "Order Date", "Sent to FBA"]
@@ -137,11 +141,11 @@ def main() -> None:
 
     token_df = pd.DataFrame(tokens)
     TOKEN_LEDGER_OUT.parent.mkdir(parents=True, exist_ok=True)
-    token_df.to_csv(TOKEN_LEDGER_OUT, index=False)
+    write_dataframe_with_sql_compat(token_df, TOKEN_LEDGER_OUT, SQL_TABLE_TOKEN_LEDGER_LIVE)
 
     # Clear allocations locally
     ALLOC_OUT.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(columns=[
+    write_dataframe_with_sql_compat(pd.DataFrame(columns=[
         "order_id",
         "order_date",
         "seller_sku",
@@ -152,7 +156,7 @@ def main() -> None:
         "allocation_date",
         "source_level",
         "notes",
-    ]).to_csv(ALLOC_OUT, index=False)
+    ]), ALLOC_OUT, SQL_TABLE_TOKEN_ALLOCATIONS_LIVE)
 
     # Push to sheets
     client = get_gspread_client()

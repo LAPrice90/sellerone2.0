@@ -1,6 +1,5 @@
 sku,pricing_writer_mode,effective_utc,note
 4W-VS57-BV6A,READ_ONLY,2026-02-17T00:00:00Z,stage_a_read_only_soak_default
-6V-EEC1-2S9Z,READ_ONLY,2026-02-17T00:00:00Z,stage_a_read_only_soak_default
 AX-NKNU-29C1,READ_ONLY,2026-02-17T00:00:00Z,stage_a_read_only_soak_default
 JB-RGB6-LZOJ,READ_ONLY,2026-02-17T00:00:00Z,stage_a_read_only_soak_default
 L1-54EX-56YC,READ_ONLY,2026-02-17T00:00:00Z,stage_a_read_only_soak_default

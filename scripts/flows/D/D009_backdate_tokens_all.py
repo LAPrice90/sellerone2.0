@@ -8,6 +8,7 @@ from pathlib import Path
 import gspread
 import pandas as pd
 
+from scripts.core.storage import read_dataframe_with_sql_fallback
 
 ORDERS_SHEET_ID = "1H_EDAYfB_xgGvnW1esOMwWsHs2wBXYoOABcMs7SWcrY"
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
@@ -16,6 +17,7 @@ TOKENS_TAB = "Token_Ledger"
 ALLOC_TAB = "Token_Allocations"
 ORDER_MASTER_PATH = Path("out/order_master.csv")
 INVENTORY_PATH = Path("out/inventory_summaries.csv")
+SQL_TABLE_INVENTORY_SUMMARIES = "a_inventory_summaries"
 DEFAULT_START_DATE = os.environ.get("PNL_START_DATE", "2026-01-01")
 
 
@@ -59,13 +61,10 @@ def main() -> None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from scripts.A003_run_inventory_to_sheet import get_gspread_client
+    from scripts.flows.A.A003_run_inventory_to_sheet import get_gspread_client
 
     if not ORDER_MASTER_PATH.exists():
         raise RuntimeError("Missing out/order_master.csv")
-    if not INVENTORY_PATH.exists():
-        raise RuntimeError("Missing out/inventory_summaries.csv")
-
     order_master = pd.read_csv(ORDER_MASTER_PATH)
     order_master = order_master[order_master["Quantity Ordered"] > 0]
     if args.start_date:
@@ -81,7 +80,14 @@ def main() -> None:
         order_master.groupby("SKU")["Quantity Ordered"].sum().astype(int).to_dict()
     )
 
-    inventory = pd.read_csv(INVENTORY_PATH)
+    try:
+        inventory = read_dataframe_with_sql_fallback(
+            INVENTORY_PATH,
+            SQL_TABLE_INVENTORY_SUMMARIES,
+            dtype=str,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Missing out/inventory_summaries.csv") from exc
     inventory = inventory.set_index("seller_sku")
     available_by_sku = inventory["available"].fillna(0).astype(int).to_dict()
     inbound_shipped_by_sku = inventory["inbound_shipped"].fillna(0).astype(int).to_dict()

@@ -1,0 +1,4 @@
+asof_utc,seller_sku,asin,supplier_code,supplier_name,recommendation_status,reason_codes,recommended_qty_raw,recommended_qty_rounded,target_days_cover,days_cover_available_only,days_cover_total_pipeline,current_supplier_buy_cost_gbp,current_supplier_cost_source,market_price_gbp,market_price_basis_used,forward_roi_pct,forward_profit_per_unit_gbp,confidence_score,policy_version,confidence_note,snooze_until_utc
+2026-04-03T10:00:00Z,SKU-FULL,ASINFULL001,SUP-A,Alpha Supply,full_restock,ROI_OK,20,20,30,10,13,5.00,supplier_catalog_price,8.00,BUY_BOX_PRICE,60,3.0,95,o_phase1_v1,,
+2026-04-03T10:00:00Z,SKU-TEST,ASINTEST001,SUP-B,Beta Wholesale,test_restock,ROI_MID_BAND,8,8,10,7,7,10.00,supplier_catalog_price,11.20,BUY_BOX_PRICE,12,1.2,82,o_phase1_v1,,
+2026-04-03T10:00:00Z,SKU-WAIT,ASINWAIT001,SUP-C,Cappa Trade,wait,ROI_BELOW_MIN_THRESHOLD,0,0,0,9,9,10.00,supplier_catalog_price,10.50,BUY_BOX_PRICE,5,0.5,60,o_phase1_v1,roi_weak,

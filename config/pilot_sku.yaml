@@ -12,7 +12,8 @@ scan_cooldown_minutes: 15
 trial_scan_cooldown_minutes: 1
 sku_call_spacing_seconds: 2.1
 use_active_merchant_skus: true
-max_skus_per_run: 0
+# Keep each H pilot batch inside the parent timeout so the dashboard publishes between batches.
+max_skus_per_run: 50
 allow_h_intraday_intel_refresh: true
 
 boundaries:

@@ -41,11 +41,11 @@
 ### 5) Product DB local dump
 
 - source path or name: `out/product_db_preview.csv`
-- likely role: local dump of the `Product_DB` Google Sheet for downstream use
-- likely authority category: preview/debug
+- likely role: legacy local dump/export mirror of Product DB-shaped data for downstream compatibility
+- likely authority category: mirror/export after SQL authority rehearsal
 - writer scripts: `scripts/flows/A/A001_run_listings_to_sheet.py`, `scripts/flows/A/A002_run_catalog_items_to_sheet.py`, `scripts/flows/A/A003_run_inventory_to_sheet.py`, `scripts/flows/A/A004_run_fees_to_sheet.py`, `scripts/flows/B/B001_run_orders_to_sheet.py`, `scripts/flows/B/B002_run_pending_orders_to_sheet.py`, `scripts/flows/B/B003_run_financial_events_level3.py`
 - reader scripts: `scripts/h/h_floor_truth.py`, `scripts/phase1/phase1_sku_scope.py`, `scripts/flows/H/H110_run_phase1_h_pilot.py`, `scripts/cycles/run_H_pricing_cycle.py`, `scripts/flows/H/H130_build_phase1_observation_sheet.py`, `scripts/flows/B/B007_allocate_tokens_live.py`, `scripts/flows/B/B025_build_token_cogs_ledger.py`, `scripts/flows/D/D001_build_pnl_daily.py`, `scripts/flows/D/D015_enrich_fee_detail_ledger.py`, rebuild and scan one-offs
-- risk note: the code repeatedly calls this a "preview", "dump", or "local copy". The likely canonical truth is the Google Sheet, not this CSV. Downstream scripts treating it as authoritative are reading a non-canonical convenience layer.
+- risk note: the code repeatedly calls this a "preview", "dump", or "local copy". The approved target authority is SQL. During the 2026-05-01 SQL/Product DB block, local SQL `product_db_products` held 659 rows while this CSV mirror was observed stale at 608 rows after legacy owner rewrites. P018 classifies the CSV as `mirror_stale_not_authority`. New O/P Product DB work should prefer SQL authority when present and treat this CSV as compatibility/export evidence.
 
 ### 6) Inventory summaries local snapshot
 
@@ -156,9 +156,10 @@
 ### Product DB
 
 - logical dataset name: product database
-- all file/path variants involved: Product_DB Google Sheet, `out/product_db_preview.csv`
-- likely canonical candidate: Product_DB Google Sheet
-- why the group is risky: the local file is repeatedly labeled "preview", "dump", or "local copy", yet many downstream calculations treat it like live truth.
+- all file/path variants involved: Product_DB Google Sheet, `out/product_db_preview.csv`, `out/sql/sellerone_dev.sqlite3:product_db_products`
+- current evidence-based canonical candidate: legacy Product_DB Google Sheet for old A/B export behavior; local SQL `product_db_products` for the active SQL migration proof slice
+- approved target authority: SQL Product DB, edited through the UI
+- why the group is risky: the local file is repeatedly labeled "preview", "dump", or "local copy", yet many downstream calculations treat it like live truth. The target direction is now SQL authority, and O030/P014/P015/P018 now exercise that path locally, but legacy A/B owner behavior can still rewrite the CSV mirror to an older row set. P019 mapped 298 Product DB references across 87 files before any A/B/H runtime reader change.
 
 ### Listing offer history
 

@@ -1,18 +1,53 @@
 ﻿from __future__ import annotations
 
+import os
 from pathlib import Path
+import sys
 from datetime import datetime, timezone
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+    )
+except ModuleNotFoundError:
+    from core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+    )
 
 OUT = Path("out")
 ORDERS = OUT / "order_master.csv"
 INVENTORY = OUT / "inventory_summaries.csv"
 OUT_VELOCITY = OUT / "sku_sales_velocity.csv"
+SQL_TABLE = "e_sku_sales_velocity"
+SQL_TABLE_INVENTORY_SUMMARIES = "a_inventory_summaries"
 
 WINDOW_DAYS = [7, 30, 90]
 
 
 def _read_csv(path: Path, usecols=None) -> pd.DataFrame:
+    if path == INVENTORY:
+        try:
+            return read_dataframe_with_sql_fallback(
+                path,
+                SQL_TABLE_INVENTORY_SUMMARIES,
+                dtype=str,
+                usecols=usecols,
+            ).fillna("")
+        except FileNotFoundError:
+            return pd.DataFrame()
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, dtype=str, usecols=usecols).fillna("")
@@ -22,12 +57,45 @@ def _to_num(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce").fillna(0)
 
 
+def _write_velocity_output(df: pd.DataFrame) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    sql_rows = 0
+
+    def write_csv() -> None:
+        OUT_VELOCITY.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(OUT_VELOCITY, index=False)
+
+    def write_sql() -> None:
+        nonlocal sql_rows
+        config = StorageConfig.from_env()
+        store = connect_store(config)
+        try:
+            result = replace_table_from_dataframe(store, SQL_TABLE, df)
+        finally:
+            store.close()
+        sql_rows = int(result["rows"])
+
+    if mode == "sql_primary_csv_export":
+        write_sql()
+        write_csv()
+    elif mode == "sql_shadow":
+        write_csv()
+        write_sql()
+    else:
+        write_csv()
+
+    return {
+        "mode": mode,
+        "sql_table": SQL_TABLE if sql_rows or mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
+
+
 def main() -> None:
     orders = _read_csv(ORDERS, usecols=["Date", "SKU", "Quantity Ordered"])
     if orders.empty:
-        OUT_VELOCITY.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame().to_csv(OUT_VELOCITY, index=False)
-        print({"status": "success", "rows": 0, "snapshot": str(OUT_VELOCITY)})
+        output = _write_velocity_output(pd.DataFrame())
+        print({"status": "success", "rows": 0, "snapshot": str(OUT_VELOCITY), **output})
         return
 
     orders["Date"] = pd.to_datetime(orders["Date"], errors="coerce", utc=True)
@@ -90,9 +158,9 @@ def main() -> None:
                 "asof_date": asof_date,
             })
 
-    OUT_VELOCITY.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(OUT_VELOCITY, index=False)
-    print({"status": "success", "rows": len(rows), "snapshot": str(OUT_VELOCITY)})
+    out = pd.DataFrame(rows)
+    output = _write_velocity_output(out)
+    print({"status": "success", "rows": len(out), "snapshot": str(OUT_VELOCITY), **output})
 
 
 if __name__ == "__main__":

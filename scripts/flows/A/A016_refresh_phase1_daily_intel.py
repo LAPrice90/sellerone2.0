@@ -42,10 +42,14 @@ try:
     from scripts.phase1 import daily_intel_required_skus, phase1_main_loop, phase1_sku_scope, phase1_storage
     from scripts.phase1.phase1_target_universe import resolve_target_universe
     from scripts.api.get_competitive_summary import fetch_cpt_for_asin
+    from scripts.core.storage import write_dataframe_with_sql_compat
 except ModuleNotFoundError:
     from scripts.phase1 import daily_intel_required_skus, phase1_main_loop, phase1_sku_scope, phase1_storage
     from scripts.phase1.phase1_target_universe import resolve_target_universe
     from scripts.api.get_competitive_summary import fetch_cpt_for_asin
+    from core.storage import write_dataframe_with_sql_compat
+
+SQL_TABLE_PHASE1_DAILY_INTEL_LATEST = "a_phase1_daily_intel_latest"
 
 
 def _norm(value: object) -> str:
@@ -1781,7 +1785,12 @@ def main() -> int:
     print(f"a016_fallback_rows={fallback_rows}")
     if not args.dry_run and mode == "full_universe" and output_path.exists():
         PHASE1_DAILY_INTEL_LATEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        PHASE1_DAILY_INTEL_LATEST_PATH.write_bytes(output_path.read_bytes())
+        latest_df = pd.read_csv(output_path, dtype=str).fillna("")
+        write_dataframe_with_sql_compat(
+            latest_df,
+            PHASE1_DAILY_INTEL_LATEST_PATH,
+            SQL_TABLE_PHASE1_DAILY_INTEL_LATEST,
+        )
         print(f"a016_output_latest_path={PHASE1_DAILY_INTEL_LATEST_PATH}")
     if args.dry_run:
         print(f"a016_dry_run_plans={dry_run_plans}")

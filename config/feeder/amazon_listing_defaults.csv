@@ -1,0 +1,2 @@
+marketplace_id,product_type,condition_type,fulfillment_channel,starting_quantity,starting_price_gbp,product_tax_code,currency_code,price_includes_tax,minimum_selling_price_rule,enabled,notes
+A1F83G8C2ARO7P,PRODUCT,new_new,DEFAULT,0,,A_GEN_STANDARD,GBP,1,manual_required,1,UK defaults; starting_price_gbp must be filled before a draft can be ready; country_of_origin must come from operator PASS review

@@ -1,0 +1,10 @@
+{
+  "supplier_id": "shure_cosmetics",
+  "supplier_name": "Shure Cosmetics",
+  "source_url": "https://aux.shure-cosmetics.co.uk/pricelist/",
+  "source_type": "csv",
+  "default_vat_rate": "20",
+  "currency": "GBP",
+  "refresh_hours": 24,
+  "skip_sku_suffixes": ["DD"]
+}

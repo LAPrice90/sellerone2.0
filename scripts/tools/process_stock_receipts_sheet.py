@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.core.out_paths import write_csv_with_compat
+from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 
 
 INTAKE_SHEET_ID = "1H_EDAYfB_xgGvnW1esOMwWsHs2wBXYoOABcMs7SWcrY"
@@ -37,6 +38,21 @@ MISSING_ORDER_KEY_OUT = Path("out/stock_receipt_missing_order_key.csv")
 DUPLICATE_BATCH_OUT = Path("out/stock_receipt_duplicate_batches.csv")
 AUTO_COST_OUT = Path("out/stock_receipt_auto_cost_applied.csv")
 LATEST_OUT = Path("out/stock_receipts_latest.csv")
+SQL_TABLE_STOCK_RECEIPT_SUMMARY = "a_stock_receipt_summary"
+SQL_TABLE_STOCK_RECEIPTS_LATEST = "a_stock_receipts_latest"
+SUMMARY_COLUMNS = [
+    "row_num",
+    "intake_date",
+    "seller_sku",
+    "qty",
+    "cost_per_unit",
+    "auto_cost_source",
+    "status",
+    "batch_id",
+    "tokens_created",
+    "order_key",
+    "error_message",
+]
 
 STATUS_NEW = "NEW"
 STATUS_VALIDATED = "VALIDATED"
@@ -238,14 +254,18 @@ def build_batch_id(intake_dt: datetime, existing_ids: set[str]) -> str:
         seq += 1
 
 
-def load_token_ledger(ws: gspread.Worksheet) -> Tuple[List[str], set[str], Dict[str, int]]:
-    header, rows = load_sheet_table(ws)
+def _summarize_token_rows(
+    header: List[str], rows: List[List[str]]
+) -> Tuple[set[str], Dict[str, int], Dict[Tuple[str, str], Dict[str, object]]]:
     token_ids = set()
     batch_counts: Dict[str, int] = {}
+    order_key_counts: Dict[Tuple[str, str], Dict[str, object]] = {}
     if not header or not rows:
-        return header, token_ids, batch_counts
+        return token_ids, batch_counts, order_key_counts
     token_idx = header.index("token_id") if "token_id" in header else -1
     batch_idx = header.index("source_batch_id") if "source_batch_id" in header else -1
+    sku_idx = header.index("seller_sku") if "seller_sku" in header else -1
+    order_key_idx = header.index("source_order_key") if "source_order_key" in header else -1
     for row in rows:
         if token_idx >= 0 and token_idx < len(row):
             token_id = row[token_idx].strip()
@@ -255,7 +275,52 @@ def load_token_ledger(ws: gspread.Worksheet) -> Tuple[List[str], set[str], Dict[
             bid = row[batch_idx].strip()
             if bid:
                 batch_counts[bid] = batch_counts.get(bid, 0) + 1
-    return header, token_ids, batch_counts
+        if sku_idx >= 0 and sku_idx < len(row) and order_key_idx >= 0 and order_key_idx < len(row):
+            sku = str(row[sku_idx]).strip()
+            order_key = str(row[order_key_idx]).strip()
+            if sku and order_key:
+                key = (order_key, sku)
+                info = order_key_counts.get(key)
+                if not info:
+                    info = {"count": 0, "batch_ids": set()}
+                    order_key_counts[key] = info
+                info["count"] = int(info.get("count", 0)) + 1
+                if batch_idx >= 0 and batch_idx < len(row):
+                    bid = str(row[batch_idx]).strip()
+                    if bid:
+                        cast_batches = info.get("batch_ids")
+                    if isinstance(cast_batches, set):
+                        cast_batches.add(bid)
+    return token_ids, batch_counts, order_key_counts
+
+
+def load_token_ledger(
+    ws: gspread.Worksheet,
+) -> Tuple[List[str], set[str], Dict[str, int], Dict[Tuple[str, str], Dict[str, object]]]:
+    header, rows = load_sheet_table(ws)
+    token_ids, batch_counts, order_key_counts = _summarize_token_rows(header, rows)
+    return header, token_ids, batch_counts, order_key_counts
+
+
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE"))
+    sql_rows = 0
+    if mode in {"sql_shadow", "sql_primary_csv_export"}:
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, sql_table, df)
+            sql_rows = int(result["rows"])
+        finally:
+            store.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return {
+        "mode": mode,
+        "path": str(path),
+        "csv_rows": int(len(df.index)),
+        "sql_table": sql_table if mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
 
 
 def main() -> None:
@@ -319,7 +384,7 @@ def main() -> None:
             f"Fill keys and re-run. Details: {MISSING_ORDER_KEY_OUT}"
         )
 
-    token_header, token_ids, batch_counts = load_token_ledger(token_ws)
+    token_header, token_ids, batch_counts, order_key_counts = load_token_ledger(token_ws)
     token_header = ensure_columns(token_ws, token_header, TOKEN_REQUIRED_COLS)
 
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -431,18 +496,54 @@ def main() -> None:
             )
             continue
 
+        existing_for_key_info = order_key_counts.get((order_key, sku), {"count": 0, "batch_ids": set()})
+        existing_for_key = int(existing_for_key_info.get("count", 0))
+        existing_batches = sorted(str(v) for v in existing_for_key_info.get("batch_ids", set()) if str(v).strip())
+        if existing_for_key >= qty:
+            status_out = STATUS_APPLIED
+            row[col_idx["batch_id"]] = existing_batches[0] if existing_batches else row[col_idx["batch_id"]].strip()
+            row[col_idx["status"]] = status_out
+            row[col_idx["processed_at"]] = now_iso
+            row[col_idx["tokens_created"]] = str(existing_for_key)
+            row[col_idx["token_id_prefix"]] = row[col_idx["batch_id"]].strip()
+            row[col_idx["error_message"]] = "idempotent_existing_order_key"
+            intake_ws.update(
+                f"{col_to_a1(1)}{row_num}:{col_to_a1(len(intake_header))}{row_num}",
+                [row],
+            )
+            applied += 1
+            summary_rows.append(
+                {
+                    "row_num": str(row_num),
+                    "intake_date": intake_date_raw,
+                    "seller_sku": sku,
+                    "qty": str(qty),
+                    "cost_per_unit": str(cost),
+                    "auto_cost_source": auto_cost_source,
+                    "status": status_out,
+                    "batch_id": row[col_idx["batch_id"]].strip(),
+                    "tokens_created": str(existing_for_key),
+                    "order_key": order_key,
+                    "error_message": "idempotent_existing_order_key",
+                }
+            )
+            continue
+
+        qty_to_create = qty - existing_for_key if existing_for_key > 0 else qty
+
         batch_id = build_batch_id(intake_dt, existing_batch_ids)
         existing_batch_ids.add(batch_id)
 
         # Idempotency: if tokens already exist for this batch, mark applied and continue.
         if batch_id in batch_counts:
             created_count = batch_counts.get(batch_id, 0)
-            status_out = STATUS_APPLIED if created_count == qty else STATUS_PARTIAL
-            err_out = "" if status_out == STATUS_APPLIED else f"partial: ledger has {created_count}/{qty}"
+            total_with_existing = existing_for_key + created_count
+            status_out = STATUS_APPLIED if total_with_existing >= qty else STATUS_PARTIAL
+            err_out = "" if status_out == STATUS_APPLIED else f"partial: ledger has {total_with_existing}/{qty}"
             row[col_idx["batch_id"]] = batch_id
             row[col_idx["status"]] = status_out
             row[col_idx["processed_at"]] = now_iso
-            row[col_idx["tokens_created"]] = str(created_count)
+            row[col_idx["tokens_created"]] = str(total_with_existing)
             row[col_idx["token_id_prefix"]] = batch_id
             row[col_idx["error_message"]] = err_out
             intake_ws.update(
@@ -460,7 +561,7 @@ def main() -> None:
                     "auto_cost_source": auto_cost_source,
                     "status": status_out,
                     "batch_id": batch_id,
-                    "tokens_created": str(created_count),
+                    "tokens_created": str(total_with_existing),
                     "error_message": err_out,
                 }
             )
@@ -469,7 +570,7 @@ def main() -> None:
         # Build tokens
         received_date = intake_dt.date().isoformat()
         token_rows = []
-        for i in range(1, qty + 1):
+        for i in range(1, qty_to_create + 1):
             token_id = f"{batch_id}-{i:04d}"
             if token_id in token_ids:
                 continue
@@ -511,13 +612,14 @@ def main() -> None:
                 full_rows.append(row_out)
             token_ws.append_rows(full_rows, value_input_option="RAW")
 
-        status_out = STATUS_APPLIED if len(token_rows) == qty else STATUS_PARTIAL
-        err_out = "" if status_out == STATUS_APPLIED else f"partial: created {len(token_rows)}/{qty}"
+        created_total = existing_for_key + len(token_rows)
+        status_out = STATUS_APPLIED if created_total >= qty else STATUS_PARTIAL
+        err_out = "" if status_out == STATUS_APPLIED else f"partial: created {created_total}/{qty}"
         row[col_idx["batch_id"]] = batch_id
         row[col_idx["status"]] = status_out
         row[col_idx["processed_at"]] = now_iso
         row[col_idx["error_message"]] = err_out
-        row[col_idx["tokens_created"]] = str(len(token_rows))
+        row[col_idx["tokens_created"]] = str(created_total)
         row[col_idx["token_id_prefix"]] = batch_id
         intake_ws.update(
             f"{col_to_a1(1)}{row_num}:{col_to_a1(len(intake_header))}{row_num}",
@@ -534,11 +636,18 @@ def main() -> None:
                     "auto_cost_source": auto_cost_source,
                     "status": status_out,
                     "batch_id": batch_id,
-                    "tokens_created": str(len(token_rows)),
+                    "tokens_created": str(created_total),
                     "order_key": order_key,
                     "error_message": err_out,
                 }
             )
+        key = (order_key, sku)
+        updated = order_key_counts.get(key, {"count": 0, "batch_ids": set()})
+        updated["count"] = int(updated.get("count", 0)) + len(token_rows)
+        cast_batches = updated.get("batch_ids")
+        if isinstance(cast_batches, set):
+            cast_batches.add(batch_id)
+        order_key_counts[key] = updated
         if auto_cost_source:
             auto_cost_rows.append(
                 {
@@ -551,11 +660,11 @@ def main() -> None:
                 }
             )
 
-    summary_df = pd.DataFrame(summary_rows)
+    summary_df = pd.DataFrame(summary_rows, columns=SUMMARY_COLUMNS)
     SUMMARY_OUT.parent.mkdir(parents=True, exist_ok=True)
-    summary_df.to_csv(SUMMARY_OUT, index=False)
+    _write_output_frame(summary_df, SUMMARY_OUT, SQL_TABLE_STOCK_RECEIPT_SUMMARY)
     # Backward-compatible alias required by A-cycle step artifact verification.
-    summary_df.to_csv(LATEST_OUT, index=False)
+    _write_output_frame(summary_df, LATEST_OUT, SQL_TABLE_STOCK_RECEIPTS_LATEST)
     if auto_cost_rows:
         AUTO_COST_OUT.parent.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(auto_cost_rows).to_csv(AUTO_COST_OUT, index=False)

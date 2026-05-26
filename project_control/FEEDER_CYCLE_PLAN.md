@@ -15,6 +15,11 @@ Key intent:
 - keep human approval for important decisions
 - ensure new products can join token-based stock, COGS, and returns tracking cleanly
 
+Reuse-first rule:
+- SellerOne should reuse proven logic from `C:\Users\Luke\Desktop\Amazon Price List Scanner 2.1` wherever that logic is still valid.
+- Do not rebuild known-good pass logic from zero unless the old implementation is Google-bound or otherwise structurally wrong.
+- The new design must separate supplier-specific file conversion from the shared feeder manager so new suppliers can be added without editing the main manager flow.
+
 ## C. Boundary Map
 | Area | What It Owns | What It Does Not Own |
 |---|---|---|
@@ -28,6 +33,8 @@ Key intent:
 
 2. List normalization
 - Convert different supplier formats into one canonical candidate structure.
+- Use one converter script per supplier to emit a universal layout.
+- Keep supplier-specific parsing out of the shared feeder manager.
 
 3. Product identity and barcode validation
 - Validate barcode structure and capture listing match state (matched, ambiguous, unmatched).
@@ -49,7 +56,9 @@ Key intent:
 
 ## E. Like-For-Like Baseline Vs Future Intelligence
 ### Like-for-like baseline replacement
+- Supplier-specific converter scripts that map raw supplier files into one universal layout.
 - Supplier list import and normalization.
+- Reuse of the old scanner's proven pass/fail logic where still valid.
 - Candidate staging and manual approval workflow.
 - Basic viability, demand, and profitability checklist outputs.
 - Test-buy recommendation output.
@@ -63,6 +72,32 @@ Key intent:
 - Rank/rating/seller-count competition scoring.
 - Smarter test-buy quantity logic with learning feedback.
 - Alternative supplier recovery logic for dropped products.
+
+## E.1 Reuse Baseline From Old Scanner
+Existing proven source:
+- `C:\Users\Luke\Desktop\Amazon Price List Scanner 2.1`
+
+Relevant reusable shape already present there:
+- supplier/file conversion pattern
+- one shared screening pipeline after input standardization
+- pass/fail style logic for rank, pricing, fees, ROI, and related screening
+- explicit fail reasons rather than silent drops
+
+What should be reused in principle:
+- screening order and pass/fail decision shape
+- reusable calculations and thresholds that are still operationally valid
+- explicit failure labeling and routing style
+
+What should not be copied blindly:
+- Google Sheets control flow
+- Google-specific state handling
+- any hardcoded external paths, tokens, or manual browser-driven workflow that does not fit SellerOne
+
+Required adaptation for SellerOne:
+- supplier-specific converter scripts output one universal feeder supplier layout
+- shared feeder manager reads only that universal layout
+- feeder state and outputs live under SellerOne flow-owned paths and contracts
+- old logic is migrated into shared manager modules rather than copied into supplier converters
 
 ## F. Output Statuses
 - Approved for Test Buy: candidate is approved and ready for PO handoff.
@@ -150,7 +185,9 @@ Suggested feeder output fields:
 
 ## K. Phased Delivery Plan
 ### v1
-- Supplier list intake and normalization.
+- Supplier-specific converters into one universal layout.
+- Shared feeder manager that reads universal-layout supplier files.
+- Reused baseline pass logic migrated from the old scanner where valid.
 - Manual approval queue and status routing.
 - PO-ready handoff payload for approved candidates.
 
@@ -165,6 +202,27 @@ Suggested feeder output fields:
 ### Later
 - Automated intelligence checks not clearly encoded in legacy baseline.
 - Alternative supplier recovery support for dropped products.
+
+## K.1 Recommended Early Build Order
+1. supplier-specific converter framework
+- one script per supplier
+- output = universal feeder supplier layout
+
+2. shared feeder manager intake
+- shared manager reads only the universal layout
+- no supplier-specific branching in the manager
+
+3. pass-logic migration
+- lift valid pass/fail logic from the old scanner into SellerOne feeder modules
+- remove Google-bound behavior while preserving screening intent
+
+4. candidate classification and recommendation outputs
+- explicit statuses
+- explicit reason codes
+
+5. approval queue and PO-ready handoff
+- durable decision lineage
+- approved-only downstream handoff
 
 ## L. Review/Update Notes
 - Review this document weekly and after any feeder logic change.

@@ -1,0 +1,899 @@
+{
+  "version": "2026-05-25",
+  "description": "Logging and storage housekeeping policy registry (L1-L6) for dry-run-first cleanup.",
+  "housekeeping_output_dir": "out/housekeeping",
+  "default_mode": "dry_run",
+  "storage_health": {
+    "free_space_warn_gb": 100,
+    "free_space_fail_gb": 50,
+    "unclassified_fail_age_days": 7
+  },
+  "scan_roots": [
+    {
+      "flow": "H",
+      "path": "out/systems/H/live",
+      "recursive": true
+    },
+    {
+      "flow": "F",
+      "path": "out/systems/F/inbox",
+      "recursive": false,
+      "include_directories": true
+    },
+    {
+      "flow": "F",
+      "path": "out/systems/F/temp",
+      "recursive": true,
+      "include_directories": true
+    }
+  ],
+  "classes": {
+    "L1": "operational_runtime",
+    "L2": "health_monitoring_evidence",
+    "L3": "error_fault_evidence",
+    "L4": "diagnostic_debug_traces",
+    "L5": "historical_audit_event_logs",
+    "L6": "temp_subprocess_artifacts"
+  },
+  "rules": [
+    {
+      "id": "h_cycle_runtime_logs",
+      "class": "L1",
+      "owner": "H cycle runtime",
+      "reason": "Primary runtime continuity logs",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/H_cycle.log",
+        "out/systems/H/live/H_cycle.log.*",
+        "out/systems/H/live/H_pricing_cycle.log",
+        "out/systems/H/live/H_pricing_cycle.log.*",
+        "out/systems/H/live/H_home_time_mode.log",
+        "out/systems/H/live/H_home_time_mode.log.*",
+        "out/systems/H/live/phase1_intel.progress.log",
+        "out/systems/H/live/phase1_intel.progress.log.*",
+        "out/systems/H/live/phase1_pilot_step.progress.log",
+        "out/systems/H/live/phase1_pilot_task.log",
+        "out/systems/H/live/phase1_lock_events.log",
+        "out/systems/H/live/phase1_lock_events.log.*"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 20,
+        "max_total_size_mb": 2048
+      },
+      "action_on_expiry": "archive",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "h_runtime_markers",
+      "class": "L1",
+      "owner": "H cycle runtime",
+      "reason": "Ownership, lock, run-state, and readiness markers",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/H_runtime_status.json",
+        "out/systems/H/live/H_runtime_status.txt",
+        "out/systems/H/live/H_pricing_cycle.lock",
+        "out/systems/H/live/H_run_state.json",
+        "out/systems/H/live/H_run_in_progress.txt",
+        "out/systems/H/live/H_last_finalized_run_id.txt",
+        "out/systems/H/live/H_cycle_current_run_id.txt",
+        "out/systems/H/live/H_cycle_last_publish_info.txt",
+        "out/systems/H/live/H_cycle_last_publish_run_id.txt",
+        "out/systems/H/live/H_cycle_last_completed_run_id.txt",
+        "out/systems/H/live/H_runtime_readiness.json",
+        "out/systems/H/live/H_runtime_readiness.txt",
+        "out/systems/H/live/H_batch_stage_dir.txt",
+        "out/systems/H/live/H_batch_state.json",
+        "out/systems/H/live/H_cycle_last_terminal_info.txt",
+        "out/systems/H/live/H_launcher.heartbeat",
+        "out/systems/H/live/H_home_time_mode.active.json",
+        "out/systems/H/live/H_pricing_cycle.EXIT_STATUS.txt",
+        "out/systems/H/live/H_pricing_cycle.PHASE.txt",
+        "out/systems/H/live/H_pricing_cycle.HEARTBEAT*.txt",
+        "out/systems/H/live/H_reconcile_lock.*.json",
+        "out/systems/H/live/h_pricing_cycle_state.json",
+        "out/systems/H/live/h_reentry_price_state.json",
+        "out/systems/H/live/h_inbound_activation_state.json",
+        "out/systems/H/live/h_item_offers_retry_queue.csv",
+        "out/systems/H/live/H_session_tally.json",
+        "out/systems/H/live/h_stock_snapshot_status.csv",
+        "out/systems/H/live/H_worker_lifecycle.json",
+        "out/systems/H/live/WATCHDOG_ENTER.txt",
+        "out/systems/H/live/WATCHDOG_EXIT.txt",
+        "out/systems/H/live/WATCHDOG_LAST_KILL.txt",
+        "out/systems/H/live/STAGE_ENTER.*.txt",
+        "out/systems/H/live/STAGE_EXIT.*.txt"
+      ],
+      "retention": {
+        "ttl_days": 30
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "h_non_gate_observability",
+      "class": "L5",
+      "owner": "H observability",
+      "reason": "Historical observability files; not flow-gate truth for live decisions",
+      "mandatory": false,
+      "path_globs": [
+        "out/cycle_alerts/checklist_H_split.csv",
+        "out/health_status_H.csv"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "archive_days": 180
+      },
+      "action_on_expiry": "archive",
+      "protected": false,
+      "live_cleanup_allowed": false,
+      "safety_blockers": []
+    },
+    {
+      "id": "health_check_evidence",
+      "class": "L2",
+      "owner": "A015 health",
+      "reason": "Current-cycle health and alert evidence",
+      "mandatory": true,
+      "path_globs": [
+        "out/system_health_checklist.csv",
+        "out/cycle_alerts/*.csv"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "archive_days": 90
+      },
+      "action_on_expiry": "archive",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected",
+        "current_cycle_health_evidence"
+      ]
+    },
+    {
+      "id": "h_fault_and_boundary_evidence",
+      "class": "L3",
+      "owner": "H boundary/finalizer diagnostics",
+      "reason": "Failure and boundary forensic evidence",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/H_parent_trace.log",
+        "out/systems/H/live/H_parent_fault_trace.log",
+        "out/systems/H/live/H_publish_gap_trace.txt",
+        "out/systems/H/live/phase1_intel_alignment.boundary.*.json",
+        "out/systems/H/live/phase1_intel_alignment.result.*.json",
+        "out/systems/H/live/phase1_intel_wait.*.json",
+        "out/systems/H/live/H_failed_run_archived.*.json",
+        "out/systems/H/live/H_ATEXIT_TRACE.log",
+        "out/systems/H/live/H_pricing_cycle.FAULT.log",
+        "out/systems/H/live/H_unfinalized_exit.json"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "archive_days": 180
+      },
+      "action_on_expiry": "archive",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected",
+        "h_run_unfinalized"
+      ]
+    },
+    {
+      "id": "h_temp_debug_dirs",
+      "class": "L4",
+      "owner": "H diagnostics",
+      "reason": "Temporary debug and helper directories",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/tmp_*/*",
+        "out/systems/H/live/tmp_*/*/*",
+        "out/systems/H/live/H_pricing_cycle.lock.stale.*",
+        "out/systems/H/live/H_pricing_cycle.lock.tmp.*"
+      ],
+      "retention": {
+        "ttl_days": 3,
+        "max_file_count": 200,
+        "max_total_size_mb": 2048
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_worker_stdio_temp",
+      "class": "L6",
+      "owner": "H worker subprocesses",
+      "reason": "Run-scoped worker stdout/stderr artifacts",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/*.stdout.*.log",
+        "out/systems/H/live/*.stderr.*.log",
+        "out/systems/H/live/phase1_pilot_step.stdout.*.log",
+        "out/systems/H/live/phase1_pilot_step.stderr.*.log",
+        "out/systems/H/live/snapshot_refresh_worker.stdout.*.log",
+        "out/systems/H/live/snapshot_refresh_worker.stderr.*.log"
+      ],
+      "retention": {
+        "ttl_days": 1,
+        "max_file_count": 200,
+        "max_total_size_mb": 1024
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_home_time_monitor_diagnostics",
+      "class": "L4",
+      "owner": "H home time monitor",
+      "reason": "High-volume monitor diagnostic snapshots for troubleshooting",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/H_home_time_monitor_diagnostic.*.json",
+        "out/systems/H/live/H_home_time_monitor_diagnostic.*.json.tmp.*"
+      ],
+      "retention": {
+        "ttl_days": 7,
+        "max_file_count": 120,
+        "max_total_size_mb": 512
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_pilot_step_contract_artifacts",
+      "class": "L6",
+      "owner": "H phase1 pilot subprocess",
+      "reason": "Run-scoped pilot completion, result, and checkpoint contract files",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/phase1_pilot_step.complete.*.json",
+        "out/systems/H/live/phase1_pilot_step.complete.*.json.tmp.*",
+        "out/systems/H/live/phase1_pilot_step.result.*.json",
+        "out/systems/H/live/phase1_pilot_step.result.*.json.tmp.*",
+        "out/systems/H/live/phase1_pilot_step.checkpoint.*.json",
+        "out/systems/H/live/phase1_pilot_step.checkpoint.*.json.tmp.*"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 500,
+        "max_total_size_mb": 1024
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_core_parent_exit_capture_artifacts",
+      "class": "L3",
+      "owner": "H core parent exit capture",
+      "reason": "Parent-exit forensic capture files used for runtime failure diagnosis",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/H_core_parent_exit_capture.monitor_start.*.txt",
+        "out/systems/H/live/H_core_parent_exit_capture.*.json"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "archive_days": 180
+      },
+      "action_on_expiry": "archive",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected",
+        "h_run_unfinalized"
+      ]
+    },
+    {
+      "id": "h_snapshot_refresh_worker_contracts",
+      "class": "L6",
+      "owner": "H snapshot refresh worker",
+      "reason": "Snapshot worker run-scoped contract evidence",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/snapshot_refresh_worker.contract.*.json"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 500,
+        "max_total_size_mb": 512
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_launcher_gate_trace_logs",
+      "class": "L4",
+      "owner": "H launcher gate",
+      "reason": "Launcher gate diagnostic trace logs",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/H_launcher_gate_trace.*.log"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 300,
+        "max_total_size_mb": 512
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_owner_termination_provenance_diagnostics",
+      "class": "L4",
+      "owner": "H owner termination diagnostics",
+      "flow": "H",
+      "storage_class": "temp_debug",
+      "target_type": "file",
+      "reason": "High-volume owner termination provenance traces used for short-term H failure diagnosis",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/H_owner_termination_provenance.*.json",
+        "out/systems/H/live/H_owner_termination_provenance.*.txt"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "max_file_count": 1000,
+        "max_total_size_mb": 1024
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_phase1_parent_handoff_contracts",
+      "class": "L6",
+      "owner": "H phase1 parent handoff",
+      "flow": "H",
+      "storage_class": "failed_partial",
+      "target_type": "file",
+      "reason": "Run-scoped parent handoff contract files; keep a bounded recent history only",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/phase1_pilot_parent_handoff.*.json"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 1000,
+        "max_total_size_mb": 512
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_phase1_wait_stdio_temp",
+      "class": "L6",
+      "owner": "H phase1 wait subprocesses",
+      "flow": "H",
+      "storage_class": "temp_debug",
+      "target_type": "file",
+      "reason": "Run-scoped phase1 wait stdout/stderr logs",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/phase1_intel_wait.*.stdout.log",
+        "out/systems/H/live/phase1_intel_wait.*.stderr.log"
+      ],
+      "retention": {
+        "ttl_days": 3,
+        "max_file_count": 200,
+        "max_total_size_mb": 256
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_lock_active",
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_phase1_abnormal_wait_evidence",
+      "class": "L3",
+      "owner": "H phase1 abnormal wait diagnostics",
+      "flow": "H",
+      "storage_class": "failure_evidence",
+      "target_type": "file",
+      "reason": "Abnormal wait forensic evidence retained for H failure diagnosis",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/phase1_pilot_wait_abnormal.*.json",
+        "out/systems/H/live/H_pricing_cycle.CRASH.log",
+        "out/systems/H/live/H_pricing_cycle.EXIT_STATUS.*.txt"
+      ],
+      "retention": {
+        "ttl_days": 90,
+        "max_total_size_mb": 512
+      },
+      "action_on_expiry": "archive",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected",
+        "h_run_unfinalized"
+      ]
+    },
+    {
+      "id": "h_phase1_progress_diagnostics",
+      "class": "L4",
+      "owner": "H phase1 pilot diagnostics",
+      "flow": "H",
+      "storage_class": "temp_debug",
+      "target_type": "file",
+      "reason": "Historical phase1 pilot progress logs; current progress log is intentionally excluded",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/phase1_pilot_step.progress.*.log",
+        "out/systems/H/live/test_h110.*.json",
+        "out/systems/H/live/test_h110.*.log",
+        "out/systems/H/live/process_tree.*.txt"
+      ],
+      "retention": {
+        "ttl_days": 14,
+        "max_file_count": 500,
+        "max_total_size_mb": 512
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_daily_exclusion_reports",
+      "class": "L4",
+      "owner": "H exclusion diagnostics",
+      "flow": "H",
+      "storage_class": "derived_report",
+      "target_type": "file",
+      "reason": "Daily H exclusion snapshots are useful for recent diagnosis but should not grow forever",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/h_excluded_scope_*.csv",
+        "out/systems/H/live/h_excluded_stock_*.csv"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "max_file_count": 60,
+        "max_total_size_mb": 512
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_seller_detail_measurement_reports",
+      "class": "L4",
+      "owner": "H seller detail diagnostics",
+      "flow": "H",
+      "storage_class": "derived_report",
+      "target_type": "file",
+      "reason": "Seller-detail measurement reports are useful recent diagnostics but high-frequency history must stay bounded",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/H/live/h_seller_detail_*_latest.csv",
+        "out/systems/H/live/history/h_seller_detail_*.csv"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "max_file_count": 500,
+        "max_total_size_mb": 1024
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_sku_decision_and_cleanup_ledgers",
+      "class": "L5",
+      "owner": "H decision audit",
+      "flow": "H",
+      "storage_class": "audit_history",
+      "target_type": "file",
+      "reason": "SKU decision, lifecycle, and cleanup ledgers are audit evidence",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/h110_sku_decision_log.csv",
+        "out/systems/H/live/h110_sku_decision_log.csv.*",
+        "out/systems/H/live/h110_sku_lifecycle_log.csv",
+        "out/systems/H/live/h110_sku_lifecycle_log.csv.*",
+        "out/systems/H/live/H_cleanup_ledger.jsonl",
+        "out/systems/H/live/H_cleanup_ledger.jsonl.*"
+      ],
+      "retention": {
+        "ttl_days": 3650,
+        "max_total_size_mb": 1024
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "h_offer_history_under_live",
+      "class": "L5",
+      "owner": "H offer history",
+      "flow": "H",
+      "storage_class": "audit_history",
+      "target_type": "file",
+      "reason": "Offer history files under H live are historical market evidence",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/live/listing_offer_history.csv",
+        "out/systems/H/live/listing_offer_seller_observation_history.csv"
+      ],
+      "retention": {
+        "ttl_days": 3650,
+        "max_total_size_mb": 2048
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "global_tmp_debug_files",
+      "class": "L4",
+      "owner": "Ops diagnostics",
+      "reason": "Top-level temporary debug traces under out/",
+      "mandatory": false,
+      "path_globs": [
+        "out/tmp_*",
+        "out/tmp_*.*"
+      ],
+      "retention": {
+        "ttl_days": 3,
+        "max_file_count": 500,
+        "max_total_size_mb": 1024
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "safety_blockers": [
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "sql_primary_database_protected",
+      "class": "L1",
+      "owner": "Shared SQL store",
+      "flow": "shared",
+      "storage_class": "current_runtime",
+      "target_type": "file",
+      "reason": "Current primary SQLite database must never be deleted by housekeeping",
+      "mandatory": true,
+      "path_globs": [
+        "out/sql/sellerone_dev.sqlite3"
+      ],
+      "retention": {
+        "ttl_days": 3650
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "f_storage_drift_reconcile_backups",
+      "class": "L6",
+      "owner": "F price-list storage drift guard",
+      "flow": "F",
+      "storage_class": "rollback",
+      "target_type": "directory",
+      "reason": "Rollback folders for F storage drift reconciliation; keep only newest non-empty family copy",
+      "mandatory": true,
+      "path_globs": [
+        "out/backups/f_storage_drift_reconcile_*"
+      ],
+      "retention": {
+        "max_file_count": 1,
+        "max_total_size_mb": 20480
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "h_staged_publish_snapshots",
+      "class": "L6",
+      "owner": "H staged publish rollback",
+      "flow": "H",
+      "storage_class": "rollback",
+      "target_type": "directory",
+      "reason": "H staged publish rollback folders; keep the newest five complete snapshots",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/H/staged/*"
+      ],
+      "retention": {
+        "max_file_count": 5,
+        "max_total_size_mb": 20480
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "f_temp_runtime_artifacts",
+      "class": "L6",
+      "owner": "F price-list runtime",
+      "flow": "F",
+      "storage_class": "temp_debug",
+      "target_type": "any",
+      "reason": "F run-scoped temporary files and folders",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/F/temp/*"
+      ],
+      "retention": {
+        "ttl_days": 3,
+        "max_file_count": 500,
+        "max_total_size_mb": 2048
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "f_raw_inbox_canonical_sources",
+      "class": "L5",
+      "owner": "F supplier source intake",
+      "flow": "F",
+      "storage_class": "raw_import",
+      "target_type": "any",
+      "reason": "Canonical supplier source files should be kept once with source-hash evidence instead of repeatedly copied",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/F/inbox/suppliers/*"
+      ],
+      "retention": {
+        "ttl_days": 3650,
+        "max_total_size_mb": 102400
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "source_hash_required": true,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "f_supplier_source_container",
+      "class": "L1",
+      "owner": "F supplier source intake",
+      "flow": "F",
+      "storage_class": "current_runtime",
+      "target_type": "directory",
+      "reason": "Container for canonical supplier source folders",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/F/inbox/suppliers"
+      ],
+      "retention": {
+        "ttl_days": 3650,
+        "max_total_size_mb": 102400
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "f_inbox_runtime_state",
+      "class": "L1",
+      "owner": "F price-list runtime",
+      "flow": "F",
+      "storage_class": "current_runtime",
+      "target_type": "file",
+      "reason": "Current F inbox state files used by the live price-list manager",
+      "mandatory": true,
+      "path_globs": [
+        "out/systems/F/inbox/feeder_review_events.csv",
+        "out/systems/F/inbox/supplier_price_list_active_run.csv",
+        "out/systems/F/inbox/supplier_price_list_queue_state.csv",
+        "out/systems/F/inbox/supplier_price_list_run_state.csv",
+        "out/systems/F/inbox/supplier_price_list_universal_holds.csv",
+        "out/systems/F/inbox/supplier_price_list_universal_live.csv"
+      ],
+      "retention": {
+        "ttl_days": 3650,
+        "max_total_size_mb": 2048
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    },
+    {
+      "id": "f_inbox_legacy_backup_dirs",
+      "class": "L4",
+      "owner": "F price-list diagnostics",
+      "flow": "F",
+      "storage_class": "rollback",
+      "target_type": "directory",
+      "reason": "F inbox backup folders retained for recent diagnosis with bounded size",
+      "mandatory": false,
+      "path_globs": [
+        "out/systems/F/inbox/*_backups"
+      ],
+      "retention": {
+        "ttl_days": 30,
+        "max_file_count": 10,
+        "max_total_size_mb": 2048
+      },
+      "health": {
+        "fail_over_cap": true
+      },
+      "action_on_expiry": "delete",
+      "protected": false,
+      "live_cleanup_allowed": true,
+      "cleanup_eligible": true,
+      "safety_blockers": [
+        "h_run_unfinalized",
+        "block_if_state_unknown"
+      ]
+    },
+    {
+      "id": "repo_audit_history",
+      "class": "L5",
+      "owner": "Governance",
+      "reason": "Business and governance audit trail",
+      "mandatory": true,
+      "path_globs": [
+        "WORK_LOG.md",
+        "project_control/DECISIONS.md",
+        "project_control/CURRENT_STATE.md"
+      ],
+      "retention": {
+        "ttl_days": 3650
+      },
+      "action_on_expiry": "keep",
+      "protected": true,
+      "live_cleanup_allowed": false,
+      "safety_blockers": [
+        "always_protected"
+      ]
+    }
+  ]
+}

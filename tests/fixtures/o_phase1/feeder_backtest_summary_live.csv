@@ -1,0 +1,3 @@
+observed_utc,policy_id,seller_sku,asin,summary_status,history_confidence,market_viability_score,exit_risk_score,estimated_total_profit_gbp,estimated_monthly_profit_gbp,capital_lockup_days,sellable_ceiling_zone,amazon_risk_level,compression_risk_level,recommendation,manual_review_reason
+2026-04-03T10:45:00Z,policy_live_default,SKU-FULL,ASINFULL001,ready,high,82.5,18.2,312.4,44.6,21,normal,low,medium,Normal fit,
+2026-04-03T10:45:00Z,policy_live_default,SKU-TEST,ASINTEST001,manual_review,medium,57.0,44.0,88.0,12.6,36,caution,high,high,Manual review,low_history

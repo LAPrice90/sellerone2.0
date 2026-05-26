@@ -32,3 +32,41 @@ Moved to scripts/one_off and renumbered with T###_ prefix.
 - scripts/one_off/T026_test_financial_events_24h.py -> scripts/one_off/T026_test_financial_events_24h.py
 - scripts/one_off/T027_test_financial_events_level3_window.py -> scripts/one_off/T027_test_financial_events_level3_window.py
 - scripts/one_off/T028_backdate_tokens_from_live_stock.py
+
+## Current operational one-off helpers
+
+- `scripts/one_off/F036_build_passed_product_page_evidence_backfill_queue.py`
+  - Purpose: build a passed-product Amazon page evidence backfill queue from local Pass review files
+  - Use for: finding clean Pass rows that still need `product_detail_text`, `product_description`, or `product_feature_bullets`
+  - Includes: scanner-ready F061 active-run staging output, schema health checks, and summary outputs
+  - Safe boundary: builds local queue files only; does not scrape, change Google Sheets, or change the product database
+
+- `scripts/one_off/F037_run_passed_product_page_evidence_backfill_batch.py`
+  - Purpose: stage and optionally execute controlled F061 batches for passed-product page evidence backfill
+  - Use for: working through the full historical backfill queue while recording per-ASIN status
+  - Includes: durable state file, batch manifest, batch health output, isolated proof roots, and consolidated backfill results
+  - Safe boundary: one-off only; default prepare mode does not scrape; execute mode refuses live F overlap unless explicit maintenance forcing is requested
+
+- `scripts/one_off/F038_apply_page_evidence_backfill_to_review_packs.py`
+  - Purpose: fill blank New Product Review page-evidence fields from successful F037 backfill results
+  - Use for: refreshing already-built review packs that were created before Amazon description/detail/bullet capture existed
+  - Includes: dry-run previews, execute-mode backups, manifest output, and health output
+  - Safe boundary: one-off only; does not change scanner evidence, Google Sheets, product database, or user review decisions
+
+- `scripts/one_off/F039_build_legacy_pass_ai_candidate_queues.py`
+  - Purpose: convert old pre-AI clean Pass handoff rows into current AI candidate manifests
+  - Use for: moving legacy clean Pass rows into the normal FPM155/Codex AI gate without treating legacy manual/near rows as clean Pass work
+  - Includes: dry-run mode, execute-mode manifest backup, clean-pass-only empty near-miss placeholder, conversion report, and optional FPM155 queue build
+  - Safe boundary: one-off only; does not change Google Sheets, product database, scanner evidence, or user review decisions
+
+- `scripts/one_off/P001_create_plan_workspace.py`
+  - Purpose: create a standard plan folder under `plans/active/`
+  - Use for: starting a new planning and execution workspace for a ticket
+  - Includes: build-lane and debug-lane starter files
+  - Safe boundary: one-off only, not for daily loops
+
+- `scripts/one_off/P002_plan_forced_proof_window.py`
+  - Purpose: produce a read-only forced-proof plan for A, B, E, or H runtime validation
+  - Use for: deciding how to prove a single-run or scoped fix now without unsafe overlap
+  - Includes: lock and marker readout, safe boundary, preflight checks, and command sequence
+  - Safe boundary: read-only planner only; execution still happens through the flow-owned cycle or isolation path

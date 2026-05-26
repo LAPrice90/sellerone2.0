@@ -65,38 +65,43 @@ def append_step(
     fresh_outputs: list[str] | None = None,
     missing_outputs: list[str] | None = None,
     stale_outputs: list[str] | None = None,
+    stdout_tail: str = "",
+    stderr_tail: str = "",
 ) -> None:
     start_ts = started_at or utc_now_iso()
     end_ts = ended_at or utc_now_iso()
     duration = _duration_seconds(start_ts, end_ts)
-    manifest.setdefault("steps", []).append(
-        {
-            "name": str(name).strip(),
-            "script_or_function": str(script_or_function).strip(),
-            "inputs": [str(x).strip() for x in (inputs or []) if str(x).strip()],
-            "outputs": [str(x).strip() for x in (outputs or []) if str(x).strip()],
-            "rc": int(rc),
-            "notes": str(notes).strip(),
-            "launched": bool(launched),
-            "completed": bool(completed),
-            "outputs_verified": bool(outputs_verified),
-            "step_status": str(step_status).strip() or _default_step_status(
-                rc=int(rc),
-                launched=bool(launched),
-                completed=bool(completed),
-                outputs_verified=bool(outputs_verified),
-            ),
-            "verification_status": str(verification_status).strip(),
-            "required_outputs": [str(x).strip() for x in (required_outputs or []) if str(x).strip()],
-            "optional_outputs": [str(x).strip() for x in (optional_outputs or []) if str(x).strip()],
-            "fresh_outputs": [str(x).strip() for x in (fresh_outputs or []) if str(x).strip()],
-            "missing_outputs": [str(x).strip() for x in (missing_outputs or []) if str(x).strip()],
-            "stale_outputs": [str(x).strip() for x in (stale_outputs or []) if str(x).strip()],
-            "start_time": start_ts,
-            "end_time": end_ts,
-            "duration_seconds": duration,
-        }
-    )
+    step = {
+        "name": str(name).strip(),
+        "script_or_function": str(script_or_function).strip(),
+        "inputs": [str(x).strip() for x in (inputs or []) if str(x).strip()],
+        "outputs": [str(x).strip() for x in (outputs or []) if str(x).strip()],
+        "rc": int(rc),
+        "notes": str(notes).strip(),
+        "launched": bool(launched),
+        "completed": bool(completed),
+        "outputs_verified": bool(outputs_verified),
+        "step_status": str(step_status).strip() or _default_step_status(
+            rc=int(rc),
+            launched=bool(launched),
+            completed=bool(completed),
+            outputs_verified=bool(outputs_verified),
+        ),
+        "verification_status": str(verification_status).strip(),
+        "required_outputs": [str(x).strip() for x in (required_outputs or []) if str(x).strip()],
+        "optional_outputs": [str(x).strip() for x in (optional_outputs or []) if str(x).strip()],
+        "fresh_outputs": [str(x).strip() for x in (fresh_outputs or []) if str(x).strip()],
+        "missing_outputs": [str(x).strip() for x in (missing_outputs or []) if str(x).strip()],
+        "stale_outputs": [str(x).strip() for x in (stale_outputs or []) if str(x).strip()],
+        "start_time": start_ts,
+        "end_time": end_ts,
+        "duration_seconds": duration,
+    }
+    if str(stdout_tail or "").strip():
+        step["stdout_tail"] = str(stdout_tail).strip()
+    if str(stderr_tail or "").strip():
+        step["stderr_tail"] = str(stderr_tail).strip()
+    manifest.setdefault("steps", []).append(step)
     _refresh_manifest_counts(manifest)
 
 

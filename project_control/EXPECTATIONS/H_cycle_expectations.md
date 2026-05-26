@@ -13,6 +13,7 @@ The H cycle is the live repricing runtime. It collects market signals, applies r
 | Runtime lock safety | Lock ownership and overlap protections are active | In Progress | Lock, heartbeat, and ownership checks are implemented |
 | Boundary truth handling | H to A016 boundary outcomes are captured safely | In Progress | Boundary artifacts exist, stabilization still needed |
 | Health reporting | H health and runtime status artifacts are produced | In Progress | H health checklist and runtime status files are present |
+| Storage self-cleaning | H staged rollback folders are capped and reported through central housekeeping | In Progress | `out/systems/H/staged/*` keeps the newest 5 snapshots by registry policy; cleanup must run only at a safe H boundary |
 
 ## SECTION 2 - Reliability Measurement
 Measure reliability over the last 10 completed H runs:
@@ -45,3 +46,19 @@ These do not affect Completion Score:
 - Portfolio-level strategy extensions.
 - Notification-led orchestration features.
 - Demand-learning and pressure-policy enhancements.
+
+## SECTION 5 - Planning Tolerance Gate
+- This expectations file defines reliability quality targets. It is not an automatic planning-stop rule by itself.
+- Planning and optimisation work may proceed when H scoped hard-block conditions are clear.
+- Hard-block examples for H planning:
+- active FAIL in H scoped gate
+- required H runtime or ownership state not operational
+- required publish path down when publish is required
+- unresolved ownership/finalization mismatch for active run markers
+- duplicate owner or crash-loop behavior that prevents normal operation
+- Soft-block examples for H planning:
+- accepted non-blocking WARN with explicit reason and review cadence
+- provisional reliability label during observation window
+- intermittent recoverable runtime faults that do not stop required H operation
+- stale aggregate labels when newer H live evidence is available
+- Soft-blocks must be reported and tracked, but do not by themselves stop planning.

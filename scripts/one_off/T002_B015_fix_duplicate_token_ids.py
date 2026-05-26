@@ -15,6 +15,8 @@ from pathlib import Path
 import gspread
 import pandas as pd
 
+from scripts.core.storage import write_dataframe_with_sql_compat
+
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 LEDGER_TAB = "Token_Ledger"
 ALLOC_TAB = "Token_Allocations"
@@ -23,6 +25,8 @@ EVENTS_TAB = "Token_Events"
 OUT_LEDGER = Path("out/token_ledger_live.csv")
 OUT_ALLOC = Path("out/token_allocations_live.csv")
 OUT_EVENTS = Path("out/token_events.csv")
+SQL_TABLE_TOKEN_LEDGER_LIVE = "b_token_ledger_live"
+SQL_TABLE_TOKEN_ALLOCATIONS_LIVE = "b_token_allocations_live"
 
 
 def get_gspread_client() -> gspread.Client:
@@ -122,14 +126,14 @@ def main() -> None:
     ledger_ws.clear()
     ledger_ws.update(ledger_rows, value_input_option="RAW")
     OUT_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-    updated_ledger.to_csv(OUT_LEDGER, index=False)
+    write_dataframe_with_sql_compat(updated_ledger, OUT_LEDGER, SQL_TABLE_TOKEN_LEDGER_LIVE)
 
     # Write allocations
     if not updated_alloc.empty:
         alloc_rows = [updated_alloc.columns.tolist()] + updated_alloc.astype(object).where(pd.notnull(updated_alloc), "").values.tolist()
         alloc_ws.clear()
         alloc_ws.update(alloc_rows, value_input_option="RAW")
-        updated_alloc.to_csv(OUT_ALLOC, index=False)
+        write_dataframe_with_sql_compat(updated_alloc, OUT_ALLOC, SQL_TABLE_TOKEN_ALLOCATIONS_LIVE)
 
     # Write events
     if not updated_events.empty:

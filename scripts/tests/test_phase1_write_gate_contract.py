@@ -38,10 +38,10 @@ def test_evaluate_live_write_gate_standard_phase1_allows_codex_h_when_phase_engi
     assert result.reason_codes == [ALLOWED_REASON]
 
 
-def test_evaluate_live_write_gate_phase_engine_mode_still_requires_cohort_when_enabled():
+def test_evaluate_live_write_gate_phase_engine_mode_allows_codex_h_when_enabled():
     from scripts.phase1.phase1_write_gate import evaluate_live_write_gate
 
-    blocked = evaluate_live_write_gate(
+    non_cohort = evaluate_live_write_gate(
         writer_mode="CODEX_H",
         phase_engine_enabled=True,
         phase_engine_behavior=True,
@@ -58,8 +58,8 @@ def test_evaluate_live_write_gate_phase_engine_mode_still_requires_cohort_when_e
         excluded=False,
     )
 
-    assert blocked.write_allowed is False
-    assert blocked.reason_codes == ["PHASE_LIVE_WRITE_BLOCKED_NOT_IN_COHORT"]
+    assert non_cohort.write_allowed is True
+    assert non_cohort.reason_codes == ["PHASE_LIVE_WRITE_ALLOWED"]
     assert allowed.write_allowed is True
 
 

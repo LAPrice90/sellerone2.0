@@ -12,10 +12,23 @@ import os
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
+import sys
 from typing import Dict, List, Tuple
 
 import pandas as pd
 import requests
+
+ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS_DIR = ROOT / "scripts"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+try:
+    from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
+except ModuleNotFoundError:
+    from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 
 
 ORDER_MASTER = Path("out/order_master.csv")
@@ -24,6 +37,9 @@ FX_RATES = Path("out/fx_rates_daily.csv")
 
 OUT_ORDER_FX = Path("out/order_ledger_fx.csv")
 OUT_FIN_FX = Path("out/financial_ledger_fx.csv")
+SQL_TABLE_ORDER_LEDGER_FX = "b_order_ledger_fx"
+SQL_TABLE_FINANCIAL_LEDGER_FX = "b_financial_ledger_fx"
+SQL_TABLE_FX_RATES = "b_fx_rates_daily"
 
 FX_BASE = os.environ.get("FX_BASE", "GBP")
 FX_SOURCE = os.environ.get("FX_SOURCE", "ECB")
@@ -31,6 +47,35 @@ FX_API_URL = "https://api.frankfurter.app"
 FX_API_URL_FALLBACK = "https://api.exchangerate.host"
 FX_API_URL_FALLBACK_LATEST = "https://open.er-api.com/v6/latest/EUR"
 FX_STALE_DAYS = int(os.environ.get("FX_STALE_DAYS", "14"))
+
+
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    sql_rows = 0
+
+    def write_csv() -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(path, index=False)
+
+    def write_sql() -> None:
+        nonlocal sql_rows
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, sql_table, df)
+        finally:
+            store.close()
+        sql_rows = int(result["rows"])
+
+    if mode == "sql_primary_csv_export":
+        write_sql()
+        write_csv()
+    elif mode == "sql_shadow":
+        write_csv()
+        write_sql()
+    else:
+        write_csv()
+
+    return {"mode": mode, "sql_table": sql_table if mode != "csv" else "", "sql_rows": sql_rows}
 
 
 def _date_key(series: pd.Series) -> pd.Series:
@@ -163,8 +208,7 @@ def _ensure_fx_rates(dates: List[str], currencies: List[str]) -> pd.DataFrame:
     if add.empty:
         return fx
     fx = pd.concat([fx, add], ignore_index=True)
-    FX_RATES.parent.mkdir(parents=True, exist_ok=True)
-    fx.to_csv(FX_RATES, index=False)
+    _write_output_frame(fx, FX_RATES, SQL_TABLE_FX_RATES)
     return fx
 
 
@@ -247,8 +291,7 @@ def build_order_ledger_fx() -> None:
         for col in fx_cols:
             df.at[idx, f"{col}_GBP"] = float(row.get(col) or 0.0) * rate
 
-    OUT_ORDER_FX.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(OUT_ORDER_FX, index=False)
+    _write_output_frame(df, OUT_ORDER_FX, SQL_TABLE_ORDER_LEDGER_FX)
 
 
 def build_financial_ledger_fx() -> None:
@@ -288,8 +331,7 @@ def build_financial_ledger_fx() -> None:
         df.at[idx, "amount_gbp"] = float(row.get("amount") or 0.0) * rate
         df.at[idx, "tax_amount_gbp"] = float(row.get("tax_amount") or 0.0) * rate
 
-    OUT_FIN_FX.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(OUT_FIN_FX, index=False)
+    _write_output_frame(df, OUT_FIN_FX, SQL_TABLE_FINANCIAL_LEDGER_FX)
 
 
 def _has_non_gbp_currency(path: Path, currency_col: str) -> bool:
@@ -311,6 +353,10 @@ def main() -> None:
     build_order_ledger_fx()
     if has_non_gbp:
         build_financial_ledger_fx()
+    if FX_RATES.exists():
+        fx = _load_fx_table()
+        if not fx.empty:
+            _write_output_frame(fx, FX_RATES, SQL_TABLE_FX_RATES)
     print(
         {
             "status": "success",

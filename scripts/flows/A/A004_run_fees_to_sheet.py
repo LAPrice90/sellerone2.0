@@ -26,11 +26,33 @@ from requests.exceptions import RequestException
 # Paths for auto-adding SKUs seen in orders
 ORDER_ITEMS_ALL = Path("out/order_items_all.csv")
 MERCHANT_LISTINGS = Path("out/merchant_listings_latest.csv")
+PHASE1_SCOPE = Path("out/phase1_sku_scope.csv")
 
 # Ensure project root is on path
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+        coalesce_duplicate_header_rows,
+        write_dataframe_with_sql_compat,
+    )
+except ImportError:  # pragma: no cover - direct script fallback
+    from core.storage import (
+        StorageConfig,
+        connect_store,
+        parse_storage_mode,
+        read_dataframe_with_sql_fallback,
+        replace_table_from_dataframe,
+        coalesce_duplicate_header_rows,
+        write_dataframe_with_sql_compat,
+    )
 
 SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
 PRODUCT_DB_TAB = "Product_DB"
@@ -45,6 +67,15 @@ MIN_INTERVAL = float(os.environ.get("FEES_MIN_INTERVAL", "1.0"))
 MAX_INTERVAL = float(os.environ.get("FEES_MAX_INTERVAL", "6.0"))
 FEES_REQUEUE_MAX_PASSES = int(os.environ.get("FEES_REQUEUE_MAX_PASSES", "2"))
 FEES_REQUEUE_PASS_BACKOFF_SEC = float(os.environ.get("FEES_REQUEUE_PASS_BACKOFF_SEC", "15"))
+OUT_FEES_ESTIMATES = Path("out/fees_estimates.csv")
+OUT_FEES_LATEST = Path("out/fees_latest.csv")
+OUT_FEES_FAILED = Path("out/fees_failed.csv")
+OUT_PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_FEES_ESTIMATES = "a_fees_estimates"
+SQL_TABLE_FEES_LATEST = "a_fees_latest"
+SQL_TABLE_FEES_FAILED = "a_fees_failed"
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
+SQL_TABLE_PHASE1_SKU_SCOPE = "b_phase1_sku_scope"
 
 _throttle_next_allowed = 0.0
 _throttle_last_fail_delay = 0.0
@@ -336,6 +367,27 @@ def calc_margin(price: float, fba_fee: Optional[float], referral_fee: Optional[f
     return round(margin, 2)
 
 
+def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE"))
+    sql_rows = 0
+    if mode in {"sql_shadow", "sql_primary_csv_export"}:
+        store = connect_store(StorageConfig.from_env())
+        try:
+            result = replace_table_from_dataframe(store, sql_table, df)
+            sql_rows = int(result["rows"])
+        finally:
+            store.close()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+    return {
+        "mode": mode,
+        "path": str(path),
+        "csv_rows": int(len(df.index)),
+        "sql_table": sql_table if mode != "csv" else "",
+        "sql_rows": sql_rows,
+    }
+
+
 def main() -> None:
     load_env()
     try:
@@ -349,6 +401,9 @@ def main() -> None:
     if not rows:
         print("Product_DB empty")
         return
+    rows, repaired_headers = coalesce_duplicate_header_rows(rows)
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before A004 update: " + ",".join(repaired_headers))
     headers = rows[0]
     idx = {h: i for i, h in enumerate(headers)}
 
@@ -365,6 +420,20 @@ def main() -> None:
                 active_listings = set(active["seller-sku"].astype(str).str.strip())
         except Exception:
             active_listings = set()
+    non_parked_scope_skus = set()
+    try:
+        sdf = read_dataframe_with_sql_fallback(PHASE1_SCOPE, SQL_TABLE_PHASE1_SKU_SCOPE, dtype=str).fillna("")
+        if {"sku", "parked_flag"}.issubset(set(sdf.columns)):
+            sku_series = sdf["sku"].astype(str).str.strip()
+            parked_series = sdf["parked_flag"].astype(str).str.strip().str.lower()
+            non_parked_mask = parked_series.isin({"0", "false", "no", "n", ""})
+            if "observe_effective" in sdf.columns:
+                observe_series = sdf["observe_effective"].astype(str).str.strip().str.lower()
+                observe_mask = observe_series.isin({"1", "true", "yes", "y", "on"})
+                non_parked_mask = non_parked_mask & observe_mask
+            non_parked_scope_skus = set(sku_series.loc[non_parked_mask])
+    except Exception:
+        non_parked_scope_skus = set()
 
     # Ensure columns exist
     for col in [
@@ -434,8 +503,10 @@ def main() -> None:
     # - Explicitly active rows.
     # - Blank status rows (legacy/missing data) so automation does not stall.
     # - Explicitly discontinued/dropped rows only when stock is still positive.
-    # If merchant_listings_latest.csv exists, active/blank rows still require the SKU to be active there.
-    # Discontinued/dropped rows with stock>0 bypass that active-listings gate.
+    # If merchant_listings_latest.csv exists, active/blank rows normally require the SKU
+    # to be active there. Inactive-listing rows can still refresh if they are non-parked
+    # in phase1 scope (aligns with H floor coverage checks), or if stock is positive.
+    # Discontinued/dropped rows with stock>0 also bypass the active-listings gate.
     target_rows = []
 
     def _stock_positive(row: list[str]) -> bool:
@@ -461,8 +532,9 @@ def main() -> None:
         include_row = False
         if status in {"", "active"}:
             if active_listings and r[sku_idx] not in active_listings:
-                continue
-            include_row = True
+                include_row = (r[sku_idx] in non_parked_scope_skus) or _stock_positive(r)
+            else:
+                include_row = True
         elif status in {"dropped", "discontinued"}:
             include_row = _stock_positive(r)
         if include_row:
@@ -568,14 +640,21 @@ def main() -> None:
         if processed % 50 == 0:
             print(f"[A004] Progress: {processed} SKUs processed...")
 
+    rows_out, repaired_headers = coalesce_duplicate_header_rows([headers] + rows[1:])
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before A004 write: " + ",".join(repaired_headers))
     ws.clear()
-    ws.update("A1", [headers] + rows[1:])
+    ws.update("A1", rows_out)
     Path("out").mkdir(parents=True, exist_ok=True)
     fees_df = pd.DataFrame(out_records)
-    fees_df.to_csv("out/fees_estimates.csv", index=False)
+    _write_output_frame(fees_df, OUT_FEES_ESTIMATES, SQL_TABLE_FEES_ESTIMATES)
     # Compatibility alias expected by A-cycle output verification.
-    fees_df.to_csv("out/fees_latest.csv", index=False)
-    pd.DataFrame(rows[1:], columns=headers).to_csv("out/product_db_preview.csv", index=False)
+    _write_output_frame(fees_df, OUT_FEES_LATEST, SQL_TABLE_FEES_LATEST)
+    write_dataframe_with_sql_compat(
+        pd.DataFrame(rows_out[1:], columns=rows_out[0]),
+        OUT_PRODUCT_DB_PREVIEW,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
     failed_cols = [
         "seller_sku",
         "fba_fee_10",
@@ -592,7 +671,7 @@ def main() -> None:
     ]
     failed = [r for r in out_records if (r.get("error_10") or r.get("error_100"))]
     failed_df = pd.DataFrame(failed, columns=failed_cols)
-    failed_df.to_csv("out/fees_failed.csv", index=False)
+    _write_output_frame(failed_df, OUT_FEES_FAILED, SQL_TABLE_FEES_FAILED)
     if failed:
         reasons = {}
         for r in failed:

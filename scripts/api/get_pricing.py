@@ -19,6 +19,11 @@ from scripts.api.spapi_owner import SpApiCallContext, spapi_get
 
 SPAPI_BASE_URL = os.environ.get("SPAPI_BASE_URL", "https://sellingpartnerapi-eu.amazon.com")
 
+DETAIL_STATUS_OK = "DETAIL_OK"
+DETAIL_STATUS_SKIPPED_ROTATION = "DETAIL_SKIPPED_ROTATION"
+DETAIL_STATUS_EMPTY_RESPONSE = "DETAIL_EMPTY_RESPONSE"
+DETAIL_STATUS_API_ERROR = "DETAIL_API_ERROR"
+
 
 def _env_float(name: str, default: float) -> float:
     try:
@@ -654,6 +659,45 @@ def _extract_market_context_from_item_offers(payload: dict) -> Dict[str, str]:
     return out
 
 
+def _select_item_offer_asins(
+    *,
+    uniq_asins: List[str],
+    run_id: str,
+    max_asins_per_run: int,
+    prioritized_asins: List[str] | None = None,
+) -> List[str]:
+    if not uniq_asins:
+        return []
+    if max_asins_per_run <= 0 or len(uniq_asins) <= max_asins_per_run:
+        return list(uniq_asins)
+
+    unique = [a for a in dict.fromkeys(uniq_asins) if str(a or "").strip()]
+    priority_seed = [str(a or "").strip() for a in (prioritized_asins or []) if str(a or "").strip()]
+    priority = [a for a in dict.fromkeys(priority_seed) if a in unique]
+
+    selected: List[str] = []
+    if priority:
+        selected.extend(priority[:max_asins_per_run])
+    if len(selected) >= max_asins_per_run:
+        return selected[:max_asins_per_run]
+
+    remaining = [a for a in unique if a not in set(selected)]
+    if not remaining:
+        return selected[:max_asins_per_run]
+
+    start_idx = 0
+    run_seed = str(run_id or "").strip()
+    if run_seed:
+        start_idx = sum(ord(ch) for ch in run_seed) % len(remaining)
+    rotated: List[str] = []
+    for offset in range(len(remaining)):
+        rotated.append(remaining[(start_idx + offset) % len(remaining)])
+
+    free_slots = max_asins_per_run - len(selected)
+    selected.extend(rotated[:free_slots])
+    return selected[:max_asins_per_run]
+
+
 def fetch_market_context_for_sku_asin(
     sku_asin_rows: List[Tuple[str, str]],
     marketplace_id: str,
@@ -666,7 +710,9 @@ def fetch_market_context_for_sku_asin(
     snapshot_timestamp_utc: str = "",
     snapshot_asof_date: str = "",
     progress_callback: Callable[..., None] | None = None,
-) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]]]:
+    prioritized_asins: List[str] | None = None,
+    include_detail_meta: bool = False,
+) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]]] | Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]], Dict[str, Dict[str, str]]]:
     """
     Fetch market offer context for SKU/ASIN rows using:
     GET /products/pricing/v0/items/{asin}/offers
@@ -674,7 +720,10 @@ def fetch_market_context_for_sku_asin(
     """
     out: Dict[str, Dict[str, str]] = {}
     offer_rows: List[Dict[str, str]] = []
+    detail_meta_by_asin: Dict[str, Dict[str, str]] = {}
     if not sku_asin_rows:
+        if include_detail_meta:
+            return out, offer_rows, detail_meta_by_asin
         return out, offer_rows
 
     # Keep first-seen order and map back from ASIN to one or more SKUs.
@@ -690,20 +739,28 @@ def fetch_market_context_for_sku_asin(
 
     uniq_asins = list(asin_to_skus.keys())
     max_asins_per_run = max(_env_int("SPAPI_ITEM_OFFERS_MAX_ASINS_PER_RUN", 15), 0)
-    if max_asins_per_run > 0 and len(uniq_asins) > max_asins_per_run:
-        # Rotate the sampled ASIN window by run_id so all ASINs eventually refresh across runs.
-        start_idx = 0
-        run_seed = str(run_id or "").strip()
-        if run_seed:
-            start_idx = sum(ord(ch) for ch in run_seed) % len(uniq_asins)
-        selected: List[str] = []
-        for offset in range(max_asins_per_run):
-            selected.append(uniq_asins[(start_idx + offset) % len(uniq_asins)])
-        uniq_asins = selected
+    selected_asins = _select_item_offer_asins(
+        uniq_asins=uniq_asins,
+        run_id=run_id,
+        max_asins_per_run=max_asins_per_run,
+        prioritized_asins=prioritized_asins,
+    )
 
-    for i, asin in enumerate(uniq_asins, start=1):
+    for asin in uniq_asins:
+        detail_meta_by_asin[asin] = {
+            "detail_status": DETAIL_STATUS_SKIPPED_ROTATION,
+            "attempted_flag": "0",
+            "selected_flag": "1" if asin in set(selected_asins) else "0",
+            "offer_row_count": "0",
+            "summary_present_flag": "0",
+            "error": "",
+        }
+
+    selected_success_count = 0
+    selected_error_count = 0
+    for i, asin in enumerate(selected_asins, start=1):
         if callable(progress_callback):
-            progress_callback(stage="item_offers", index=i, total=len(uniq_asins), asin=asin)
+            progress_callback(stage="item_offers", index=i, total=len(selected_asins), asin=asin)
         url = f"{SPAPI_BASE_URL}/products/pricing/v0/items/{asin}/offers"
         headers = {
             "x-amz-access-token": access_token,
@@ -731,27 +788,74 @@ def fetch_market_context_for_sku_asin(
             max_retries=2,
         )
         if resp.status_code != 200:
-            raise RuntimeError(f"Pricing Item Offers API failed for {asin}: {resp.status_code} {resp.text}")
-        payload = resp.json() or {}
-        ctx_data = _extract_market_context_from_item_offers(payload)
-        for sku in asin_to_skus.get(asin, []):
-            out[sku] = dict(ctx_data)
-        if include_offer_rows:
-            asin_offer_rows = _extract_offer_rows_from_item_offers(payload)
+            detail_meta_by_asin[asin] = {
+                "detail_status": DETAIL_STATUS_API_ERROR,
+                "attempted_flag": "1",
+                "selected_flag": "1",
+                "offer_row_count": "0",
+                "summary_present_flag": "0",
+                "error": f"http_{int(resp.status_code)}",
+            }
+            selected_error_count += 1
+            if i < len(selected_asins):
+                time.sleep(sleep_sec)
+            continue
+        try:
+            payload = resp.json() or {}
+            ctx_data = _extract_market_context_from_item_offers(payload)
+            summary_present = any(
+                str(ctx_data.get(k, "")).strip()
+                for k in [
+                    "price",
+                    "lowest_fba_price",
+                    "lowest_fbm_price",
+                    "offer_count_fba",
+                    "offer_count_fbm",
+                    "list_price",
+                ]
+            )
             for sku in asin_to_skus.get(asin, []):
-                for row in asin_offer_rows:
-                    rec = dict(row)
-                    rec["timestamp_utc"] = snapshot_timestamp_utc
-                    rec["asof_date"] = snapshot_asof_date
-                    rec["marketplace"] = "UK"
-                    rec["sku"] = sku
-                    rec["asin"] = asin
-                    rec["source"] = "SPAPI"
-                    offer_rows.append(rec)
+                out[sku] = dict(ctx_data)
+            asin_offer_rows = _extract_offer_rows_from_item_offers(payload)
+            if include_offer_rows:
+                for sku in asin_to_skus.get(asin, []):
+                    for row in asin_offer_rows:
+                        rec = dict(row)
+                        rec["timestamp_utc"] = snapshot_timestamp_utc
+                        rec["asof_date"] = snapshot_asof_date
+                        rec["marketplace"] = "UK"
+                        rec["sku"] = sku
+                        rec["asin"] = asin
+                        rec["source"] = "SPAPI"
+                        offer_rows.append(rec)
+            detail_status = DETAIL_STATUS_OK if len(asin_offer_rows) > 0 else DETAIL_STATUS_EMPTY_RESPONSE
+            detail_meta_by_asin[asin] = {
+                "detail_status": detail_status,
+                "attempted_flag": "1",
+                "selected_flag": "1",
+                "offer_row_count": str(len(asin_offer_rows)),
+                "summary_present_flag": "1" if summary_present else "0",
+                "error": "",
+            }
+            selected_success_count += 1
+        except Exception as exc:
+            detail_meta_by_asin[asin] = {
+                "detail_status": DETAIL_STATUS_API_ERROR,
+                "attempted_flag": "1",
+                "selected_flag": "1",
+                "offer_row_count": "0",
+                "summary_present_flag": "0",
+                "error": str(exc)[:200],
+            }
+            selected_error_count += 1
 
-        if i < len(uniq_asins):
+        if i < len(selected_asins):
             time.sleep(sleep_sec)
+    if selected_asins and selected_success_count == 0 and selected_error_count > 0:
+        raise RuntimeError("Pricing Item Offers API failed for all selected ASINs")
 
+    if include_detail_meta:
+        return out, offer_rows, detail_meta_by_asin
     return out, offer_rows
 
 
@@ -801,4 +905,38 @@ def run_market_context_lookup_with_offers(
         snapshot_asof_date=snapshot_asof_date,
         progress_callback=progress_callback,
     )
+
+
+def run_market_context_lookup_with_offers_detail(
+    sku_asin_rows: List[Tuple[str, str]],
+    marketplace_id: str,
+    snapshot_timestamp_utc: str,
+    snapshot_asof_date: str,
+    run_id: str = "",
+    script_name: str = "",
+    progress_callback: Callable[..., None] | None = None,
+    prioritized_asins: List[str] | None = None,
+) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, str]], Dict[str, Dict[str, str]]]:
+    load_dotenv_if_missing()
+    token = get_lwa_access_token()
+    sleep_sec = _env_float("SPAPI_ITEM_OFFERS_SLEEP_SEC", _env_float("PRICE_API_SLEEP_SEC", 2.5))
+    result = fetch_market_context_for_sku_asin(
+        sku_asin_rows=sku_asin_rows,
+        marketplace_id=marketplace_id,
+        access_token=token,
+        run_id=run_id,
+        script_name=script_name,
+        sleep_sec=sleep_sec,
+        include_offer_rows=True,
+        snapshot_timestamp_utc=snapshot_timestamp_utc,
+        snapshot_asof_date=snapshot_asof_date,
+        progress_callback=progress_callback,
+        prioritized_asins=prioritized_asins,
+        include_detail_meta=True,
+    )
+    if len(result) == 3:
+        bb_map, offer_rows, detail_meta = result
+        return bb_map, offer_rows, detail_meta
+    bb_map, offer_rows = result
+    return bb_map, offer_rows, {}
 

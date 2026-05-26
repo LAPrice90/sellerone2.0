@@ -46,3 +46,18 @@ These do not affect Completion Score:
 - Throughput optimizations and lower-latency cycle timing.
 - Convenience-only output formatting improvements.
 - Non-critical shadow-comparison enhancements.
+
+## SECTION 5 - Planning Tolerance Gate
+- This expectations file defines reliability quality targets. It is not an automatic planning-stop rule by itself.
+- Planning and optimisation work may proceed when B scoped hard-block conditions are clear.
+- Hard-block examples for B planning:
+- active FAIL in B scoped gate
+- required B runtime path not operational
+- required B publish/output path down when required
+- core B outputs stale beyond cadence
+- duplicate ownership, crash loop, or unresolved scheduler ghost affecting B
+- Soft-block examples for B planning:
+- accepted non-blocking WARN (for example classified nonfatal collector status)
+- "To Baseline" reliability label while evidence window matures
+- stale aggregate labels when current B live evidence is newer
+- Soft-blocks must be reported and tracked, but do not by themselves stop planning.

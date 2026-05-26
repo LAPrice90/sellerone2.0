@@ -11,11 +11,12 @@ Flow:
 from __future__ import annotations
 
 import os
+import csv
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 
 import gspread
 import pandas as pd
@@ -30,6 +31,12 @@ from scripts.api.get_inventory_summaries import (
     load_dotenv_if_missing,
 )
 from run_api_collection import run_api_collection as run_api_collection_entry
+from scripts.core.out_paths import write_csv_with_compat
+from scripts.core.storage import (
+    coalesce_duplicate_header_rows,
+    dataframe_from_product_db_sheet_rows,
+    write_dataframe_with_sql_compat,
+)
 
 SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
@@ -51,6 +58,12 @@ WRITE_SUMMARY_TAB = os.environ.get("INVENTORY_WRITE_SUMMARY", "1").strip() == "1
 WRITE_PRODUCT_DB = os.environ.get("INVENTORY_WRITE_PRODUCT_DB", "1").strip() == "1"
 WRITE_TOKEN_RECON = os.environ.get("INVENTORY_WRITE_TOKEN_RECON", "1").strip() == "1"
 USE_API_OWNER = os.environ.get("INVENTORY_USE_API_OWNER", "1").strip() == "1"
+TOKEN_LEDGER_PATH = Path("out/token_ledger_live.csv")
+PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
+SQL_TABLE_INVENTORY_SUMMARIES = "a_inventory_summaries"
+SQL_TABLE_INVENTORY_HISTORY = "a_inventory_history"
+SQL_TABLE_INVENTORY_SNAPSHOT_LATEST = "a_inventory_snapshot_latest"
 FOCUS_COLUMNS = [
     "asin",
     "fnsku",
@@ -68,6 +81,498 @@ FOCUS_COLUMNS = [
     "reserved_customer",
     "last_updated_time",
 ]
+
+INVENTORY_CONTRACT_COLUMNS = [
+    "timestamp_utc",
+    "asof_date",
+    "marketplace",
+    "sku",
+    "asin",
+    "available",
+    "inbound_working",
+    "inbound_shipped",
+    "inbound_receiving",
+    "inbound_total",
+    "unsellable",
+    "researching",
+    "reserved_transfers",
+    "reserved_processing",
+    "reserved_customer",
+    "total_quantity",
+    "last_updated_time",
+    "source",
+    "notes",
+]
+
+
+def _snapshot_timestamp_utc() -> str:
+    override = os.environ.get("H_SNAPSHOT_DATE", "").strip()
+    if override:
+        return f"{override}T00:00:00Z"
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _snapshot_date_from_timestamp(timestamp_utc: str) -> str:
+    return str(timestamp_utc).split("T", 1)[0]
+
+
+def _to_int(value) -> int:
+    try:
+        return int(float(str(value).strip()))
+    except Exception:
+        return 0
+
+
+def _to_bool(value: object, default: bool = False) -> bool:
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _parse_iso_utc(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _resolve_inventory_row_stale_hours() -> float:
+    raw = os.environ.get("A003_STOCK_ROW_STALE_HOURS", os.environ.get("H_STOCK_ROW_STALE_HOURS", "24"))
+    try:
+        return max(float(str(raw).strip() or "24"), 0.0)
+    except Exception:
+        return 24.0
+
+
+def _merge_stock_count_maps(base: Dict[str, int], incoming: Dict[str, int]) -> Dict[str, int]:
+    merged: Dict[str, int] = dict(base)
+    for sku, qty in incoming.items():
+        key = str(sku or "").strip().upper()
+        if not key:
+            continue
+        prev = int(merged.get(key, 0))
+        merged[key] = max(prev, int(qty))
+    return merged
+
+
+def _build_token_stock_maps_from_df(token_df: pd.DataFrame) -> Tuple[Dict[str, int], Dict[str, int]]:
+    if token_df is None or token_df.empty:
+        return {}, {}
+    sku_col = ""
+    for candidate in ("seller_sku", "sku", "SellerSKU", "seller-sku"):
+        if candidate in token_df.columns:
+            sku_col = candidate
+            break
+    status_col = ""
+    for candidate in ("status", "Status"):
+        if candidate in token_df.columns:
+            status_col = candidate
+            break
+    if not sku_col or not status_col:
+        return {}, {}
+    work = token_df[[sku_col, status_col]].copy()
+    work["sku_key"] = work[sku_col].astype(str).str.strip().str.upper()
+    work["status_key"] = work[status_col].astype(str).str.strip().str.lower()
+    work = work.loc[work["sku_key"].ne("")].copy()
+    if work.empty:
+        return {}, {}
+    token_available_by_sku: Dict[str, int] = {}
+    token_total_effective_by_sku: Dict[str, int] = {}
+    effective_statuses = {"available", "allocated", "unsellable", "research_pending", "returned_pending"}
+    available_counts = work.loc[work["status_key"].eq("available")].groupby("sku_key", as_index=False).size()
+    for _, row in available_counts.iterrows():
+        token_available_by_sku[str(row["sku_key"])] = int(row["size"])
+    effective_counts = work.loc[work["status_key"].isin(effective_statuses)].groupby("sku_key", as_index=False).size()
+    for _, row in effective_counts.iterrows():
+        token_total_effective_by_sku[str(row["sku_key"])] = int(row["size"])
+    return token_available_by_sku, token_total_effective_by_sku
+
+
+def _load_token_stock_maps(token_ledger_path: Path = TOKEN_LEDGER_PATH) -> Tuple[Dict[str, int], Dict[str, int]]:
+    if not token_ledger_path.exists():
+        return {}, {}
+    try:
+        max_attempts = max(int(float(os.environ.get("A003_TOKEN_LEDGER_READ_ATTEMPTS", "3") or "3")), 1)
+    except Exception:
+        max_attempts = 3
+    try:
+        retry_sleep = max(float(os.environ.get("A003_TOKEN_LEDGER_READ_RETRY_SEC", "0.25") or "0.25"), 0.0)
+    except Exception:
+        retry_sleep = 0.25
+
+    merged_available: Dict[str, int] = {}
+    merged_effective: Dict[str, int] = {}
+    for attempt in range(max_attempts):
+        stable_snapshot = True
+        stat_before = None
+        stat_after = None
+        try:
+            stat_before = token_ledger_path.stat()
+        except Exception:
+            stat_before = None
+        try:
+            token_df = pd.read_csv(token_ledger_path, dtype=str).fillna("")
+        except Exception:
+            token_df = pd.DataFrame()
+        try:
+            stat_after = token_ledger_path.stat()
+        except Exception:
+            stat_after = None
+        if stat_before is None or stat_after is None:
+            stable_snapshot = False
+        else:
+            before_ns = int(getattr(stat_before, "st_mtime_ns", int(stat_before.st_mtime * 1_000_000_000)))
+            after_ns = int(getattr(stat_after, "st_mtime_ns", int(stat_after.st_mtime * 1_000_000_000)))
+            stable_snapshot = (before_ns == after_ns) and (int(stat_before.st_size) == int(stat_after.st_size))
+
+        attempt_available, attempt_effective = _build_token_stock_maps_from_df(token_df)
+        merged_available = _merge_stock_count_maps(merged_available, attempt_available)
+        merged_effective = _merge_stock_count_maps(merged_effective, attempt_effective)
+        if stable_snapshot:
+            break
+        if attempt < (max_attempts - 1) and retry_sleep > 0:
+            time.sleep(retry_sleep)
+    return merged_available, merged_effective
+
+
+def _apply_inventory_stale_token_floor(
+    df: pd.DataFrame,
+    *,
+    scope_skus: Set[str] | None = None,
+    now_utc: datetime | None = None,
+) -> Tuple[pd.DataFrame, Dict[str, object]]:
+    if df is None or df.empty:
+        return df if df is not None else pd.DataFrame(), {
+            "row_stale_hours": _resolve_inventory_row_stale_hours(),
+            "stale_rows": 0,
+            "stale_scope_rows": 0,
+            "token_floor_rows": 0,
+            "stale_scope_token_gap_rows": 0,
+            "stale_scope_sample": [],
+            "token_floor_sample": [],
+        }
+
+    work = df.copy()
+    for col in ("seller_sku", "last_updated_time", "available", "total_quantity", "in_stock_supply_quantity"):
+        if col not in work.columns:
+            work[col] = ""
+
+    probe_now = now_utc or datetime.now(timezone.utc)
+    stale_hours = _resolve_inventory_row_stale_hours()
+    token_floor_enabled = _to_bool(os.environ.get("A003_STALE_TOKEN_FLOOR_ENABLED", "1"), default=True)
+    scope = {str(v).strip().upper() for v in (scope_skus or set()) if str(v).strip()}
+
+    token_available_by_sku: Dict[str, int] = {}
+    token_total_effective_by_sku: Dict[str, int] = {}
+    if token_floor_enabled:
+        token_available_by_sku, token_total_effective_by_sku = _load_token_stock_maps()
+
+    stale_rows = 0
+    stale_scope_rows = 0
+    token_floor_rows = 0
+    stale_scope_token_gap_rows = 0
+    stale_scope_sample: List[str] = []
+    token_floor_sample: List[str] = []
+    age_hours_col: List[str] = []
+    status_col: List[str] = []
+    stale_flag_col: List[str] = []
+    adjustment_col: List[str] = []
+    source_col: List[str] = []
+    token_available_col: List[str] = []
+    token_total_effective_col: List[str] = []
+
+    for idx, row in work.iterrows():
+        sku = str(row.get("seller_sku", "")).strip().upper()
+        in_scope = (not scope) or (sku in scope)
+        updated_dt = _parse_iso_utc(row.get("last_updated_time", ""))
+        status_text = "UNKNOWN"
+        age_hours_text = ""
+        is_stale = True
+        if updated_dt is not None:
+            age_hours = max((probe_now - updated_dt).total_seconds() / 3600.0, 0.0)
+            age_hours_text = f"{age_hours:.2f}"
+            status_text = "STALE" if age_hours >= stale_hours else "FRESH"
+            is_stale = status_text == "STALE"
+        if is_stale:
+            stale_rows += 1
+        if is_stale and in_scope:
+            stale_scope_rows += 1
+            if len(stale_scope_sample) < 5 and sku:
+                stale_scope_sample.append(sku)
+
+        token_available = int(token_available_by_sku.get(sku, 0)) if token_floor_enabled else 0
+        token_total_effective = int(token_total_effective_by_sku.get(sku, 0)) if token_floor_enabled else 0
+        adjustment = ""
+        source = "SPAPI"
+
+        if is_stale and in_scope:
+            source = "SPAPI_STALE"
+            if token_floor_enabled:
+                api_available = _to_int(row.get("available", 0))
+                api_total = _to_int(row.get("total_quantity", 0))
+                floor_available = max(api_available, token_available)
+                floor_total = max(api_total, token_total_effective, floor_available)
+                if floor_available > api_available or floor_total > api_total:
+                    work.at[idx, "available"] = int(floor_available)
+                    work.at[idx, "in_stock_supply_quantity"] = int(floor_available)
+                    work.at[idx, "total_quantity"] = int(floor_total)
+                    adjustment = "TOKEN_FLOOR"
+                    source = "SPAPI_TOKEN_FLOOR"
+                    token_floor_rows += 1
+                    if len(token_floor_sample) < 5 and sku:
+                        token_floor_sample.append(sku)
+                final_available = _to_int(work.at[idx, "available"])
+                if token_available > final_available:
+                    stale_scope_token_gap_rows += 1
+
+        age_hours_col.append(age_hours_text)
+        status_col.append(status_text)
+        stale_flag_col.append("1" if is_stale else "0")
+        adjustment_col.append(adjustment)
+        source_col.append(source)
+        token_available_col.append(str(token_available))
+        token_total_effective_col.append(str(token_total_effective))
+
+    work["row_last_updated_age_hours"] = age_hours_col
+    work["row_last_updated_status"] = status_col
+    work["row_last_updated_is_stale"] = stale_flag_col
+    work["row_stock_truth_adjustment"] = adjustment_col
+    work["row_stock_truth_source"] = source_col
+    work["row_token_available_units"] = token_available_col
+    work["row_token_total_effective_units"] = token_total_effective_col
+
+    summary = {
+        "row_stale_hours": stale_hours,
+        "stale_rows": stale_rows,
+        "stale_scope_rows": stale_scope_rows,
+        "token_floor_rows": token_floor_rows,
+        "stale_scope_token_gap_rows": stale_scope_token_gap_rows,
+        "stale_scope_sample": stale_scope_sample,
+        "token_floor_sample": token_floor_sample,
+        "scope_count": len(scope),
+        "token_floor_enabled": "1" if token_floor_enabled else "0",
+    }
+    return work, summary
+
+
+def _to_inventory_contract(df: pd.DataFrame, snapshot_timestamp_utc: str) -> pd.DataFrame:
+    snapshot_date = _snapshot_date_from_timestamp(snapshot_timestamp_utc)
+    if df is None or df.empty:
+        return pd.DataFrame(columns=INVENTORY_CONTRACT_COLUMNS)
+
+    inv = df.copy()
+    if "seller_sku" not in inv.columns and "sku" in inv.columns:
+        inv["seller_sku"] = inv["sku"]
+    if "seller_sku" not in inv.columns:
+        inv["seller_sku"] = ""
+    if "asin" not in inv.columns:
+        inv["asin"] = ""
+    if "last_updated_time" not in inv.columns:
+        inv["last_updated_time"] = ""
+    for col in (
+        "available",
+        "inbound_working",
+        "inbound_shipped",
+        "inbound_receiving",
+        "unsellable",
+        "researching",
+        "reserved_transfers",
+        "reserved_processing",
+        "reserved_customer",
+        "total_quantity",
+    ):
+        if col not in inv.columns:
+            inv[col] = 0
+
+    contract = pd.DataFrame(index=inv.index.copy())
+    contract["timestamp_utc"] = snapshot_timestamp_utc
+    contract["asof_date"] = snapshot_date
+    contract["marketplace"] = "UK"
+    contract["sku"] = inv["seller_sku"].astype(str)
+    contract["asin"] = inv["asin"].astype(str)
+    contract["available"] = inv["available"].apply(_to_int)
+    contract["inbound_working"] = inv["inbound_working"].apply(_to_int)
+    contract["inbound_shipped"] = inv["inbound_shipped"].apply(_to_int)
+    contract["inbound_receiving"] = inv["inbound_receiving"].apply(_to_int)
+    contract["inbound_total"] = (
+        contract["inbound_working"] + contract["inbound_shipped"] + contract["inbound_receiving"]
+    )
+    contract["unsellable"] = inv["unsellable"].apply(_to_int)
+    contract["researching"] = inv["researching"].apply(_to_int)
+    contract["reserved_transfers"] = inv["reserved_transfers"].apply(_to_int)
+    contract["reserved_processing"] = inv["reserved_processing"].apply(_to_int)
+    contract["reserved_customer"] = inv["reserved_customer"].apply(_to_int)
+    contract["total_quantity"] = inv["total_quantity"].apply(_to_int)
+    contract["last_updated_time"] = inv["last_updated_time"].astype(str)
+    if "row_stock_truth_source" in inv.columns:
+        source_series = inv["row_stock_truth_source"].astype(str).str.strip().replace("", "SPAPI")
+        contract["source"] = source_series
+    else:
+        contract["source"] = "SPAPI"
+    if "row_stock_truth_adjustment" in inv.columns:
+        contract["notes"] = inv["row_stock_truth_adjustment"].astype(str).str.strip()
+    else:
+        contract["notes"] = ""
+    return contract[INVENTORY_CONTRACT_COLUMNS]
+
+
+def _rewrite_inventory_history_today(contract: pd.DataFrame, snapshot_date: str) -> pd.DataFrame:
+    history_path = Path("out/inventory_history.csv")
+    if history_path.exists():
+        try:
+            history = pd.read_csv(history_path, dtype=str).fillna("")
+        except Exception:
+            history = pd.DataFrame(columns=INVENTORY_CONTRACT_COLUMNS)
+    else:
+        history = pd.DataFrame(columns=INVENTORY_CONTRACT_COLUMNS)
+
+    for col in INVENTORY_CONTRACT_COLUMNS:
+        if col not in history.columns:
+            history[col] = ""
+    history = history[INVENTORY_CONTRACT_COLUMNS]
+
+    def persist_history(history_df: pd.DataFrame) -> None:
+        write_csv_with_compat(
+            history_df,
+            path_or_rel="inventory_history.csv",
+            default_system="shared",
+            index=False,
+            mirror_legacy=True,
+        )
+        write_dataframe_with_sql_compat(
+            history_df,
+            Path("out/inventory_history.csv"),
+            SQL_TABLE_INVENTORY_HISTORY,
+        )
+
+    if contract is None or contract.empty:
+        persist_history(history)
+        return history
+
+    snapshot = contract.copy()
+    for col in INVENTORY_CONTRACT_COLUMNS:
+        if col not in snapshot.columns:
+            snapshot[col] = ""
+    snapshot = snapshot[INVENTORY_CONTRACT_COLUMNS]
+    snapshot["asof_date"] = snapshot["asof_date"].astype(str).str.strip()
+
+    key_cols = ["asof_date", "sku", "marketplace"]
+    snapshot_today = snapshot.loc[snapshot["asof_date"].eq(snapshot_date)].copy()
+    snapshot_today["_stable_order"] = list(range(len(snapshot_today.index)))
+    if "timestamp_utc" in snapshot_today.columns:
+        snapshot_today["_order_ts"] = pd.to_datetime(snapshot_today["timestamp_utc"], errors="coerce", utc=True)
+    else:
+        snapshot_today["_order_ts"] = pd.NaT
+    snapshot_today = snapshot_today.sort_values(
+        key_cols + ["_order_ts", "_stable_order"],
+        ascending=[True, True, True, False, True],
+        kind="stable",
+    )
+    snapshot_today = snapshot_today.drop_duplicates(subset=key_cols, keep="first").copy()
+    snapshot_today = snapshot_today.drop(columns=["_stable_order", "_order_ts"], errors="ignore")
+
+    history["asof_date"] = history["asof_date"].astype(str).str.strip()
+    for col in ("sku", "marketplace"):
+        history[col] = history[col].astype(str).str.strip()
+        snapshot_today[col] = snapshot_today[col].astype(str).str.strip()
+
+    marketplaces_today = {
+        str(v).strip().upper()
+        for v in snapshot_today.get("marketplace", pd.Series([], dtype=str)).astype(str).tolist()
+        if str(v).strip()
+    }
+    history_marketplace_upper = history["marketplace"].astype(str).str.upper()
+    history_keep_mask = ~history["asof_date"].eq(snapshot_date)
+    if marketplaces_today:
+        history_keep_mask = history_keep_mask | ~history_marketplace_upper.isin(marketplaces_today)
+    history_keep = history.loc[history_keep_mask].copy()
+
+    merged = pd.concat([history_keep, snapshot_today], ignore_index=True)
+    merged = merged[INVENTORY_CONTRACT_COLUMNS]
+    persist_history(merged)
+    return merged
+
+
+def _persist_inventory_contract_outputs(df: pd.DataFrame) -> tuple[str, str, int]:
+    out_dir = Path("out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_timestamp_utc = _snapshot_timestamp_utc()
+    snapshot_date = _snapshot_date_from_timestamp(snapshot_timestamp_utc)
+    contract = _to_inventory_contract(df, snapshot_timestamp_utc)
+
+    snapshot_dated_path = out_dir / f"inventory_snapshot_{snapshot_date}.csv"
+    snapshot_latest_path = out_dir / "inventory_snapshot_latest.csv"
+    contract.to_csv(snapshot_dated_path, index=False)
+    write_dataframe_with_sql_compat(contract, snapshot_latest_path, SQL_TABLE_INVENTORY_SNAPSHOT_LATEST)
+    history = _rewrite_inventory_history_today(contract, snapshot_date)
+    print(
+        f"Persisted inventory contract outputs rows={len(contract)} "
+        f"snapshot={snapshot_dated_path} latest={snapshot_latest_path} history_rows={len(history)}"
+    )
+    return str(snapshot_dated_path), str(snapshot_latest_path), int(len(history))
+
+
+def _mtime_seconds(path: Path) -> float | None:
+    try:
+        if not path.exists():
+            return None
+        return float(path.stat().st_mtime)
+    except Exception:
+        return None
+
+
+def _collect_inventory_direct(active_skus: Set[str], sku_filter: Set[str]) -> tuple[pd.DataFrame, int, int]:
+    token = get_lwa_access_token()
+    records: List[Dict[str, object]] = []
+    next_token = None
+    page = 0
+    while True:
+        page += 1
+        batch, next_token = fetch_inventory_summaries(
+            marketplace_id=MARKETPLACE_ID,
+            access_token=token,
+            next_token=next_token,
+        )
+        records.extend(batch)
+        if next_token and (LIMIT_PAGES == 0 or page < LIMIT_PAGES):
+            time.sleep(SLEEP_SEC)
+            continue
+        break
+
+    missing_count = 0
+    if sku_filter:
+        seen_skus = {(r or {}).get("sellerSku", "") for r in records}
+        missing_skus = [s for s in sku_filter if s not in seen_skus]
+        if missing_skus:
+            batch_size = 40
+            for i in range(0, len(missing_skus), batch_size):
+                chunk = missing_skus[i : i + batch_size]
+                page += 1
+                chunk_batch, _ = fetch_inventory_summaries(
+                    marketplace_id=MARKETPLACE_ID,
+                    access_token=token,
+                    seller_skus=chunk,
+                )
+                records.extend(chunk_batch)
+                time.sleep(SLEEP_SEC)
+        seen_skus = {(r or {}).get("sellerSku", "") for r in records}
+        missing_skus = [s for s in sku_filter if s not in seen_skus]
+        missing_count = len(missing_skus)
+
+    filtered = records if INCLUDE_INACTIVE or not active_skus else [r for r in records if (r or {}).get("sellerSku", "") in active_skus]
+    df = records_to_df(filtered)
+    return df, int(missing_count), int(page)
 
 
 def load_active_skus(csv_path: Path) -> Set[str]:
@@ -185,8 +690,15 @@ def export_product_db(sheet: gspread.Spreadsheet) -> None:
     rows = ws.get_all_values()
     if not rows:
         return
+    df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
     Path("out").mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows[1:], columns=rows[0]).to_csv("out/product_db_preview.csv", index=False)
+    write_dataframe_with_sql_compat(
+        df,
+        PRODUCT_DB_PREVIEW,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
     print("Saved Product_DB preview to out/product_db_preview.csv")
 
 
@@ -199,6 +711,9 @@ def update_product_db_stock(sheet: gspread.Spreadsheet, df: pd.DataFrame, run_ts
     prod_rows = ws.get_all_values()
     if not prod_rows:
         return
+    prod_rows, repaired_headers = coalesce_duplicate_header_rows(prod_rows)
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers before A003 update: " + ",".join(repaired_headers))
     headers = prod_rows[0]
     idx_map = {h: i for i, h in enumerate(headers)}
     if "last_updated_A003" not in idx_map:
@@ -297,7 +812,12 @@ def update_local_product_db_stock(product_db_path: Path, df: pd.DataFrame, run_t
         print(f"Skipped local Product DB refresh (missing file): {product_db_path}")
         return 0
     try:
-        prod = pd.read_csv(product_db_path, dtype=str, keep_default_na=False)
+        with product_db_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.reader(handle))
+        repaired_rows, repaired_headers = coalesce_duplicate_header_rows(rows)
+        prod = pd.DataFrame(repaired_rows[1:], columns=repaired_rows[0]) if repaired_rows else pd.DataFrame()
+        if repaired_headers:
+            print("Repaired duplicate Product DB headers before local A003 refresh: " + ",".join(repaired_headers))
     except Exception as exc:
         print(f"Skipped local Product DB refresh (read error): {exc}")
         return 0
@@ -693,6 +1213,12 @@ def main() -> int:
         if not INCLUDE_INACTIVE:
             active_skus = sku_filter.copy()
         if USE_API_OWNER:
+            owner_paths = [
+                Path("out/inventory_summaries.csv"),
+                Path("out/inventory_snapshot_latest.csv"),
+                Path("out/inventory_history.csv"),
+            ]
+            owner_before = {str(p): _mtime_seconds(p) for p in owner_paths}
             prev_dataset_env = os.environ.get("API_COLLECTION_DATASETS")
             os.environ["API_COLLECTION_DATASETS"] = "inventory_inbound"
             try:
@@ -714,55 +1240,51 @@ def main() -> int:
             if sku_filter and "seller_sku" in df.columns:
                 seen_skus = set(df["seller_sku"].astype(str).tolist())
                 missing_count = len([s for s in sku_filter if s not in seen_skus])
-        else:
-            token = get_lwa_access_token()
-            records: List[Dict[str, object]] = []
-            next_token = None
-            page = 0
-            while True:
-                page += 1
-                attempts_used = page
-                batch, next_token = fetch_inventory_summaries(
-                    marketplace_id=MARKETPLACE_ID,
-                    access_token=token,
-                    next_token=next_token,
-                )
-                records.extend(batch)
-                if next_token and (LIMIT_PAGES == 0 or page < LIMIT_PAGES):
-                    time.sleep(SLEEP_SEC)
+            owner_after = {str(p): _mtime_seconds(p) for p in owner_paths}
+            owner_refreshed = False
+            for key, after_val in owner_after.items():
+                before_val = owner_before.get(key)
+                if after_val is None:
                     continue
-                break
-            if sku_filter:
-                seen_skus = {(r or {}).get("sellerSku", "") for r in records}
-                missing_skus = [s for s in sku_filter if s not in seen_skus]
-                if missing_skus:
-                    batch_size = 40
-                    for i in range(0, len(missing_skus), batch_size):
-                        chunk = missing_skus[i : i + batch_size]
-                        page += 1
-                        attempts_used = page
-                        chunk_batch, _ = fetch_inventory_summaries(
-                            marketplace_id=MARKETPLACE_ID,
-                            access_token=token,
-                            seller_skus=chunk,
-                        )
-                        records.extend(chunk_batch)
-                        time.sleep(SLEEP_SEC)
-                # Recompute missing after targeted fetches
-                seen_skus = {(r or {}).get("sellerSku", "") for r in records}
-                missing_skus = [s for s in sku_filter if s not in seen_skus]
-                missing_count = len(missing_skus)
+                if before_val is None or after_val > (before_val + 1e-6):
+                    owner_refreshed = True
+                    break
+            if not owner_refreshed:
+                print(
+                    "[A003] WARN API owner reported success but inventory artifacts were not refreshed; "
+                    "falling back to direct collector."
+                )
+                df, missing_count, direct_pages = _collect_inventory_direct(active_skus, sku_filter)
+                attempts_used = max(int(attempts_used), int(direct_pages))
+        else:
+            df, missing_count, direct_pages = _collect_inventory_direct(active_skus, sku_filter)
+            attempts_used = int(direct_pages)
+        df, stale_guard_summary = _apply_inventory_stale_token_floor(
+            df,
+            scope_skus=sku_filter,
+            now_utc=datetime.now(timezone.utc),
+        )
+        print(
+            "[A003] stale_stock_guard "
+            f"row_stale_hours={stale_guard_summary.get('row_stale_hours', '')} "
+            f"scope_count={stale_guard_summary.get('scope_count', 0)} "
+            f"stale_rows={stale_guard_summary.get('stale_rows', 0)} "
+            f"stale_scope_rows={stale_guard_summary.get('stale_scope_rows', 0)} "
+            f"token_floor_rows={stale_guard_summary.get('token_floor_rows', 0)} "
+            f"stale_scope_token_gap_rows={stale_guard_summary.get('stale_scope_token_gap_rows', 0)} "
+            f"token_floor_enabled={stale_guard_summary.get('token_floor_enabled', '0')} "
+            f"stale_scope_sample={','.join([str(v) for v in stale_guard_summary.get('stale_scope_sample', [])])} "
+            f"token_floor_sample={','.join([str(v) for v in stale_guard_summary.get('token_floor_sample', [])])}"
+        )
 
-            filtered = records if INCLUDE_INACTIVE or not active_skus else [r for r in records if (r or {}).get("sellerSku", "") in active_skus]
-            df = records_to_df(filtered)
         row_count = len(df)
         col_count = len(df.columns)
 
         out_path = Path("out/inventory_summaries.csv")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out_path, index=False)
+        write_dataframe_with_sql_compat(df, out_path, SQL_TABLE_INVENTORY_SUMMARIES)
         snapshot_path = str(out_path)
         print(f"Saved inventory data to {out_path}")
+        _persist_inventory_contract_outputs(df)
         if missing_count > 0:
             print(f"Warning: missing {missing_count} active SKUs from inventory API (kept in alert).")
 

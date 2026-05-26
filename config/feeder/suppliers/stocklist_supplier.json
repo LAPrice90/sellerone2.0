@@ -1,0 +1,11 @@
+{
+  "supplier_id": "stocklist_supplier",
+  "supplier_name": "Stocklist Supplier",
+  "source_url": "local://reference/Backtest Strategy Ideas/Stocklist.xlsx",
+  "source_type": "xlsx",
+  "default_vat_rate": "20",
+  "currency": "GBP",
+  "refresh_hours": 24,
+  "skip_sku_suffixes": [],
+  "source_path_override": "reference/Backtest Strategy Ideas/Stocklist.xlsx"
+}

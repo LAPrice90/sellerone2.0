@@ -7,11 +7,31 @@ Build operational outputs for tokens:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
+import sys
+from typing import TYPE_CHECKING
 
-import gspread
 import pandas as pd
-from scripts.core.out_paths import resolve_compat_path
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+try:
+    from scripts.core.out_paths import resolve_compat_path
+    from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_tables_from_dataframes
+except ModuleNotFoundError:
+    from core.out_paths import resolve_compat_path
+    from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_tables_from_dataframes
+
+try:
+    import gspread
+except Exception:
+    gspread = None
+
+if TYPE_CHECKING:
+    import gspread as gspread_types
 
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 MOVEMENT_TAB = "Token_Movement_Log"
@@ -20,11 +40,26 @@ EVENTS_TAB = "Token_Events"
 
 OUT_MOVEMENT = Path("out/token_movement_log.csv")
 OUT_COGS = Path("out/order_cogs_from_tokens.csv")
+OUT_EVENTS = Path("out/token_events.csv")
+SQL_TABLE_MOVEMENT = "b_token_movement_log"
+SQL_TABLE_COGS = "b_order_cogs_from_tokens"
 TOKEN_LEDGER_REL = "token_ledger_live.csv"
 TOKEN_COGS_LEDGER = Path("out/token_cogs_ledger.csv")
+WRITE_SHEETS = (
+    os.environ.get(
+        "TOKEN_OPS_WRITE_SHEETS",
+        os.environ.get(
+            "TOKEN_EVENTS_WRITE_SHEETS",
+            os.environ.get("STOCK_EVENTS_WRITE_SHEETS", "0"),
+        ),
+    ).strip()
+    == "1"
+)
 
 
-def get_gspread_client() -> gspread.Client:
+def get_gspread_client() -> "gspread_types.Client":
+    if gspread is None:
+        raise RuntimeError("gspread not available")
     cred_path = Path("secrets/sellerone-2-0d3642b951a0.json")
     return gspread.service_account(filename=str(cred_path))
 
@@ -36,7 +71,7 @@ def parse_float(value: str) -> float:
         return 0.0
 
 
-def load_events() -> pd.DataFrame:
+def load_events_from_sheet() -> pd.DataFrame:
     client = get_gspread_client()
     sheet = client.open_by_key(TOKENS_SHEET_ID)
     try:
@@ -47,6 +82,13 @@ def load_events() -> pd.DataFrame:
     if not values:
         return pd.DataFrame()
     return pd.DataFrame(values[1:], columns=values[0]).fillna("")
+
+
+def load_events_local() -> pd.DataFrame:
+    if not OUT_EVENTS.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(OUT_EVENTS, dtype=str).fillna("")
+    return df
 
 
 def load_ledger_costs() -> pd.DataFrame:
@@ -81,7 +123,7 @@ def load_token_cogs_ledger() -> pd.DataFrame:
     return cogs
 
 
-def write_sheet(sheet: gspread.Spreadsheet, tab_name: str, df: pd.DataFrame) -> None:
+def write_sheet(sheet: "gspread_types.Spreadsheet", tab_name: str, df: pd.DataFrame) -> None:
     payload = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
     try:
         ws = sheet.worksheet(tab_name)
@@ -92,15 +134,60 @@ def write_sheet(sheet: gspread.Spreadsheet, tab_name: str, df: pd.DataFrame) -> 
     ws.update(range_name="A1", values=payload)
 
 
+def _write_outputs(movement: pd.DataFrame, cogs: pd.DataFrame) -> dict[str, object]:
+    mode = parse_storage_mode(os.environ.get("SELLERONE_STORAGE_MODE", "csv"))
+    sql_rows = {"movement": 0, "cogs": 0}
+
+    def write_csv_exports() -> None:
+        OUT_MOVEMENT.parent.mkdir(parents=True, exist_ok=True)
+        movement.to_csv(OUT_MOVEMENT, index=False)
+        OUT_COGS.parent.mkdir(parents=True, exist_ok=True)
+        cogs.to_csv(OUT_COGS, index=False)
+
+    def write_sql_tables() -> None:
+        config = StorageConfig.from_env()
+        store = connect_store(config)
+        try:
+            results = replace_tables_from_dataframes(
+                store,
+                {
+                    SQL_TABLE_MOVEMENT: movement,
+                    SQL_TABLE_COGS: cogs,
+                },
+            )
+        finally:
+            store.close()
+        for result in results:
+            table = str(result["table"])
+            if table == SQL_TABLE_MOVEMENT:
+                sql_rows["movement"] = int(result["rows"])
+            elif table == SQL_TABLE_COGS:
+                sql_rows["cogs"] = int(result["rows"])
+
+    if mode == "sql_primary_csv_export":
+        write_sql_tables()
+        write_csv_exports()
+    elif mode == "sql_shadow":
+        write_csv_exports()
+        write_sql_tables()
+    else:
+        write_csv_exports()
+
+    return {
+        "mode": mode,
+        "sql_tables": [SQL_TABLE_MOVEMENT, SQL_TABLE_COGS] if any(sql_rows.values()) else [],
+        "sql_movement_rows": sql_rows["movement"],
+        "sql_cogs_rows": sql_rows["cogs"],
+    }
+
+
 def main() -> None:
-    movement = load_events()
+    use_sheets = bool(WRITE_SHEETS and gspread is not None)
+    movement = load_events_from_sheet() if use_sheets else load_events_local()
     if movement.empty:
         print({"status": "skip", "reason": "no_token_events"})
         return
     movement = movement.sort_values(by=["event_ts", "event_type", "sku"], na_position="last")
-
-    OUT_MOVEMENT.parent.mkdir(parents=True, exist_ok=True)
-    movement.to_csv(OUT_MOVEMENT, index=False)
 
     # Build COGS hook from token COGS ledger (preferred)
     cogs = load_token_cogs_ledger()
@@ -135,13 +222,13 @@ def main() -> None:
         else:
             cogs = pd.DataFrame(columns=["order_id", "sku", "currency", "quantity", "cogs_total"])
 
-    OUT_COGS.parent.mkdir(parents=True, exist_ok=True)
-    cogs.to_csv(OUT_COGS, index=False)
+    output = _write_outputs(movement, cogs)
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(TOKENS_SHEET_ID)
-    write_sheet(sheet, MOVEMENT_TAB, movement)
-    write_sheet(sheet, COGS_TAB, cogs)
+    if use_sheets:
+        client = get_gspread_client()
+        sheet = client.open_by_key(TOKENS_SHEET_ID)
+        write_sheet(sheet, MOVEMENT_TAB, movement)
+        write_sheet(sheet, COGS_TAB, cogs)
 
     print(
         {
@@ -150,8 +237,10 @@ def main() -> None:
             "cogs_rows": len(cogs),
             "snapshot": str(OUT_MOVEMENT),
             "cogs_snapshot": str(OUT_COGS),
-            "tabs": [MOVEMENT_TAB, COGS_TAB],
+            "tabs": [MOVEMENT_TAB, COGS_TAB] if use_sheets else [],
+            "write_sheets": use_sheets,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            **output,
         }
     )
 

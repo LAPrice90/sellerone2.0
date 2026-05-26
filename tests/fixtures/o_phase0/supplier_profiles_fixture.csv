@@ -1,0 +1,7 @@
+supplier_code,supplier_name,shipping_charge_rule,free_shipping_threshold,current_basket_value_gbp,can_backorder,lead_time_profile_type,order_friction_level
+SUP-A,Alpha Supply,flat_7_95,100.00,54.20,0,standard,low
+SUP-B,Beta Wholesale,flat_5_00,80.00,25.00,0,standard,low
+SUP-C,Cappa Trade,flat_9_50,120.00,14.00,0,standard,medium
+SUP-D,Delta Bulk,threshold_80_then_free,400.00,390.00,1,long_lead,high
+SUP-E,Echo Global,flat_6_00,150.00,42.50,1,backorder_common,medium
+SUP-F,Foxtrot Imports,threshold_40_then_free,200.00,196.50,0,standard,medium

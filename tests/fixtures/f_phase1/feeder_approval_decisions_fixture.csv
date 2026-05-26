@@ -1,0 +1,2 @@
+decision_utc,event_id,candidate_id,feeder_candidate_id,decision_action,final_decision_status,decision_source,recommendation_status,recommended_test_qty,actor,decision_note,source_row_hash,source_file_path,source_seen_at_utc
+2026-04-07T18:35:00Z,FDEC-fixture1,F-SHURE-1,F-SHURE-1,seed_pending_review,pending_review,system_seed,approve_test_buy,5,system,initial_pending_review_seed,hash-1,tests/raw.csv,2026-04-07T18:20:00Z

@@ -14,13 +14,30 @@ DATA_DIR = Path(os.environ.get("PHASE1_DATA_DIR", str(DEFAULT_DATA_DIR)))
 DEFAULT_LOCK_PATH = ROOT / "out" / "phase1.lock"
 LOCK_PATH = Path(os.environ.get("PHASE1_LOCK_PATH", str(DEFAULT_LOCK_PATH)))
 LOCK_EVENTS_PATH = ROOT / "out" / "systems" / "H" / "live" / "phase1_lock_events.log"
+LOCK_EVENTS_ROTATE_MAX_BYTES = max(
+    int(float(os.environ.get("PHASE1_LOCK_EVENTS_ROTATE_MAX_MB", "32") or "32") * 1024 * 1024),
+    512 * 1024,
+)
+LOCK_EVENTS_ROTATE_MAX_FILES = max(
+    int(float(os.environ.get("PHASE1_LOCK_EVENTS_ROTATE_MAX_FILES", "6") or "6")),
+    2,
+)
+LOCK_EVENTS_DEDUP_INTERVAL_SECONDS = max(
+    float(os.environ.get("PHASE1_LOCK_EVENTS_DEDUP_SECONDS", "5.0") or "5.0"),
+    0.0,
+)
 H_SUPPRESSION_CASES_PATH = ROOT / "out" / "h_suppression_cases.csv"
 H_SUPPRESSION_THRESHOLD_MEMORY_PATH = ROOT / "out" / "h_suppression_threshold_memory.csv"
 H_SUPPRESSION_REACTIVATION_LOG_PATH = ROOT / "out" / "h_suppression_reactivation_log.csv"
+H_CEILING_EVENTS_PATH = ROOT / "out" / "h_ceiling_events.csv"
+H_STRATEGY_OUTCOME_LOG_PATH = ROOT / "out" / "h_strategy_outcome_log.csv"
+H_STRATEGY_OUTCOME_DAILY_PATH = ROOT / "out" / "h_strategy_outcome_daily.csv"
+H_STRATEGY_CONTROL_MEMORY_PATH = ROOT / "out" / "h_strategy_control_memory.csv"
 PHASE1_LOCK_FORCE_STALE_SECONDS = max(
     float(os.environ.get("PHASE1_LOCK_FORCE_STALE_SECONDS", "120") or 120.0),
     1.0,
 )
+_LOCK_EVENT_DEDUP_CACHE: Dict[str, float] = {}
 
 
 # Phase 1 table registry from the current phase_1.md spec.
@@ -214,6 +231,17 @@ PHASE1_TABLE_SCHEMAS: Dict[str, List[str]] = {
         "last_buy_box_state",
         "updated_utc",
     ],
+    "strategy_control_memory": [
+        "sku",
+        "hold_until_utc",
+        "retry_budget_remaining",
+        "undercut_streak_count",
+        "last_state",
+        "last_target_price_gbp",
+        "last_competitor_lowest_price_gbp",
+        "last_stop_rule_code",
+        "updated_utc",
+    ],
     "sku_phase_transition_log": [
         "event_ts_utc",
         "sku",
@@ -245,6 +273,7 @@ UPSERT_TABLE_KEYS: Dict[str, List[str]] = {
     "sku_daily_intel": ["date_utc", "sku"],
     "sku_phase_state": ["sku"],
     "suppression_threshold_memory": ["sku"],
+    "strategy_control_memory": ["sku"],
 }
 
 SUPPRESSION_CASES_SCHEMA: List[str] = [
@@ -281,6 +310,89 @@ SUPPRESSION_REACTIVATION_LOG_SCHEMA: List[str] = [
     "reason_codes_json",
 ]
 
+H_CEILING_EVENTS_SCHEMA: List[str] = [
+    "event_ts_utc",
+    "run_id",
+    "sku",
+    "ceiling_event_id",
+    "compliance_ceiling_gbp",
+    "eligibility_ceiling_gbp",
+    "demand_ceiling_gbp",
+    "suppression_ceiling_gbp",
+    "true_binding_ceiling_gbp",
+    "true_binding_ceiling_type",
+    "target_price_gbp",
+    "hard_floor_gbp",
+    "ceiling_conflict_flag",
+    "reason_codes_json",
+]
+
+H_STRATEGY_OUTCOME_LOG_SCHEMA: List[str] = [
+    "event_ts_utc",
+    "run_id",
+    "sku",
+    "asin",
+    "scenario_type",
+    "chosen_tactic",
+    "buy_box_state_before",
+    "buy_box_state_after",
+    "seller_count",
+    "lowest_price_1_gbp",
+    "lowest_price_2_gbp",
+    "lowest_price_3_gbp",
+    "our_price_before_gbp",
+    "target_price_gbp",
+    "price_written_gbp",
+    "hold_until_utc",
+    "response_window_minutes",
+    "retry_budget_remaining",
+    "stop_rule_code",
+    "writer_outcome",
+    "tactic_success_state",
+    "reason_codes_json",
+    "tactic_case_id",
+]
+
+H_STRATEGY_OUTCOME_DAILY_SCHEMA: List[str] = [
+    "asof_date",
+    "scenario_type",
+    "chosen_tactic",
+    "decision_rows",
+    "applied_rows",
+    "no_write_rows",
+    "resolved_rows",
+    "pending_rows",
+    "success_rows",
+    "failed_rows",
+    "expired_rows",
+    "aborted_rows",
+    "success_rate_pct",
+    "failed_rate_pct",
+    "sample_min_rows",
+    "provisional_sample_flag",
+    "avg_seller_count",
+    "avg_price_gap_to_lowest_gbp",
+    "below_break_even_rows",
+    "at_floor_rows",
+    "notes",
+]
+
+H_STRATEGY_OUTCOME_DAILY_ZERO_FILL_COLUMNS: List[str] = [
+    "decision_rows",
+    "applied_rows",
+    "no_write_rows",
+    "resolved_rows",
+    "pending_rows",
+    "success_rows",
+    "failed_rows",
+    "expired_rows",
+    "aborted_rows",
+    "sample_min_rows",
+    "provisional_sample_flag",
+    "below_break_even_rows",
+    "at_floor_rows",
+]
+
 
 def phase1_table_path(table_name: str) -> Path:
     env_override = str(os.environ.get("PHASE1_DATA_DIR", "") or "").strip()
@@ -307,11 +419,69 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _rotate_log_file(path: Path, *, max_bytes: int, max_files: int) -> bool:
+    if max_bytes <= 0 or max_files <= 1:
+        return False
+    try:
+        if not path.exists():
+            return False
+        if int(path.stat().st_size) < int(max_bytes):
+            return False
+    except Exception:
+        return False
+    try:
+        oldest = Path(f"{path}.{max_files}")
+        if oldest.exists():
+            oldest.unlink(missing_ok=True)
+        for idx in range(max_files - 1, 0, -1):
+            src = Path(f"{path}.{idx}")
+            dst = Path(f"{path}.{idx + 1}")
+            if src.exists():
+                src.replace(dst)
+        path.replace(Path(f"{path}.1"))
+        return True
+    except Exception:
+        return False
+
+
+def _dedupe_emit(cache: Dict[str, float], key: str, min_interval_seconds: float) -> bool:
+    if min_interval_seconds <= 0:
+        return True
+    now = time.monotonic()
+    last = float(cache.get(key, 0.0) or 0.0)
+    if last > 0.0 and (now - last) < min_interval_seconds:
+        return False
+    cache[key] = now
+    if len(cache) > 4096:
+        stale_before = now - max(min_interval_seconds * 4.0, 60.0)
+        stale_keys = [k for k, ts in cache.items() if ts < stale_before]
+        for stale_key in stale_keys[:2048]:
+            cache.pop(stale_key, None)
+    return True
+
+
 def _log_lock_event(event: str, **fields: object) -> None:
     try:
+        event_norm = str(event or "").strip()
+        dedupe_basis = [
+            event_norm,
+            str(fields.get("pid", "") or "").strip(),
+            str(fields.get("path", "") or "").strip(),
+            str(fields.get("reason", "") or "").strip(),
+        ]
+        noisy_events = {"PHASE1_LOCK_ACQUIRED", "PHASE1_LOCK_RELEASED"}
+        if event_norm in noisy_events:
+            dedupe_key = "|".join(dedupe_basis)
+            if not _dedupe_emit(_LOCK_EVENT_DEDUP_CACHE, dedupe_key, LOCK_EVENTS_DEDUP_INTERVAL_SECONDS):
+                return
         LOCK_EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _rotate_log_file(
+            LOCK_EVENTS_PATH,
+            max_bytes=LOCK_EVENTS_ROTATE_MAX_BYTES,
+            max_files=LOCK_EVENTS_ROTATE_MAX_FILES,
+        )
         details = " ".join(f"{k}={str(v)}" for k, v in fields.items() if str(v) != "")
-        line = f"{_utc_now_iso()} {event}"
+        line = f"{_utc_now_iso()} {event_norm}"
         if details:
             line = f"{line} {details}"
         with LOCK_EVENTS_PATH.open("a", encoding="utf-8", newline="\n") as fh:
@@ -578,6 +748,92 @@ def read_table(csv_path: Path | str) -> List[Dict[str, str]]:
     return out
 
 
+SUPPRESSION_TARGET_SOURCE_FALLBACK = "NONE_UNAVAILABLE"
+SUPPRESSION_CEILING_FALLBACK = "UNAVAILABLE"
+
+
+def _text_cell(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _first_non_empty_text(*values: object) -> str:
+    for value in values:
+        text = _text_cell(value)
+        if text != "":
+            return text
+    return ""
+
+
+def _normalize_suppression_target_source(value: object) -> str:
+    text = _text_cell(value).upper()
+    if text != "":
+        return text
+    return SUPPRESSION_TARGET_SOURCE_FALLBACK
+
+
+def _normalize_suppression_case_row(row: Mapping[str, object]) -> Dict[str, object]:
+    out: Dict[str, object] = dict(row)
+    out["suppression_target_source"] = _normalize_suppression_target_source(out.get("suppression_target_source", ""))
+    ceiling = _first_non_empty_text(
+        out.get("suppression_ceiling_landed_temp", ""),
+        out.get("suppression_reactivation_target_landed_gbp", ""),
+        out.get("anchor_floor_price", ""),
+    )
+    out["suppression_ceiling_landed_temp"] = ceiling if ceiling != "" else SUPPRESSION_CEILING_FALLBACK
+    if _text_cell(out.get("suppression_reactivation_target_landed_gbp", "")) == "":
+        out["suppression_reactivation_target_landed_gbp"] = str(out.get("suppression_ceiling_landed_temp", ""))
+    return out
+
+
+def _normalize_suppression_reactivation_row(row: Mapping[str, object]) -> Dict[str, object]:
+    out: Dict[str, object] = dict(row)
+    out["suppression_target_source"] = _normalize_suppression_target_source(out.get("suppression_target_source", ""))
+    ceiling = _first_non_empty_text(
+        out.get("suppression_ceiling_landed_temp", ""),
+        out.get("suppression_reactivation_target_landed_gbp", ""),
+        out.get("target_price_gbp", ""),
+        out.get("current_price_gbp", ""),
+        out.get("anchor_floor_price", ""),
+    )
+    out["suppression_ceiling_landed_temp"] = ceiling if ceiling != "" else SUPPRESSION_CEILING_FALLBACK
+    if _text_cell(out.get("suppression_reactivation_target_landed_gbp", "")) == "":
+        out["suppression_reactivation_target_landed_gbp"] = str(out.get("suppression_ceiling_landed_temp", ""))
+    return out
+
+
+def _normalize_h_strategy_outcome_daily_row(row: Mapping[str, object]) -> Dict[str, object]:
+    out: Dict[str, object] = {col: row.get(col, "") for col in H_STRATEGY_OUTCOME_DAILY_SCHEMA}
+    for col in H_STRATEGY_OUTCOME_DAILY_ZERO_FILL_COLUMNS:
+        if _text_cell(out.get(col, "")) == "":
+            out[col] = "0"
+    try:
+        decision_rows = max(int(float(str(out.get("decision_rows", "0") or "0"))), 0)
+    except Exception:
+        decision_rows = 0
+    try:
+        at_floor_rows = max(int(float(str(out.get("at_floor_rows", "0") or "0"))), 0)
+    except Exception:
+        at_floor_rows = 0
+    try:
+        below_break_even_rows = max(int(float(str(out.get("below_break_even_rows", "0") or "0"))), 0)
+    except Exception:
+        below_break_even_rows = 0
+    out["at_floor_rows"] = str(min(at_floor_rows, decision_rows))
+    out["below_break_even_rows"] = str(min(below_break_even_rows, decision_rows))
+    return out
+
+
+def _normalize_h_strategy_outcome_daily_file_in_place() -> None:
+    with _phase1_lock():
+        rows = read_table(H_STRATEGY_OUTCOME_DAILY_PATH)
+        if not rows:
+            return
+        normalized = [_normalize_h_strategy_outcome_daily_row(row) for row in rows]
+        _atomic_write_rows(H_STRATEGY_OUTCOME_DAILY_PATH, [{k: str(v or "") for k, v in row.items()} for row in normalized], H_STRATEGY_OUTCOME_DAILY_SCHEMA)
+
+
 def append_rows(
     csv_path: Path | str,
     rows: Iterable[Dict[str, object]],
@@ -751,7 +1007,8 @@ def append_sku_phase_transition(row: Mapping[str, object]) -> None:
 
 
 def append_suppression_cases(rows: Iterable[Dict[str, object]]) -> None:
-    append_rows(H_SUPPRESSION_CASES_PATH, rows, SUPPRESSION_CASES_SCHEMA)
+    normalized = [_normalize_suppression_case_row(row) for row in rows]
+    append_rows(H_SUPPRESSION_CASES_PATH, normalized, SUPPRESSION_CASES_SCHEMA)
 
 
 def upsert_suppression_threshold_memory(rows: Iterable[Dict[str, object]]) -> None:
@@ -764,6 +1021,46 @@ def upsert_suppression_threshold_memory(rows: Iterable[Dict[str, object]]) -> No
     )
 
 
+def upsert_strategy_control_memory(rows: Iterable[Dict[str, object]]) -> None:
+    upsert("strategy_control_memory", key_cols=["sku"], rows=rows)
+    upsert_rows(
+        H_STRATEGY_CONTROL_MEMORY_PATH,
+        rows,
+        key_cols=["sku"],
+        schema=PHASE1_TABLE_SCHEMAS["strategy_control_memory"],
+    )
+
+
 def append_suppression_reactivation_log(rows: Iterable[Dict[str, object]]) -> None:
-    append_rows(H_SUPPRESSION_REACTIVATION_LOG_PATH, rows, SUPPRESSION_REACTIVATION_LOG_SCHEMA)
+    normalized = [_normalize_suppression_reactivation_row(row) for row in rows]
+    append_rows(H_SUPPRESSION_REACTIVATION_LOG_PATH, normalized, SUPPRESSION_REACTIVATION_LOG_SCHEMA)
+
+
+def append_h_ceiling_events(rows: Iterable[Dict[str, object]]) -> None:
+    append_rows(H_CEILING_EVENTS_PATH, rows, H_CEILING_EVENTS_SCHEMA)
+
+
+def append_h_strategy_outcome_log(rows: Iterable[Dict[str, object]]) -> None:
+    append_rows(H_STRATEGY_OUTCOME_LOG_PATH, rows, H_STRATEGY_OUTCOME_LOG_SCHEMA)
+
+
+def upsert_h_strategy_outcome_log(rows: Iterable[Dict[str, object]]) -> None:
+    upsert_rows(
+        H_STRATEGY_OUTCOME_LOG_PATH,
+        rows,
+        key_cols=["tactic_case_id"],
+        schema=H_STRATEGY_OUTCOME_LOG_SCHEMA,
+    )
+
+
+def upsert_h_strategy_outcome_daily(rows: Iterable[Dict[str, object]]) -> None:
+    normalized_rows = [_normalize_h_strategy_outcome_daily_row(row) for row in rows]
+    upsert_rows(
+        H_STRATEGY_OUTCOME_DAILY_PATH,
+        normalized_rows,
+        key_cols=["asof_date", "scenario_type", "chosen_tactic"],
+        schema=H_STRATEGY_OUTCOME_DAILY_SCHEMA,
+    )
+    # Keep legacy rows compatible when schema expands with new count columns.
+    _normalize_h_strategy_outcome_daily_file_in_place()
 

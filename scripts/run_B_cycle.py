@@ -1,8 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from cycles.run_B_cycle import main
+import sys
+
+from cycles import run_B_cycle as _impl
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
+if __name__ != "__main__":
+    sys.modules[__name__] = _impl
+else:
+    raise SystemExit(_impl.main())

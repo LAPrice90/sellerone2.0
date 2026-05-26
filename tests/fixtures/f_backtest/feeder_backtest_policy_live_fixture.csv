@@ -1,0 +1,2 @@
+observed_utc,policy_id,policy_version,policy_status,minimum_expected_profit_gbp,entry_target_roi_pct,working_floor_roi_pct,exit_floor_roi_pct,emergency_floor_roi_pct,recency_weight_30d,recency_weight_90d,recency_weight_180d,recency_weight_365d,ceiling_warn_ratio_30d,ceiling_red_ratio_30d,ceiling_extreme_ratio_30d,shock_trigger_pct_1d,shared_sales_default_pct
+2026-04-10T08:00:00Z,f_backtest_policy_v1,1.0,active,100,20,10,0,-5,0.5,0.3,0.15,0.05,1.25,1.5,2,20,50

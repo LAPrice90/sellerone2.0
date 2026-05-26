@@ -107,7 +107,106 @@ class Phase1ProbeEngineTests(unittest.TestCase):
         )
         self.assertEqual(regain_clamp.target_price_gbp, "9.50")
         self.assertIn("STEP_REGAIN_TO_RIVAL", regain_clamp.reason_codes)
+        self.assertIn("TACTIC_SINGLE_RIVAL_RESET", regain_clamp.reason_codes)
         self.assertIn("GUARDRAIL_HARD_FLOOR_CLAMP", regain_clamp.reason_codes)
+
+        single_rival_deadlock_break = phase1_probe_engine.choose_next_price(
+            state="REGAIN",
+            current_price_gbp="9.50",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="10.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="9.50",
+            stable_buffer_gbp="0.02",
+            seller_count="1",
+            ladder_price_1_gbp="9.50",
+            ladder_price_2_gbp="",
+            ladder_price_3_gbp="",
+            ladder_gap_buffer_gbp="0.01",
+        )
+        self.assertEqual(single_rival_deadlock_break.target_price_gbp, "9.70")
+        self.assertTrue(single_rival_deadlock_break.write_required)
+        self.assertIn("SINGLE_RIVAL_RESET_DEADLOCK_BREAK", single_rival_deadlock_break.reason_codes)
+        self.assertIn("STEP_SINGLE_RIVAL_RESET_BREAK_UP", single_rival_deadlock_break.reason_codes)
+
+        regain_ladder_cap = phase1_probe_engine.choose_next_price(
+            state="REGAIN",
+            current_price_gbp="9.50",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="11.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="8.50",
+            stable_buffer_gbp="0.02",
+            seller_count="2",
+            ladder_price_1_gbp="8.50",
+            ladder_price_2_gbp="9.00",
+            ladder_price_3_gbp="9.40",
+            ladder_gap_buffer_gbp="0.01",
+        )
+        self.assertEqual(regain_ladder_cap.target_price_gbp, "8.99")
+        self.assertIn("STEP_REGAIN_MULTI_SELLER_LADDER_CAP", regain_ladder_cap.reason_codes)
+        self.assertIn("TACTIC_MULTI_SELLER_LADDER_CAP", regain_ladder_cap.reason_codes)
+        self.assertIn("LADDER_CAP_SOURCE_SECOND_LOWEST", regain_ladder_cap.reason_codes)
+
+        regain_ladder_reset_up = phase1_probe_engine.choose_next_price(
+            state="REGAIN",
+            current_price_gbp="8.98",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="11.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="8.50",
+            stable_buffer_gbp="0.02",
+            seller_count="3",
+            ladder_price_1_gbp="8.50",
+            ladder_price_2_gbp="9.12",
+            ladder_price_3_gbp="9.99",
+            ladder_gap_buffer_gbp="0.01",
+        )
+        self.assertEqual(regain_ladder_reset_up.target_price_gbp, "9.11")
+        self.assertTrue(regain_ladder_reset_up.write_required)
+        self.assertIn("STEP_REGAIN_MULTI_SELLER_RESET_UP", regain_ladder_reset_up.reason_codes)
+        self.assertIn("STEP_REGAIN_MULTI_SELLER_LADDER_CAP", regain_ladder_reset_up.reason_codes)
+        self.assertIn("TACTIC_MULTI_SELLER_LADDER_CAP", regain_ladder_reset_up.reason_codes)
+        self.assertNotIn("REGAIN_MULTI_SELLER_NO_DOWNWARD_HEADROOM", regain_ladder_reset_up.reason_codes)
+
+        regain_floor_clamp_no_move = phase1_probe_engine.choose_next_price(
+            state="REGAIN",
+            current_price_gbp="10.00",
+            hard_floor_gbp="10.00",
+            final_ceiling_landed_gbp="12.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="9.20",
+            stable_buffer_gbp="0.02",
+            seller_count="3",
+            ladder_price_1_gbp="9.20",
+            ladder_price_2_gbp="9.40",
+            ladder_price_3_gbp="9.60",
+            ladder_gap_buffer_gbp="0.01",
+        )
+        self.assertEqual(regain_floor_clamp_no_move.target_price_gbp, "10.00")
+        self.assertFalse(regain_floor_clamp_no_move.write_required)
+        self.assertIn("GUARDRAIL_HARD_FLOOR_CLAMP", regain_floor_clamp_no_move.reason_codes)
+        self.assertIn("REGAIN_MULTI_SELLER_NO_DOWNWARD_HEADROOM", regain_floor_clamp_no_move.reason_codes)
 
         suppression = phase1_probe_engine.choose_next_price(
             state="STATE_SUPPRESSION_REACTIVATION",
@@ -130,6 +229,30 @@ class Phase1ProbeEngineTests(unittest.TestCase):
         self.assertEqual(suppression.target_price_gbp, "9.80")
         self.assertIn("SUPPRESSION_DIRECT_TARGET", suppression.reason_codes)
         self.assertIn("GUARDRAIL_ANCHOR_FLOOR_CLAMP", suppression.reason_codes)
+
+        suppression_stale_target = phase1_probe_engine.choose_next_price(
+            state="STATE_SUPPRESSION_REACTIVATION",
+            current_price_gbp="10.00",
+            hard_floor_gbp="9.50",
+            final_ceiling_landed_gbp="10.60",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="10.20",
+            stable_buffer_gbp="0.02",
+            suppression_reactivation_target_landed_gbp="10.00",
+            anchor_floor_gbp="9.50",
+            suppression_threshold_estimate_gbp="",
+            suppression_threshold_upper_bound_gbp="10.40",
+        )
+        self.assertEqual(suppression_stale_target.target_price_gbp, "10.20")
+        self.assertTrue(suppression_stale_target.write_required)
+        self.assertIn("SUPPRESSION_DIRECT_TARGET_NO_MOVE", suppression_stale_target.reason_codes)
+        self.assertIn("SUPPRESSION_DIRECT_TARGET_STALE", suppression_stale_target.reason_codes)
+        self.assertIn("SUPPRESSION_PROBE_UPWARD_STEP", suppression_stale_target.reason_codes)
 
         inferred = phase1_probe_engine.choose_next_price(
             state="STATE_SUPPRESSION_REACTIVATION",
@@ -186,6 +309,75 @@ class Phase1ProbeEngineTests(unittest.TestCase):
         )
         self.assertEqual(liquidation.target_price_gbp, "9.40")
         self.assertIn("CANNOT_COMPETE_ACTIVE_FLOOR_TARGET", liquidation.reason_codes)
+
+        raise_ladder_cap = phase1_probe_engine.choose_next_price(
+            state="RAISE_FIND_LOSS",
+            current_price_gbp="8.80",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="12.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.50",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="8.50",
+            stable_buffer_gbp="0.02",
+            seller_count="2",
+            ladder_price_1_gbp="8.50",
+            ladder_price_2_gbp="9.00",
+            ladder_price_3_gbp="9.40",
+            ladder_gap_buffer_gbp="0.01",
+        )
+        self.assertEqual(raise_ladder_cap.target_price_gbp, "8.99")
+        self.assertIn("STEP_RAISE_FIND_LOSS_LADDER_CAP", raise_ladder_cap.reason_codes)
+        self.assertIn("RAISE_MULTI_SELLER_CEILING_CAPPED_TO_LADDER", raise_ladder_cap.reason_codes)
+        self.assertIn("LADDER_CAP_SOURCE_SECOND_LOWEST", raise_ladder_cap.reason_codes)
+
+    def test_choose_next_price_multi_seller_ladder_cap_source_codes(self) -> None:
+        cluster_edge = phase1_probe_engine.choose_next_price(
+            state="RAISE_FIND_LOSS",
+            current_price_gbp="8.80",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="12.00",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="1.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="8.50",
+            stable_buffer_gbp="0.02",
+            seller_count="3",
+            ladder_price_1_gbp="8.50",
+            ladder_price_2_gbp="9.00",
+            ladder_price_3_gbp="9.10",
+            ladder_gap_buffer_gbp="0.02",
+        )
+        self.assertEqual(cluster_edge.target_price_gbp, "9.08")
+        self.assertIn("LADDER_CAP_SOURCE_CLUSTER_EDGE", cluster_edge.reason_codes)
+
+        ceiling_clamp = phase1_probe_engine.choose_next_price(
+            state="RAISE_FIND_LOSS",
+            current_price_gbp="8.80",
+            hard_floor_gbp="8.00",
+            final_ceiling_landed_gbp="8.90",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="1.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            highest_delta_win_effective_gbp="",
+            lowest_delta_loss_effective_gbp="",
+            best_rival_effective_price_gbp="8.50",
+            stable_buffer_gbp="0.02",
+            seller_count="3",
+            ladder_price_1_gbp="8.50",
+            ladder_price_2_gbp="9.00",
+            ladder_price_3_gbp="9.10",
+            ladder_gap_buffer_gbp="0.02",
+        )
+        self.assertEqual(ceiling_clamp.target_price_gbp, "8.90")
+        self.assertIn("LADDER_CAP_SOURCE_CEILING_CLAMP", ceiling_clamp.reason_codes)
 
     def test_update_delta_memory_updates_bounds_and_confidence(self) -> None:
         memory = {

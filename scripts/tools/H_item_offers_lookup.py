@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.api.get_pricing import run_market_context_lookup_with_offers
+from scripts.api.get_pricing import run_market_context_lookup_with_offers_detail
 
 
 def _norm(value: object) -> str:
@@ -45,7 +45,15 @@ def main() -> int:
                 continue
             sku_asins.append((sku, asin))
 
-    bb_map, offer_rows = run_market_context_lookup_with_offers(
+    prioritized_asins_raw = payload.get("prioritized_asins", [])
+    prioritized_asins: list[str] = []
+    if isinstance(prioritized_asins_raw, list):
+        for value in prioritized_asins_raw:
+            asin = _norm(value)
+            if asin:
+                prioritized_asins.append(asin)
+
+    bb_map, offer_rows, detail_meta = run_market_context_lookup_with_offers_detail(
         sku_asin_rows=sku_asins,
         marketplace_id=_norm(args.marketplace_id),
         snapshot_timestamp_utc=_norm(args.snapshot_ts),
@@ -53,6 +61,7 @@ def main() -> int:
         run_id=_norm(args.run_id),
         script_name=_norm(args.script_name) or "run_H_pricing_cycle",
         progress_callback=None,
+        prioritized_asins=prioritized_asins,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
@@ -60,6 +69,7 @@ def main() -> int:
             {
                 "bb_map": bb_map,
                 "offer_rows": offer_rows,
+                "detail_meta_by_asin": detail_meta,
             },
             ensure_ascii=True,
         ),

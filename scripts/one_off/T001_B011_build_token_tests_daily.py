@@ -10,6 +10,8 @@ from pathlib import Path
 import gspread
 import pandas as pd
 
+from scripts.core.storage import read_dataframe_with_sql_fallback
+
 TOKENS_SHEET_ID = "1msYs_zYPTaXCHG8amokOa7APFg_lqWJd9FwKc1jELbw"
 TESTS_TAB = "Token_Tests_Daily"
 
@@ -22,6 +24,7 @@ ORDERS_TAB = "Orders"
 ORDERS_CSV = Path("out/orders_sheet_orders.csv")
 ORDER_MASTER_CSV = Path("out/order_master.csv")
 INVENTORY_CSV = Path("out/inventory_summaries.csv")
+SQL_TABLE_INVENTORY_SUMMARIES = "a_inventory_summaries"
 REFUNDS_CSV = Path("out/financial_events_refunds_official.csv")
 CUTOFF_DATE = "2025-11-01"
 
@@ -76,10 +79,14 @@ def load_order_master() -> pd.DataFrame:
 
 
 def load_inventory() -> pd.DataFrame:
-    if not INVENTORY_CSV.exists():
+    try:
+        return read_dataframe_with_sql_fallback(
+            INVENTORY_CSV,
+            SQL_TABLE_INVENTORY_SUMMARIES,
+            dtype=str,
+        ).fillna("")
+    except FileNotFoundError:
         return pd.DataFrame()
-    df = pd.read_csv(INVENTORY_CSV, dtype=str).fillna("")
-    return df
 
 
 def load_refunds() -> pd.DataFrame:

@@ -24,6 +24,7 @@ from typing import List, Set
 
 import gspread
 import pandas as pd
+from requests.exceptions import RequestException
 
 # Ensure package imports work when running directly
 ROOT = Path(__file__).resolve().parents[3]
@@ -31,6 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.api.get_catalog_items import fetch_catalog_item, get_lwa_access_token
+from scripts.core.storage import coalesce_duplicate_header_rows, dataframe_from_product_db_sheet_rows, write_dataframe_with_sql_compat
 SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
 TAB_NAME = "CatalogItems_raw"
 SUMMARY_TAB = "Listings_focus_summary"
@@ -44,6 +46,10 @@ LIMIT = int(os.environ.get("CATALOG_LIMIT", "0"))  # 0 = no limit
 SLEEP_SEC = float(os.environ.get("CATALOG_SLEEP_SEC", "1.1"))
 # Simple retry for transient failures (429/5xx). Set to 3 attempts by default.
 MAX_RETRIES = int(os.environ.get("CATALOG_MAX_RETRIES", "3"))
+SHEET_OP_MAX_RETRIES = int(os.environ.get("A002_SHEET_OP_MAX_RETRIES", "4"))
+SHEET_OP_BACKOFF_SEC = float(os.environ.get("A002_SHEET_OP_BACKOFF_SEC", "2.0"))
+PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
+SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 FOCUS_COLUMNS = [
     "asin",
     "main_image",
@@ -104,6 +110,55 @@ def summarize_focus(df: pd.DataFrame, prev_counts: dict) -> list[list[str]]:
     return rows
 # Default on so you donâ€™t have to set anything; toggle via env if needed.
 DEBUG_ATTRS = os.environ.get("DEBUG_ATTRS", "true").lower() == "true"
+
+
+def _sheet_status_code(exc: Exception) -> int | None:
+    response = getattr(exc, "response", None)
+    if response is None:
+        return None
+    status_code = getattr(response, "status_code", None)
+    try:
+        return int(status_code) if status_code is not None else None
+    except Exception:
+        return None
+
+
+def _is_transient_sheet_error(exc: Exception) -> bool:
+    if isinstance(exc, RequestException):
+        return True
+    status_code = _sheet_status_code(exc)
+    if status_code in {429, 500, 502, 503, 504}:
+        return True
+    text = str(exc).lower()
+    markers = [
+        "connection aborted",
+        "remote end closed connection",
+        "timed out",
+        "temporary failure",
+        "connection reset",
+        "connection refused",
+        "network is unreachable",
+        "service unavailable",
+    ]
+    return any(marker in text for marker in markers)
+
+
+def _run_sheet_op(label: str, fn):
+    attempts = max(int(SHEET_OP_MAX_RETRIES), 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if _is_transient_sheet_error(exc) and attempt < attempts:
+                delay = max(float(SHEET_OP_BACKOFF_SEC), 0.0) * attempt
+                print(
+                    f"[A002] transient sheet error op={label} "
+                    f"attempt={attempt}/{attempts} retry_in_s={delay:.1f} err={exc}"
+                )
+                if delay > 0:
+                    time.sleep(delay)
+                continue
+            raise
 
 
 def load_env(paths: List[str] | None = None) -> None:
@@ -404,14 +459,21 @@ def export_product_db(sheet: gspread.Spreadsheet) -> None:
     rows = ws.get_all_values()
     if not rows:
         return
+    df, repaired_headers = dataframe_from_product_db_sheet_rows(rows)
     Path("out").mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows[1:], columns=rows[0]).to_csv("out/product_db_preview.csv", index=False)
+    write_dataframe_with_sql_compat(
+        df,
+        PRODUCT_DB_PREVIEW,
+        SQL_TABLE_PRODUCT_DB_PREVIEW,
+    )
+    if repaired_headers:
+        print("Repaired duplicate Product_DB headers for export: " + ",".join(repaired_headers))
     print("Saved Product_DB preview to out/product_db_preview.csv")
 
 
 def write_raw_and_summary(df: pd.DataFrame) -> None:
     client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID)
+    sheet = _run_sheet_op("open_by_key", lambda: client.open_by_key(SHEET_ID))
 
     raw_values = [list(df.columns)] + df.fillna("").astype(str).values.tolist()
     try:
@@ -428,6 +490,9 @@ def write_raw_and_summary(df: pd.DataFrame) -> None:
         prod_rows = ws_prod.get_all_values()
         if not prod_rows:
             raise ValueError("Product_DB tab empty")
+        prod_rows, repaired_headers = coalesce_duplicate_header_rows(prod_rows)
+        if repaired_headers:
+            print("Repaired duplicate Product_DB headers before A002 update: " + ",".join(repaired_headers))
         headers_prod = prod_rows[0]
         idx_map = {h: i for i, h in enumerate(headers_prod)}
         if "last_updated_A002" not in idx_map:
@@ -607,7 +672,7 @@ def main() -> None:
     col_count = 0
 
     client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID)
+    sheet = _run_sheet_op("open_by_key_main", lambda: client.open_by_key(SHEET_ID))
 
     try:
         asins = load_asins(Path(args.input_csv), args.limit)
@@ -680,7 +745,7 @@ def main() -> None:
         snapshot_path = str(out_path)
         print(f"Saved flattened catalog data to {out_path}")
 
-        write_raw_and_summary(df)
+        _run_sheet_op("write_raw_and_summary", lambda: write_raw_and_summary(df))
         sheet_tabs_written = [TAB_NAME, SUMMARY_TAB]
         print(f"Wrote {len(df)} rows to sheet tabs {TAB_NAME} and {SUMMARY_TAB}")
     except Exception as exc:
@@ -696,9 +761,13 @@ def main() -> None:
     consecutive_failures = 0
     consecutive_successes = 0
     try:
-        ws_status = sheet.worksheet(RUN_STATUS_TAB)
-        existing = ws_status.get_all_values()
+        ws_status = _run_sheet_op("run_status_worksheet", lambda: sheet.worksheet(RUN_STATUS_TAB))
+        existing = _run_sheet_op("run_status_get_all_values", ws_status.get_all_values)
     except gspread.WorksheetNotFound:
+        existing = []
+        ws_status = None
+    except Exception as exc:
+        print(f"[A002] WARN run status read skipped: {exc}")
         existing = []
         ws_status = None
     headers = [
@@ -768,7 +837,10 @@ def main() -> None:
         git_version,
         last_error,
     ]
-    append_run_status(sheet, status_row)
+    try:
+        _run_sheet_op("append_run_status", lambda: append_run_status(sheet, status_row))
+    except Exception as exc:
+        print(f"[A002] WARN append_run_status skipped: {exc}")
 
 
 if __name__ == "__main__":
