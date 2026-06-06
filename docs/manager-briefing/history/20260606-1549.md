@@ -29,7 +29,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ## Movement Watch
 
-- F live scanner movement: Moving. td_synnex over 5 chunks and 52.3 minutes: pending 5371 to 5271, drop 100, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
+- F live scanner movement: Moving. td_synnex over 5 chunks and 37.0 minutes: pending 5221 to 5121, drop 100, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
 - F-DHB-FORWARD-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
 - B manager lane: Blocked. 9 active jobs, 0 waiting proof, 2 Luke gates. Next: Keep B-B008-TOKEN-STATE-CONFLICT visible as a protected Luke decision.
 - O manager lane: Working. 4 active jobs, 0 waiting proof, 0 Luke gates. Next: Continue O-ACTIVE-RESTOCK-FILES inside its approved packet.
