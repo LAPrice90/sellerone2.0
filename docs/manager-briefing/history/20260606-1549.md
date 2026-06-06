@@ -5,7 +5,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 ## Today At A Glance
 
 - Overall status: Blocked
-- Restocking readiness: 55%
+- Restocking readiness: 56%
 - Summary: Restocking is not clean yet. The main blocker managers are B, F.
 
 ## Manager Progress
@@ -16,9 +16,9 @@ Observed UTC: 2026-06-06T15:49:33Z
 | B | orders, refunds, fees, token COGS | Blocked | 42% | B is warning-only again. Stock-receipt/token sync is now proved, but refund/token bridge, fallback-cost proof, marketplace coverage, and bridge-only ROI warnings still keep B from clean buying authority. Existing token correction remains protected and must not happen without preview and Luke approval. | Keep B-B008-TOKEN-STATE-CONFLICT visible as a protected Luke decision. |
 | E | sales velocity and confidence | Warning | 82% | E is manager-proved as a restock evidence layer: 10 clean completed E runs, 0 E MOT failures, and the remaining ROI/B-money gaps still warning-labelled instead of treated as buying authority. | Keep warning visible and continue only if it blocks today's restocking work. |
 | H | repricing safety | Warning | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Keep warning visible and continue only if it blocks today's restocking work. |
-| F | supplier scanner | Blocked | 62% | F login has been consolidated behind one scanner-owned controller. Code-level proof passed. Live scanner proof now reaches Seller Central Two-Step Verification, but Dashboard Yes/No is still blocked by `no_fresh_code` in the approved code source. Weekend Hometime is F-first until this is proved or parked with an exact blocker. | Continue F-ACTIVE-FAIL-GROUP inside its approved packet. |
+| F | supplier scanner | Blocked | 74% | F login controller rewrite is now proved. F found a fresh Seller Central code, submitted it, proved Dashboard Yes/No as `YES`, and scanner continuation/backtrack promotion evidence exists. Weekend Hometime should now monitor durability and F scanner progress rather than treating login rewrite as the active blocker. | Continue F-DHB-FORWARD-PROGRESS inside its approved packet. |
 | O | restocking workspace | Working | 48% | O remains the reordering lane, but affected SKUs must stay out of clean action-ready status while B fallback-token cost risk is active. O-TOKEN-COST-TRUST-GATE is now added. | Continue O-ACTIVE-RESTOCK-FILES inside its approved packet. |
-| M | main manager | Warning | 67% | Current Manager Task Board: 30 active cards, 6 not started, 0 in progress, 4 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
+| M | main manager | Warning | 67% | Current Manager Task Board: 26 active cards, 3 not started, 0 in progress, 4 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
 
 ## Visible Decisions
 
@@ -29,7 +29,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ## Movement Watch
 
-- F live scanner movement: Moving. dhb over 5 chunks and 12.5 minutes: pending 5490 to 5490, drop 0, processed rows 0, memory blocks 4. Next: Keep watching until F MOT clears or the worker marks proof ready.
+- F live scanner movement: Moving. dhb over 5 chunks and 31.1 minutes: pending 5490 to 5488, drop 2, processed rows 9, memory blocks 4. Next: Keep watching until F MOT clears or the worker marks proof ready.
 - F-DHB-FORWARD-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
 - B manager lane: Blocked. 9 active jobs, 0 waiting proof, 2 Luke gates. Next: Keep B-B008-TOKEN-STATE-CONFLICT visible as a protected Luke decision.
 - O manager lane: Working. 4 active jobs, 0 waiting proof, 0 Luke gates. Next: Continue O-ACTIVE-RESTOCK-FILES inside its approved packet.
@@ -69,11 +69,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ### F - supplier scanner
 
-- F-ACTIVE-FAIL-GROUP: Approved. Repair F active FAIL group
 - F-DHB-FORWARD-PROGRESS: Approved. F Repair Package - DHB Forward Progress Stall - 2026-06-06
-- F-LOGIN-MODE: Approved. F MOT: f_login_mode_state needs repair
-- F-SELLER-CENTRAL-ELIGIBILITY: Approved. F MOT: f_seller_central_eligibility_auth_state needs repair
-- F-LOGIN-CONTROLLER-REWRITE: Fixed Needs Retest. F Repair Package - Login Controller Rewrite V1 - 2026-06-06
 - F-RESCAN-PRIORITY-02: Luke gate. F MOT: f_rescan_priority_proof needs Luke decision
 - F-VISIBLE-LOGIN-CONTROL-02: Luke gate. MOT_F_F_VISIBLE_LOGIN_CONTROL_PROOF
 - F-PARKED-ROWS: Parked. F MOT: f_parked_decision_rows is parked
