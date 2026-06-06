@@ -1,6 +1,6 @@
 # SellerOne Manager Briefing
 
-Observed UTC: 2026-06-06T11:29:26Z
+Observed UTC: 2026-06-06T12:39:11Z
 
 ## Today At A Glance
 
@@ -15,15 +15,16 @@ Observed UTC: 2026-06-06T11:29:26Z
 | A | source facts | Calm | 100% | A is the first rollout section because it is the daily upstream base. | No further action needed now. |
 | B | orders, refunds, fees, token COGS | Blocked | 40% | B has moved from warning-only into active safe repair work: marketplace/order-truth proof is failing from outside evidence. Hometime has approved safe B packets for B-ACTIVE-FAIL-GROUP, B-FUTURE-MARKETPLACE-ORDER, B-MANAGEMENT-READY-FOR, and B-ORDER-TRUTH-COMPLETION. Existing token correction remains protected and must not happen without preview and Luke approval. | Keep B-B008-TOKEN-STATE-CONFLICT visible as a protected Luke decision. |
 | E | sales velocity and confidence | Warning | 82% | E is manager-proved as a restock evidence layer: 10 clean completed E runs, 0 E MOT failures, and the remaining ROI/B-money gaps still warning-labelled instead of treated as buying authority. | Keep warning visible and continue only if it blocks today's restocking work. |
-| H | repricing safety | Working | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Continue H-RELIABILITY-WINDOW-02 inside its approved packet. |
-| F | supplier scanner | Blocked | 55% | F login/Seller Central proof is not the current blocker. New issue: DHB is alive but stuck in a forward-progress loop, so F MOT now fails `f_live_owner_status`. `F-DHB-FORWARD-PROGRESS` is approved as the bounded worker repair package. The separate protected rescan-priority row is still parked. | Continue F-ACTIVE-FAIL-GROUP inside its approved packet. |
+| H | repricing safety | Warning | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Keep warning visible and continue only if it blocks today's restocking work. |
+| F | supplier scanner | Blocked | 55% | F login/Seller Central proof is not the current blocker. New issue: DHB is alive but stuck in a forward-progress loop, so F MOT now fails `f_live_owner_status`. `F-DHB-FORWARD-PROGRESS` is approved as the bounded worker repair package. The separate protected rescan-priority row is still parked. | Continue F-DHB-FORWARD-PROGRESS inside its approved packet. |
 | O | restocking workspace | Working | 48% | O remains the reordering lane, but affected SKUs must stay out of clean action-ready status while B fallback-token cost risk is active. O-TOKEN-COST-TRUST-GATE is now added. | Continue O-ACTIVE-RESTOCK-FILES inside its approved packet. |
-| M | main manager | Warning | 67% | Current Manager Task Board: 29 active cards, 5 not started, 1 in progress, 4 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
+| M | main manager | Warning | 67% | Current Manager Task Board: 27 active cards, 3 not started, 0 in progress, 5 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
 
 ## Visible Decisions
 
 - B-B008-TOKEN-STATE-CONFLICT: B B008 Token State Conflict Decision v1
 - B-B009-RETURN-REUSE-APPLY: B B009 Return Reuse Apply Decision v1
+- F-DECIDE-EVIDENCE-USER: Decide F protected proof evidence
 - F-RESCAN-PRIORITY-02: F MOT: f_rescan_priority_proof needs Luke decision
 - F-VISIBLE-LOGIN-CONTROL: F MOT: f_visible_login_control_proof needs Luke decision
 
@@ -31,7 +32,6 @@ Observed UTC: 2026-06-06T11:29:26Z
 
 - F live scanner movement: Stalled. dhb over 5 chunks and 26.9 minutes: pending 5489 to 5489, drop 0, processed rows 7, memory blocks 5. Next: Worker must repair the approved F-DHB package; Luke is not needed unless the repair crosses a protected boundary.
 - F-DHB-FORWARD-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
-- F-SCANNER-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
 - B manager lane: Blocked. 9 active jobs, 0 waiting proof, 2 Luke gates. Next: Keep B-B008-TOKEN-STATE-CONFLICT visible as a protected Luke decision.
 - O manager lane: Working. 4 active jobs, 0 waiting proof, 0 Luke gates. Next: Continue O-ACTIVE-RESTOCK-FILES inside its approved packet.
 
@@ -59,7 +59,6 @@ Observed UTC: 2026-06-06T11:29:26Z
 
 ### H - repricing safety
 
-- H-RELIABILITY-WINDOW-02: In Progress. H MOT: h_reliability_window needs repair
 - H-ACTIVE-FAILURES-2026: Parked. H Repair Package - Current Active Failures - 2026-05-27
 - H-CLASSIFICATION-ONLY-2026: Parked. H Classification Package - WARN Only State - 2026-05-30
 - H-INDEPENDENT-FAILURES-2026: Parked. H Repair Package - Current Independent MOT Failures - 2026-05-30
@@ -71,9 +70,8 @@ Observed UTC: 2026-06-06T11:29:26Z
 
 ### F - supplier scanner
 
-- F-ACTIVE-FAIL-GROUP: Approved. Repair F active FAIL group
 - F-DHB-FORWARD-PROGRESS: Approved. F Repair Package - DHB Forward Progress Stall - 2026-06-06
-- F-SCANNER-PROGRESS: Approved. F MOT: f_live_owner_status needs repair
+- F-DECIDE-EVIDENCE-USER: Luke gate. Decide F protected proof evidence
 - F-RESCAN-PRIORITY-02: Luke gate. F MOT: f_rescan_priority_proof needs Luke decision
 - F-VISIBLE-LOGIN-CONTROL: Luke gate. F MOT: f_visible_login_control_proof needs Luke decision
 - F-PARKED-ROWS: Parked. F MOT: f_parked_decision_rows is parked
