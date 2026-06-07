@@ -15,10 +15,10 @@ Observed UTC: 2026-06-06T15:49:33Z
 | A | source facts | Calm | 100% | A is the first rollout section because it is the daily upstream base. | No further action needed now. |
 | B | orders, refunds, fees, token COGS | Blocked | 42% | B is warning-only again. Stock-receipt/token sync is now proved, but refund/token bridge, fallback-cost proof, marketplace coverage, and bridge-only ROI warnings still keep B from clean buying authority. Existing token correction remains protected and must not happen without preview and Luke approval. | Continue B-ACTIVE-FAIL-GROUP inside its approved packet. |
 | E | sales velocity and confidence | Warning | 82% | E is manager-proved as a restock evidence layer: 10 clean completed E runs, 0 E MOT failures, and the remaining ROI/B-money gaps still warning-labelled instead of treated as buying authority. | Keep warning visible and continue only if it blocks today's restocking work. |
-| H | repricing safety | Warning | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Keep warning visible and continue only if it blocks today's restocking work. |
+| H | repricing safety | Working | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Continue H-BOUNDARY-FINALIZER-TRUTH inside its approved packet. |
 | F | supplier scanner | Blocked | 78% | F login controller rewrite is now proved. F found a fresh Seller Central code, submitted it, proved Dashboard Yes/No as `YES`, and scanner continuation/backtrack promotion evidence exists. F has now continued into TD Synnex hidden scanning after login, so Weekend Hometime is monitoring durability rather than treating login as the active blocker. | Continue F-ACTIVE-FAIL-GROUP inside its approved packet. |
 | O | restocking workspace | Working | 48% | O remains the reordering lane, but affected SKUs must stay out of clean action-ready status while B fallback-token cost risk is active. O-TOKEN-COST-TRUST-GATE is now added. | Continue O-ACTIVE-RESTOCK-FILES inside its approved packet. |
-| M | main manager | Warning | 67% | Current Manager Task Board: 33 active cards, 10 not started, 0 in progress, 4 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
+| M | main manager | Warning | 67% | Current Manager Task Board: 37 active cards, 14 not started, 0 in progress, 4 blocked, 19 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
 
 ## Visible Decisions
 
@@ -29,7 +29,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ## Movement Watch
 
-- F live scanner movement: Moving. td_synnex over 5 chunks and 32.3 minutes: pending 1186 to 1089, drop 97, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
+- F live scanner movement: Moving. td_synnex over 5 chunks and 55.1 minutes: pending 1089 to 1000, drop 89, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
 - F-DHB-FORWARD-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
 - B manager lane: Blocked. 12 active jobs, 0 waiting proof, 2 Luke gates. Next: Continue B-ACTIVE-FAIL-GROUP inside its approved packet.
 - O manager lane: Working. 4 active jobs, 0 waiting proof, 0 Luke gates. Next: Continue O-ACTIVE-RESTOCK-FILES inside its approved packet.
@@ -61,6 +61,10 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ### H - repricing safety
 
+- H-BOUNDARY-FINALIZER-TRUTH: Approved. H MOT: h_boundary_finalizer_truth needs repair
+- H-MANIFEST: Approved. H MOT: h_latest_manifest_state needs repair
+- H-RELIABILITY-WINDOW-02: Approved. H MOT: h_reliability_window needs repair
+- H-TERMINAL-PUBLISH-TRUTH: Approved. H MOT: h_terminal_publish_truth needs repair
 - H-ACTIVE-FAILURES-2026: Parked. H Repair Package - Current Active Failures - 2026-05-27
 - H-CLASSIFICATION-ONLY-2026: Parked. H Classification Package - WARN Only State - 2026-05-30
 - H-INDEPENDENT-FAILURES-2026: Parked. H Repair Package - Current Independent MOT Failures - 2026-05-30
