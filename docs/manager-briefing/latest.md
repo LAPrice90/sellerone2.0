@@ -18,7 +18,7 @@ Observed UTC: 2026-06-06T15:49:33Z
 | H | repricing safety | Warning | 62% | H is calculating floors from B token evidence. For affected SKUs, H should not call the floor source clean while B fallback-token cost is unproved. H-TOKEN-FLOOR-SOURCE-GUARD is now added. | Keep warning visible and continue only if it blocks today's restocking work. |
 | F | supplier scanner | Blocked | 78% | F login controller rewrite is now proved. F found a fresh Seller Central code, submitted it, proved Dashboard Yes/No as `YES`, and scanner continuation/backtrack promotion evidence exists. F has now continued into TD Synnex hidden scanning after login, so Weekend Hometime is monitoring durability rather than treating login as the active blocker. | Continue F-ACTIVE-FAIL-GROUP inside its approved packet. |
 | O | restocking workspace | Working | 48% | O remains the reordering lane, but affected SKUs must stay out of clean action-ready status while B fallback-token cost risk is active. O-TOKEN-COST-TRUST-GATE is now added. | Continue O-ACTIVE-RESTOCK-FILES inside its approved packet. |
-| M | main manager | Warning | 67% | Current Manager Task Board: 33 active cards, 10 not started, 0 in progress, 4 blocked, 18 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
+| M | main manager | Warning | 67% | Current Manager Task Board: 32 active cards, 9 not started, 0 in progress, 4 blocked, 18 parked. | Keep warning visible and continue only if it blocks today's restocking work. |
 
 ## Visible Decisions
 
@@ -29,9 +29,9 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 ## Movement Watch
 
-- F live scanner movement: Moving. td_synnex over 5 chunks and 136.8 minutes: pending 329 to 298, drop 31, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
+- F live scanner movement: Moving. td_synnex over 5 chunks and 135.8 minutes: pending 311 to 295, drop 16, processed rows 125, memory blocks 0. Next: Keep watching until F MOT clears or the worker marks proof ready.
 - F-DHB-FORWARD-PROGRESS: Approved. Job is approved; no Luke gate is active. Next: Start or continue the approved worker packet.
-- B manager lane: Blocked. 13 active jobs, 0 waiting proof, 2 Luke gates. Next: Continue B-ACTIVE-FAIL-GROUP inside its approved packet.
+- B manager lane: Blocked. 12 active jobs, 0 waiting proof, 2 Luke gates. Next: Continue B-ACTIVE-FAIL-GROUP inside its approved packet.
 - O manager lane: Working. 4 active jobs, 0 waiting proof, 0 Luke gates. Next: Continue O-ACTIVE-RESTOCK-FILES inside its approved packet.
 
 ## Active Job Breakdown
@@ -44,7 +44,6 @@ Observed UTC: 2026-06-06T15:49:33Z
 
 - B-ACTIVE-FAIL-GROUP: Approved. Repair B active FAIL group
 - B-FUTURE-MARKETPLACE-ORDER: Approved. B MOT: b_future_marketplace_order_cursors needs repair
-- B-MAINTENANCE-MARKER: Approved. B MOT: b_maintenance_marker_state needs repair
 - B-MANAGEMENT-READY-FOR: Approved. B MOT: b_management_ready_for_maintenance needs repair
 - B-ORDER-TRUTH-COMPLETION: Approved. B MOT: b_order_truth_completion needs repair
 - B-B008-TOKEN-STATE-CONFLICT: Luke gate. B B008 Token State Conflict Decision v1
