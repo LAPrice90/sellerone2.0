@@ -1,0 +1,2 @@
+po_id,po_line_id,seller_sku,asin,supplier_code,supplier_name,ordered_qty,received_qty,remaining_open_qty,receipt_status,expected_arrival_utc,backorder_flag,cost_mode,recommendation_basis,source_event_id,asof_utc
+PO-DRAFT-20260404-001,PO-DRAFT-20260404-001-L001,XE-YPAI-HX9F,B086ZD7MG6,CUR120,DHB,15,0,15,not_received,,,test,test_cost_snapshot,phase2-evt-approve-test,2026-04-04T13:58:53Z

@@ -4663,12 +4663,21 @@ def _run_item_offers_lookup_guarded(
             offer_rows = []
         if not isinstance(detail_meta, dict):
             detail_meta = {}
+        asin_to_skus: Dict[str, List[str]] = {}
+        for sku_raw, asin_raw in sku_asins:
+            sku_key = _norm(sku_raw).upper()
+            asin_key = _norm(asin_raw).upper()
+            if sku_key and asin_key:
+                asin_to_skus.setdefault(asin_key, []).append(sku_key)
         out_map: Dict[str, Dict[str, str]] = {}
         for key, value in bb_map.items():
             key_norm = _norm(key).upper()
             if not key_norm or not isinstance(value, dict):
                 continue
-            out_map[key_norm] = {str(k): _norm(v) for k, v in value.items()}
+            normalized_value = {str(k): _norm(v) for k, v in value.items()}
+            out_map[key_norm] = normalized_value
+            for sku_key in asin_to_skus.get(key_norm, []):
+                out_map.setdefault(sku_key, normalized_value)
         out_rows: List[Dict[str, str]] = []
         for row in offer_rows:
             if not isinstance(row, dict):

@@ -1,0 +1,1 @@
+queue_utc,po_id,po_line_id,seller_sku,asin,supplier_code,supplier_name,received_qty_available_for_send,send_status,shipment_ref,cost_mode,recommendation_basis,source_event_id,queue_note,total_received_qty,total_handed_off_qty

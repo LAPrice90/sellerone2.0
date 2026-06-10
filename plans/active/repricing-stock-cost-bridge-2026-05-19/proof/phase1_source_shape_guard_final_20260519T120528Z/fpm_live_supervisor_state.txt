@@ -1,0 +1,1 @@
+state=ok|reason=freshest_live_state_seconds=28.9|manager_pids=35404|child_pids=|launched_pid=0|stale_seconds=900.0|updated_utc=2026-05-19T12:05:08Z

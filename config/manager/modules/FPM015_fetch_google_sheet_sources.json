@@ -1,0 +1,66 @@
+{
+  "id": "FPM015_fetch_google_sheet_sources",
+  "display_name": "FPM015 Google Sheet Source Intake",
+  "flow": "F",
+  "purpose": "Register Google Sheet source intake so the manager can inspect existing sheet-source status without reading or writing Google Sheets from MOT.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM015_fetch_google_sheet_sources.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM015_fetch_google_sheet_sources.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "supplier_registry",
+      "path": "config/feeder/price_list_manager/suppliers.csv",
+      "required": false,
+      "max_age_minutes": 100000
+    }
+  ],
+  "outputs": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "google_sheet_source_status_warn_after_10080_minutes",
+    "mot_must_not_read_or_write_google_sheets"
+  ],
+  "needs_user_signals": [
+    "google_sheet_source_blocked",
+    "sheet_access_missing"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "read_google_sheets_from_mot",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "download_price_file",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may read local source status evidence but must not read or write Google Sheets."
+}

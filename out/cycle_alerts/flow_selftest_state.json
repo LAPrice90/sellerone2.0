@@ -1,7 +1,7 @@
 {
-  "a_match_streak": 0,
-  "b_match_streak": 2471,
-  "e_match_streak": 0,
-  "ready_for_cutover": false,
-  "updated_utc": "2026-03-17T16:03:01Z"
+  "a_match_streak": 10,
+  "b_match_streak": 10,
+  "e_match_streak": 10,
+  "ready_for_cutover": true,
+  "updated_utc": "2026-04-28T16:25:16Z"
 }

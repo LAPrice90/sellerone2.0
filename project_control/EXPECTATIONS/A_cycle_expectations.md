@@ -3,6 +3,8 @@
 ## Purpose
 The A cycle is the daily orchestration layer for core product and health data. It refreshes key datasets, runs required daily steps, and provides health gate evidence for safe downstream use.
 
+Current direction: A is a no-Sheets source-fact cycle. It should refresh local CSV proof and local SQL-compatible facts, while O/UI owns user viewing and user-editable decisions.
+
 ## SECTION 1 - Completion Definition
 | Feature | Description | Status | Notes |
 |---|---|---|---|
@@ -11,6 +13,7 @@ The A cycle is the daily orchestration layer for core product and health data. I
 | Catalog refresh | Catalog item data is refreshed daily | In Progress | Implemented in A002 flow |
 | Inventory refresh | Inventory snapshot and history are refreshed daily | In Progress | Implemented in A003 flow |
 | Fees refresh | Fee estimates are refreshed daily | In Progress | Implemented in A004 flow |
+| No-Sheets source-fact path | A refreshes local facts without normal Google Sheets reads/writes | In Progress | 2026-05-26 code split applied for A001/A002/A004 and A runner disables Sheet-only Product DB steps; live A-owned proof still pending |
 | Daily intel refresh | Daily intel is rebuilt for repricing support | In Progress | Implemented in A016 flow |
 | Floor table support | Floor table support inputs are refreshed | In Progress | A018 is called by H path; daily dependency exists |
 | E cycle trigger | A cycle triggers E cycle as part of daily run | In Progress | `run_E_cycle.py` is in A run order |
@@ -32,8 +35,10 @@ Suggested scoring baseline:
 ## SECTION 3 - Acceptance Criteria
 - Replacement Complete:
 - A run order covers required daily data refresh and health gate scope.
-- Inventory refresh must run even when legacy Google Sheet output steps are disabled.
+- Listings, catalog, inventory, and fees refresh must run locally even when legacy Google Sheet output paths are disabled.
 - Inventory summaries and inventory history must persist through SQL-compatible writers after stale-token-floor correction, so CSV and SQL fallback tables stay aligned.
+- Sheet-only Product DB sync steps must not be required for normal A completion.
+- User-editable Product DB decisions belong to O/UI edit events and local SQL apply proof, not normal A source-fact refresh.
 - Required outputs are produced and evidenced in manifests.
 - Stable:
 - No blocking fail in last 10 runs.

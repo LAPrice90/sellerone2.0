@@ -1,5 +1,5 @@
 {
-  "snooze_until_utc": "2026-02-14T23:59:00Z",
-  "set_at_utc": "2026-02-14T13:20:44.755520Z",
-  "reason": "temporary suppression while focusing on H-cycle blocker gate"
+  "snooze_until_utc": "2026-03-30T13:30:00Z",
+  "set_at_utc": "2026-03-30T09:38:43.830149Z",
+  "reason": "reduce repeated health alert interruptions while user is working"
 }

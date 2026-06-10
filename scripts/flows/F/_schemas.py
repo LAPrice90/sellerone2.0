@@ -1318,7 +1318,7 @@ _OUTPUT_CONTRACTS: Dict[str, FFileContract] = {
     ),
     "f_screening_row_state_live": FFileContract(
         rel_path="out/systems/F/live/f_screening_row_state_live.csv",
-        purpose="Canonical per-candidate F screening state (pass, pending, timeout) emitted by F061.",
+        purpose="Canonical per-candidate F screening state (pass, pending, retry, timeout) emitted by F061.",
         owner="F",
         required_columns=(
             "observed_utc",

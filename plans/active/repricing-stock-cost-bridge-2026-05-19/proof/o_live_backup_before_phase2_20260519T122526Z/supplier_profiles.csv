@@ -1,0 +1,3 @@
+supplier_code,supplier_name,moq_default,can_backorder,shipping_charge_rule,free_shipping_threshold,lead_time_profile_type,order_friction_level,bulk_discount_available,profile_notes
+stocklist_supplier,Entertainment Trading,1,false,standard,,unknown,medium,,website=https://www.et-group.com|legacy_supplier_id=stocklist_supplier
+ET_GROUP,Entertainment Trading,1,false,standard,,unknown,medium,,website=https://www.et-group.com

@@ -27,6 +27,40 @@ def test_summarize_token_rows_builds_order_key_counts() -> None:
     assert set(order_key_counts[key]["batch_ids"]) == {"SR-1", "SR-2"}
 
 
+def test_build_batch_id_uses_sheet_row_for_split_shipments() -> None:
+    intake_dt = receipts.parse_date_uk("05/06/2026")
+
+    assert intake_dt is not None
+    assert receipts.build_batch_id(intake_dt, {"SR-20260605-001"}, row_num=91) == "SR-20260605-ROW0091"
+
+
+def test_split_shipment_batch_id_is_stable_when_tokens_already_exist() -> None:
+    intake_dt = receipts.parse_date_uk("05/06/2026")
+
+    assert intake_dt is not None
+    assert (
+        receipts.build_batch_id(intake_dt, {"SR-20260605-ROW0091"}, row_num=91)
+        == "SR-20260605-ROW0091"
+    )
+
+
+def test_duplicate_batch_guard_should_ignore_applied_rows() -> None:
+    row_statuses = [receipts.STATUS_APPLIED, receipts.STATUS_APPLIED, ""]
+    batch_ids = ["SR-20260318-014", "SR-20260318-014", "SR-20260605-ROW0091"]
+    active_seen: dict[str, int] = {}
+    duplicates: list[str] = []
+
+    for index, (status, batch_id) in enumerate(zip(row_statuses, batch_ids), start=2):
+        if status in (receipts.STATUS_APPLIED, receipts.STATUS_CANCELLED):
+            continue
+        if batch_id in active_seen:
+            duplicates.append(str(index))
+        else:
+            active_seen[batch_id] = index
+
+    assert duplicates == []
+
+
 def test_summary_columns_keep_empty_output_schema() -> None:
     df = pd.DataFrame([], columns=receipts.SUMMARY_COLUMNS)
 

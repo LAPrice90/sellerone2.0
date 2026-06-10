@@ -1,9 +1,9 @@
 pnl_category,order_scope_total,column
-Price_Total,2769.06,Price_Total_GBP
-Price_VAT,463.16,Price_VAT_GBP
-Shipping_Total,39.04,Shipping_Total_GBP
-Shipping_VAT,6.51,Shipping_VAT_GBP
+Price_Total,0.0,Price_Total_GBP
+Price_VAT,0.0,Price_VAT_GBP
+Shipping_Total,0.0,Shipping_Total_GBP
+Shipping_VAT,0.0,Shipping_VAT_GBP
 Promotion_Total,0.0,Promotion_Total_GBP
-FBA_Fee_Total,-383.51,FBA_Fee_Total_GBP
-Commission_Total,-206.03,Commission_Total_GBP
-Digital_Fee_Total,-11.440000000000001,Digital_Fee_Total_GBP
+FBA_Fee_Total,0.0,FBA_Fee_Total_GBP
+Commission_Total,0.0,Commission_Total_GBP
+Digital_Fee_Total,0.0,Digital_Fee_Total_GBP

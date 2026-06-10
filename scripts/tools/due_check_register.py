@@ -51,7 +51,7 @@ STATUS_COLUMNS = [
 ]
 
 OPEN_STATUSES = {"open", "pending", "monitoring"}
-CLOSED_STATUSES = {"complete", "completed", "cancelled", "closed"}
+CLOSED_STATUSES = {"complete", "completed", "cancelled", "closed", "parked"}
 EXECUTABLE_CHECK_IDS = {"F_PRICE_LIST_POST_RESTART_MOT_DAILY"}
 
 

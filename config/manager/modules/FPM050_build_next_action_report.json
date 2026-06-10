@@ -1,0 +1,72 @@
+{
+  "id": "FPM050_build_next_action_report",
+  "display_name": "FPM050 Next Action Report",
+  "flow": "F",
+  "purpose": "Describe the test-mode next action report builder so the manager can understand supplier recommendation evidence without asking Luke to choose from raw queue files.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM050_build_next_action_report.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM050_build_next_action_report.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "batch_scan_eligibility",
+      "path": "out/systems/F/price_list_manager/test_mode/batch_scan_eligibility.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "manager_decisions",
+      "path": "out/systems/F/price_list_manager/test_mode/manager_decisions.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "supplier_registry",
+      "path": "out/systems/F/price_list_manager/test_mode/supplier_registry.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "next_action_report",
+      "path": "out/systems/F/price_list_manager/test_mode/next_action_report.md",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "next_action_skip_reasons",
+      "path": "out/systems/F/price_list_manager/test_mode/next_action_skip_reasons.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "next_action_report_warn_after_10080_minutes",
+    "test_mode_health_warn_after_10080_minutes"
+  ],
+  "needs_user_signals": [
+    "manual_file_needed",
+    "supplier_source_missing"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox"
+  ],
+  "manager_notes": "V1.3 registration only. The manager may read this report contract but must not rebuild the report or change queue decisions in this phase."
+}

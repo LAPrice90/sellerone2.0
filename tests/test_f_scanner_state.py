@@ -12,10 +12,12 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from scripts.flows.F._scanner_state import (
+    AUTH_STATE_BBP_AUTHENTICATED,
     AUTH_STATE_BBP_LOGIN_REQUIRED,
     AUTH_STATE_DASHBOARD_LOGIN_REQUIRED,
     AUTH_STATE_LOGGED_IN,
     AUTH_STATE_LOGIN_REQUIRED,
+    AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED,
     BROWSER_STATE_HIDDEN,
     BROWSER_STATE_VISIBLE,
     DASHBOARD_DELIVERY_CLASSIFICATION_LIKELY_SEPARATE,
@@ -39,11 +41,13 @@ from scripts.flows.F._scanner_state import (
 
 
 def test_scanner_state_maps_auth_logs_to_binary_browser_state() -> None:
-    assert auth_state_from_log_text("BBP login skipped: already authenticated.") == AUTH_STATE_LOGGED_IN
+    assert auth_state_from_log_text("BBP login skipped: already authenticated.") == AUTH_STATE_BBP_AUTHENTICATED
     assert browser_state_for_auth_state(AUTH_STATE_LOGGED_IN) == BROWSER_STATE_HIDDEN
-    assert auth_state_from_log_text("[Profile5] Dashboard yes/no => LIKELY") == AUTH_STATE_LOGGED_IN
+    assert browser_state_for_auth_state(AUTH_STATE_BBP_AUTHENTICATED) == BROWSER_STATE_HIDDEN
+    assert auth_state_from_log_text("[Profile5] Dashboard yes/no => LIKELY") == AUTH_STATE_BBP_AUTHENTICATED
 
     assert auth_state_from_log_text("{'error': 'BBP_LOGIN_REQUIRED'}") == AUTH_STATE_BBP_LOGIN_REQUIRED
+    assert auth_state_from_log_text("No BBP iframe") == ""
     assert browser_state_for_auth_state(AUTH_STATE_LOGIN_REQUIRED) == BROWSER_STATE_VISIBLE
     assert browser_state_for_auth_state(AUTH_STATE_BBP_LOGIN_REQUIRED) == BROWSER_STATE_VISIBLE
     assert browser_state_for_auth_state(AUTH_STATE_DASHBOARD_LOGIN_REQUIRED) == BROWSER_STATE_VISIBLE
@@ -51,6 +55,11 @@ def test_scanner_state_maps_auth_logs_to_binary_browser_state() -> None:
     assert auth_state_from_log_text("F061_LOGIN_OPTION_DETECTED login_mode_missing_bbp_iframe") == ""
     assert auth_state_from_log_text("BBP/Amazon login option detected") == ""
     assert auth_state_from_log_text("BBP login option detected") == AUTH_STATE_BBP_LOGIN_REQUIRED
+    assert (
+        auth_state_from_log_text("SELLER_CENTRAL_LOGIN_RECOVERY status=waiting_for_code")
+        == AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED
+    )
+    assert browser_state_for_auth_state(AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED) == BROWSER_STATE_VISIBLE
 
     mixed_log = "\n".join(
         [
@@ -103,6 +112,17 @@ def test_scanner_state_splits_login_rescan_from_yesno_rescan() -> None:
             }
         )
         == ROW_QUEUE_NEEDS_YESNO_RESCAN
+    )
+
+    assert (
+        active_row_queue_state(
+            {
+                "scan_status": "login_backtrack_pending",
+                "scan_reason": "login_backtrack_required",
+                "completion_block_reason": "seller_central_eligibility_login_required",
+            }
+        )
+        == ROW_QUEUE_NEEDS_LOGIN_RESCAN
     )
 
 

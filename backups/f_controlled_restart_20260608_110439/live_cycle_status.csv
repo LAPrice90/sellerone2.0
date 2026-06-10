@@ -1,0 +1,2 @@
+observed_utc,run_id,owner_pid,state,active_supplier_id,active_f061_run_id,pending_rows,last_action,last_action_status,chunk_rows,drain_ready,notes
+2026-06-08T07:54:36Z,fpm_live_20260608T064734Z,25952,running,td_synnex,fpm_td_synnex_20260519T095000Z,286,resume_f061_active_run,scanner_running,25,0,f061_child_started;login_mode=1;global_pending_rows=286

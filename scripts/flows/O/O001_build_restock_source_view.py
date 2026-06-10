@@ -25,6 +25,10 @@ NUMERIC_DEFAULT_ZERO_COLUMNS: tuple[str, ...] = (
     "velocity_30d",
     "velocity_90d",
     "expected_refund_cost_per_unit_gbp",
+    "refund_unit_rate_30d",
+    "refund_unit_rate_90d",
+    "refund_units_30d",
+    "sales_units_30d",
     "roi_at_market_price_pct",
     "supplier_pack_size",
     "moq",
@@ -35,6 +39,31 @@ NUMERIC_DEFAULT_ZERO_COLUMNS: tuple[str, ...] = (
 DEMAND_INPUT_MIN_UNITS_PER_DAY = 0.05
 TEST_COST_MODE_ENV = "O_RESTOCK_COST_MODE"
 NET_FEE_MODEL_MAX_AGE_HOURS = 48.0
+WEAK_REFUND_PROOF_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "sellerboard_bridge_only",
+    "bridge_labelled_only",
+}
+WEAK_REFUND_CONFIDENCE_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+}
+WEAK_INBOUND_COST_CONFIDENCE_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "missing_inbound_cost_confidence",
+    "unsupported_currency",
+}
 BACKTEST_FIELD_MAP: tuple[tuple[str, str], ...] = (
     ("policy_id", "backtest_policy_id"),
     ("history_confidence", "backtest_history_confidence"),
@@ -569,6 +598,148 @@ def _select_velocity_rows(velocity_df: pd.DataFrame) -> dict[str, pd.Series]:
     return {idx: work.loc[idx] for idx in work.index}
 
 
+def _select_inbound_cost_rows(inbound_df: pd.DataFrame) -> dict[str, dict[str, str]]:
+    if inbound_df.empty or "sku" not in inbound_df.columns:
+        return {}
+
+    totals: dict[str, dict[str, object]] = {}
+    for _, row in inbound_df.iterrows():
+        sku_norm = _normalize_key(row.get("sku", ""))
+        if not sku_norm:
+            continue
+        bucket = totals.setdefault(
+            sku_norm,
+            {
+                "received_qty": 0.0,
+                "allocated_total": 0.0,
+                "unsupported_currency": "",
+                "shipment_ids": [],
+            },
+        )
+        currency = _normalize_text(row.get("currency", "")).upper()
+        if currency and currency != "GBP":
+            bucket["unsupported_currency"] = currency
+
+        received_qty = _num_or_none(row.get("received_qty", ""))
+        allocated_total = _num_or_none(row.get("allocated_total", ""))
+        if allocated_total is None:
+            allocated_amount = _num_or_none(row.get("allocated_amount", "")) or 0.0
+            allocated_tax = _num_or_none(row.get("allocated_tax", "")) or 0.0
+            allocated_total = allocated_amount + allocated_tax
+
+        if received_qty is not None and received_qty > 0:
+            bucket["received_qty"] = float(bucket["received_qty"]) + received_qty
+        if allocated_total is not None and allocated_total != 0:
+            bucket["allocated_total"] = float(bucket["allocated_total"]) + abs(allocated_total)
+
+        shipment_id = _normalize_text(row.get("shipment_id", ""))
+        if shipment_id:
+            shipment_ids = bucket["shipment_ids"]
+            if isinstance(shipment_ids, list) and shipment_id not in shipment_ids:
+                shipment_ids.append(shipment_id)
+
+    out: dict[str, dict[str, str]] = {}
+    for sku_norm, bucket in totals.items():
+        received_qty = float(bucket["received_qty"])
+        allocated_total = float(bucket["allocated_total"])
+        unit_cost = allocated_total / received_qty if received_qty > 0 and allocated_total > 0 else None
+        shipment_ids = bucket["shipment_ids"] if isinstance(bucket["shipment_ids"], list) else []
+        out[sku_norm] = {
+            "received_qty": _num_to_text(received_qty),
+            "allocated_total": _num_to_text(allocated_total),
+            "unit_cost": _num_to_text(unit_cost),
+            "unsupported_currency": _normalize_text(bucket["unsupported_currency"]),
+            "source_reference": "|".join(str(value) for value in shipment_ids[:5]),
+        }
+    return out
+
+
+def _build_inbound_cost_context(inbound_row: dict[str, str] | None, notes: list[str]) -> dict[str, str]:
+    if inbound_row is None:
+        notes.append("INBOUND_COST_CONFIDENCE_MISSING")
+        return {
+            "expected_inbound_cost_per_unit_gbp": "",
+            "inbound_cost_basis": "missing_sku_inbound_cost_allocation",
+            "inbound_cost_confidence": "missing",
+            "inbound_cost_source_asof": "",
+            "inbound_cost_source_reference": "",
+        }
+
+    unsupported_currency = _normalize_text(inbound_row.get("unsupported_currency", ""))
+    unit_cost = _num_or_none(inbound_row.get("unit_cost", ""))
+    if unsupported_currency:
+        notes.append("INBOUND_COST_UNSUPPORTED_CURRENCY")
+        return {
+            "expected_inbound_cost_per_unit_gbp": "",
+            "inbound_cost_basis": f"unsupported_currency_{unsupported_currency}",
+            "inbound_cost_confidence": "unsupported_currency",
+            "inbound_cost_source_asof": "",
+            "inbound_cost_source_reference": _normalize_text(inbound_row.get("source_reference", "")),
+        }
+    if unit_cost is None or unit_cost <= 0:
+        notes.append("INBOUND_COST_CONFIDENCE_MISSING")
+        return {
+            "expected_inbound_cost_per_unit_gbp": "",
+            "inbound_cost_basis": "missing_sku_inbound_cost_allocation",
+            "inbound_cost_confidence": "missing",
+            "inbound_cost_source_asof": "",
+            "inbound_cost_source_reference": _normalize_text(inbound_row.get("source_reference", "")),
+        }
+
+    return {
+        "expected_inbound_cost_per_unit_gbp": _num_to_text(unit_cost),
+        "inbound_cost_basis": "allocated_inbound_cost_per_received_unit",
+        "inbound_cost_confidence": "sku_allocated",
+        "inbound_cost_source_asof": "out/inbound_costs_allocated_sku.csv",
+        "inbound_cost_source_reference": _normalize_text(inbound_row.get("source_reference", "")),
+    }
+
+
+def _refund_confidence_is_weak(*, proof_state: str, sample_confidence: str) -> bool:
+    proof = _normalize_text(proof_state).lower()
+    confidence = _normalize_text(sample_confidence).lower()
+    return proof in WEAK_REFUND_PROOF_STATES or confidence in WEAK_REFUND_CONFIDENCE_STATES
+
+
+def _build_profit_input_confidence(row: dict[str, str], notes: list[str]) -> dict[str, str]:
+    blockers: list[str] = []
+
+    if _refund_confidence_is_weak(
+        proof_state=row.get("refund_proof_state", ""),
+        sample_confidence=row.get("refund_sample_confidence", ""),
+    ):
+        blockers.append("missing_refund_confidence")
+
+    inbound_confidence = _normalize_text(row.get("inbound_cost_confidence", "")).lower()
+    if inbound_confidence in WEAK_INBOUND_COST_CONFIDENCE_STATES:
+        blockers.append("missing_inbound_cost_confidence")
+
+    net_fee_status = _normalize_text(row.get("net_fee_model_status", "")).lower()
+    if net_fee_status != "fresh":
+        blockers.append("missing_net_fee_model" if net_fee_status in {"", "missing"} else f"{net_fee_status}_net_fee_model")
+
+    token_cost_trust_state = _normalize_text(row.get("token_cost_trust_state", "")).lower()
+    if token_cost_trust_state != "trusted":
+        blockers.append("token_cost_not_trusted" if token_cost_trust_state else "token_cost_not_verified")
+
+    if (_num_or_none(row.get("market_price_gbp", "")) or 0.0) <= 0:
+        blockers.append("missing_market_price")
+    if (_num_or_none(row.get("current_supplier_buy_cost_gbp", "")) or 0.0) <= 0:
+        blockers.append("missing_supplier_cost")
+
+    unique_blockers = list(dict.fromkeys(blockers))
+    if unique_blockers:
+        notes.append("PROFIT_INPUT_CONFIDENCE_MISSING")
+        return {
+            "profit_input_confidence": "missing_profit_inputs",
+            "profit_input_blockers": "|".join(unique_blockers),
+        }
+    return {
+        "profit_input_confidence": "profit_inputs_verified",
+        "profit_input_blockers": "",
+    }
+
+
 def _backtest_status_priority(value: object) -> int:
     token = str(value or "").strip().lower()
     if token == "ready":
@@ -628,6 +799,41 @@ def _select_supplier_buy_cost_truth_rows(cost_truth_df: pd.DataFrame) -> dict[st
     )
     work = work.drop_duplicates(subset=["seller_sku_norm"], keep="first").set_index("seller_sku_norm")
     return {idx: work.loc[idx] for idx in work.index}
+
+
+def _select_token_cost_trust_rows(trust_df: pd.DataFrame) -> dict[str, pd.Series]:
+    if trust_df.empty or "seller_sku" not in trust_df.columns:
+        return {}
+    work = trust_df.copy()
+    work["seller_sku_norm"] = work.get("seller_sku", "").map(_normalize_key)
+    work = work[work["seller_sku_norm"] != ""]
+    if work.empty:
+        return {}
+    if "proof_utc" in work.columns:
+        work["_proof_sort"] = pd.to_datetime(work.get("proof_utc", ""), errors="coerce", utc=True)
+        work = work.sort_values(by=["seller_sku_norm", "_proof_sort"], ascending=[True, False], kind="stable")
+    work = work.drop_duplicates(subset=["seller_sku_norm"], keep="first").set_index("seller_sku_norm")
+    return {idx: work.loc[idx] for idx in work.index}
+
+
+def _build_token_cost_trust_context(trust_row: pd.Series | None, notes: list[str]) -> dict[str, str]:
+    if trust_row is None:
+        notes.append("TOKEN_COST_TRUST_NOT_VERIFIED")
+        return {
+            "token_cost_trust_state": "not_verified",
+            "token_cost_trust_basis": "restock_token_cost_trust_gate_missing_or_no_sku_row",
+            "token_cost_trust_source": "out/systems/O/live/restock_token_cost_trust_gate_live.csv",
+            "token_cost_trust_blockers": "missing_token_cost_trust_gate",
+        }
+    state = _normalize_text(trust_row.get("token_cost_trust_state", "")).lower() or "not_verified"
+    if state != "trusted":
+        notes.append(f"TOKEN_COST_TRUST_{state.upper()}")
+    return {
+        "token_cost_trust_state": state,
+        "token_cost_trust_basis": _normalize_text(trust_row.get("token_cost_trust_basis", "")),
+        "token_cost_trust_source": _normalize_text(trust_row.get("token_cost_trust_source", "")),
+        "token_cost_trust_blockers": _normalize_text(trust_row.get("token_cost_trust_blockers", "")),
+    }
 
 
 def _select_profile_rows(profile_df: pd.DataFrame) -> dict[str, pd.Series]:
@@ -1020,6 +1226,7 @@ def build_restock_source_view(
     inventory_source = source_data["inventory_summaries"]
     velocity_source = source_data["sku_sales_velocity"]
     performance_source = source_data["sku_performance_summary"]
+    inbound_cost_source = source_data["inbound_costs_allocated_sku"]
     offer_source = source_data["listing_offer_snapshot_latest"]
     backtest_source = source_data["feeder_backtest_summary_live"]
 
@@ -1077,6 +1284,8 @@ def build_restock_source_view(
         perf = perf.drop_duplicates(subset=["sku_norm"], keep="first").set_index("sku_norm")
         perf_map = {idx: perf.loc[idx] for idx in perf.index}
 
+    inbound_cost_map = _select_inbound_cost_rows(inbound_cost_source.df)
+
     offer_map: dict[str, pd.Series] = {}
     if not offer_source.df.empty:
         offer = offer_source.df.copy()
@@ -1092,6 +1301,9 @@ def build_restock_source_view(
 
     supplier_buy_cost_truth_map = _select_supplier_buy_cost_truth_rows(
         read_o_contract_df(root_path, "supplier_buy_cost_truth")
+    )
+    token_cost_trust_map = _select_token_cost_trust_rows(
+        read_o_contract_df(root_path, "restock_token_cost_trust_gate_live")
     )
     sku_quantity_profile_map = _select_profile_rows(read_o_contract_df(root_path, "sku_quantity_profiles"))
     special_order_profile_map = _select_profile_rows(read_o_contract_df(root_path, "special_order_profiles"))
@@ -1134,6 +1346,7 @@ def build_restock_source_view(
         inventory_row = inventory_map.get(sku_norm)
         velocity_row = velocity_map.get(sku_norm)
         performance_row = perf_map.get(sku_norm)
+        inbound_cost_row = inbound_cost_map.get(sku_norm)
         offer_row = offer_map.get(sku_norm)
         backtest_row = backtest_map_by_pair.get((sku_norm, asin_norm))
         if backtest_row is None:
@@ -1188,6 +1401,15 @@ def build_restock_source_view(
             asof_utc=timestamp_utc,
             notes=notes,
         )
+        token_cost_trust_context = _build_token_cost_trust_context(token_cost_trust_map.get(sku_norm), notes)
+        inbound_cost_context = _build_inbound_cost_context(inbound_cost_row, notes)
+        refund_proof_state = _value_from_any(performance_row, ("refund_proof_state",), default="not_yet_proven")
+        refund_sample_confidence = _value_from_any(performance_row, ("refund_sample_confidence",))
+        if _refund_confidence_is_weak(
+            proof_state=refund_proof_state,
+            sample_confidence=refund_sample_confidence,
+        ):
+            notes.append("REFUND_PROOF_WEAK")
 
         row = {
             "asof_utc": timestamp_utc,
@@ -1225,6 +1447,21 @@ def build_restock_source_view(
                 ("expected_refund_cost_per_unit_gbp",),
                 default="0",
             ),
+            "refund_unit_rate_30d": _value_from_any(performance_row, ("refund_unit_rate_30d",), default="0"),
+            "refund_unit_rate_90d": _value_from_any(performance_row, ("refund_unit_rate_90d",), default="0"),
+            "refund_units_30d": _value_from_any(performance_row, ("refund_units_30d",), default="0"),
+            "sales_units_30d": _value_from_any(performance_row, ("sales_units_30d",), default="0"),
+            "refund_cost_basis": _value_from_any(performance_row, ("refund_cost_basis",)),
+            "refund_proof_state": refund_proof_state or "not_yet_proven",
+            "refund_sample_confidence": refund_sample_confidence,
+            "profit_confidence": _value_from_any(performance_row, ("profit_confidence",)),
+            "sales_truth_state": _value_from_any(performance_row, ("sales_truth_state",)),
+            "stock_signal": _value_from_any(performance_row, ("stock_signal",)),
+            "restock_business_ready": _value_from_any(performance_row, ("restock_business_ready",), default="no"),
+            "restock_decision_state": _value_from_any(performance_row, ("restock_decision_state",)),
+            "restock_missing_proof": _value_from_any(performance_row, ("restock_missing_proof",)),
+            "missing_roi_reason": _value_from_any(performance_row, ("missing_roi_reason",)),
+            "missing_roi_reason_detail": _value_from_any(performance_row, ("missing_roi_reason_detail",)),
             "roi_at_market_price_pct": roi_context,
             "source_inventory_asof": _value_from_any(inventory_row, ("last_updated_time",)),
             "source_velocity_asof": _value_from_any(velocity_row, ("asof_date",)),
@@ -1233,6 +1470,8 @@ def build_restock_source_view(
             "source_notes": "|".join(sorted(set(note for note in notes if note))),
         }
         row.update(net_fee_context)
+        row.update(token_cost_trust_context)
+        row.update(inbound_cost_context)
         row.update(cost_context)
         row.update(backtest_context)
         if effective_cost_mode == "test":
@@ -1270,6 +1509,7 @@ def build_restock_source_view(
                 notes=notes,
             )
         )
+        row.update(_build_profit_input_confidence(row, notes))
         row["source_notes"] = "|".join(sorted(set(note for note in notes if note)))
         if row["market_price_basis_used"] == "MISSING_MARKET_CONTEXT" and not row["source_notes"]:
             row["source_notes"] = "REDUCED_CONFIDENCE_MISSING_H_PRICE_CONTEXT"

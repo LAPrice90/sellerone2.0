@@ -7,6 +7,7 @@ from typing import Iterable, Mapping
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
 from scripts.core.storage.adapter import SqlStore, connect_store
 from scripts.core.storage.config import StorageConfig, parse_storage_mode
 
@@ -153,7 +154,7 @@ def write_dataframe_with_sql_compat(dataframe: pd.DataFrame, path: str | Path, t
             store.close()
     csv_path = Path(path)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    dataframe.to_csv(csv_path, index=False)
+    safe_to_csv(dataframe, csv_path, index=False)
     return {
         "mode": mode,
         "path": str(csv_path),

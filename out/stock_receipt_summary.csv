@@ -1,2 +1,4 @@
-row_num,intake_date,seller_sku,qty,cost_per_unit,status,batch_id,tokens_created,order_key,error_message
-3,10/11/25,4U-9ZL6-9G0Y,3,1.26,APPLIED,SR-20251110-001,3,0750fad9-dc80-4d3d-a8a9-186ab66cea7c,
+row_num,intake_date,seller_sku,qty,cost_per_unit,auto_cost_source,status,batch_id,tokens_created,order_key,error_message
+89,28/04/2026,6V-EEC1-2S9Z,250,2.22,,APPLIED,SR-20260428-ROW0089,250,6a52f486-dd3c-44d6-bbca-39b53e8c4d37,
+90,18/03/2026,MW-9K5M-VKW8,40,13.65,,APPLIED,SR-20260318-ROW0090,40,e11213df-b721-4c96-acda-ce68cf140f9a,
+91,19/11/2025,VF-3T0K-DR5O,100,2.05,,APPLIED,SR-20251119-ROW0091,100,73e6e8fd-f000-4b14-bbbe-70c4554fd7de,

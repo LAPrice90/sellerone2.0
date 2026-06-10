@@ -79,19 +79,45 @@ Before finishing, edit this file and fill in section 9.
 
 ## 10. Goal Reply - To Be Filled In By Goal Pursue
 
-Status:
+Status: Complete - research only. No A015 run, no A scripts run, no stock receipt data edits, and no Google Sheets writes.
 
 Files changed:
+- `plans/active/sellerone-endgame-command-center-2026-05-26/goal_files/GOAL_A-001_classify_stock_receipt_warning.md`
 
 Files inspected:
+- `out/cycle_alerts/checklist_A.csv`
+- `out/system_health_checklist.csv`
+- `out/stock_receipt_duplicate_batches.csv`
+- `out/manifests/A/2026-05-25/20260525T050108Z.json`
+- `out/stock_receipts_latest.csv`
+- `out/stock_receipt_summary.csv`
+- `out/token_ledger_live.csv`
+- `plans/active/sellerone-endgame-command-center-2026-05-26/A_CYCLE_TODO.md`
+- `scripts/tools/process_stock_receipts_sheet.py`
+- `scripts/flows/A/A015_build_system_health_check.py` read only, not run
 
 Evidence found:
+- A warning text: `a_stock_receipts_collection_health` is `warn` because `process_stock_receipts_sheet.py` was skipped by the guardrail: duplicate `batch_id` values were found in the intake sheet.
+- Latest named A manifest: `20260525T050108Z.json`. The A run final state was `completed`; the stock receipt step had `rc=1`, `step_status=skipped`, and `verification_status=guardrail_blocked`.
+- Duplicate row count: 2.
+- Affected duplicate rows:
+  - Row 77 - `SR-20260318-014`, SKU `MY-KL21-NMV5`, qty `4`, status `APPLIED`, error `idempotent_existing_order_key`, tokens_created `8`, OrderKey `571289f8-b7a9-4297-a6df-4c84e54c8c15`.
+  - Row 79 - `SR-20260318-024`, SKU `8W-I703-VOFQ`, qty `12`, status `APPLIED`, error `idempotent_existing_order_key`, tokens_created `12`, OrderKey `2ec1affe-febf-4902-baa4-d3ee06ed5071`.
+- Token ledger evidence exists for both order keys/SKUs:
+  - `MY-KL21-NMV5` has 8 existing live tokens for the same order key: 7 under `SR-20260318-014` and 1 under `SR-20260318-025`.
+  - `8W-I703-VOFQ` has 12 existing live tokens under `SR-20260318-024`: 10 available and 2 allocated.
+- Local code evidence: the receipt script pre-scans all intake rows for duplicate `batch_id` values before it skips already-`APPLIED` rows. That means safe historical rows can still keep the guardrail warning active.
 
 Decision made:
+Classification: `harmless idempotent history` for received-stock truth. These two rows are not showing dangerous duplicate token creation; they are already applied and backed by existing tokens. The warning itself is still real as an operational guardrail because those historical duplicate batch IDs remain in the intake sheet and will keep the receipt step skipped until an approved follow-up records them as an accepted non-blocking exception, cleans the historical duplicate intake rows, or updates the guardrail to ignore safe `APPLIED` plus `idempotent_existing_order_key` duplicates.
 
 Tests or proof:
+- Read-only CSV and manifest inspection completed.
+- Read-only token ledger check completed for both affected order keys.
+- No delayed result check was added because this goal made a classification only, and the classification is proven immediately from existing artifacts.
 
 Remaining blocker:
+No blocker to classifying the A warning. The warning will remain visible until a separate approved follow-up chooses one cleanup/exception path.
 
 Recommended next goal:
-
+continue with GOAL_O-001_compare_o_plans

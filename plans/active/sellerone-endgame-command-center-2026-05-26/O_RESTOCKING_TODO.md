@@ -3,6 +3,8 @@
 Created: 2026-05-26
 Owner flow: O
 Business purpose: reorder existing profitable products and stop stock gaps.
+Last plan comparison: 2026-05-26
+Current next phase: Phase 1 - Clear the price-proof blocker before deeper PO, receiving, or send-to-Amazon work.
 
 ## Source Plans To Read First
 
@@ -18,12 +20,16 @@ Business purpose: reorder existing profitable products and stop stock gaps.
 
 ## Current Evidence
 
-- Restock source view: 608 rows.
-- Restock recommendations: 608 rows.
-- Restock profit checks: 608 rows.
-- Market-refresh candidates: 59 rows.
-- Legacy purchase list bridge: 72 rows.
+- Restock source view: 608 rows, last modified 2026-05-23.
+- Restock recommendations: 608 rows, last modified 2026-05-23.
+- Restock profit checks: 608 rows, last modified 2026-05-23.
+- Reorder input coverage: 608 rows, with `action_ready_now=0` for all rows.
+- Market-refresh candidates: 59 rows, all `candidate_status=ready`.
+- Legacy purchase list bridge: 72 rows, split as 51 Restock, 18 No Data, and 3 Drop.
 - Purchase orders: 2 header/order rows and 9 PO line rows.
+- Purchase order line source mix: 1 `test` line and 8 `legacy_sheet` lines.
+- Ordered stock state: 1 sample/test row.
+- Receiving events: 3 `phase4_test` rows.
 - Send-to-Amazon queue: 0 rows.
 - Current active price-proof plan is blocked because H isolation was required before a candidate-only market scan.
 
@@ -40,16 +46,47 @@ The reorder system is finished for v1 when the user can:
 
 ## Phase 0 - Research And Tidy The Existing Restock Plans
 
-- [ ] Compare the April restock implementation plan against the May O plans.
-- [ ] Mark each old phase as `done`, `partly done`, `still needed`, or `obsolete`.
-- [ ] Confirm whether `purchase_orders_live.csv` and `purchase_order_lines_live.csv` are real operator-ready PO drafts or sample/bridge outputs.
-- [ ] Confirm whether the 72 legacy bridge rows are still the operator source of truth for current buying.
-- [ ] Confirm why native O can still disagree with Sheet source and list the exact fields causing disagreement.
+- [x] Compare the April restock implementation plan against the May O plans.
+- [x] Mark each old phase as `done`, `partly done`, `still needed`, or `obsolete`.
+- [x] Confirm whether `purchase_orders_live.csv` and `purchase_order_lines_live.csv` are real operator-ready PO drafts or sample/bridge outputs.
+- [x] Confirm whether the 72 legacy bridge rows are still the operator source of truth for current buying.
+- [x] Confirm why native O can still disagree with Sheet source and list the exact fields causing disagreement.
 
 Proof to collect:
-- file row counts
-- latest output timestamps
-- exact field mismatch examples, not general comments
+- file row counts: collected on 2026-05-26 by read-only local CSV inspection.
+- latest output timestamps: collected from local file metadata.
+- exact field mismatch examples: collected for SKU `12-749B-9EB5`.
+
+Phase 0 decision from 2026-05-26:
+
+| April phase | Current status | Decision |
+| --- | --- | --- |
+| Phase 0 - Foundations | done | Keep. O paths, schemas, source contracts, scripts, and tests exist. |
+| Phase 1 - Restock Advisor Data | partly done | Keep. O001/O002/O003 and 608-row outputs exist, but native O currently produces 608 `wait` recommendations and 0 action-ready rows. |
+| Phase 2 - Human Decision Capture | partly done | Keep. O010 and decision event flow exist, but current proof still relies on sample and legacy bridge paths. |
+| Phase 3 - Minimal UI | partly done | Keep the thin-UI rule, but use the newer supplier-first reorder board blueprint for the actual UI shape. |
+| Phase 4 - Purchase Orders | partly done | Keep. O100 can create draft rows, but current PO files are mixed proof output: 1 test line and 8 legacy-sheet lines, not fully native operator-ready PO truth. |
+| Phase 5 - Ordered Stock And Receiving | partly done | Keep. O200/O210 artifacts exist with sample/test evidence only; no live receiving lane is proven. |
+| Phase 6 - Send To Amazon Handoff | still needed | Keep. Queue file exists but has 0 rows, so no received-stock-to-Amazon handoff is proven. |
+| Phase 7 - Runtime Cadence And Evidence | blocked | Keep for later. O runner files exist, but cadence should not become the main work until native price proof, supplier readiness, PO, and receiving states are safe. |
+
+Old or replaced plan noise:
+
+- Old Google Sheets formula logic is obsolete as core logic.
+- Old checkbox and delete-row history behavior is obsolete as durable workflow state.
+- The legacy Purchase List is useful only as a temporary bridge and operator reference until native O parity is proven.
+- The old idea of building UI first is obsolete; the current path is data proof first, UI as a thin operator layer.
+
+Native O versus Sheet bridge mismatch example:
+
+- SKU `12-749B-9EB5` is `Restock` in the legacy bridge with `recommendation_status=full_restock`, `market_price_basis_used=LEGACY_PURCHASE_LIST_ROI_BACKSOLVE`, `forward_roi_pct=36`, and `bridge_note=LEGACY_PURCHASE_LIST_RESTOCK|NATIVE_O_PARITY_PENDING`.
+- The native O recommendation for the same SKU is `wait`, with `market_price_gbp` blank, `net_fee_model_status=missing`, `recommended_qty_rounded=0`, and reason codes `SUPPLIER_COST_USER_CONFIRMATION_REQUIRED,LOW_CONFIDENCE_MARKET_CONTEXT,SALE_STATUS_NOT_ACTIVE`.
+- The market-refresh queue names the missing proof as `legacy_sheet_market_not_native|missing_native_max_pay|missing_native_fee_model|legacy_sheet_requires_native_market_proof`.
+
+Next safe goal:
+
+- Continue with `GOAL_O-003_clear_market_refresh_blocker.md`.
+- Do not build deeper PO, receiving, or send-to-Amazon behavior until the 59-row market-proof blocker is classified and either cleared or parked.
 
 ## Phase 1 - Clear The Price-Proof Blocker
 
@@ -111,4 +148,3 @@ Stop before changing anything if:
 - H is active and the proof needs H-owned market files
 - the row source of truth is unclear
 - a supplier business rule is unknown
-

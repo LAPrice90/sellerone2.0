@@ -96,6 +96,19 @@ def test_due_check_register_supports_trigger_based_rows(tmp_path: Path) -> None:
     assert rows[0]["alert_status"] == "ok"
 
 
+def test_due_check_register_keeps_parked_rows_quiet(tmp_path: Path) -> None:
+    register_path = tmp_path / "register.csv"
+    _write_register(register_path, [_base_row(status="parked", due_utc="2026-05-01T09:00:00Z")])
+
+    rows = due_check_register.build_due_check_status(
+        register_path=register_path,
+        observed_utc="2026-05-02T09:00:00Z",
+    )
+
+    assert rows[0]["due_state"] == "parked"
+    assert rows[0]["alert_status"] == "ok"
+
+
 def test_due_check_register_flags_duplicate_ids_as_fail(tmp_path: Path) -> None:
     register_path = tmp_path / "register.csv"
     _write_register(

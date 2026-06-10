@@ -1,0 +1,4 @@
+supplier_code,supplier_name,supplier_sku,seller_sku,asin,current_unit_cost,currency,availability_status,supplier_stock,moq,pack_size,source_type,source_reference,captured_at_utc,is_current
+2046517,TD Synnex,TEST-L3-ZQ8U-A7LQ,L3-ZQ8U-A7LQ,B004I2N5AS,12.4667,GBP,in_stock,1000,1,1,test_fixture,out/systems/O/live/supplier_cost_snapshot_test_input_generated.csv,2026-04-03T13:58:33Z,1
+CUR120,DHB,TEST-XE-YPAI-HX9F,XE-YPAI-HX9F,B086ZD7MG6,8.0625,GBP,in_stock,1000,5,5,test_fixture,out/systems/O/live/supplier_cost_snapshot_test_input_generated.csv,2026-04-03T13:58:33Z,1
+348926,Stax,TEST-AK-OB6V-HIYD,AK-OB6V-HIYD,B00IUKPVYM,4.2857,GBP,in_stock,1000,1,1,test_fixture,out/systems/O/live/supplier_cost_snapshot_test_input_generated.csv,2026-04-03T13:58:33Z,1

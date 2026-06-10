@@ -51,12 +51,31 @@ def test_supervisor_decision_keeps_fresh_manager() -> None:
         manager_state={"updated_utc": "2026-05-14T13:42:32Z"},
         child_state={"heartbeat": "2026-05-14T13:42:32Z", "last_output_utc": "2026-05-14T13:42:30Z"},
         child_stdout_age_seconds=30,
+        scanner_progress_age_seconds=25,
         stale_seconds=900,
         now=now,
     )
 
     assert decision == "ok"
-    assert reason.startswith("freshest_live_state_seconds=")
+    assert reason.startswith("process_alive_seconds=")
+    assert "scanner_progress_seconds=" in reason
+
+
+def test_supervisor_decision_does_not_call_fresh_heartbeat_real_progress() -> None:
+    now = datetime(2026, 5, 14, 13, 43, 0, tzinfo=timezone.utc)
+
+    decision, reason = supervisor._supervisor_decision(
+        manager_pids=[1234],
+        manager_state={"updated_utc": "2026-05-14T13:42:32Z"},
+        child_state={"heartbeat": "2026-05-14T13:42:32Z", "last_output_utc": "2026-05-14T13:42:30Z"},
+        child_stdout_age_seconds=30,
+        scanner_progress_age_seconds=1900,
+        stale_seconds=900,
+        now=now,
+    )
+
+    assert decision == "alive_no_progress"
+    assert "scanner_progress_seconds=1900.0" in reason
 
 
 def test_supervise_once_launches_when_manager_missing(tmp_path: Path) -> None:
@@ -168,7 +187,7 @@ def test_supervise_once_uses_lock_pid_when_command_line_lookup_is_empty(tmp_path
         now=datetime(2026, 5, 15, 10, 7, 0, tzinfo=timezone.utc),
     )
 
-    assert result["status"] == "ok"
+    assert result["status"] == "alive_no_progress"
     assert result["manager_pids"] == [2468]
     assert result["launched_pid"] == 0
 
@@ -197,7 +216,45 @@ def test_supervise_once_uses_fresh_lock_heartbeat_when_mode_state_is_idle_stale(
     )
 
     state_path = live_dir / "fpm_live_supervisor_state.txt"
-    assert result["status"] == "ok"
+    assert result["status"] == "alive_no_progress"
     assert result["manager_pids"] == [2468]
     assert result["launched_pid"] == 0
-    assert "state=ok" in state_path.read_text(encoding="ascii")
+    state_text = state_path.read_text(encoding="ascii")
+    assert "state=alive_no_progress" in state_text
+    assert "progress_state=progress_missing" in state_text
+
+
+def test_supervise_once_keeps_ok_only_when_scanner_chunk_progress_is_fresh(
+    tmp_path: Path, monkeypatch
+) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "live_cycle.lock").write_text(
+        "pid=2468|start=2026-05-18T08:41:49Z|heartbeat=2026-05-18T08:42:51Z|owner=FPM130_live_cycle\n",
+        encoding="ascii",
+    )
+    (live_dir / "f061_manager_mode_state.txt").write_text(
+        "mode=Scanning Hidden|updated_utc=2026-05-18T08:42:51Z\n",
+        encoding="ascii",
+    )
+    (live_dir / "live_cycle_events.csv").write_text(
+        "event_utc,event_type,status,supplier_id,rows\n"
+        "2026-05-18T08:42:40Z,scanner_chunk,success,td_synnex,25\n",
+        encoding="ascii",
+    )
+    monkeypatch.setattr(supervisor, "_pid_alive", lambda root, pid: pid == 2468)
+
+    result = supervisor.supervise_once(
+        root=tmp_path,
+        process_finder=lambda _pattern: [],
+        child_finder=lambda _pattern: [],
+        launch_manager=lambda root, **kwargs: 9999,
+        now=datetime(2026, 5, 18, 8, 43, 0, tzinfo=timezone.utc),
+    )
+
+    state_path = live_dir / "fpm_live_supervisor_state.txt"
+    state_text = state_path.read_text(encoding="ascii")
+    assert result["status"] == "ok"
+    assert result["launched_pid"] == 0
+    assert "progress_state=scanner_progressing" in state_text
+    assert "scanner_progress_utc=2026-05-18T08:42:40Z" in state_text

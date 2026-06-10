@@ -1,0 +1,67 @@
+{
+  "id": "FPM155_apply_review_intelligence_gate",
+  "display_name": "FPM155 Review Intelligence Gate",
+  "flow": "F",
+  "purpose": "Register the review intelligence gate so the manager can inspect AI decision readiness without applying hidden gate changes or moving rows.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM155_apply_review_intelligence_gate.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM155_apply_review_intelligence_gate.py",
+  "health_sources": [
+    {
+      "name": "ai_review_intelligence_health",
+      "path": "out/systems/F/price_list_manager/review_handoffs",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "ai_review_queue",
+      "path": "out/systems/F/price_list_manager/review_handoffs",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "codex_ai_review_decisions",
+      "path": "out/systems/F/price_list_manager/review_handoffs",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ai_review_intelligence_health",
+      "path": "out/systems/F/price_list_manager/review_handoffs",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "ai_decision_rows_must_match_active_queue",
+    "stale_ai_decisions_must_not_move_rows"
+  ],
+  "needs_user_signals": [
+    "ai_manual_review_required",
+    "ai_decision_gap_visible"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "apply_ai_gate",
+    "publish_review_rows",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. The manager may read AI gate evidence but must not apply the gate, move rows, or publish review rows."
+}

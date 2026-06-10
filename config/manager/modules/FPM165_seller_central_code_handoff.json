@@ -1,0 +1,87 @@
+{
+  "id": "FPM165_seller_central_code_handoff",
+  "display_name": "FPM165 Seller Central Code Handoff",
+  "flow": "F",
+  "purpose": "Register the Seller Central eligibility-login and SMS-code handoff proof so the manager can distinguish BBP account login from Amazon eligibility authorization.",
+  "owner_entrypoint": "scripts/flows/F/seller_central_login_recovery.py",
+  "worker_entrypoint": "scripts/flows/F/seller_central_login_recovery.py",
+  "health_sources": [
+    {
+      "name": "seller_central_login_recovery_proof",
+      "path": "out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "seller_central_login_secret_presence",
+      "path": "secrets/price_list_manager/seller_central_login.env",
+      "required": false,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "gmail_oauth_token_presence",
+      "path": "secrets/price_list_manager/gmail_token.json",
+      "required": false,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "seller_central_otp_used_messages",
+      "path": "out/systems/F/price_list_manager/live/seller_central_otp_used_messages.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "f061_login_mode_request",
+      "path": "out/systems/F/price_list_manager/live/f061_login_mode.requested",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "seller_central_login_recovery_proof",
+      "path": "out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "seller_central_otp_used_messages",
+      "path": "out/systems/F/price_list_manager/live/seller_central_otp_used_messages.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "seller_central_eligibility_proof_warn_after_10080_minutes",
+    "seller_central_eligibility_proof_fail_after_live_stuck_or_repeated_failure"
+  ],
+  "needs_user_signals": [
+    "seller_central_credentials_missing",
+    "sms_forwarding_missing",
+    "one_time_code_waiting",
+    "manual_amazon_challenge_required",
+    "live_proof_window_not_approved"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_redacted_proof"
+  ],
+  "forbidden_actions": [
+    "run_f061_without_approved_proof_window",
+    "open_separate_chrome_login",
+    "change_amazon_security_settings",
+    "log_password_or_code",
+    "delete_gmail_message",
+    "edit_f061_queue",
+    "approve_f061_handoff",
+    "write_google_sheets",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. This proof may read redacted local status and can run a bounded read-only AmazonOTP Gmail proof without F061. MOT must not delete Gmail, run F061, open a separate browser, edit queues, change prices, or write Sheets."
+}

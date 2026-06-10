@@ -1,0 +1,72 @@
+{
+  "id": "FPM190_build_split_rollout_readiness",
+  "display_name": "FPM190 Split Rollout Readiness",
+  "flow": "F",
+  "purpose": "Register the split-rollout readiness report so the manager can inspect default-off scanner safety without enabling enforced rollout or proof windows.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM190_build_split_rollout_readiness.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM190_build_split_rollout_readiness.py",
+  "health_sources": [
+    {
+      "name": "split_rollout_readiness",
+      "path": "out/systems/F/price_list_manager/live/split_rollout_readiness.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "production_line_health",
+      "path": "out/systems/F/price_list_manager/live/production_line_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "live_cycle_status",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_status.csv",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "storage_drift_report",
+      "path": "out/systems/F/price_list_manager/live/storage_drift_report.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "split_rollout_readiness",
+      "path": "out/systems/F/price_list_manager/live/split_rollout_readiness.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "split_rollout_default_off_must_remain_visible",
+    "enforced_routing_requires_capped_proof_window"
+  ],
+  "needs_user_signals": [
+    "enforced_split_rollout_requested",
+    "live_scanner_proof_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "enable_enforced_rollout",
+    "run_live_scanner_proof",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may read rollout readiness but must not enable enforced routing or start a live scanner proof window."
+}

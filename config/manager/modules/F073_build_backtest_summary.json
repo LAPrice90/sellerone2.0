@@ -1,0 +1,75 @@
+{
+  "id": "F073_build_backtest_summary",
+  "display_name": "F073 Backtest Summary",
+  "flow": "F",
+  "purpose": "Register F backtest summary proof so the manager can inspect recommendations, confidence, and risk labels without rebuilding summaries.",
+  "owner_entrypoint": "scripts/flows/F/F073_build_backtest_summary.py",
+  "worker_entrypoint": "scripts/flows/F/F073_build_backtest_summary.py",
+  "health_sources": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_input_view_live",
+      "path": "out/systems/F/live/feeder_backtest_input_view_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_replay_daily_live",
+      "path": "out/systems/F/live/feeder_backtest_replay_daily_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_backtest_summary_live",
+      "path": "out/systems/F/live/feeder_backtest_summary_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "backtest_summary_warn_after_43200_minutes",
+    "summary_recommendations_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "manual_review_rows_visible",
+    "decision_confidence_low",
+    "summary_source_contract_failed"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_backtest_summary",
+    "change_backtest_policy",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read summary recommendations and confidence proof but must not rebuild summaries or use them as price-change permission."
+}

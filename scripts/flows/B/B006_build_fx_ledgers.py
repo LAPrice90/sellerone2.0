@@ -26,8 +26,10 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 try:
+    from scripts.core.safe_file_writes import safe_to_csv
     from scripts.core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 except ModuleNotFoundError:
+    from core.safe_file_writes import safe_to_csv
     from core.storage import StorageConfig, connect_store, parse_storage_mode, replace_table_from_dataframe
 
 
@@ -55,7 +57,7 @@ def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[st
 
     def write_csv() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path, index=False)
+        safe_to_csv(df, path, index=False)
 
     def write_sql() -> None:
         nonlocal sql_rows

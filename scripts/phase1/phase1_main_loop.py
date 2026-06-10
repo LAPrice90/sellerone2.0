@@ -17,14 +17,15 @@ if str(BOOT_ROOT) not in sys.path:
     sys.path.insert(0, str(BOOT_ROOT))
 
 try:
-    from scripts.phase1 import phase1_ceilings, phase1_dve, phase1_market_snapshot_processor, phase1_oas, phase1_phase_engine, phase1_probe_engine, phase1_storage, phase1_write_gate, phase1_write_verify
+    from scripts.phase1 import phase1_ceilings, phase1_defensive_listing, phase1_dve, phase1_market_snapshot_processor, phase1_oas, phase1_phase_engine, phase1_probe_engine, phase1_storage, phase1_write_gate, phase1_write_verify
 except ModuleNotFoundError:
-    from scripts.phase1 import phase1_ceilings, phase1_dve, phase1_market_snapshot_processor, phase1_oas, phase1_phase_engine, phase1_probe_engine, phase1_storage, phase1_write_gate, phase1_write_verify
+    from scripts.phase1 import phase1_ceilings, phase1_defensive_listing, phase1_dve, phase1_market_snapshot_processor, phase1_oas, phase1_phase_engine, phase1_probe_engine, phase1_storage, phase1_write_gate, phase1_write_verify
 
 
 PHASE_WRITE_AUDIT_PATH = BOOT_ROOT / "out" / "phase_write_audit.csv"
 H_FLOOR_TRACE_PATH = BOOT_ROOT / "out" / "h_floor_truth_trace.csv"
 H_TEMP_TRIAL_RULES_PATH = BOOT_ROOT / "config" / "h_temp_trial_rules.csv"
+H_DEFENSIVE_LISTING_RULES_PATH = BOOT_ROOT / "config" / "h_defensive_listing_protection.csv"
 PHASE_WRITE_AUDIT_FIELDS = [
     "ts_utc",
     "sku",
@@ -131,6 +132,22 @@ def _phase_log(line: str) -> None:
             fh.write(text + "\n")
     except Exception:
         pass
+
+
+def _strategy_progress(checkpoint: str, **fields: object) -> None:
+    checkpoint_text = str(checkpoint or "").strip()
+    if not checkpoint_text:
+        return
+    run_id = str(os.environ.get("H_RUN_ID", "") or "").strip()
+    parts = [_format_utc(datetime.now(timezone.utc)), f"checkpoint={checkpoint_text}"]
+    if run_id:
+        parts.append(f"run_id={run_id}")
+    for key, value in fields.items():
+        key_text = str(key or "").strip()
+        value_text = str(value or "").strip()
+        if key_text and value_text:
+            parts.append(f"{key_text}={value_text}")
+    _phase_log(" ".join(parts))
 
 
 def _csv_cell(value: object) -> str:
@@ -314,6 +331,13 @@ def _seller_ladder_prices(rows: Iterable[Mapping[str, object]]) -> tuple[int, st
 
 def _strategy_scenario_type(*, tactic_state: str, seller_count: int, suppression_active: bool) -> str:
     state = str(tactic_state or "").strip().upper()
+    if state in {
+        "DEFENSIVE_LISTING_BALANCED_DEFEND",
+        "DEFENSIVE_LISTING_RAISE_RECOVERY",
+        "DEFENSIVE_LISTING_HOLD",
+        "DEFENSIVE_LISTING_SLOW_SHARE_HOLD",
+    }:
+        return "defensive_listing_protection"
     if state in {"HOLD_OBSERVE", "DEFENSIVE_HOLD", "SELLER_DETAIL_HOLD"}:
         return "share_hold"
     if state == "STATE_SUPPRESSION_REACTIVATION":
@@ -338,6 +362,13 @@ def _strategy_response_window_minutes(*, tactic_state: str, suppression_active: 
     default_minutes = max(_env_int("H_STRATEGY_RESPONSE_WINDOW_MINUTES_DEFAULT", 20), 1)
     if suppression_active or state in {"STATE_SUPPRESSION_REACTIVATION", "SUPPRESSION_REACTIVATION"}:
         return suppression_minutes
+    if state in {
+        "DEFENSIVE_LISTING_BALANCED_DEFEND",
+        "DEFENSIVE_LISTING_RAISE_RECOVERY",
+        "DEFENSIVE_LISTING_HOLD",
+        "DEFENSIVE_LISTING_SLOW_SHARE_HOLD",
+    }:
+        return hold_minutes
     if state in {"HOLD_OBSERVE", "DEFENSIVE_HOLD", "SELLER_DETAIL_HOLD", "RISK_GATED_HOLD"}:
         return hold_minutes
     if state in {"REGAIN_LADDER_CAP", "MULTI_SELLER_LADDER_CAP", "RAISE_FIND_LOSS_LADDER_CAP"}:
@@ -542,6 +573,13 @@ def _derive_chosen_tactic(
         for code in reason_codes
         if str(code or "").strip()
     }
+    if state in {
+        "DEFENSIVE_LISTING_BALANCED_DEFEND",
+        "DEFENSIVE_LISTING_RAISE_RECOVERY",
+        "DEFENSIVE_LISTING_HOLD",
+        "DEFENSIVE_LISTING_SLOW_SHARE_HOLD",
+    }:
+        return state
     if state in {"HOLD_OBSERVE", "DEFENSIVE_HOLD", "SELLER_DETAIL_HOLD"}:
         return state
     if suppression_active or state == "STATE_SUPPRESSION_REACTIVATION":
@@ -643,9 +681,12 @@ def _emit_h_ceiling_event(
 ) -> None:
     run_id = str(os.environ.get("H_RUN_ID", "") or "").strip() or event_ts_utc.replace(":", "").replace("-", "")
     target_price_text = str(target_price_gbp or "").strip()
+    true_binding_ceiling = str(final_ceiling.final_ceiling_landed_gbp or "").strip()
+    if not true_binding_ceiling:
+        return
     event_reason_codes, conflict_flag = _classify_h_ceiling_event_reason_codes(
         reason_codes=reason_codes,
-        final_ceiling_landed_gbp=final_ceiling.final_ceiling_landed_gbp,
+        final_ceiling_landed_gbp=true_binding_ceiling,
         target_price_gbp=target_price_gbp,
         hard_floor_gbp=hard_floor_gbp,
     )
@@ -660,7 +701,7 @@ def _emit_h_ceiling_event(
                 "eligibility_ceiling_gbp": final_ceiling.eligibility_ceiling_landed_gbp,
                 "demand_ceiling_gbp": final_ceiling.demand_ceiling_landed_gbp,
                 "suppression_ceiling_gbp": final_ceiling.suppression_ceiling_landed_temp,
-                "true_binding_ceiling_gbp": final_ceiling.final_ceiling_landed_gbp,
+                "true_binding_ceiling_gbp": true_binding_ceiling,
                 "true_binding_ceiling_type": str(final_ceiling.binding_ceiling_type or "").strip() or "NONE",
                 "target_price_gbp": target_price_text,
                 "hard_floor_gbp": str(hard_floor_gbp or "").strip(),
@@ -671,79 +712,105 @@ def _emit_h_ceiling_event(
     )
 
 
-def _update_h_strategy_daily_rollup(*, outcome_row: Mapping[str, object], hard_floor_gbp: object) -> None:
-    event_ts_utc = str(outcome_row.get("event_ts_utc", "") or "").strip()
-    asof_date = event_ts_utc[:10] if len(event_ts_utc) >= 10 else ""
-    scenario_type = str(outcome_row.get("scenario_type", "") or "").strip()
-    chosen_tactic = str(outcome_row.get("chosen_tactic", "") or "").strip()
-    if not asof_date or not scenario_type or not chosen_tactic:
-        return
-
+def _h_strategy_daily_current_row(
+    *,
+    asof_date: str,
+    scenario_type: str,
+    chosen_tactic: str,
+) -> Mapping[str, str] | None:
     current_rows = phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_DAILY_PATH)
-    current: Mapping[str, str] | None = None
     for row in current_rows:
         if (
             str(row.get("asof_date", "")).strip() == asof_date
             and str(row.get("scenario_type", "")).strip() == scenario_type
             and str(row.get("chosen_tactic", "")).strip() == chosen_tactic
         ):
-            current = row
+            return row
+    return None
 
-    prev_decision_rows = _safe_int(current.get("decision_rows", "0") if current else "0")
-    prev_applied_rows = _safe_int(current.get("applied_rows", "0") if current else "0")
-    prev_no_write_rows = _safe_int(current.get("no_write_rows", "0") if current else "0")
-    prev_success_rows = _safe_int(current.get("success_rows", "0") if current else "0")
-    prev_failed_rows = _safe_int(current.get("failed_rows", "0") if current else "0")
-    prev_expired_rows = _safe_int(current.get("expired_rows", "0") if current else "0")
-    prev_aborted_rows = _safe_int(current.get("aborted_rows", "0") if current else "0")
-    prev_below_break_even_rows = _safe_int(current.get("below_break_even_rows", "0") if current else "0")
-    prev_at_floor_rows = _safe_int(current.get("at_floor_rows", "0") if current else "0")
-    prev_avg_seller_count = _to_decimal(current.get("avg_seller_count", "") if current else "") or Decimal("0")
-    prev_avg_price_gap = _to_decimal(current.get("avg_price_gap_to_lowest_gbp", "") if current else "") or Decimal("0")
 
-    seller_count = Decimal(_safe_int(outcome_row.get("seller_count", "0")))
-    our_price_before = _to_decimal(outcome_row.get("our_price_before_gbp", ""))
-    lowest_price_1 = _to_decimal(outcome_row.get("lowest_price_1_gbp", ""))
-    price_gap = Decimal("0")
-    if our_price_before is not None and lowest_price_1 is not None:
-        price_gap = our_price_before - lowest_price_1
+def _h_strategy_outcome_source_rows_for_daily(
+    *,
+    asof_date: str,
+    scenario_type: str,
+    chosen_tactic: str,
+) -> list[Mapping[str, str]]:
+    keyed_rows: dict[str, Mapping[str, str]] = {}
+    unkeyed_rows: list[Mapping[str, str]] = []
+    for row in phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_LOG_PATH):
+        event_ts_utc = str(row.get("event_ts_utc", "") or "").strip()
+        if len(event_ts_utc) < 10 or event_ts_utc[:10] != asof_date:
+            continue
+        if str(row.get("scenario_type", "")).strip() != scenario_type:
+            continue
+        if str(row.get("chosen_tactic", "")).strip() != chosen_tactic:
+            continue
+        tactic_case_id = str(row.get("tactic_case_id", "") or "").strip()
+        clean_row = {str(k): str(v or "") for k, v in row.items()}
+        if tactic_case_id:
+            keyed_rows[tactic_case_id] = clean_row
+        else:
+            unkeyed_rows.append(clean_row)
+    return list(keyed_rows.values()) + unkeyed_rows
 
-    writer_outcome = str(outcome_row.get("writer_outcome", "") or "").strip().upper()
-    applied_inc = 1 if writer_outcome == "APPLIED" else 0
-    no_write_inc = 0 if writer_outcome == "APPLIED" else 1
-    tactic_success_state = str(outcome_row.get("tactic_success_state", "") or "").strip().lower()
-    success_inc = 1 if tactic_success_state == "success" else 0
-    failed_inc = 1 if tactic_success_state == "failed" else 0
-    expired_inc = 1 if tactic_success_state == "expired" else 0
-    aborted_inc = 1 if tactic_success_state == "aborted" else 0
 
-    target_price = _to_decimal(outcome_row.get("target_price_gbp", ""))
-    hard_floor = _to_decimal(hard_floor_gbp)
-    at_floor_inc = 1 if target_price is not None and hard_floor is not None and target_price <= hard_floor else 0
-    break_even_inc = 0
-    floor_trace = _load_floor_trace_latest_map().get(str(outcome_row.get("sku", "")).strip().upper())
-    if floor_trace is not None and target_price is not None:
-        break_even_inc = 1 if target_price <= floor_trace[1] else 0
+def _rebuild_h_strategy_daily_rollup_from_source(
+    *,
+    asof_date: str,
+    scenario_type: str,
+    chosen_tactic: str,
+    below_break_even_increment: int = 0,
+    at_floor_increment: int = 0,
+) -> dict[str, str] | None:
+    if not asof_date or not scenario_type or not chosen_tactic:
+        return None
 
-    prev_decision_rows = max(prev_decision_rows, 0)
-    prev_applied_rows = max(min(prev_applied_rows, prev_decision_rows), 0)
-    prev_no_write_rows = max(min(prev_no_write_rows, max(prev_decision_rows - prev_applied_rows, 0)), 0)
-    prev_below_break_even_rows = max(min(prev_below_break_even_rows, prev_decision_rows), 0)
-    prev_at_floor_rows = max(min(prev_at_floor_rows, prev_decision_rows), 0)
+    source_rows = _h_strategy_outcome_source_rows_for_daily(
+        asof_date=asof_date,
+        scenario_type=scenario_type,
+        chosen_tactic=chosen_tactic,
+    )
+    if not source_rows:
+        return None
 
-    decision_rows = prev_decision_rows + 1
-    avg_seller_count = (prev_avg_seller_count * Decimal(prev_decision_rows) + seller_count) / Decimal(decision_rows)
-    avg_price_gap = (prev_avg_price_gap * Decimal(prev_decision_rows) + price_gap) / Decimal(decision_rows)
-    applied_rows = prev_applied_rows + applied_inc
-    no_write_rows = prev_no_write_rows + no_write_inc
-    if applied_rows + no_write_rows != decision_rows:
-        no_write_rows = max(decision_rows - applied_rows, 0)
-    success_rows = prev_success_rows + success_inc
-    failed_rows = prev_failed_rows + failed_inc
-    expired_rows = prev_expired_rows + expired_inc
-    aborted_rows = prev_aborted_rows + aborted_inc
-    below_break_even_rows = min(prev_below_break_even_rows + break_even_inc, decision_rows)
-    at_floor_rows = min(prev_at_floor_rows + at_floor_inc, decision_rows)
+    current = _h_strategy_daily_current_row(
+        asof_date=asof_date,
+        scenario_type=scenario_type,
+        chosen_tactic=chosen_tactic,
+    )
+
+    decision_rows = len(source_rows)
+    applied_rows = 0
+    success_rows = 0
+    failed_rows = 0
+    expired_rows = 0
+    aborted_rows = 0
+    seller_count_sum = Decimal("0")
+    price_gap_sum = Decimal("0")
+
+    for row in source_rows:
+        writer_outcome = str(row.get("writer_outcome", "") or "").strip().upper()
+        if writer_outcome == "APPLIED":
+            applied_rows += 1
+        tactic_success_state = str(row.get("tactic_success_state", "") or "").strip().lower()
+        if tactic_success_state == "success":
+            success_rows += 1
+        elif tactic_success_state == "failed":
+            failed_rows += 1
+        elif tactic_success_state == "expired":
+            expired_rows += 1
+        elif tactic_success_state == "aborted":
+            aborted_rows += 1
+
+        seller_count_sum += Decimal(_safe_int(row.get("seller_count", "0")))
+        our_price_before = _to_decimal(row.get("our_price_before_gbp", ""))
+        lowest_price_1 = _to_decimal(row.get("lowest_price_1_gbp", ""))
+        if our_price_before is not None and lowest_price_1 is not None:
+            price_gap_sum += our_price_before - lowest_price_1
+
+    no_write_rows = max(decision_rows - applied_rows, 0)
+    avg_seller_count = seller_count_sum / Decimal(decision_rows)
+    avg_price_gap = price_gap_sum / Decimal(decision_rows)
     derived = _strategy_daily_derived_fields(
         scenario_type=scenario_type,
         decision_rows=decision_rows,
@@ -753,32 +820,65 @@ def _update_h_strategy_daily_rollup(*, outcome_row: Mapping[str, object], hard_f
         aborted_rows=aborted_rows,
     )
 
-    phase1_storage.upsert_h_strategy_outcome_daily(
-        [
-            {
-                "asof_date": asof_date,
-                "scenario_type": scenario_type,
-                "chosen_tactic": chosen_tactic,
-                "decision_rows": str(decision_rows),
-                "applied_rows": str(applied_rows),
-                "no_write_rows": str(no_write_rows),
-                "resolved_rows": derived["resolved_rows"],
-                "pending_rows": derived["pending_rows"],
-                "success_rows": str(success_rows),
-                "failed_rows": str(failed_rows),
-                "expired_rows": str(expired_rows),
-                "aborted_rows": str(aborted_rows),
-                "success_rate_pct": derived["success_rate_pct"],
-                "failed_rate_pct": derived["failed_rate_pct"],
-                "sample_min_rows": derived["sample_min_rows"],
-                "provisional_sample_flag": derived["provisional_sample_flag"],
-                "avg_seller_count": f"{avg_seller_count:.2f}",
-                "avg_price_gap_to_lowest_gbp": f"{avg_price_gap:.2f}",
-                "below_break_even_rows": str(below_break_even_rows),
-                "at_floor_rows": str(at_floor_rows),
-                "notes": str(current.get("notes", "") if current else "").strip(),
-            }
-        ]
+    current_below_break_even_rows = max(_safe_int(current.get("below_break_even_rows", "0") if current else "0"), 0)
+    current_at_floor_rows = max(_safe_int(current.get("at_floor_rows", "0") if current else "0"), 0)
+    below_break_even_rows = min(
+        current_below_break_even_rows + max(int(below_break_even_increment), 0),
+        decision_rows,
+    )
+    at_floor_rows = min(
+        current_at_floor_rows + max(int(at_floor_increment), 0),
+        decision_rows,
+    )
+    rebuilt = {
+        "asof_date": asof_date,
+        "scenario_type": scenario_type,
+        "chosen_tactic": chosen_tactic,
+        "decision_rows": str(decision_rows),
+        "applied_rows": str(applied_rows),
+        "no_write_rows": str(no_write_rows),
+        "resolved_rows": derived["resolved_rows"],
+        "pending_rows": derived["pending_rows"],
+        "success_rows": str(success_rows),
+        "failed_rows": str(failed_rows),
+        "expired_rows": str(expired_rows),
+        "aborted_rows": str(aborted_rows),
+        "success_rate_pct": derived["success_rate_pct"],
+        "failed_rate_pct": derived["failed_rate_pct"],
+        "sample_min_rows": derived["sample_min_rows"],
+        "provisional_sample_flag": derived["provisional_sample_flag"],
+        "avg_seller_count": f"{avg_seller_count:.2f}",
+        "avg_price_gap_to_lowest_gbp": f"{avg_price_gap:.2f}",
+        "below_break_even_rows": str(below_break_even_rows),
+        "at_floor_rows": str(at_floor_rows),
+        "notes": str(current.get("notes", "") if current else "").strip(),
+    }
+    phase1_storage.upsert_h_strategy_outcome_daily([rebuilt])
+    return rebuilt
+
+
+def _update_h_strategy_daily_rollup(*, outcome_row: Mapping[str, object], hard_floor_gbp: object) -> None:
+    event_ts_utc = str(outcome_row.get("event_ts_utc", "") or "").strip()
+    asof_date = event_ts_utc[:10] if len(event_ts_utc) >= 10 else ""
+    scenario_type = str(outcome_row.get("scenario_type", "") or "").strip()
+    chosen_tactic = str(outcome_row.get("chosen_tactic", "") or "").strip()
+    if not asof_date or not scenario_type or not chosen_tactic:
+        return
+
+    target_price = _to_decimal(outcome_row.get("target_price_gbp", ""))
+    hard_floor = _to_decimal(hard_floor_gbp)
+    at_floor_inc = 1 if target_price is not None and hard_floor is not None and target_price <= hard_floor else 0
+    break_even_inc = 0
+    floor_trace = _load_floor_trace_latest_map().get(str(outcome_row.get("sku", "")).strip().upper())
+    if floor_trace is not None and target_price is not None:
+        break_even_inc = 1 if target_price <= floor_trace[1] else 0
+
+    _rebuild_h_strategy_daily_rollup_from_source(
+        asof_date=asof_date,
+        scenario_type=scenario_type,
+        chosen_tactic=chosen_tactic,
+        below_break_even_increment=break_even_inc,
+        at_floor_increment=at_floor_inc,
     )
 
 
@@ -794,6 +894,8 @@ def _strategy_sample_min_rows(scenario_type: object) -> int:
         return max(_env_int("H_STRATEGY_SAMPLE_MIN_SINGLE_RIVAL", 30), 1)
     if scenario == "suppression_reactivation":
         return max(_env_int("H_STRATEGY_SAMPLE_MIN_SUPPRESSION", 20), 1)
+    if scenario == "defensive_listing_protection":
+        return max(_env_int("H_STRATEGY_SAMPLE_MIN_DEFENSIVE_LISTING", 20), 1)
     return max(_env_int("H_STRATEGY_SAMPLE_MIN_DEFAULT", 30), 1)
 
 
@@ -936,83 +1038,10 @@ def _update_h_strategy_daily_resolution(
     if prior not in tracked_states and nxt not in tracked_states:
         return
 
-    current_rows = phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_DAILY_PATH)
-    current: Mapping[str, str] | None = None
-    for row in current_rows:
-        if (
-            str(row.get("asof_date", "")).strip() == asof_date
-            and str(row.get("scenario_type", "")).strip() == scenario_type
-            and str(row.get("chosen_tactic", "")).strip() == chosen_tactic
-        ):
-            current = row
-            break
-    if current is None:
-        return
-
-    decision_rows = _safe_int(current.get("decision_rows", "0"))
-    success_rows = max(_safe_int(current.get("success_rows", "0")), 0)
-    failed_rows = max(_safe_int(current.get("failed_rows", "0")), 0)
-    expired_rows = max(_safe_int(current.get("expired_rows", "0")), 0)
-    aborted_rows = max(_safe_int(current.get("aborted_rows", "0")), 0)
-
-    if prior == "success":
-        success_rows = max(success_rows - 1, 0)
-    elif prior == "failed":
-        failed_rows = max(failed_rows - 1, 0)
-    elif prior == "expired":
-        expired_rows = max(expired_rows - 1, 0)
-    elif prior == "aborted":
-        aborted_rows = max(aborted_rows - 1, 0)
-
-    if nxt == "success":
-        success_rows += 1
-    elif nxt == "failed":
-        failed_rows += 1
-    elif nxt == "expired":
-        expired_rows += 1
-    elif nxt == "aborted":
-        aborted_rows += 1
-
-    derived = _strategy_daily_derived_fields(
+    _rebuild_h_strategy_daily_rollup_from_source(
+        asof_date=asof_date,
         scenario_type=scenario_type,
-        decision_rows=decision_rows,
-        success_rows=success_rows,
-        failed_rows=failed_rows,
-        expired_rows=expired_rows,
-        aborted_rows=aborted_rows,
-    )
-
-    below_break_even_rows = max(_safe_int(current.get("below_break_even_rows", "0")), 0)
-    at_floor_rows = max(_safe_int(current.get("at_floor_rows", "0")), 0)
-    below_break_even_rows = min(below_break_even_rows, decision_rows)
-    at_floor_rows = min(at_floor_rows, decision_rows)
-
-    phase1_storage.upsert_h_strategy_outcome_daily(
-        [
-            {
-                "asof_date": asof_date,
-                "scenario_type": scenario_type,
-                "chosen_tactic": chosen_tactic,
-                "decision_rows": str(decision_rows),
-                "applied_rows": str(_safe_int(current.get("applied_rows", "0"))),
-                "no_write_rows": str(_safe_int(current.get("no_write_rows", "0"))),
-                "resolved_rows": derived["resolved_rows"],
-                "pending_rows": derived["pending_rows"],
-                "success_rows": str(success_rows),
-                "failed_rows": str(failed_rows),
-                "expired_rows": str(expired_rows),
-                "aborted_rows": str(aborted_rows),
-                "success_rate_pct": derived["success_rate_pct"],
-                "failed_rate_pct": derived["failed_rate_pct"],
-                "sample_min_rows": derived["sample_min_rows"],
-                "provisional_sample_flag": derived["provisional_sample_flag"],
-                "avg_seller_count": str(current.get("avg_seller_count", "")).strip() or "0.00",
-                "avg_price_gap_to_lowest_gbp": str(current.get("avg_price_gap_to_lowest_gbp", "")).strip() or "0.00",
-                "below_break_even_rows": str(below_break_even_rows),
-                "at_floor_rows": str(at_floor_rows),
-                "notes": str(current.get("notes", "")).strip(),
-            }
-        ]
+        chosen_tactic=chosen_tactic,
     )
 
 
@@ -1028,14 +1057,29 @@ def _close_pending_strategy_outcomes(
     if observation_dt is None:
         return
 
+    _strategy_progress(
+        "close_pending_strategy_outcomes_read_start",
+        sku=sku_norm,
+        expire_other_skus="1" if expire_other_skus else "0",
+    )
     rows = phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_LOG_PATH)
+    _strategy_progress(
+        "close_pending_strategy_outcomes_read_done",
+        total_rows=str(len(rows)),
+        sku=sku_norm,
+        expire_other_skus="1" if expire_other_skus else "0",
+    )
     if not rows:
+        _strategy_progress("close_pending_strategy_outcomes_no_rows")
         return
 
     updates: list[tuple[Mapping[str, str], dict[str, str]]] = []
+    pending_seen = 0
+    daily_rebuild_keys: set[tuple[str, str, str]] = set()
     for row in rows:
         if str(row.get("tactic_success_state", "")).strip().lower() != "pending":
             continue
+        pending_seen += 1
         row_event_dt = _parse_utc(row.get("event_ts_utc", ""))
         if row_event_dt is None or row_event_dt >= observation_dt:
             continue
@@ -1087,26 +1131,59 @@ def _close_pending_strategy_outcomes(
                 "OUTCOME_WINDOW_TIMEOUT",
             )
         updates.append((row, updated))
+        event_ts_utc = str(row.get("event_ts_utc", "") or "").strip()
+        asof_date = event_ts_utc[:10] if len(event_ts_utc) >= 10 else ""
+        scenario_type = str(row.get("scenario_type", "") or "").strip()
+        chosen_tactic = str(row.get("chosen_tactic", "") or "").strip()
+        if asof_date and scenario_type and chosen_tactic:
+            prior = str(row.get("tactic_success_state", "") or "").strip().lower()
+            nxt = str(updated.get("tactic_success_state", "") or "").strip().lower()
+            tracked_states = {"success", "failed", "expired", "aborted"}
+            if prior != nxt and (prior in tracked_states or nxt in tracked_states):
+                daily_rebuild_keys.add((asof_date, scenario_type, chosen_tactic))
 
     if not updates:
+        _strategy_progress(
+            "close_pending_strategy_outcomes_no_updates",
+            pending_seen=str(pending_seen),
+        )
         return
 
+    _strategy_progress(
+        "close_pending_strategy_outcomes_upsert_start",
+        pending_seen=str(pending_seen),
+        update_count=str(len(updates)),
+        daily_rebuild_count=str(len(daily_rebuild_keys)),
+    )
     phase1_storage.upsert_h_strategy_outcome_log([updated for _, updated in updates])
+    _strategy_progress(
+        "close_pending_strategy_outcomes_upsert_done",
+        update_count=str(len(updates)),
+    )
 
-    for before_row, after_row in updates:
-        event_ts_utc = str(before_row.get("event_ts_utc", "") or "").strip()
-        asof_date = event_ts_utc[:10] if len(event_ts_utc) >= 10 else ""
-        scenario_type = str(before_row.get("scenario_type", "") or "").strip()
-        chosen_tactic = str(before_row.get("chosen_tactic", "") or "").strip()
-        if not asof_date or not scenario_type or not chosen_tactic:
-            continue
-        _update_h_strategy_daily_resolution(
+    for asof_date, scenario_type, chosen_tactic in sorted(daily_rebuild_keys):
+        _strategy_progress(
+            "close_pending_strategy_outcomes_rollup_rebuild_start",
             asof_date=asof_date,
             scenario_type=scenario_type,
             chosen_tactic=chosen_tactic,
-            prior_state=str(before_row.get("tactic_success_state", "") or ""),
-            next_state=str(after_row.get("tactic_success_state", "") or ""),
         )
+        _rebuild_h_strategy_daily_rollup_from_source(
+            asof_date=asof_date,
+            scenario_type=scenario_type,
+            chosen_tactic=chosen_tactic,
+        )
+        _strategy_progress(
+            "close_pending_strategy_outcomes_rollup_rebuild_done",
+            asof_date=asof_date,
+            scenario_type=scenario_type,
+            chosen_tactic=chosen_tactic,
+        )
+    _strategy_progress(
+        "close_pending_strategy_outcomes_done",
+        update_count=str(len(updates)),
+        daily_rebuild_count=str(len(daily_rebuild_keys)),
+    )
 
 
 def close_pending_strategy_outcomes_tick(
@@ -1234,6 +1311,92 @@ def _emit_h_strategy_outcome(
     }
     phase1_storage.append_h_strategy_outcome_log([row])
     _update_h_strategy_daily_rollup(outcome_row=row, hard_floor_gbp=hard_floor_gbp)
+
+
+def _emit_h_defensive_listing_proof(
+    *,
+    event_ts_utc: str,
+    sku: str,
+    asin: str,
+    rule: phase1_defensive_listing.DefensiveListingRule,
+    evaluation: phase1_defensive_listing.DefensiveListingEvaluation,
+    buy_box_state: str,
+    seller_count: int,
+    lowest_rival_price_gbp: object,
+    current_price_gbp: object,
+    hard_floor_gbp: object,
+    final_ceiling_gbp: object,
+    write_status: str,
+    write_error: str,
+    attempted_write: str,
+    wrote: str,
+    reason_codes: list[str],
+) -> None:
+    run_id = str(os.environ.get("H_RUN_ID", "") or "").strip() or event_ts_utc.replace(":", "").replace("-", "")
+    asof_date = str(event_ts_utc or "")[:10]
+    action_row = {
+        "event_ts_utc": event_ts_utc,
+        "run_id": run_id,
+        "sku": sku,
+        "asin": asin,
+        "mode": rule.mode,
+        "phase": evaluation.phase,
+        "buy_box_state": buy_box_state,
+        "seller_count": str(seller_count),
+        "lowest_rival_price_gbp": str(lowest_rival_price_gbp or ""),
+        "current_price_gbp": str(current_price_gbp or ""),
+        "target_price_gbp": evaluation.target_price_gbp,
+        "hard_floor_gbp": str(hard_floor_gbp or ""),
+        "final_ceiling_gbp": str(final_ceiling_gbp or ""),
+        "write_required": "1" if evaluation.write_required else "0",
+        "live_write_enabled": "1" if evaluation.live_write_enabled else "0",
+        "write_status": str(write_status or ""),
+        "write_error": str(write_error or ""),
+        "attempted_write": str(attempted_write or "0"),
+        "wrote": str(wrote or "0"),
+        "reason_codes_json": _json_compact(reason_codes),
+    }
+    phase1_storage.append_h_defensive_listing_action_log([action_row])
+    rows = [
+        row
+        for row in phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        if row.get("sku") == sku and row.get("asin") == asin and str(row.get("event_ts_utc", ""))[:10] == asof_date
+    ]
+    blocked_live_rows = [
+        row
+        for row in rows
+        if row.get("write_required") == "1"
+        and row.get("live_write_enabled") != "1"
+        and row.get("write_status") == "READ_ONLY_NO_WRITE"
+    ]
+    hold_rows = [
+        row
+        for row in rows
+        if row.get("write_required") != "1" or str(row.get("phase", "")).endswith("hold")
+    ]
+    last = rows[-1] if rows else action_row
+    phase1_storage.upsert_h_defensive_listing_daily(
+        [
+            {
+                "asof_date": asof_date,
+                "sku": sku,
+                "asin": asin,
+                "mode": rule.mode,
+                "enabled": "1",
+                "live_write_enabled": "1" if rule.live_write_enabled else "0",
+                "phase": evaluation.phase,
+                "action_rows": str(len(rows)),
+                "write_required_rows": str(sum(1 for row in rows if row.get("write_required") == "1")),
+                "applied_rows": str(sum(1 for row in rows if row.get("write_status") == "APPLIED")),
+                "blocked_live_rows": str(len(blocked_live_rows)),
+                "hold_rows": str(len(hold_rows)),
+                "last_target_price_gbp": last.get("target_price_gbp", ""),
+                "last_rival_price_gbp": last.get("lowest_rival_price_gbp", ""),
+                "last_reason": str(last.get("reason_codes_json", ""))[:500],
+                "updated_utc": event_ts_utc,
+            }
+        ]
+    )
 
 
 def _build_offer_variants_rows(snapshot_rows: Iterable[Mapping[str, object]], event_ts_utc: str) -> list[dict[str, str]]:
@@ -2413,8 +2576,49 @@ def run_h_cycle(
                 f"ceiling_price_gbp={final_ceiling.final_ceiling_landed_gbp}"
             )
 
+    defensive_listing_rule = phase1_defensive_listing.active_rule_for_sku(
+        H_DEFENSIVE_LISTING_RULES_PATH,
+        str(sku or "").strip(),
+    )
+    defensive_listing_evaluation: phase1_defensive_listing.DefensiveListingEvaluation | None = None
+    if defensive_listing_rule is not None:
+        defensive_listing_evaluation = phase1_defensive_listing.evaluate_defensive_listing(
+            rule=defensive_listing_rule,
+            memory=phase1_storage.read_h_defensive_listing_memory(sku),
+            event_ts_utc=event_ts,
+            buy_box_state=buy_box_state,
+            seller_count=seller_count_ladder,
+            lowest_rival_price_gbp=ladder_price_1_gbp,
+            current_price_gbp=current_price_gbp,
+            hard_floor_gbp=hard_floor_for_decision,
+            final_ceiling_gbp=final_ceiling.final_ceiling_landed_gbp,
+            max_step_down_gbp=max_step_down_for_decision,
+            max_step_up_gbp=max_step_up_gbp,
+            observable=bool(observable and seller_detail_status_norm == SELLER_DETAIL_STATUS_OK and seller_detail_ts_dt is not None),
+            we_present=str(we_present or "").strip() == "1",
+        )
+        phase1_storage.upsert_h_defensive_listing_memory([defensive_listing_evaluation.memory_row])
+        if defensive_listing_evaluation.override_decision:
+            decision_effective = phase1_probe_engine.NextPriceDecision(
+                state=defensive_listing_evaluation.state,
+                target_price_gbp=defensive_listing_evaluation.target_price_gbp,
+                write_required=defensive_listing_evaluation.write_required,
+                reason_codes=decision_effective.reason_codes + defensive_listing_evaluation.reason_codes,
+            )
+        else:
+            reason_codes.extend(defensive_listing_evaluation.reason_codes)
+            reason_codes.append("DEFENSIVE_LISTING_NORMAL_H_CONTROL")
+        reason_codes.append("DEFENSIVE_LISTING_SKIPS_TEMP_TRIAL")
+        _phase_log(
+            f"DEFENSIVE_LISTING_EVALUATED sku={sku} mode={defensive_listing_rule.mode} "
+            f"state={defensive_listing_evaluation.state} "
+            f"target_price_gbp={defensive_listing_evaluation.target_price_gbp} "
+            f"override_decision={'1' if defensive_listing_evaluation.override_decision else '0'} "
+            f"live_write_enabled={'1' if defensive_listing_evaluation.live_write_enabled else '0'}"
+        )
+
     temp_trial_undercut = _load_temp_trial_undercut_map().get(str(sku or "").strip())
-    if temp_trial_undercut is not None:
+    if temp_trial_undercut is not None and defensive_listing_rule is None:
         trial_target, trial_reasons = _compute_temp_trial_target_gbp(
             competitor_price_gbp=_money(best_rival_effective),
             undercut_gbp=temp_trial_undercut,
@@ -2573,6 +2777,15 @@ def run_h_cycle(
             if invalid_writer_mode
             else ""
         )
+    elif (
+        decision_effective.write_required
+        and defensive_listing_evaluation is not None
+        and defensive_listing_evaluation.override_decision
+        and not defensive_listing_evaluation.live_write_enabled
+    ):
+        write_status = "READ_ONLY_NO_WRITE"
+        write_error = "defensive_listing_live_writes_disabled"
+        reason_codes.append("DEFENSIVE_LISTING_LIVE_WRITES_DISABLED")
     elif decision_effective.write_required and effective_live_writes and write_submitter is not None:
         attempted_write = "1"
         _phase_log(
@@ -2669,6 +2882,30 @@ def run_h_cycle(
             "wrote": wrote,
         }
     )
+    if defensive_listing_rule is not None and defensive_listing_evaluation is not None:
+        defensive_proof_write_status = (
+            write_status
+            if defensive_listing_evaluation.override_decision
+            else "DEFENSIVE_NOT_TRIGGERED_NORMAL_H_CONTROL"
+        )
+        _emit_h_defensive_listing_proof(
+            event_ts_utc=event_ts,
+            sku=sku,
+            asin=asin,
+            rule=defensive_listing_rule,
+            evaluation=defensive_listing_evaluation,
+            buy_box_state=buy_box_state,
+            seller_count=seller_count_ladder,
+            lowest_rival_price_gbp=ladder_price_1_gbp,
+            current_price_gbp=current_price_gbp,
+            hard_floor_gbp=hard_floor_for_decision,
+            final_ceiling_gbp=final_ceiling.final_ceiling_landed_gbp,
+            write_status=defensive_proof_write_status,
+            write_error=write_error if defensive_listing_evaluation.override_decision else "",
+            attempted_write=attempted_write if defensive_listing_evaluation.override_decision else "0",
+            wrote=wrote if defensive_listing_evaluation.override_decision else "0",
+            reason_codes=reason_codes,
+        )
 
     suppression_update_allowed = "1" if suppression_active and not _is_truthy(promo_suspected_flag) and not writer_lock_blocked else "0"
     suppression_memory_update = phase1_probe_engine.update_suppression_memory(

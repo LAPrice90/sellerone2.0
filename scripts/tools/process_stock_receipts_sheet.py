@@ -243,9 +243,11 @@ def load_sheet_table(ws: gspread.Worksheet) -> Tuple[List[str], List[List[str]]]
     return values[0], values[1:]
 
 
-def build_batch_id(intake_dt: datetime, existing_ids: set[str]) -> str:
+def build_batch_id(intake_dt: datetime, existing_ids: set[str], row_num: int | None = None) -> str:
     date_str = intake_dt.strftime("%Y%m%d")
     prefix = f"SR-{date_str}-"
+    if row_num is not None:
+        return f"{prefix}ROW{int(row_num):04d}"
     seq = 1
     while True:
         batch_id = f"{prefix}{seq:03d}"
@@ -397,6 +399,9 @@ def main() -> None:
     for row_num, row in enumerate(intake_rows, start=2):
         if len(row) < len(intake_header):
             row = row + [""] * (len(intake_header) - len(row))
+        status = row[col_idx["status"]].strip().upper()
+        if status in (STATUS_APPLIED, STATUS_CANCELLED):
+            continue
         bid = row[col_idx["batch_id"]].strip()
         if not bid:
             continue
@@ -499,45 +504,15 @@ def main() -> None:
         existing_for_key_info = order_key_counts.get((order_key, sku), {"count": 0, "batch_ids": set()})
         existing_for_key = int(existing_for_key_info.get("count", 0))
         existing_batches = sorted(str(v) for v in existing_for_key_info.get("batch_ids", set()) if str(v).strip())
-        if existing_for_key >= qty:
-            status_out = STATUS_APPLIED
-            row[col_idx["batch_id"]] = existing_batches[0] if existing_batches else row[col_idx["batch_id"]].strip()
-            row[col_idx["status"]] = status_out
-            row[col_idx["processed_at"]] = now_iso
-            row[col_idx["tokens_created"]] = str(existing_for_key)
-            row[col_idx["token_id_prefix"]] = row[col_idx["batch_id"]].strip()
-            row[col_idx["error_message"]] = "idempotent_existing_order_key"
-            intake_ws.update(
-                f"{col_to_a1(1)}{row_num}:{col_to_a1(len(intake_header))}{row_num}",
-                [row],
-            )
-            applied += 1
-            summary_rows.append(
-                {
-                    "row_num": str(row_num),
-                    "intake_date": intake_date_raw,
-                    "seller_sku": sku,
-                    "qty": str(qty),
-                    "cost_per_unit": str(cost),
-                    "auto_cost_source": auto_cost_source,
-                    "status": status_out,
-                    "batch_id": row[col_idx["batch_id"]].strip(),
-                    "tokens_created": str(existing_for_key),
-                    "order_key": order_key,
-                    "error_message": "idempotent_existing_order_key",
-                }
-            )
-            continue
+        qty_to_create = qty
 
-        qty_to_create = qty - existing_for_key if existing_for_key > 0 else qty
-
-        batch_id = build_batch_id(intake_dt, existing_batch_ids)
+        batch_id = build_batch_id(intake_dt, existing_batch_ids, row_num=row_num)
         existing_batch_ids.add(batch_id)
 
         # Idempotency: if tokens already exist for this batch, mark applied and continue.
         if batch_id in batch_counts:
             created_count = batch_counts.get(batch_id, 0)
-            total_with_existing = existing_for_key + created_count
+            total_with_existing = created_count
             status_out = STATUS_APPLIED if total_with_existing >= qty else STATUS_PARTIAL
             err_out = "" if status_out == STATUS_APPLIED else f"partial: ledger has {total_with_existing}/{qty}"
             row[col_idx["batch_id"]] = batch_id
@@ -612,7 +587,7 @@ def main() -> None:
                 full_rows.append(row_out)
             token_ws.append_rows(full_rows, value_input_option="RAW")
 
-        created_total = existing_for_key + len(token_rows)
+        created_total = len(token_rows)
         status_out = STATUS_APPLIED if created_total >= qty else STATUS_PARTIAL
         err_out = "" if status_out == STATUS_APPLIED else f"partial: created {created_total}/{qty}"
         row[col_idx["batch_id"]] = batch_id

@@ -28,6 +28,7 @@ def test_phase1_source_contracts_present() -> None:
         "order_master",
         "sku_sales_velocity",
         "sku_performance_summary",
+        "inbound_costs_allocated_sku",
         "product_db_preview",
         "listing_offer_snapshot_latest",
         "feeder_backtest_summary_live",

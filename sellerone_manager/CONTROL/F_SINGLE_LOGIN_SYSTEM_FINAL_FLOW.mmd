@@ -1,0 +1,43 @@
+flowchart TD
+    A["Start price file"] --> B["Check single login controller state"]
+    B --> C{"Dashboard Yes/No?"}
+
+    C -->|YES| D["Logged-in mode"]
+    D --> E["Run full checks including Seller Central"]
+    E --> F["Complete file or send true business uncertainty to user review"]
+    F --> G["Move to next price file"]
+
+    C -->|NO| H["Logged-out mode"]
+    H --> I["Run all checks that do not need Seller Central"]
+    I --> J{"Row needs Seller Central?"}
+
+    J -->|NO| K["Decide row from logged-out evidence"]
+    K --> L{"More rows in file?"}
+
+    J -->|YES| M["Mark row as needs_seller_central_second_check"]
+    M --> N["Hold current price file for login"]
+    N --> O["Move to next price file"]
+
+    L -->|YES| I
+    L -->|NO| P{"Any second checks parked?"}
+    P -->|NO| G
+    P -->|YES| N
+
+    O --> Q["Continue scanning later price files"]
+    Q --> R{"Login restored?"}
+    R -->|NO| A
+    R -->|YES| S["Return to held files in priority order"]
+    S --> T["Run parked Seller Central second checks"]
+    T --> F
+
+    H --> U{"Login request needed and allowed?"}
+    U -->|NO| I
+    U -->|YES| V["Route request through single login controller"]
+    V --> W{"SMS/code/manual challenge?"}
+    W -->|No challenge| B
+    W -->|SMS available| X["One controlled code route only"]
+    X --> B
+    W -->|SMS unavailable| Y["Human intervention or cooldown"]
+    W -->|Manual challenge/captcha/passkey/authenticator| Z["Human intervention required"]
+    Y --> I
+    Z --> I

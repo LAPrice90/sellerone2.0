@@ -9,4 +9,16 @@ e_schema_performance_summary,ok,ok,,,,,,E
 e_schema_study_report,ok,ok,,,,,,E
 e_schema_run_log,ok,ok,,,,,,E
 e_schema_decision_log,ok,ok,,,,,,E
+e_schema_sales_truth_sku_30d,ok,ok,,,,,,E
+e_schema_sales_truth_reconciliation,ok,ok,,,,,,E
+e_schema_sku_daily_sales_truth,ok,ok,,,,,,E
+e_sales_truth_selling_rows_revenue_zero,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_zero_profit_with_revenue,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_missing_cogs_equals_units,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_reconciliation_mismatch_rows,ok,0,path=out\sales_truth_reconciliation_latest.csv;total_rows=39;mismatch_rows=0;mismatch_share=0.0000;revenue_delta_abs_sum=0.00;profit_delta_abs_sum=0.00;fail_share=0.80,,,,,E
+e_sales_truth_performance_units_align_roi,ok,0,path=out\sku_performance_summary.csv;roi_row_count=39;mismatch_rows=0,,,,,E
+e_sales_truth_daily_state_explicit,ok,0,path=out\sku_daily_sales_truth_latest.csv;rows=246;invalid_source_rows=0;blank_source_rows=0;provisional_bad_confidence_rows=0;finalized_bad_confidence_rows=0,,,,,E
+e_sales_truth_daily_confidence_state_alignment,ok,0,path=out\sku_daily_sales_truth_latest.csv;rows=246;invalid_source_rows=0;blank_source_rows=0;provisional_bad_confidence_rows=0;finalized_bad_confidence_rows=0,,,,,E
+e_study_report_fresh_vs_summary,ok,0,summary=out\sku_performance_summary.csv;study=out\e_study_report.csv;summary_mtime_utc=2026-06-10T05:20:37.265996+00:00;study_mtime_utc=2026-06-10T05:20:38.172076+00:00;lag_seconds=0,,,,,E
+e_study_report_truth_alignment,ok,0,summary=out\sku_performance_summary.csv;study=out\e_study_report.csv;roi_row_count=39;mismatch_rows=0;sample=,,,,,E
 e_cycle_stale_lock,ok,0,"searched=out\systems\E\live\E_cycle.lock,out\E_cycle.lock",,,,,E

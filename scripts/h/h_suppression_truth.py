@@ -380,6 +380,34 @@ def resolve_unified_truth(
                 true_binding_ceiling_gbp = f"{execution_hard_floor:.2f}"
             true_binding_ceiling_type = "PHASE_FLOOR"
 
+    direct_floor_write_applied = bool(
+        not effective_suppression_active
+        and true_binding_ceiling_gbp == ""
+        and unified_writer_outcome in APPLIED_WRITE_STATUSES
+        and execution_hard_floor is not None
+        and (
+            execution_state_text in {"MARGIN_COMPRESS_TO_FLOOR", "CONTROLLED_EXIT_TO_FLOOR", "LIQUIDATE_TO_FLOOR"}
+            or "CANNOT_COMPETE_FLOOR_SEEK_STEP" in exec_reason_set
+            or "DAILY_INTEL_DEGRADED_FLOOR_SEEK" in exec_reason_set
+            or "PHASE_4_CANNOT_COMPETE_EXECUTION_OVERRIDE" in exec_reason_set
+        )
+        and (
+            _approx_equal(execution_new_price, trace_floor_total)
+            or _approx_equal(execution_new_price, execution_hard_floor)
+            or _approx_equal(observed_our_price, trace_floor_total)
+            or _approx_equal(observed_our_price, execution_hard_floor)
+        )
+    )
+    if direct_floor_write_applied:
+        if trace_floor_total is not None and (
+            _approx_equal(execution_new_price, trace_floor_total)
+            or _approx_equal(observed_our_price, trace_floor_total)
+        ):
+            true_binding_ceiling_gbp = f"{trace_floor_total:.2f}"
+        else:
+            true_binding_ceiling_gbp = f"{execution_hard_floor:.2f}"
+        true_binding_ceiling_type = "PHASE_FLOOR"
+
     if parked:
         # Parked SKUs are intentionally excluded from write flow in this cycle.
         # Force a non-write outcome so stale historic execution states do not

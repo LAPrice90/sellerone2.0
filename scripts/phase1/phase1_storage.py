@@ -33,6 +33,9 @@ H_CEILING_EVENTS_PATH = ROOT / "out" / "h_ceiling_events.csv"
 H_STRATEGY_OUTCOME_LOG_PATH = ROOT / "out" / "h_strategy_outcome_log.csv"
 H_STRATEGY_OUTCOME_DAILY_PATH = ROOT / "out" / "h_strategy_outcome_daily.csv"
 H_STRATEGY_CONTROL_MEMORY_PATH = ROOT / "out" / "h_strategy_control_memory.csv"
+H_DEFENSIVE_LISTING_ACTION_LOG_PATH = ROOT / "out" / "h_defensive_listing_action_log.csv"
+H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_PATH = ROOT / "out" / "h_defensive_listing_campaign_memory.csv"
+H_DEFENSIVE_LISTING_DAILY_PATH = ROOT / "out" / "h_defensive_listing_daily.csv"
 PHASE1_LOCK_FORCE_STALE_SECONDS = max(
     float(os.environ.get("PHASE1_LOCK_FORCE_STALE_SECONDS", "120") or 120.0),
     1.0,
@@ -391,6 +394,68 @@ H_STRATEGY_OUTCOME_DAILY_ZERO_FILL_COLUMNS: List[str] = [
     "provisional_sample_flag",
     "below_break_even_rows",
     "at_floor_rows",
+]
+
+H_DEFENSIVE_LISTING_ACTION_LOG_SCHEMA: List[str] = [
+    "event_ts_utc",
+    "run_id",
+    "sku",
+    "asin",
+    "mode",
+    "phase",
+    "buy_box_state",
+    "seller_count",
+    "lowest_rival_price_gbp",
+    "current_price_gbp",
+    "target_price_gbp",
+    "hard_floor_gbp",
+    "final_ceiling_gbp",
+    "write_required",
+    "live_write_enabled",
+    "write_status",
+    "write_error",
+    "attempted_write",
+    "wrote",
+    "reason_codes_json",
+]
+
+H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_SCHEMA: List[str] = [
+    "sku",
+    "asin",
+    "mode",
+    "campaign_started_utc",
+    "last_seen_rival_utc",
+    "last_absent_utc",
+    "reset_count",
+    "failed_defend_count",
+    "writes_date",
+    "writes_today",
+    "cooldown_until_utc",
+    "phase",
+    "last_target_price_gbp",
+    "last_rival_price_gbp",
+    "last_action",
+    "live_write_enabled",
+    "updated_utc",
+]
+
+H_DEFENSIVE_LISTING_DAILY_SCHEMA: List[str] = [
+    "asof_date",
+    "sku",
+    "asin",
+    "mode",
+    "enabled",
+    "live_write_enabled",
+    "phase",
+    "action_rows",
+    "write_required_rows",
+    "applied_rows",
+    "blocked_live_rows",
+    "hold_rows",
+    "last_target_price_gbp",
+    "last_rival_price_gbp",
+    "last_reason",
+    "updated_utc",
 ]
 
 
@@ -1063,4 +1128,39 @@ def upsert_h_strategy_outcome_daily(rows: Iterable[Dict[str, object]]) -> None:
     )
     # Keep legacy rows compatible when schema expands with new count columns.
     _normalize_h_strategy_outcome_daily_file_in_place()
+
+
+def read_h_defensive_listing_memory(sku: str) -> Dict[str, str]:
+    sku_text = str(sku or "").strip()
+    if not sku_text:
+        return {}
+    rows = read_table(H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_PATH)
+    matches = [row for row in rows if str(row.get("sku", "")).strip() == sku_text]
+    return dict(matches[-1]) if matches else {}
+
+
+def upsert_h_defensive_listing_memory(rows: Iterable[Dict[str, object]]) -> None:
+    upsert_rows(
+        H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_PATH,
+        rows,
+        key_cols=["sku"],
+        schema=H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_SCHEMA,
+    )
+
+
+def append_h_defensive_listing_action_log(rows: Iterable[Dict[str, object]]) -> None:
+    append_rows(
+        H_DEFENSIVE_LISTING_ACTION_LOG_PATH,
+        rows,
+        H_DEFENSIVE_LISTING_ACTION_LOG_SCHEMA,
+    )
+
+
+def upsert_h_defensive_listing_daily(rows: Iterable[Dict[str, object]]) -> None:
+    upsert_rows(
+        H_DEFENSIVE_LISTING_DAILY_PATH,
+        rows,
+        key_cols=["asof_date", "sku", "asin", "mode"],
+        schema=H_DEFENSIVE_LISTING_DAILY_SCHEMA,
+    )
 

@@ -1,0 +1,62 @@
+{
+  "id": "O_operations_loop",
+  "display_name": "O Operations Loop",
+  "flow": "O",
+  "purpose": "Register the O operations loop so the manager can distinguish foundations, bridges, proof layers, and true restock-to-send readiness.",
+  "owner_entrypoint": "scripts/flows/O/O003_build_restock_review_queue.py",
+  "worker_entrypoint": "scripts/flows/O/O003_build_restock_review_queue.py",
+  "health_sources": [
+    {
+      "name": "checklist_O",
+      "path": "out/cycle_alerts/checklist_O.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "expectations_O",
+      "path": "project_control/EXPECTATIONS/operations_loop_expectations.md",
+      "required": true,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "restock_review_queue",
+      "path": "out/systems/O/live/restock_review_queue.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "O_manager_state",
+      "path": "out/systems/M/flow_maintenance_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "O_foundation_outputs_are_not_full_loop_completion",
+    "O_commitment_actions_require_explicit_approval"
+  ],
+  "needs_user_signals": [
+    "business_decision_required",
+    "purchase_commitment_required",
+    "receiving_or_send_to_amazon_approval_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "create_manager_task"
+  ],
+  "forbidden_actions": [
+    "run_worker_cycle",
+    "create_purchase_commitment",
+    "receive_inventory",
+    "send_to_amazon",
+    "write_legacy_sheets",
+    "change_pricing",
+    "align_local_db",
+    "delete_outputs"
+  ],
+  "manager_notes": "Manager registration only. O planned or scaffolded work must be marked not_verified until full loop proof exists."
+}

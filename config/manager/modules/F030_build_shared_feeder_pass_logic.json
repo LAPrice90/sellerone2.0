@@ -1,0 +1,66 @@
+{
+  "id": "F030_build_shared_feeder_pass_logic",
+  "display_name": "F030 Shared Feeder Pass Logic",
+  "flow": "F",
+  "purpose": "Classify the shared feeder pass-logic builder so the manager can inspect pass, hold, and health outputs without rebuilding feeder decisions.",
+  "owner_entrypoint": "scripts/flows/F/F030_build_shared_feeder_pass_logic.py",
+  "worker_entrypoint": "scripts/flows/F/F030_build_shared_feeder_pass_logic.py",
+  "health_sources": [
+    {
+      "name": "feeder_shared_pass_logic_health",
+      "path": "out/systems/F/live/feeder_shared_pass_logic_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_price_list_universal_live",
+      "path": "out/systems/F/inbox/supplier_price_list_universal_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_shared_pass_logic_live",
+      "path": "out/systems/F/live/feeder_shared_pass_logic_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "feeder_shared_pass_logic_holds",
+      "path": "out/systems/F/live/feeder_shared_pass_logic_holds.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "shared_pass_logic_output_warn_after_10080_minutes",
+    "pass_logic_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "manual_review_rows_visible",
+    "pass_logic_source_contract_failed"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_pass_logic",
+    "publish_review_rows",
+    "align_local_db"
+  ],
+  "manager_notes": "Bridge classification only. MOT may inspect shared pass-logic proof but must not rebuild pass rows, move rows, or publish anything."
+}

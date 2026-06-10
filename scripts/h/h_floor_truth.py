@@ -40,6 +40,18 @@ BLOCKING_REASON_CODES = {
 }
 
 
+@dataclass(frozen=True)
+class HTokenCogsSource:
+    cost_exvat_gbp: float
+    source_cogs: str
+    token_id: str = ""
+    token_source: str = ""
+    source_batch_id: str = ""
+    source_order_key: str = ""
+    notes: str = ""
+    proof_state: str = "unknown"
+
+
 def _norm(value: object) -> str:
     return str(value or "").strip()
 
@@ -76,6 +88,45 @@ def _uniq_codes(codes: list[str]) -> list[str]:
     return out
 
 
+def _notes_value(notes: object, key: str) -> str:
+    wanted = _norm(key).lower()
+    for part in _norm(notes).split(";"):
+        if "=" not in part:
+            continue
+        raw_key, raw_value = part.split("=", 1)
+        if _norm(raw_key).lower() == wanted:
+            return _norm(raw_value)
+    return ""
+
+
+def _is_fallback_token_row(row: Mapping[str, object]) -> bool:
+    token_id = _norm(row.get("token_id", "")).upper()
+    source = _norm(row.get("source", "")).lower()
+    notes = _norm(row.get("notes", "")).lower()
+    return (
+        token_id.startswith("ADJ-")
+        or source == "stock_adjustment_fallback"
+        or "adjustment_fallback_create:" in notes
+    )
+
+
+def _token_cost_proof_state(row: Mapping[str, object], source_cogs: str) -> str:
+    if source_cogs == "token_cogs_ledger_median":
+        return "unproved"
+    if not row:
+        return "unknown"
+    if not _is_fallback_token_row(row):
+        return "clean"
+    cost_source = _notes_value(row.get("notes", ""), "cost_source").lower()
+    if cost_source == "receipt_proved":
+        return "receipt_proved"
+    if cost_source == "source_token_proved":
+        return "source_token_proved"
+    if cost_source:
+        return "weak_fallback"
+    return "unproved"
+
+
 @dataclass
 class HFloorInputs:
     sku: str
@@ -93,6 +144,12 @@ class HFloorInputs:
     reason_codes: list[str] = field(default_factory=list)
     band_bucket: str = ""
     referral_min_fee_applied: bool = False
+    cogs_source_token_id: str = ""
+    cogs_token_source: str = ""
+    cogs_source_batch_id: str = ""
+    cogs_source_order_key: str = ""
+    cogs_source_notes: str = ""
+    cogs_source_proof_state: str = "unknown"
 
 
 @dataclass
@@ -108,7 +165,7 @@ class HFloorResult:
 @dataclass
 class HFloorContext:
     product_db_rows: dict[str, dict[str, str]]
-    token_cogs_by_sku: dict[str, tuple[float, str]]
+    token_cogs_by_sku: dict[str, HTokenCogsSource]
     vat_policy: dict[str, object]
 
 
@@ -130,7 +187,7 @@ def load_h_floor_context(
         except Exception:
             product_db_rows = {}
 
-    token_cogs_by_sku: dict[str, tuple[float, str]] = {}
+    token_cogs_by_sku: dict[str, HTokenCogsSource] = {}
 
     if token_ledger_path.exists():
         try:
@@ -162,7 +219,17 @@ def load_h_floor_context(
                 first_rows = base.groupby("sku_u", as_index=False).head(1).copy()
                 source = "token_ledger_live_next_available" if not available.empty else "token_ledger_live_first_cost"
                 for _, row in first_rows.iterrows():
-                    token_cogs_by_sku[str(row["sku_u"]).strip().upper()] = (float(row["cost_num"]), source)
+                    row_dict = {str(k): _norm(v) for k, v in row.to_dict().items()}
+                    token_cogs_by_sku[str(row["sku_u"]).strip().upper()] = HTokenCogsSource(
+                        cost_exvat_gbp=float(row["cost_num"]),
+                        source_cogs=source,
+                        token_id=row_dict.get("token_id", ""),
+                        token_source=row_dict.get("source", ""),
+                        source_batch_id=row_dict.get("source_batch_id", ""),
+                        source_order_key=row_dict.get("source_order_key", ""),
+                        notes=row_dict.get("notes", ""),
+                        proof_state=_token_cost_proof_state(row_dict, source),
+                    )
         except Exception:
             token_cogs_by_sku = {}
 
@@ -178,7 +245,11 @@ def load_h_floor_context(
                     sku_key = str(sku).strip().upper()
                     if sku_key in token_cogs_by_sku:
                         continue
-                    token_cogs_by_sku[sku_key] = (float(value), "token_cogs_ledger_median")
+                    token_cogs_by_sku[sku_key] = HTokenCogsSource(
+                        cost_exvat_gbp=float(value),
+                        source_cogs="token_cogs_ledger_median",
+                        proof_state="unproved",
+                    )
         except Exception:
             pass
 
@@ -291,10 +362,22 @@ def resolve_h_floor_inputs(
     if cogs_info is None:
         cogs_ex = 0.0
         source_cogs = "MISSING"
+        cogs_source_token_id = ""
+        cogs_token_source = ""
+        cogs_source_batch_id = ""
+        cogs_source_order_key = ""
+        cogs_source_notes = ""
+        cogs_source_proof_state = "unknown"
         reason_codes.append(REASON_COGS_TOKEN_MISSING)
     else:
-        cogs_ex = float(cogs_info[0])
-        source_cogs = str(cogs_info[1])
+        cogs_ex = float(cogs_info.cost_exvat_gbp)
+        source_cogs = str(cogs_info.source_cogs)
+        cogs_source_token_id = cogs_info.token_id
+        cogs_token_source = cogs_info.token_source
+        cogs_source_batch_id = cogs_info.source_batch_id
+        cogs_source_order_key = cogs_info.source_order_key
+        cogs_source_notes = cogs_info.notes
+        cogs_source_proof_state = cogs_info.proof_state
 
     fba_ex, source_fba = _resolve_fba_exvat(row, band_bucket, reason_codes)
     referral_pct, source_referral = _resolve_referral_pct(row, band_bucket, reason_codes)
@@ -327,6 +410,12 @@ def resolve_h_floor_inputs(
         reason_codes=_uniq_codes(reason_codes),
         band_bucket=band_bucket,
         referral_min_fee_applied=referral_min_applied,
+        cogs_source_token_id=cogs_source_token_id,
+        cogs_token_source=cogs_token_source,
+        cogs_source_batch_id=cogs_source_batch_id,
+        cogs_source_order_key=cogs_source_order_key,
+        cogs_source_notes=cogs_source_notes,
+        cogs_source_proof_state=cogs_source_proof_state,
     )
 
 
@@ -465,6 +554,12 @@ def build_h_floor_trace_row(
         "digital_fee_exvat_gbp": f"{_round_half_up(inputs.digital_fee_exvat_gbp, 3):.3f}",
         "margin_exvat_gbp": f"{_round_half_up(inputs.margin_exvat_gbp, 3):.3f}",
         "source_cogs": _norm(inputs.source_cogs),
+        "cogs_source_token_id": _norm(inputs.cogs_source_token_id),
+        "cogs_token_source": _norm(inputs.cogs_token_source),
+        "cogs_source_batch_id": _norm(inputs.cogs_source_batch_id),
+        "cogs_source_order_key": _norm(inputs.cogs_source_order_key),
+        "cogs_source_notes": _norm(inputs.cogs_source_notes),
+        "cogs_source_proof_state": _norm(inputs.cogs_source_proof_state),
         "source_fba": _norm(inputs.source_fba),
         "source_referral": _norm(inputs.source_referral),
         "band_bucket": _norm(inputs.band_bucket),
@@ -495,6 +590,12 @@ def append_h_floor_trace_rows(rows: list[dict[str, str]], *, path: Path = TRACE_
         "digital_fee_exvat_gbp",
         "margin_exvat_gbp",
         "source_cogs",
+        "cogs_source_token_id",
+        "cogs_token_source",
+        "cogs_source_batch_id",
+        "cogs_source_order_key",
+        "cogs_source_notes",
+        "cogs_source_proof_state",
         "source_fba",
         "source_referral",
         "band_bucket",
@@ -504,6 +605,22 @@ def append_h_floor_trace_rows(rows: list[dict[str, str]], *, path: Path = TRACE_
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
+    if exists:
+        try:
+            with path.open("r", encoding="utf-8", newline="") as fh:
+                reader = csv.DictReader(fh)
+                existing_headers = list(reader.fieldnames or [])
+                existing_rows = list(reader)
+            merged_headers = existing_headers + [header for header in headers if header not in existing_headers]
+            if merged_headers != existing_headers:
+                with path.open("w", encoding="utf-8", newline="") as fh:
+                    writer = csv.DictWriter(fh, fieldnames=merged_headers)
+                    writer.writeheader()
+                    for existing_row in existing_rows:
+                        writer.writerow({k: _norm(existing_row.get(k, "")) for k in merged_headers})
+            headers = merged_headers
+        except OSError:
+            pass
     with path.open("a", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=headers)
         if not exists:

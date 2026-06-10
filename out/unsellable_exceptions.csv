@@ -1,5 +1,0 @@
-seller_sku,inventory_unsellable,token_unsellable,delta_unsellable,token_available,token_research_pending,token_returned_pending,token_ordered,token_warehouse,token_total,expected_token_total,delta_total,updated_at
-IB-U5FA-BO2Y,1,0,-1,0,0,0,0,0,5,5,0,2026-01-29T12:55:44.651266+00:00
-MW-9K5M-VKW8,2,0,-2,0,0,0,0,0,96,96,0,2026-01-29T12:55:44.651266+00:00
-OZ-3NKR-VLYG,1,0,-1,0,0,0,0,0,0,0,0,2026-01-29T12:55:44.651266+00:00
-RB-82FL-T88J,1,0,-1,0,0,0,0,0,13,13,0,2026-01-29T12:55:44.651266+00:00

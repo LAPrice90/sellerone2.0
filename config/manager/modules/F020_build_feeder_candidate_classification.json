@@ -1,0 +1,80 @@
+{
+  "id": "F020_build_feeder_candidate_classification",
+  "display_name": "F020 Feeder Candidate Classification",
+  "flow": "F",
+  "purpose": "Register first-pass feeder candidate classification so the manager can inspect ready, manual-review, and hold proof without classifying rows.",
+  "owner_entrypoint": "scripts/flows/F/F020_build_feeder_candidate_classification.py",
+  "worker_entrypoint": "scripts/flows/F/F020_build_feeder_candidate_classification.py",
+  "health_sources": [
+    {
+      "name": "feeder_classification_health",
+      "path": "out/systems/F/live/feeder_classification_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_candidate_intake_live",
+      "path": "out/systems/F/live/feeder_candidate_intake_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_candidate_first_pass_holds",
+      "path": "out/systems/F/live/feeder_candidate_first_pass_holds.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_candidate_normalized_live",
+      "path": "out/systems/F/live/feeder_candidate_normalized_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_candidate_first_pass_classification_live",
+      "path": "out/systems/F/live/feeder_candidate_first_pass_classification_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_candidate_first_pass_holds",
+      "path": "out/systems/F/live/feeder_candidate_first_pass_holds.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "feeder_classification_health_warn_after_43200_minutes",
+    "classification_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "classification_contract_failed",
+    "manual_review_rows_visible",
+    "no_ready_rows"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "classify_candidate_rows",
+    "approve_candidate_rows",
+    "write_purchase_handoff",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may inspect classification health, ready rows, and holds but must not classify or move feeder candidates."
+}

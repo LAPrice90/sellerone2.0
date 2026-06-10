@@ -99,6 +99,18 @@ MAINTENANCE_READY_PATH = Path(
 MAINTENANCE_ACTIVE_PATH = Path(
     os.environ.get("MAINTENANCE_ACTIVE_PATH", LOCKS_DIR / "maintenance.active")
 )
+A_MAINTENANCE_HANDOFF_LATEST_PATH = Path(
+    os.environ.get(
+        "A_MAINTENANCE_HANDOFF_LATEST_PATH",
+        ROOT / "out" / "systems" / "A" / "live" / "a_maintenance_handoff_latest.json",
+    )
+)
+A_MAINTENANCE_HANDOFF_HISTORY_PATH = Path(
+    os.environ.get(
+        "A_MAINTENANCE_HANDOFF_HISTORY_PATH",
+        ROOT / "out" / "systems" / "A" / "history" / "a_maintenance_handoff_history.jsonl",
+    )
+)
 MAINTENANCE_REASON = os.environ.get("MAINTENANCE_REASON", "A_cycle_run").strip() or "A_cycle_run"
 HEALTH_CHECKLIST_PATH = Path(os.environ.get("HEALTH_CHECKLIST_PATH", ROOT / "out" / "system_health_checklist.csv"))
 A_SPLIT_CHECKLIST_PATH = flow_gate_checklist_path("A")
@@ -128,14 +140,17 @@ FLOW_SELFTEST_COMPARE_FIELDS = [
 ]
 _ensure_b_after_a_raw = os.environ.get("A_ENSURE_B_AFTER_A", "0").strip().lower()
 ENSURE_B_AFTER_A = _ensure_b_after_a_raw in {"1", "true", "yes", "y", "on"}
-LEGACY_SHEET_OUTPUT_STEPS = {
-    "A001_run_listings_to_sheet.py",
-    "A002_run_catalog_items_to_sheet.py",
-    "A004_run_fees_to_sheet.py",
+LEGACY_SHEET_OUTPUT_STEPS = set()
+LEGACY_SHEET_ONLY_PRODUCT_DB_STEPS = {
     "dedupe_product_db.py",
     "sync_product_db_to_main_sheet.py",
 }
-_skip_sheet_outputs_raw = os.environ.get("A_SKIP_LEGACY_SHEET_OUTPUT_STEPS", "0").strip().lower()
+LOCAL_REFRESH_WITH_LEGACY_SHEETS_DISABLED = {
+    "A001_run_listings_to_sheet.py",
+    "A002_run_catalog_items_to_sheet.py",
+    "A004_run_fees_to_sheet.py",
+}
+_skip_sheet_outputs_raw = os.environ.get("A_SKIP_LEGACY_SHEET_OUTPUT_STEPS", "1").strip().lower()
 A_SKIP_LEGACY_SHEET_OUTPUT_STEPS = _skip_sheet_outputs_raw in {"1", "true", "yes", "y", "on"}
 _stock_receipts_sheet_raw = os.environ.get("A_ENABLE_STOCK_RECEIPTS_SHEET", "1").strip().lower()
 A_ENABLE_STOCK_RECEIPTS_SHEET = _stock_receipts_sheet_raw in {"1", "true", "yes", "y", "on"}
@@ -502,6 +517,84 @@ def _clear_maintenance() -> None:
                 path.unlink()
         except Exception:
             pass
+
+
+def _marker_evidence(path: Path) -> dict[str, object]:
+    exists = path.exists()
+    text = ""
+    if exists:
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except Exception:
+            text = "<unreadable>"
+    return {
+        "path": str(path),
+        "exists": bool(exists),
+        "text": text,
+    }
+
+
+def _maintenance_cleanup_evidence() -> dict[str, object]:
+    markers = {
+        "request": _marker_evidence(MAINTENANCE_REQUEST_PATH),
+        "ready": _marker_evidence(MAINTENANCE_READY_PATH),
+        "active": _marker_evidence(MAINTENANCE_ACTIVE_PATH),
+    }
+    return {
+        "all_clear": all(not bool(item.get("exists", False)) for item in markers.values()),
+        "markers": markers,
+    }
+
+
+def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp_path, path)
+
+
+def _write_a_maintenance_handoff_proof(
+    *,
+    request_id: str,
+    handoff_mode: str,
+    b_ready_evidence: dict[str, object] | None,
+    b_status_at_handoff: dict[str, object] | None,
+    a_active_evidence: dict[str, object] | None,
+    final_run_id: str,
+    final_state: str,
+    final_exit_code: int,
+    manifest_path: str = "",
+) -> dict[str, object]:
+    observed_utc = utc_now_iso()
+    cleanup_evidence = _maintenance_cleanup_evidence()
+    active_seen = bool((a_active_evidence or {}).get("exists", False))
+    cleanup_clear = bool(cleanup_evidence.get("all_clear", False))
+    accepted_handoff = handoff_mode in {"b_ready", "b_not_running", "timeout_b_not_running"}
+    proof_status = (
+        "ok"
+        if final_state == "completed" and final_exit_code == 0 and accepted_handoff and active_seen and cleanup_clear
+        else "fail"
+    )
+    payload: dict[str, object] = {
+        "observed_utc": observed_utc,
+        "flow": "A",
+        "proof_status": proof_status,
+        "request_id": request_id,
+        "handoff_mode": handoff_mode,
+        "b_ready_evidence": b_ready_evidence or _marker_evidence(MAINTENANCE_READY_PATH),
+        "b_status_at_handoff": b_status_at_handoff or {},
+        "a_active_evidence": a_active_evidence or _marker_evidence(MAINTENANCE_ACTIVE_PATH),
+        "cleanup_evidence": cleanup_evidence,
+        "final_run_id": final_run_id,
+        "final_state": final_state,
+        "final_exit_code": int(final_exit_code),
+        "manifest_path": manifest_path,
+    }
+    _atomic_write_json(A_MAINTENANCE_HANDOFF_LATEST_PATH, payload)
+    A_MAINTENANCE_HANDOFF_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with A_MAINTENANCE_HANDOFF_HISTORY_PATH.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
+    return payload
 
 
 def _clear_stale_b_lock_if_any() -> None:
@@ -1080,8 +1173,6 @@ RUN_ORDER = [
     "A010_apply_researching_delta.py",
     "A005_run_inventory_adjustments_report.py",
     "A016_refresh_phase1_daily_intel.py",
-    "dedupe_product_db.py",
-    "sync_product_db_to_main_sheet.py",
     "run_E_cycle.py",
     "A020_run_daily_finance.py",
     "A015_build_system_health_check.py",
@@ -1339,6 +1430,14 @@ def _append_a_step(
 def main() -> int:
     manifest = None
     run_id = ""
+    exit_code = 1
+    final_state_for_proof = "not_started"
+    manifest_path_for_proof = ""
+    handoff_request_id = ""
+    handoff_mode = ""
+    handoff_ready_evidence: dict[str, object] = {}
+    handoff_b_status: dict[str, object] = {}
+    handoff_active_evidence: dict[str, object] = {}
     health_summary_payload = _health_summary_payload(
         None,
         status="missing",
@@ -1348,11 +1447,17 @@ def main() -> int:
     try:
         print("[A_all] requesting maintenance handoff from B cycle")
         request_id = _request_maintenance()
+        handoff_request_id = request_id
         handoff_mode = _wait_for_b_maintenance_ready(request_id)
+        handoff_ready_evidence = _marker_evidence(MAINTENANCE_READY_PATH)
+        handoff_b_status = _b_cycle_status()
         if handoff_mode == "timeout_b_running":
             print("[A_all] ERROR maintenance handoff timeout while B is still running; aborting A run to avoid overlap")
+            run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            exit_code = 3
+            final_state_for_proof = "failed"
             _record_a_failure_event(
-                run_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+                run_id=run_id,
                 final_state="failed",
                 cause_code="MAINTENANCE_ABORT",
                 cause_detail="maintenance handoff timeout while B was still running",
@@ -1370,6 +1475,7 @@ def main() -> int:
         else:
             print(f"[A_all] maintenance handoff ready ({handoff_mode}); activating A maintenance")
         _activate_maintenance(request_id)
+        handoff_active_evidence = _marker_evidence(MAINTENANCE_ACTIVE_PATH)
         _acquire_lock()
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         manifest = new_manifest(cycle="A", run_id=run_id, start_time=utc_now_iso())
@@ -1474,9 +1580,16 @@ def main() -> int:
                 # Default to no sheet writes to avoid quota issues unless explicitly enabled.
                 if "INVENTORY_WRITE_SHEETS" not in env:
                     env["INVENTORY_WRITE_SHEETS"] = "0"
+                env.setdefault("INVENTORY_WRITE_PRODUCT_DB", "0")
+                env.setdefault("INVENTORY_WRITE_TOKEN_RECON", "0")
                 # Prefer direct collector in A cycle by default.
                 # API-owner mode remains opt-in via A003_USE_API_OWNER=1.
                 env["INVENTORY_USE_API_OWNER"] = str(env.get("A003_USE_API_OWNER", "0")).strip() or "0"
+            if name in LOCAL_REFRESH_WITH_LEGACY_SHEETS_DISABLED and A_SKIP_LEGACY_SHEET_OUTPUT_STEPS:
+                # Keep the local source-fact refresh, but do not write legacy Sheets.
+                env.setdefault("A001_WRITE_LEGACY_SHEETS", "0")
+                env.setdefault("A002_WRITE_LEGACY_SHEETS", "0")
+                env.setdefault("A004_WRITE_LEGACY_SHEETS", "0")
             if name == "A020_run_daily_finance.py":
                 # Default to skipping Level 3 sheet writes to avoid 10M cell limits.
                 if "FIN_L3_SKIP_SHEETS" not in env:
@@ -1963,6 +2076,7 @@ def main() -> int:
                     final_state = "failed"
                 else:
                     final_state = "completed"
+                final_state_for_proof = final_state or "unknown"
                 finalize_manifest(
                     manifest,
                     health_checklist_path=None,
@@ -1971,6 +2085,7 @@ def main() -> int:
                     health_summary=health_summary_payload,
                 )
                 manifest_path = write_manifest(ROOT, manifest)
+                manifest_path_for_proof = str(manifest_path)
                 print(f"[A_all] manifest written: {manifest_path}")
                 if final_state in {"failed", "partial"} or exit_code != 0:
                     try:
@@ -1989,6 +2104,21 @@ def main() -> int:
         _release_lock()
         _clear_maintenance()
         print("[A_all] maintenance cleared; B cycle may resume")
+        if handoff_request_id:
+            try:
+                _write_a_maintenance_handoff_proof(
+                    request_id=handoff_request_id,
+                    handoff_mode=handoff_mode,
+                    b_ready_evidence=handoff_ready_evidence,
+                    b_status_at_handoff=handoff_b_status,
+                    a_active_evidence=handoff_active_evidence,
+                    final_run_id=run_id,
+                    final_state=final_state_for_proof,
+                    final_exit_code=exit_code,
+                    manifest_path=manifest_path_for_proof,
+                )
+            except Exception as exc:
+                print(f"[A_all] WARN maintenance handoff proof write failed: {type(exc).__name__}: {exc}")
         try:
             _ensure_b_cycle_running_after_a()
         except Exception as exc:

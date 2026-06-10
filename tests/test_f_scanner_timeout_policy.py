@@ -63,8 +63,31 @@ def test_default_policy_uses_approved_values() -> None:
     assert policy.loc["SCRAPEFAIL", "timeout_days"] == "30"
     assert policy.loc["SELLERHISTORYFAIL", "timeout_days"] == "180"
     assert policy.loc["PRICEHISTORYFAIL", "timeout_days"] == "180"
-    assert policy.loc["RESCAN", "timeout_days"] == "30"
+    assert policy.loc["RESCAN", "enabled"] == "1"
+    assert policy.loc["RESCAN", "timeout_mode"] == "disabled"
+    assert policy.loc["RESCAN", "timeout_days"] == ""
+    assert policy.loc["RESCAN", "max_timeout_days"] == "0"
     assert policy.loc["FAIL", "timeout_days"] == "90"
+
+
+def test_rescan_policy_never_creates_timeout_skip() -> None:
+    policy = default_timeout_policy_df("2026-05-01T10:00:00Z")
+
+    timeout_until = timeout_until_utc_for_policy(
+        observed_utc="2026-05-01T00:00:00Z",
+        fail_code="RESCAN",
+        policy_df=policy,
+    )
+    decision = should_skip_for_timeout_policy(
+        fail_code="RESCAN",
+        policy_df=policy,
+        last_scanned_at_utc="2026-05-01T00:00:00Z",
+        observed_utc="2026-05-02T00:00:00Z",
+    )
+
+    assert timeout_until == ""
+    assert decision.skip is False
+    assert decision.reason == "policy_disabled"
 
 
 def test_unknown_fail_code_falls_back_to_fail_and_warns(tmp_path: Path) -> None:

@@ -1,7 +1,8 @@
 ﻿"""
 One-click runner with mode toggle:
-- MODE="sheet": fetch listings report, write raw + focused summary to Sheets, update status, save CSV snapshot.
+- MODE="sheet": fetch listings report and save local CSV snapshots. Legacy Sheet writing is opt-in.
 - MODE="sku": fetch listings report, save snapshot, and print the target SKU rows.
+- A001_WRITE_LEGACY_SHEETS=1: opt in to the old Google Sheets update path.
 
 Focus columns for summary:
 item-name, listing-id, seller-sku, price, open-date, item-condition, product-id, fulfillment-channel
@@ -35,8 +36,8 @@ RAW_TAB = "MerchantListings_raw"
 SUMMARY_TAB = "Listings_focus_summary"
 RUN_STATUS_TAB = "Run_Status"
 MARKETPLACE_ID = os.environ.get("MARKETPLACE_ID", "A1F83G8C2ARO7P")
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))
-MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "24"))
+POLL_INTERVAL = int(os.environ.get("A001_POLL_INTERVAL", os.environ.get("POLL_INTERVAL", "20")))
+MAX_ATTEMPTS = int(os.environ.get("A001_MAX_ATTEMPTS", os.environ.get("MAX_ATTEMPTS", "40")))
 PRODUCT_DB_PREVIEW = Path("out/product_db_preview.csv")
 SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 
@@ -50,6 +51,14 @@ FOCUS_COLUMNS: List[str] = [
     "product-id",
     "fulfillment-channel",
 ]
+
+
+def env_flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def write_legacy_sheets_enabled() -> bool:
+    return env_flag("A001_WRITE_LEGACY_SHEETS", "0")
 
 
 def get_gspread_client() -> gspread.Client:
@@ -357,8 +366,11 @@ def main() -> None:
     env_name = os.environ.get("ENV", "prod")
     git_version = os.environ.get("GIT_COMMIT", "")
 
-    client = get_gspread_client()
-    sheet = client.open_by_key(SHEET_ID)
+    write_legacy_sheets = write_legacy_sheets_enabled()
+    sheet = None
+    if write_legacy_sheets:
+        client = get_gspread_client()
+        sheet = client.open_by_key(SHEET_ID)
 
     try:
         result = run_live(
@@ -379,9 +391,13 @@ def main() -> None:
         snapshot_path = save_snapshot(df)
 
         if mode == "sheet":
-            write_raw_and_focus_summary(df)
-            sheet_tabs_written = [RAW_TAB, SUMMARY_TAB]
-            export_product_db(sheet)
+            if write_legacy_sheets:
+                write_raw_and_focus_summary(df)
+                sheet_tabs_written = [RAW_TAB, SUMMARY_TAB]
+                if sheet is not None:
+                    export_product_db(sheet)
+            else:
+                sheet_tabs_written = []
         elif mode == "sku":
             matches = df[df["seller-sku"] == TARGET_SKU].fillna("")
             if matches.empty:
@@ -394,10 +410,14 @@ def main() -> None:
         alert = "drop_to_zero"
 
     # Load existing consecutive counters
-    try:
-        ws_status = sheet.worksheet(RUN_STATUS_TAB)
-        existing = ws_status.get_all_values()
-    except gspread.WorksheetNotFound:
+    if write_legacy_sheets and sheet is not None:
+        try:
+            ws_status = sheet.worksheet(RUN_STATUS_TAB)
+            existing = ws_status.get_all_values()
+        except gspread.WorksheetNotFound:
+            existing = []
+            ws_status = None
+    else:
         existing = []
         ws_status = None
     headers = [
@@ -468,7 +488,8 @@ def main() -> None:
         git_version,
         last_error,
     ]
-    append_run_status(sheet, status_row)
+    if write_legacy_sheets and sheet is not None:
+        append_run_status(sheet, status_row)
 
     print(
         {
@@ -479,10 +500,13 @@ def main() -> None:
             "snapshot": snapshot_path,
             "sheet_tabs": sheet_tabs_written,
             "mode": mode,
+            "legacy_sheet_writes": write_legacy_sheets,
             "alert": alert,
             "error": last_error,
         }
     )
+    if status != "success":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

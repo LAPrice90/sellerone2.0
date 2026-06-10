@@ -1,0 +1,76 @@
+{
+  "id": "F092_build_amazon_listing_drafts",
+  "display_name": "F092 Amazon Listing Drafts",
+  "flow": "F",
+  "purpose": "Register Amazon listing draft proof so the manager can inspect draft rows without creating or publishing Amazon listings.",
+  "owner_entrypoint": "scripts/flows/F/F092_build_amazon_listing_drafts.py",
+  "worker_entrypoint": "scripts/flows/F/F092_build_amazon_listing_drafts.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_health",
+      "path": "out/systems/F/health/amazon_listing_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "amazon_listing_sku_reservations_live",
+      "path": "out/systems/F/live/amazon_listing_sku_reservations_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_holds_live",
+      "path": "out/systems/F/live/amazon_listing_holds_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "amazon_listing_drafts_live",
+      "path": "out/systems/F/live/amazon_listing_drafts_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_draft_events",
+      "path": "out/systems/F/history/amazon_listing_draft_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "listing_draft_proof_warn_after_43200_minutes",
+    "draft_rows_are_not_publish_permission"
+  ],
+  "needs_user_signals": [
+    "listing_publish_requested",
+    "draft_hold_rows_visible",
+    "required_listing_fact_missing"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_amazon_listing_drafts",
+    "publish_listing",
+    "call_amazon_api",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. Draft proof can be read, but creating/publishing listings and Amazon API calls remain protected."
+}

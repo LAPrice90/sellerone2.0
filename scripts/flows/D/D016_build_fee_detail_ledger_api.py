@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 IN_BREAKDOWNS = Path("out/financial_transactions_v2024_breakdowns.csv")
 OUT_LEDGER = Path("out/fee_detail_ledger_api.csv")
@@ -41,7 +43,7 @@ def main() -> None:
 
     df = pd.read_csv(IN_BREAKDOWNS)
     if df.empty:
-        pd.DataFrame(columns=OUT_COLS).to_csv(OUT_LEDGER, index=False)
+        safe_to_csv(pd.DataFrame(columns=OUT_COLS), OUT_LEDGER, index=False)
         print({"status": "warning", "rows": 0, "ledger": str(OUT_LEDGER)})
         return
 
@@ -53,7 +55,7 @@ def main() -> None:
     ].copy()
 
     if df.empty:
-        pd.DataFrame(columns=OUT_COLS).to_csv(OUT_LEDGER, index=False)
+        safe_to_csv(pd.DataFrame(columns=OUT_COLS), OUT_LEDGER, index=False)
         print({"status": "warning", "rows": 0, "ledger": str(OUT_LEDGER)})
         return
 
@@ -82,7 +84,7 @@ def main() -> None:
         if col not in df.columns:
             df[col] = ""
 
-    df[OUT_COLS].to_csv(OUT_LEDGER, index=False)
+    safe_to_csv(df[OUT_COLS], OUT_LEDGER, index=False)
     print({"status": "success", "rows": len(df), "ledger": str(OUT_LEDGER)})
 
 

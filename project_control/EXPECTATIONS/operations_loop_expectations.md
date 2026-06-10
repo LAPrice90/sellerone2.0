@@ -110,3 +110,13 @@ These do not affect Completion Score:
 - latest local proof produced 59 ready market-refresh candidates, including 8 ABGee rows and `12-749B-9EB5` with ASIN `B084HZRR8G`
 - no Google Sheet, Amazon write, receiving, send-to-Amazon, O010, or O100 action is part of this step
 - the operations-loop completion table remains unchanged because this is a proof-collection bridge, not the full restock-to-receiving loop
+
+## SECTION 11 - Manager Readiness Mapping Note
+- As of 2026-05-30, O is explicitly managed as mid-build, not as a finished live operations cycle.
+- Current user-working readiness means the manager can prove a safe walkthrough of viewing, review, and decision-shaping only.
+- User-working readiness does not mean purchase commitment, purchase order creation, receiving, send-to-Amazon, market scan, H pause, Sheet write, price change, queue edit, local DB alignment, output deletion, or business approval is allowed.
+- Old-but-readable O active proof files may remain a visible MOT warning without blocking a user walkthrough. Missing, unreadable, short, or fail-stale proof remains a blocker.
+- `Send To Amazon flow` and `Closed-loop feedback` remain not_started as full live-loop features.
+- `Single workflow view` and `Pack and supplier readiness` remain not_verified until a dedicated O walkthrough proof and pack/supplier readiness proof exist.
+- O/H market proof and H pause/resume remain parked until clean H maintenance controller install proof exists and a separate approved proof packet proves H ownership restoration afterward.
+- Real unsafe blockers are still hard blockers: missing O UI files, missing or empty Product DB operator view, buy-ready rows without cost/market/net-fee/Max-pay proof, unlabeled PO draft sources, send-to-Amazon queue rows without receiving proof, H/O proof gates requiring Luke, or any action crossing the protected boundaries above.

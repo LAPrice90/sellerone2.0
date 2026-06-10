@@ -10,6 +10,7 @@ import logging
 import os
 import json
 import subprocess
+import csv
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 import re
@@ -46,6 +47,33 @@ from scripts.flows.F._scanner_state import (
     dashboard_separate_delivery_required,
     has_required_dashboard_signal,
 )
+from scripts.flows.F.bbp_login_recovery import (
+    BBPLoginRecoveryConfig,
+    append_bbp_login_recovery_proof,
+    bbp_login_safe_proof_fields,
+    load_bbp_login_recovery_config,
+)
+from scripts.flows.F.seller_central_login_recovery import (
+    SellerCentralLoginRecoveryConfig,
+    append_seller_central_login_recovery_proof,
+    login_attempt_control_mode_for_blocker,
+    load_seller_central_login_recovery_config,
+    mark_seller_central_code_message_used,
+    redact_seller_central_secrets,
+    seller_central_login_attempt_control_for_config,
+    seller_central_login_safe_proof_fields,
+    seller_central_security_message_reason,
+    utc_now_iso,
+    wait_for_seller_central_code,
+    write_seller_central_login_attempt_control,
+)
+from scripts.flows.F.login_controller import (
+    BrowserSessionDurabilityPaths,
+    LoginControllerPaths,
+    record_browser_session_durability_event,
+    record_browser_session_page_pull,
+    record_login_controller_attempt,
+)
 
 # ---------------------------------------------------
 # 2. LOGGER SETUP
@@ -55,6 +83,121 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 PRE_REVIEW_LOW_SALES_MAX_UNITS = 2
 F061_MANUAL_BBP_LOGIN_WAIT_SECONDS_ENV = "F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"
+SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR = "SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED"
+SELLER_CENTRAL_TAB_OPEN_WAIT_SECONDS_ENV = "SELLER_CENTRAL_TAB_OPEN_WAIT_SECONDS"
+SELLER_CENTRAL_BBP_RETURN_WAIT_SECONDS_ENV = "SELLER_CENTRAL_BBP_RETURN_WAIT_SECONDS"
+SELLER_CENTRAL_DASHBOARD_RECONCILE_STATUSES = {
+    "attempted",
+    "blocked",
+    "disabled",
+    "expired",
+    "failed",
+    "waiting_for_code",
+}
+SELLER_CENTRAL_DASHBOARD_RECONCILE_REASONS = {
+    "auto_login_disabled",
+    "amazon_forced_passkey",
+    "bbp_dashboard_not_refreshed_after_seller_central",
+    "eligibility_signal_not_visible_after_code",
+    "password_not_entered",
+    "password_rejected",
+    "signin_or_passkey_page_after_code_wait",
+    "signin_or_passkey_page_after_credentials",
+    "manual_seller_central_login_wait",
+    "manual_seller_central_login_wait_timeout",
+    "otp_page_not_detected",
+    "submit_not_accepted",
+}
+SELLER_CENTRAL_DASHBOARD_RECONCILE_RETURN_STATUSES = {
+    "amazon_forced_passkey",
+    "disabled",
+    "eligibility_signal_not_visible_after_code",
+    "password_not_entered",
+    "password_rejected",
+    "signin_or_passkey_page_after_code_wait",
+    "signin_or_passkey_page_after_credentials",
+    "manual_seller_central_login_wait",
+    "manual_seller_central_login_wait_timeout",
+    "otp_page_not_detected",
+    "submit_not_accepted",
+}
+
+
+def _login_controller_dashboard_value(notes: str) -> str:
+    match = re.search(r"(?:dashboard_value|dashboard_yes_no)=([^;\s]+)", str(notes or ""), flags=re.I)
+    return _normalize_text(match.group(1)).upper() if match else ""
+
+
+def _seller_central_login_controller_page_type(
+    *,
+    status: str,
+    reason: str,
+    signin_detected: bool,
+    otp_detected: bool,
+    succeeded: bool,
+) -> str:
+    clean_reason = _normalize_lower(reason)
+    if succeeded or _normalize_lower(status) == "succeeded":
+        return "authenticated"
+    if "manual_challenge" in clean_reason:
+        return "manual_challenge"
+    if clean_reason in {
+        "otp_page_not_detected",
+        "signin_or_passkey_page_after_code_wait",
+        "signin_or_passkey_page_after_credentials",
+    } and signin_detected and not otp_detected:
+        return "seller_central_signin"
+    if clean_reason == "authenticator_only_no_sms_option":
+        return "manual_challenge"
+    if otp_detected or "otp" in clean_reason or "code" in clean_reason:
+        return "seller_central_otp"
+    if signin_detected:
+        return "seller_central_signin"
+    return "seller_central_unknown"
+
+
+def _seller_central_login_controller_action(*, status: str, reason: str, succeeded: bool) -> str:
+    clean_status = _normalize_lower(status)
+    clean_reason = _normalize_lower(reason)
+    if succeeded or clean_status == "succeeded":
+        return "seller_central_prove_dashboard"
+    if clean_reason == "credentials_submitted":
+        return "seller_central_submit_credentials"
+    if clean_reason in {"otp_page_detected"} or clean_status == "waiting_for_code":
+        return "seller_central_wait_for_code"
+    if clean_reason in {"otp_code_submitted"}:
+        return "seller_central_submit_code"
+    if clean_reason == "manual_challenge_required":
+        return "manual_fallback_required"
+    if clean_status in {"blocked", "disabled", "failed", "expired"}:
+        return "seller_central_blocked"
+    return "seller_central_observe"
+
+
+def _login_controller_paths_from_proof_env(env_name: str) -> LoginControllerPaths | None:
+    raw_path = _normalize_text(os.getenv(env_name, ""))
+    if not raw_path:
+        return None
+    live_dir = Path(raw_path).parent
+    return LoginControllerPaths(
+        live_dir=live_dir,
+        attempts_path=live_dir / "f_login_controller_attempts.csv",
+        state_path=live_dir / "f_login_controller_state.json",
+        report_path=live_dir / "f_login_controller_report_latest.md",
+    )
+
+
+def _browser_session_paths_from_proof_env(env_name: str) -> BrowserSessionDurabilityPaths | None:
+    raw_path = _normalize_text(os.getenv(env_name, ""))
+    if not raw_path:
+        return None
+    live_dir = Path(raw_path).parent
+    return BrowserSessionDurabilityPaths(
+        live_dir=live_dir,
+        events_path=live_dir / "f_browser_session_events.csv",
+        state_path=live_dir / "f_browser_session_durability_state.json",
+        report_path=live_dir / "f_browser_session_durability_report_latest.md",
+    )
 
 
 def _apply_dashboard_delivery_fields(data, dashboard_value):
@@ -116,6 +259,7 @@ def _format_bbp_money(value) -> str:
 
 def _set_bbp_money_input(driver, element, value, *, field_name: str) -> str:
     formatted = _format_bbp_money(value)
+    typed = False
     try:
         element.click()
     except Exception:
@@ -140,12 +284,19 @@ def _set_bbp_money_input(driver, element, value, *, field_name: str) -> str:
         )
     except Exception:
         pass
-    element.send_keys(formatted)
+    try:
+        element.send_keys(formatted)
+        typed = True
+    except Exception as exc:
+        logger.warning(
+            f"[Profile5] {field_name} input normal typing blocked; using browser-script fallback => "
+            f"{type(exc).__name__}"
+        )
     try:
         observed = str(element.get_attribute("value") or "").strip()
     except Exception:
         observed = ""
-    if observed and observed != formatted:
+    if typed and observed and observed != formatted:
         logger.warning(f"[Profile5] {field_name} input mismatch after typing => expected={formatted}, observed={observed}")
     try:
         driver.execute_script(
@@ -2421,18 +2572,2251 @@ def _bbp_frame_or_container_present(driver):
         return False
 
 
-def _login_option_evidence(driver):
-    selectors = [
-        "#loginEmail",
-        "#loginPassword",
-        "#loginBtn",
-    ]
-    for selector in selectors:
+def _element_text(element):
+    try:
+        raw = getattr(element, "text", "")
+        if _normalize_text(raw):
+            return _normalize_text(raw)
+    except Exception:
+        pass
+    for attr in ("textContent", "innerText", "value"):
         try:
-            if driver.find_elements(By.CSS_SELECTOR, selector):
-                return f"selector:{selector}"
+            raw = element.get_attribute(attr)
+            if _normalize_text(raw):
+                return _normalize_text(raw)
         except Exception:
             continue
+    return ""
+
+
+def _bbp_login_heading_detected(driver, config: BBPLoginRecoveryConfig) -> bool:
+    try:
+        heading_nodes = driver.find_elements(By.XPATH, config.heading_xpath)
+    except Exception:
+        return False
+    expected = _normalize_lower(config.heading_text)
+    for node in heading_nodes:
+        if _normalize_lower(_element_text(node)) == expected:
+            return True
+    return False
+
+
+def _find_first_xpath(driver, xpath):
+    try:
+        nodes = driver.find_elements(By.XPATH, xpath)
+    except Exception:
+        return None
+    return nodes[0] if nodes else None
+
+
+def _find_first_css(driver, selector):
+    try:
+        nodes = driver.find_elements(By.CSS_SELECTOR, selector)
+    except Exception:
+        return None
+    return nodes[0] if nodes else None
+
+
+def _find_first_login_control(driver, xpath: str, css_selectors: tuple[str, ...] = ()):
+    node = _find_first_xpath(driver, xpath)
+    if node is not None:
+        return node
+    for selector in css_selectors:
+        node = _find_first_css(driver, selector)
+        if node is not None:
+            return node
+    return None
+
+
+def _is_real_password_field(node) -> bool:
+    try:
+        node_id = _normalize_lower(node.get_attribute("id"))
+    except Exception:
+        node_id = ""
+    try:
+        node_type = _normalize_lower(node.get_attribute("type"))
+    except Exception:
+        node_type = ""
+    try:
+        node_name = _normalize_lower(node.get_attribute("name"))
+    except Exception:
+        node_name = ""
+    if node_type == "hidden":
+        return False
+    if node_id in {"ap-credential-autofill-hint", "auth-password-autofill-hint"}:
+        return False
+    return True
+
+
+def _find_first_real_password_field(driver, config: SellerCentralLoginRecoveryConfig):
+    for selector in (config.password_xpath, "input#ap_password", "input[name='password']", "input[type='password']"):
+        try:
+            nodes = driver.find_elements(By.XPATH if selector.startswith("/") else By.CSS_SELECTOR, selector)
+        except Exception:
+            nodes = []
+        for node in nodes:
+            if _is_real_password_field(node):
+                return node
+    return None
+
+
+def _wait_for_real_password_field(driver, config: SellerCentralLoginRecoveryConfig, seconds: float = 3.0):
+    deadline = time.monotonic() + max(0.0, seconds)
+    while time.monotonic() <= deadline:
+        node = _find_first_real_password_field(driver, config)
+        if node is not None:
+            return node
+        _human_sleep(0.25, 0.45, cap=0.6)
+    return _find_first_real_password_field(driver, config)
+
+
+def _wait_for_login_control(driver, xpath: str, css_selectors: tuple[str, ...] = (), seconds: float = 3.0):
+    deadline = time.monotonic() + max(0.0, seconds)
+    while time.monotonic() <= deadline:
+        node = _find_first_login_control(driver, xpath, css_selectors)
+        if node is not None:
+            return node
+        _human_sleep(0.25, 0.45, cap=0.6)
+    return _find_first_login_control(driver, xpath, css_selectors)
+
+
+def _safe_replace_text(element, value):
+    try:
+        element.click()
+    except Exception:
+        pass
+    try:
+        element.clear()
+    except Exception:
+        pass
+    try:
+        element.send_keys(value)
+        return True
+    except Exception:
+        return False
+
+
+def _safe_click(element):
+    try:
+        element.click()
+        return True
+    except Exception:
+        return False
+
+
+def _safe_click_with_driver(driver, element):
+    if _safe_click(element):
+        return True
+    try:
+        return bool(
+            driver.execute_script(
+                "arguments[0].click(); return true;",
+                element,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _login_control_value_matches(element, expected: str) -> bool:
+    try:
+        value = element.get_attribute("value")
+    except Exception:
+        return False
+    return str(value or "") == str(expected or "")
+
+
+def _finalize_login_control_value_with_driver(driver, element, value) -> bool:
+    try:
+        return bool(
+            driver.execute_script(
+                """
+                const el = arguments[0];
+                const value = arguments[1];
+                if (!el) {
+                    return false;
+                }
+                el.focus && el.focus();
+                if (String(el.value || '') !== String(value || '')) {
+                    el.value = value;
+                }
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.blur && el.blur();
+                return String(el.value || '') === String(value || '');
+                """,
+                element,
+                value,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _safe_replace_text_with_driver(driver, element, value):
+    if _safe_replace_text(element, value):
+        _finalize_login_control_value_with_driver(driver, element, value)
+        return True
+    try:
+        return bool(
+            driver.execute_script(
+                """
+                const el = arguments[0];
+                const value = arguments[1];
+                if (!el) {
+                    return false;
+                }
+                el.focus && el.focus();
+                el.value = value;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.blur && el.blur();
+                return String(el.value || '') === String(value || '');
+                """,
+                element,
+                value,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _login_control_value_state(element) -> str:
+    try:
+        value = _normalize_text(element.get_attribute("value"))
+    except Exception:
+        return "unreadable"
+    return "present" if value else "empty"
+
+
+def _seller_central_email_continue_page(evidence: dict[str, object]) -> bool:
+    hint = _normalize_lower(str(evidence.get("page_hint", "")))
+    return (
+        "email_field" in hint
+        and "continue_button" in hint
+        and "password_field" not in hint
+        and not bool(evidence.get("otp_detected"))
+        and not bool(evidence.get("sms_option_detected"))
+        and not bool(evidence.get("authenticator_option_detected"))
+        and not bool(evidence.get("manual_challenge"))
+        and not bool(evidence.get("success_detected"))
+    )
+
+
+def _wait_for_seller_central_email_continue_result(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    seconds: float = 4.0,
+) -> dict[str, object]:
+    deadline = time.monotonic() + max(0.0, seconds)
+    latest: dict[str, object] = {}
+    while time.monotonic() <= deadline:
+        latest = _seller_central_page_evidence(driver, config)
+        if not _seller_central_email_continue_page(latest):
+            return latest
+        _human_sleep(0.25, 0.45, cap=0.6)
+    return latest or _seller_central_page_evidence(driver, config)
+
+
+def _seller_central_email_continue_controls(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+) -> tuple[object | None, object | None]:
+    email_element = _find_first_login_control(
+        driver,
+        config.email_xpath,
+        ("input#ap_email", "input[name='email']", "input[type='email']"),
+    )
+    continue_element = _find_first_login_control(
+        driver,
+        config.continue_button_xpath,
+        (
+            "input#continue",
+            "button#continue",
+            "input[name='continue']",
+            "button[name='continue']",
+            "input[type='submit']",
+            "button[type='submit']",
+        ),
+    )
+    return email_element, continue_element
+
+
+def _seller_central_submit_current_email_form(driver, email_element, continue_element) -> bool:
+    try:
+        return bool(
+            driver.execute_script(
+                """
+                const email = arguments[0] || document.querySelector(
+                    "input#ap_email, input[name='email'], input[type='email']"
+                );
+                const button = arguments[1] || document.querySelector(
+                    "input#continue, button#continue, input[type='submit'], button[type='submit']"
+                );
+                const form =
+                    (button && button.form) ||
+                    (email && email.form) ||
+                    (button && button.closest && button.closest('form')) ||
+                    (email && email.closest && email.closest('form')) ||
+                    document.querySelector("form#ap_login_form, form[name='signIn'], form[action*='/ap/signin']");
+                if (!form) {
+                    if (button && button.click) {
+                        button.click();
+                        return true;
+                    }
+                    return false;
+                }
+                if (form.requestSubmit) {
+                    try {
+                        form.requestSubmit(button || undefined);
+                        return true;
+                    } catch (err) {
+                    }
+                }
+                if (button && button.click) {
+                    try {
+                        button.click();
+                        return true;
+                    } catch (err) {
+                    }
+                }
+                if (form.submit) {
+                    form.submit();
+                    return true;
+                }
+                return false;
+                """,
+                email_element,
+                continue_element,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _submit_seller_central_email_continue(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    email_element,
+    continue_element,
+) -> tuple[dict[str, object], str]:
+    attempts: list[str] = []
+    email_finalized = _finalize_login_control_value_with_driver(driver, email_element, config.email)
+    email_value_state = _login_control_value_state(email_element)
+    attempts.append(f"email_finalize={int(email_finalized)}")
+    if continue_element is not None:
+        clicked = _safe_click_with_driver(driver, continue_element)
+        attempts.append(f"click={int(clicked)}")
+        evidence = _wait_for_seller_central_email_continue_result(driver, config, seconds=4.0)
+        if not _seller_central_email_continue_page(evidence):
+            attempts.append(f"email_value={email_value_state}")
+            return evidence, ";".join(attempts)
+
+        js_clicked = False
+        try:
+            js_clicked = bool(
+                driver.execute_script(
+                    """
+                    const button = arguments[0];
+                    if (!button) {
+                        return false;
+                    }
+                    button.focus && button.focus();
+                    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                    button.click && button.click();
+                    return true;
+                    """,
+                    continue_element,
+                )
+            )
+        except Exception:
+            js_clicked = False
+        attempts.append(f"js_click={int(js_clicked)}")
+        evidence = _wait_for_seller_central_email_continue_result(driver, config, seconds=4.0)
+        if not _seller_central_email_continue_page(evidence):
+            attempts.append(f"email_value={email_value_state}")
+            return evidence, ";".join(attempts)
+
+        email_element, continue_element = _seller_central_email_continue_controls(driver, config)
+
+    enter_sent = False
+    try:
+        if email_element is not None:
+            email_element.send_keys(Keys.ENTER)
+            enter_sent = True
+    except Exception:
+        enter_sent = False
+    attempts.append(f"enter={int(enter_sent)}")
+    evidence = _wait_for_seller_central_email_continue_result(driver, config, seconds=4.0)
+    if not _seller_central_email_continue_page(evidence):
+        attempts.append(f"email_value={email_value_state}")
+        return evidence, ";".join(attempts)
+
+    js_enter_sent = False
+    try:
+        js_enter_sent = bool(
+            driver.execute_script(
+                """
+                const el = arguments[0];
+                if (!el) {
+                    return false;
+                }
+                el.focus && el.focus();
+                for (const type of ['keydown', 'keypress', 'keyup']) {
+                    el.dispatchEvent(new KeyboardEvent(type, {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    }));
+                }
+                return true;
+                """,
+                email_element,
+            )
+        )
+    except Exception:
+        js_enter_sent = False
+    attempts.append(f"js_enter={int(js_enter_sent)}")
+    evidence = _wait_for_seller_central_email_continue_result(driver, config, seconds=4.0)
+    if not _seller_central_email_continue_page(evidence):
+            attempts.append(f"email_value={email_value_state}")
+            return evidence, ";".join(attempts)
+
+    email_element, continue_element = _seller_central_email_continue_controls(driver, config)
+    form_submitted = _seller_central_submit_current_email_form(driver, email_element, continue_element)
+    attempts.append(f"form_submit={int(form_submitted)}")
+    evidence = _wait_for_seller_central_email_continue_result(driver, config, seconds=4.0)
+    attempts.append(f"email_value={email_value_state}")
+    return evidence, ";".join(attempts)
+
+
+def _body_text_lower(driver):
+    try:
+        body_nodes = driver.find_elements(By.TAG_NAME, "body")
+    except Exception:
+        return ""
+    return " ".join(_element_text(node) for node in body_nodes).lower()
+
+
+def _body_visible_text_lower(driver):
+    try:
+        visible = driver.execute_script(
+            "return document.body ? String(document.body.innerText || '') : '';"
+        )
+        visible_text = _normalize_text(visible) if isinstance(visible, str) else ""
+        if visible_text:
+            return visible_text.lower()
+    except Exception:
+        pass
+    return _body_text_lower(driver)
+
+
+def _seller_central_page_pull_dir() -> Path:
+    raw_path = os.getenv("F_LOGIN_CONTROLLER_PAGE_PULL_DIR", "").strip()
+    if raw_path:
+        return Path(raw_path)
+    return (
+        REPO_ROOT
+        / "out"
+        / "systems"
+        / "F"
+        / "price_list_manager"
+        / "live"
+        / "page_pulls"
+    )
+
+
+def _safe_filename_token(value: object, default: str = "page") -> str:
+    token = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "").strip()).strip("_")
+    return token[:80] or default
+
+
+def _redact_seller_central_page_text(text: object, config: SellerCentralLoginRecoveryConfig) -> str:
+    safe = redact_seller_central_secrets(text, config)
+    safe = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "<redacted-email>", safe)
+    safe = re.sub(r"(?<!\d)\d{6}(?!\d)", "<redacted-code>", safe)
+    safe = re.sub(
+        r"(?i)(appActionToken|metadata1|webAuthnGetParametersForButton|workflowState|anti-csrftoken-a2z)"
+        r'(["\\\s:=]+)[^",}\s]{12,}',
+        r"\1\2<redacted-token>",
+        safe,
+    )
+    return safe
+
+
+def _seller_central_control_text(
+    node,
+    *,
+    control_type: str,
+    control_name: str,
+    control_id: str,
+) -> str:
+    text = _element_text(node)[:200]
+    tokenish_names = {
+        "appactiontoken",
+        "metadata1",
+        "webauthnchallengeidforbutton",
+        "webauthngetparametersforbutton",
+        "workflowstate",
+        "anti-csrftoken-a2z",
+        "prevrid",
+        "openid.return_to",
+    }
+    identity = {control_name.lower(), control_id.lower()}
+    if control_type.lower() == "hidden" or identity.intersection(tokenish_names):
+        return "<redacted-hidden>"
+    return text
+
+
+def _seller_central_page_pull_state(evidence: dict[str, object]) -> str:
+    hint = _normalize_lower(str(evidence.get("page_hint", "")))
+    if evidence.get("success_detected"):
+        return "authenticated"
+    if "passkey" in hint and ("password_field" in hint or "signin_button" in hint):
+        return "password_or_passkey_page"
+    if evidence.get("manual_challenge"):
+        return "manual_challenge"
+    if evidence.get("otp_detected"):
+        return "otp_code_page"
+    if "email_field" in hint and "continue_button" in hint and "password_field" not in hint:
+        return "email_continue_page"
+    if "password_field" in hint or "signin_button" in hint:
+        if "passkey" in hint:
+            return "password_or_passkey_page"
+        return "password_page"
+    if evidence.get("signin_detected"):
+        return "signin_page"
+    return "unknown"
+
+
+def _write_seller_central_page_pull(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    context: str,
+    reason: str,
+) -> dict[str, str]:
+    observed = utc_now_iso()
+    stamp = observed.replace(":", "").replace("-", "")
+    pull_dir = _seller_central_page_pull_dir()
+    pull_dir.mkdir(parents=True, exist_ok=True)
+    title = ""
+    url = ""
+    body = ""
+    controls: list[dict[str, str]] = []
+    try:
+        title = _normalize_text(getattr(driver, "title", ""))
+    except Exception:
+        title = ""
+    try:
+        url = _normalize_text(getattr(driver, "current_url", ""))
+    except Exception:
+        url = ""
+    try:
+        body = _body_visible_text_lower(driver)[:8000]
+        if not body:
+            body_nodes = driver.find_elements(By.TAG_NAME, "body")
+            body = "\n".join(_element_text(node) for node in body_nodes)[:8000]
+    except Exception:
+        body = ""
+    try:
+        nodes = driver.find_elements(By.CSS_SELECTOR, "input,button,select,textarea,a")
+    except Exception:
+        nodes = []
+    for node in nodes[:50]:
+        try:
+            controls.append(
+                {
+                    "tag": _normalize_text(getattr(node, "tag_name", "")),
+                    "id": (control_id := _normalize_text(node.get_attribute("id"))),
+                    "name": (control_name := _normalize_text(node.get_attribute("name"))),
+                    "type": (control_type := _normalize_text(node.get_attribute("type"))),
+                    "aria_label": _normalize_text(node.get_attribute("aria-label")),
+                    "placeholder": _normalize_text(node.get_attribute("placeholder")),
+                    "text": _seller_central_control_text(
+                        node,
+                        control_type=control_type,
+                        control_name=control_name,
+                        control_id=control_id,
+                    ),
+                }
+            )
+        except Exception:
+            continue
+    evidence = _seller_central_page_evidence(driver, config)
+    payload = {
+        "observed_utc": observed,
+        "context": context,
+        "reason": reason,
+        "page_state": _seller_central_page_pull_state(evidence),
+        "page_hint": _redact_seller_central_page_text(str(evidence.get("page_hint", "")), config),
+        "title": _redact_seller_central_page_text(title, config),
+        "url": _redact_seller_central_page_text(url.split("?", 1)[0], config),
+        "body": _redact_seller_central_page_text(body, config),
+        "controls": controls,
+    }
+    safe_payload = json.loads(_redact_seller_central_page_text(json.dumps(payload, ensure_ascii=False), config))
+    base = f"{stamp}_{_safe_filename_token(context)}_{_safe_filename_token(reason)}"
+    json_path = pull_dir / f"{base}.json"
+    latest_path = pull_dir / "latest_seller_central_page_pull.json"
+    json_text = json.dumps(safe_payload, ensure_ascii=False, indent=2)
+    screenshot_path = ""
+    try:
+        png = driver.get_screenshot_as_png()
+        if png:
+            image_path = pull_dir / f"{base}.png"
+            image_path.write_bytes(png)
+            screenshot_path = str(image_path)
+    except Exception as exc:
+        logger.info("Seller Central page pull screenshot skipped: %s", exc)
+    if screenshot_path:
+        safe_payload["screenshot_path"] = _redact_seller_central_page_text(screenshot_path, config)
+        json_text = json.dumps(safe_payload, ensure_ascii=False, indent=2)
+    json_path.write_text(json_text, encoding="utf-8")
+    latest_path.write_text(json_text, encoding="utf-8")
+    try:
+        record_browser_session_page_pull(
+            safe_payload,
+            paths=_browser_session_paths_from_proof_env("SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_PATH"),
+            extra_secrets=(config.email, config.password),
+        )
+    except Exception as exc:
+        logger.warning("F browser session durability page-pull record failed: %s", exc)
+    return {
+        "json_path": str(json_path),
+        "latest_json_path": str(latest_path),
+        "screenshot_path": screenshot_path,
+    }
+
+
+def _seller_central_success_signal_present(driver, config: SellerCentralLoginRecoveryConfig) -> bool:
+    selector = _normalize_text(config.success_selector)
+    if not selector:
+        return False
+    try:
+        nodes = driver.find_elements(By.CSS_SELECTOR, selector)
+    except Exception:
+        nodes = []
+    for node in nodes:
+        if has_required_dashboard_signal(_element_text(node)):
+            return True
+    return False
+
+
+def _seller_central_page_evidence(driver, config: SellerCentralLoginRecoveryConfig) -> dict[str, bool]:
+    body_text = _body_visible_text_lower(driver)
+    security_reason = seller_central_security_message_reason(body_text)
+    current_url = ""
+    try:
+        current_url = _normalize_lower(getattr(driver, "current_url", ""))
+    except Exception:
+        current_url = ""
+    email_field = _find_first_login_control(
+        driver,
+        config.email_xpath,
+        ("input#ap_email", "input[name='email']", "input[type='email']"),
+    ) is not None
+    password_field = _find_first_real_password_field(driver, config) is not None
+    continue_button = _find_first_login_control(
+        driver,
+        config.continue_button_xpath,
+        ("input#continue", "button#continue", "input[name='continue']", "button[name='continue']"),
+    ) is not None
+    signin_button = _find_first_login_control(
+        driver,
+        config.signin_button_xpath,
+        (
+            "input#signInSubmit",
+            "button#signInSubmit",
+            "input[name='signInSubmit']",
+            "button[name='signInSubmit']",
+        ),
+    ) is not None
+    otp_field = _find_first_login_control(
+        driver,
+        config.otp_xpath,
+        (
+            "input#auth-mfa-otpcode",
+            "input[name='otpCode']",
+            "input[name='code']",
+            "input[name*='otp' i]",
+            "input[id*='otp' i]",
+            "input[name*='mfa' i]",
+            "input[id*='mfa' i]",
+        ),
+    ) is not None
+    signin_detected = any(
+        [
+            email_field,
+            password_field,
+            signin_button,
+            "/ap/signin" in current_url,
+            "sellercentral.amazon" in current_url and "sign" in body_text,
+            "amazon" in body_text and "sign in" in body_text and ("password" in body_text or "email" in body_text),
+        ]
+    )
+    mfa_url = "/ap/mfa" in current_url or "mfa" in current_url and "amazon" in current_url
+    cvf_url = "cvf" in current_url and "amazon" in current_url
+    otp_text_detected = any(
+        token in body_text
+        for token in (
+            "two-step verification",
+            "two step verification",
+            "one time password",
+            "one-time password",
+            "one time passcode",
+            "one-time passcode",
+            "enter the code",
+            "enter code",
+            "verification code",
+            "security code",
+            "we sent you",
+            "has been sent",
+        )
+    )
+    sms_option_detected = any(
+        token in body_text
+        for token in (
+            "send a text message",
+            "send text message",
+            "text message",
+            "sms",
+            "send code to phone",
+            "send a code to",
+        )
+    )
+    authenticator_option_detected = any(
+        token in body_text
+        for token in (
+            "authenticator app",
+            "authentication app",
+            "code authenticator",
+            "authenticator",
+        )
+    )
+    otp_detected = any(
+        [
+            otp_field,
+            otp_text_detected,
+            mfa_url,
+            cvf_url,
+        ]
+    )
+    if otp_detected and (email_field or password_field or signin_button) and not (otp_field or mfa_url or cvf_url):
+        otp_detected = False
+        otp_text_detected = False
+    if otp_detected and not (email_field or password_field):
+        signin_detected = False
+    manual_challenge = any(
+        token in body_text
+        for token in (
+            "captcha",
+            "enter the characters",
+            "approve the notification",
+            "approve notification",
+            "select a delivery method",
+            "we need to make sure you're not a robot",
+            "account temporarily locked",
+        )
+    )
+    if security_reason in {"captcha", "passkey_required"}:
+        manual_challenge = True
+    page_hints: list[str] = []
+    if "sellercentral.amazon" in current_url:
+        page_hints.append("sellercentral_url")
+    if "/ap/signin" in current_url:
+        page_hints.append("signin_url")
+    if mfa_url:
+        page_hints.append("mfa_url")
+    if cvf_url:
+        page_hints.append("cvf_url")
+    if email_field:
+        page_hints.append("email_field")
+    if password_field:
+        page_hints.append("password_field")
+    if continue_button:
+        page_hints.append("continue_button")
+    if signin_button:
+        page_hints.append("signin_button")
+    if otp_field:
+        page_hints.append("otp_field")
+    if otp_text_detected:
+        page_hints.append("otp_text")
+    if sms_option_detected:
+        page_hints.append("sms_option")
+    if authenticator_option_detected:
+        page_hints.append("authenticator_option")
+    if "passkey" in body_text:
+        page_hints.append("passkey_option")
+    if manual_challenge:
+        page_hints.append("manual_challenge_text")
+    if security_reason:
+        page_hints.append(security_reason)
+    return {
+        "signin_detected": bool(signin_detected),
+        "otp_detected": bool(otp_detected),
+        "sms_option_detected": bool(sms_option_detected),
+        "authenticator_option_detected": bool(authenticator_option_detected),
+        "manual_challenge": bool(manual_challenge),
+        "security_reason": security_reason,
+        "success_detected": _seller_central_success_signal_present(driver, config),
+        "page_hint": "|".join(page_hints) or "unknown",
+    }
+
+
+def _seller_central_post_credentials_blocker(
+    driver,
+    evidence: dict[str, bool],
+    *,
+    password_value_before_submit: str,
+    submit_clicked: bool,
+) -> str:
+    body_text = _body_visible_text_lower(driver)
+    hint = _normalize_lower(evidence.get("page_hint", ""))
+    if any(
+        token in body_text
+        for token in (
+            "your password is incorrect",
+            "password is incorrect",
+            "incorrect password",
+            "invalid password",
+            "there was a problem",
+            "we cannot find an account with that email address",
+        )
+    ):
+        return "password_rejected"
+    if "passkey_option" in hint and "password_field" not in hint and "signin_button" not in hint:
+        return "amazon_forced_passkey"
+    if "email_field" in hint and "continue_button" in hint and "password_field" not in hint:
+        return "email_continue_not_advanced"
+    if password_value_before_submit == "empty":
+        return "password_not_entered"
+    if not submit_clicked:
+        return "submit_not_accepted"
+    return "submit_not_accepted"
+
+
+def _seller_central_option_text(node) -> str:
+    chunks = []
+    for attr in ("textContent", "innerText", "aria-label", "value"):
+        try:
+            chunks.append(_normalize_text(node.get_attribute(attr)))
+        except Exception:
+            continue
+    try:
+        chunks.append(_normalize_text(getattr(node, "text", "")))
+    except Exception:
+        pass
+    return " ".join(chunk for chunk in chunks if chunk).lower()
+
+
+def _find_seller_central_sms_option(driver):
+    try:
+        nodes = driver.find_elements(By.CSS_SELECTOR, "input,button,a,label")
+    except Exception:
+        nodes = []
+    preferred_terms = (
+        "send a text message",
+        "send text message",
+        "text message",
+        "sms",
+        "send code to phone",
+        "send a code to",
+    )
+    blocked_terms = (
+        "authenticator",
+        "passkey",
+        "security key",
+        "password",
+    )
+    for node in nodes:
+        text = _seller_central_option_text(node)
+        if not text:
+            continue
+        if any(term in text for term in preferred_terms) and not any(term in text for term in blocked_terms):
+            return node
+    return None
+
+
+def _record_seller_central_login_recovery(
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    status: str,
+    reason: str,
+    context: str,
+    signin_detected: bool = False,
+    otp_detected: bool = False,
+    requested_utc: str = "",
+    message_ts_utc: str = "",
+    code_seen: bool = False,
+    fresh_code: bool = False,
+    used_message: bool = False,
+    attempted: bool = False,
+    succeeded: bool = False,
+    code_age_seconds: float | None = None,
+    source_message_id: str = "",
+    notes: str = "",
+) -> None:
+    proof = seller_central_login_safe_proof_fields(
+        config,
+        status=status,
+        reason=reason,
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=otp_detected,
+        requested_utc=requested_utc,
+        message_ts_utc=message_ts_utc,
+        code_seen=code_seen,
+        fresh_code=fresh_code,
+        used_message=used_message,
+        attempted=attempted,
+        succeeded=succeeded,
+        code_age_seconds=code_age_seconds,
+        source_message_id=source_message_id,
+        notes=notes,
+    )
+    logger.info(
+        "SELLER_CENTRAL_LOGIN_RECOVERY status=%s context=%s reason=%s enabled=%s "
+        "signin_detected=%s otp_detected=%s code_seen=%s attempted=%s succeeded=%s",
+        proof["status"],
+        proof["context"],
+        proof["reason"],
+        proof["auto_login_enabled"],
+        proof["seller_central_signin_detected"],
+        proof["seller_central_otp_detected"],
+        proof["code_seen_flag"],
+        proof["attempted_flag"],
+        proof["succeeded_flag"],
+    )
+    append_seller_central_login_recovery_proof(
+        config,
+        status=status,
+        reason=reason,
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=otp_detected,
+        requested_utc=requested_utc,
+        message_ts_utc=message_ts_utc,
+        code_seen=code_seen,
+        fresh_code=fresh_code,
+        used_message=used_message,
+        attempted=attempted,
+        succeeded=succeeded,
+        code_age_seconds=code_age_seconds,
+        source_message_id=source_message_id,
+        notes=notes,
+    )
+    page_type = _seller_central_login_controller_page_type(
+        status=status,
+        reason=reason,
+        signin_detected=signin_detected,
+        otp_detected=otp_detected,
+        succeeded=succeeded,
+    )
+    try:
+        record_login_controller_attempt(
+            context=context,
+            page_type=page_type,
+            action=_seller_central_login_controller_action(
+                status=status,
+                reason=reason,
+                succeeded=succeeded,
+            ),
+            status=status,
+            reason=reason,
+            dashboard_yes_no=_login_controller_dashboard_value(notes),
+            attempted=attempted,
+            succeeded=succeeded,
+            manual_challenge=reason == "manual_challenge_required",
+            code_seen=code_seen,
+            fresh_code=fresh_code,
+            blocked_reason=reason if status in {"blocked", "disabled", "failed", "expired"} else "",
+            source="seller_central_login_recovery",
+            notes=notes,
+            paths=_login_controller_paths_from_proof_env("SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_PATH"),
+            extra_secrets=(config.email, config.password),
+        )
+    except Exception as exc:
+        logger.warning("F login controller record failed for Seller Central recovery: %s", exc)
+    try:
+        record_browser_session_durability_event(
+            event_type="seller_central_login",
+            context=context,
+            page_type=page_type,
+            status=status,
+            reason=reason,
+            result=(
+                "succeeded"
+                if succeeded
+                else ("blocked" if status in {"blocked", "disabled", "failed", "expired"} else status)
+            ),
+            auth_state="logged_in" if succeeded else "login_required",
+            blocker=reason if status in {"blocked", "disabled", "failed", "expired"} else "",
+            source="seller_central_login_recovery",
+            notes=notes,
+            paths=_browser_session_paths_from_proof_env("SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_PATH"),
+            extra_secrets=(config.email, config.password),
+        )
+    except Exception as exc:
+        logger.warning("F browser session durability record failed for Seller Central recovery: %s", exc)
+
+
+def _set_seller_central_login_attempt_control_for_reason(
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    reason: str,
+    source: str,
+) -> str:
+    mode = login_attempt_control_mode_for_blocker(reason)
+    if not mode:
+        return ""
+    write_seller_central_login_attempt_control(
+        config,
+        mode=mode,
+        reason=reason,
+        source=source,
+    )
+    return mode
+
+
+def _seller_central_login_recovery_proof_path() -> Path:
+    raw_path = os.getenv("SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_PATH", "").strip()
+    if raw_path:
+        return Path(raw_path)
+    return (
+        REPO_ROOT
+        / "out"
+        / "systems"
+        / "F"
+        / "price_list_manager"
+        / "live"
+        / "seller_central_login_recovery_proof.csv"
+    )
+
+
+def _latest_seller_central_login_recovery_row() -> dict[str, str]:
+    path = _seller_central_login_recovery_proof_path()
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+    except Exception:
+        return {}
+    if not rows:
+        return {}
+    return {str(key): _normalize_text(value) for key, value in rows[-1].items()}
+
+
+def _seller_central_proof_needs_dashboard_reconciliation(row: dict[str, str]) -> bool:
+    if not row:
+        return False
+    context = _normalize_lower(row.get("context", ""))
+    status = _normalize_lower(row.get("status", ""))
+    reason = _normalize_lower(row.get("reason", ""))
+    if context != "dashboard_yes_no_login":
+        return False
+    if status == "succeeded":
+        return False
+    return status in SELLER_CENTRAL_DASHBOARD_RECONCILE_STATUSES or reason in SELLER_CENTRAL_DASHBOARD_RECONCILE_REASONS
+
+
+def _record_seller_central_success_from_bbp_dashboard_signal(
+    dashboard_value: str,
+    *,
+    context: str = "dashboard_yes_no_login",
+    reason: str = "bbp_dashboard_signal_visible_after_manual_login",
+) -> bool:
+    clean_dashboard = _normalize_text(dashboard_value).upper()
+    if not has_required_dashboard_signal(clean_dashboard):
+        return False
+    latest = _latest_seller_central_login_recovery_row()
+    if not _seller_central_proof_needs_dashboard_reconciliation(latest):
+        return False
+    config = load_seller_central_login_recovery_config()
+    _record_seller_central_login_recovery(
+        config,
+        status="succeeded",
+        reason=reason,
+        context=context,
+        succeeded=True,
+        notes=(
+            f"dashboard_value={clean_dashboard};"
+            f"prior_status={_normalize_text(latest.get('status', '')) or 'missing'};"
+            f"prior_reason={_normalize_text(latest.get('reason', '')) or 'missing'}"
+        ),
+    )
+    return True
+
+
+def _wait_for_seller_central_eligibility_success(driver, config: SellerCentralLoginRecoveryConfig, seconds: float) -> bool:
+    deadline = time.monotonic() + max(0.0, seconds)
+    while time.monotonic() <= deadline:
+        if _seller_central_success_signal_present(driver, config):
+            return True
+        _human_sleep(0.45, 0.85, cap=1.0)
+    return _seller_central_success_signal_present(driver, config)
+
+
+def _manual_seller_central_login_wait_seconds() -> float:
+    if not _env_flag_enabled("F061_LOGIN_MODE"):
+        return 0.0
+    if _normalize_lower(os.getenv("F061_BACKGROUND_BROWSER_MODE", "")) != "visible":
+        return 0.0
+    raw = os.getenv("F061_MANUAL_BBP_LOGIN_WAIT_SECONDS") or os.getenv("F061_LOGIN_HOLD_SECONDS") or "0"
+    return _clamp(_safe_float(raw, 0.0), 0.0, 900.0)
+
+
+def _wait_for_manual_seller_central_login(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+    *,
+    context: str,
+    signin_detected: bool,
+    otp_detected: bool,
+) -> str:
+    wait_seconds = _manual_seller_central_login_wait_seconds()
+    if wait_seconds <= 0:
+        return ""
+    _record_seller_central_login_recovery(
+        config,
+        status="waiting_for_code",
+        reason="manual_seller_central_login_wait",
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=otp_detected,
+    )
+    if _wait_for_seller_central_eligibility_success(driver, config, wait_seconds):
+        evidence = _seller_central_page_evidence(driver, config)
+        _record_seller_central_login_recovery(
+            config,
+            status="succeeded",
+            reason="manual_eligibility_signal_visible",
+            context=context,
+            signin_detected=evidence["signin_detected"],
+            otp_detected=evidence["otp_detected"],
+            succeeded=True,
+        )
+        return "succeeded"
+    evidence = _seller_central_page_evidence(driver, config)
+    _record_seller_central_login_recovery(
+        config,
+        status="blocked",
+        reason="manual_seller_central_login_wait_timeout",
+        context=context,
+        signin_detected=evidence["signin_detected"],
+        otp_detected=evidence["otp_detected"],
+    )
+    return "manual_seller_central_login_wait_timeout"
+
+
+def _attempt_seller_central_login_recovery(driver, *, context: str) -> str:
+    config = load_seller_central_login_recovery_config()
+    evidence = _seller_central_page_evidence(driver, config)
+    signin_detected = evidence["signin_detected"]
+    otp_detected = evidence["otp_detected"]
+    if evidence["success_detected"]:
+        _record_seller_central_login_recovery(
+            config,
+            status="succeeded",
+            reason="eligibility_signal_visible",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+            succeeded=True,
+        )
+        return "succeeded"
+    if not signin_detected and not otp_detected and context != "dashboard_yes_no_login":
+        return "not_login_page"
+    if not config.secret_file_exists:
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason="missing_secret_file",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+        )
+        return "missing_secret_file"
+    security_reason = _normalize_text(evidence.get("security_reason", ""))
+    if security_reason:
+        proof_reason = "manual_challenge_required" if security_reason == "captcha" else security_reason
+        mode = _set_seller_central_login_attempt_control_for_reason(
+            config,
+            reason=proof_reason,
+            source="seller_central_page_evidence",
+        )
+        status = "blocked" if mode == "manual_challenge" else "disabled"
+        _record_seller_central_login_recovery(
+            config,
+            status=status,
+            reason=proof_reason,
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+            notes=f"login_attempt_control_mode={mode or 'normal_scan_only'}",
+        )
+        return proof_reason
+    attempt_control = seller_central_login_attempt_control_for_config(config)
+    if not attempt_control.allows_attempt:
+        if attempt_control.mode == "normal_scan_only":
+            write_seller_central_login_attempt_control(
+                config,
+                mode="normal_scan_only",
+                reason=attempt_control.reason or "attempt_mode_not_enabled",
+                source="seller_central_login_recovery_gate",
+            )
+        _record_seller_central_login_recovery(
+            config,
+            status="disabled" if attempt_control.mode in {"normal_scan_only", "login_cooldown"} else "blocked",
+            reason=attempt_control.mode,
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+            notes=(
+                f"login_attempt_control_reason={attempt_control.reason};"
+                f"cooldown_until_utc={attempt_control.cooldown_until_utc}"
+            ),
+        )
+        return attempt_control.mode
+    if not config.credentials_present:
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason="missing_credentials",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+        )
+        return "missing_credentials"
+    if evidence["manual_challenge"]:
+        _set_seller_central_login_attempt_control_for_reason(
+            config,
+            reason="manual_challenge_required",
+            source="seller_central_initial_page",
+        )
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason="manual_challenge_required",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+        )
+        return "manual_challenge_required"
+
+    requested_utc = utc_now_iso()
+    attempted = False
+    if signin_detected:
+        email_element = _find_first_login_control(
+            driver,
+            config.email_xpath,
+            ("input#ap_email", "input[name='email']", "input[type='email']"),
+        )
+        if email_element is not None:
+            if not _safe_replace_text_with_driver(driver, email_element, config.email):
+                _record_seller_central_login_recovery(
+                    config,
+                    status="failed",
+                    reason="email_field_not_interactable",
+                    context=context,
+                    signin_detected=True,
+                    otp_detected=otp_detected,
+                    requested_utc=requested_utc,
+                )
+                return "email_field_not_interactable"
+            continue_element = _find_first_login_control(
+                driver,
+                config.continue_button_xpath,
+                (
+                    "input#continue",
+                    "button#continue",
+                    "input[name='continue']",
+                    "button[name='continue']",
+                    "input[type='submit']",
+                    "button[type='submit']",
+                ),
+            )
+            password_present_after_email = _find_first_real_password_field(driver, config)
+            if continue_element is not None and password_present_after_email is None:
+                continue_evidence, continue_notes = _submit_seller_central_email_continue(
+                    driver,
+                    config,
+                    email_element=email_element,
+                    continue_element=continue_element,
+                )
+                if _seller_central_email_continue_page(continue_evidence):
+                    page_pull = _write_seller_central_page_pull(
+                        driver,
+                        config,
+                        context=context,
+                        reason="email_continue_not_advanced",
+                    )
+                    _record_seller_central_login_recovery(
+                        config,
+                        status="failed",
+                        reason="email_continue_not_advanced",
+                        context=context,
+                        signin_detected=True,
+                        otp_detected=otp_detected,
+                        requested_utc=requested_utc,
+                        notes=(
+                            f"page_pull={page_pull.get('latest_json_path', '')};"
+                            f"page_hint={continue_evidence.get('page_hint', 'unknown')};"
+                            f"{continue_notes}"
+                        ),
+                    )
+                    return "email_continue_not_advanced"
+                evidence = continue_evidence
+                signin_detected = bool(evidence.get("signin_detected"))
+                otp_detected = bool(evidence.get("otp_detected"))
+            elif continue_element is None and password_present_after_email is None:
+                try:
+                    email_element.send_keys(Keys.ENTER)
+                except Exception:
+                    pass
+                _human_sleep(0.65, 1.15, cap=1.5)
+
+        password_element = _wait_for_real_password_field(driver, config, seconds=5.0)
+        signin_element = _find_first_login_control(
+            driver,
+            config.signin_button_xpath,
+            (
+                "input#signInSubmit",
+                "button#signInSubmit",
+                "input[name='signInSubmit']",
+                "button[name='signInSubmit']",
+                "input[type='submit']",
+                "button[type='submit']",
+            ),
+        )
+        skip_password_submit = False
+        if password_element is None or signin_element is None:
+            current_evidence = _seller_central_page_evidence(driver, config)
+            current_hint = _normalize_lower(str(current_evidence.get("page_hint", "")))
+            if (
+                current_evidence.get("otp_detected")
+                or current_evidence.get("sms_option_detected")
+                or current_evidence.get("authenticator_option_detected")
+                or current_evidence.get("manual_challenge")
+                or current_evidence.get("success_detected")
+            ):
+                evidence = current_evidence
+                signin_detected = bool(current_evidence.get("signin_detected"))
+                otp_detected = bool(current_evidence.get("otp_detected"))
+                password_value_before_submit = "not_applicable"
+                attempted = True
+                skip_password_submit = True
+            elif _seller_central_email_continue_page(current_evidence):
+                page_pull = _write_seller_central_page_pull(
+                    driver,
+                    config,
+                    context=context,
+                    reason="email_continue_not_advanced",
+                )
+                _record_seller_central_login_recovery(
+                    config,
+                    status="failed",
+                    reason="email_continue_not_advanced",
+                    context=context,
+                    signin_detected=True,
+                    otp_detected=otp_detected,
+                    requested_utc=requested_utc,
+                    notes=f"page_pull={page_pull.get('latest_json_path', '')};page_hint={current_hint}",
+                )
+                return "email_continue_not_advanced"
+            else:
+                _record_seller_central_login_recovery(
+                    config,
+                    status="failed",
+                    reason="signin_selectors_missing",
+                    context=context,
+                    signin_detected=True,
+                    otp_detected=otp_detected,
+                    requested_utc=requested_utc,
+                )
+                return "signin_selectors_missing"
+        if skip_password_submit:
+            pass
+        elif not _safe_replace_text_with_driver(driver, password_element, config.password):
+            _record_seller_central_login_recovery(
+                config,
+                status="failed",
+                reason="password_field_not_interactable",
+                context=context,
+                signin_detected=True,
+                otp_detected=otp_detected,
+                requested_utc=requested_utc,
+            )
+            return "password_field_not_interactable"
+        if not skip_password_submit:
+            password_value_before_submit = _login_control_value_state(password_element)
+        if not skip_password_submit and password_value_before_submit == "empty":
+            page_pull = _write_seller_central_page_pull(
+                driver,
+                config,
+                context=context,
+                reason="password_not_entered",
+            )
+            _record_seller_central_login_recovery(
+                config,
+                status="failed",
+                reason="password_not_entered",
+                context=context,
+                signin_detected=True,
+                otp_detected=otp_detected,
+                requested_utc=requested_utc,
+                attempted=False,
+                notes=(
+                    f"page_pull={page_pull.get('latest_json_path', '')};"
+                    f"password_value_before_submit={password_value_before_submit}"
+                ),
+            )
+            return "password_not_entered"
+        if not skip_password_submit:
+            attempted = _safe_click_with_driver(driver, signin_element)
+        if not skip_password_submit and not attempted:
+            page_pull = _write_seller_central_page_pull(
+                driver,
+                config,
+                context=context,
+                reason="submit_not_accepted",
+            )
+            _record_seller_central_login_recovery(
+                config,
+                status="failed",
+                reason="submit_not_accepted",
+                context=context,
+                signin_detected=True,
+                otp_detected=otp_detected,
+                requested_utc=requested_utc,
+                attempted=False,
+                notes=(
+                    f"page_pull={page_pull.get('latest_json_path', '')};"
+                    f"password_value_before_submit={password_value_before_submit}"
+                ),
+            )
+            return "submit_not_accepted"
+        if not skip_password_submit:
+            _record_seller_central_login_recovery(
+                config,
+                status="attempted",
+                reason="credentials_submitted",
+                context=context,
+                signin_detected=True,
+                otp_detected=otp_detected,
+                requested_utc=requested_utc,
+                attempted=attempted,
+                notes=f"password_value_before_submit={password_value_before_submit}",
+            )
+            _human_sleep(0.75, 1.35, cap=1.8)
+    else:
+        password_value_before_submit = "not_applicable"
+
+    if _wait_for_seller_central_eligibility_success(driver, config, 3.0):
+        _record_seller_central_login_recovery(
+            config,
+            status="succeeded",
+            reason="eligibility_signal_visible",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=otp_detected,
+            requested_utc=requested_utc,
+            attempted=attempted,
+            succeeded=True,
+        )
+        return "succeeded"
+
+    otp_deadline = time.monotonic() + min(15.0, max(0.0, config.code_wait_seconds))
+    while time.monotonic() <= otp_deadline:
+        evidence = _seller_central_page_evidence(driver, config)
+        if evidence.get("sms_option_detected"):
+            sms_option = _find_seller_central_sms_option(driver)
+            if sms_option is not None and _safe_click_with_driver(driver, sms_option):
+                _record_seller_central_login_recovery(
+                    config,
+                    status="attempted",
+                    reason="sms_delivery_option_selected",
+                    context=context,
+                    signin_detected=signin_detected,
+                    otp_detected=False,
+                    requested_utc=requested_utc,
+                    attempted=True,
+                    notes=f"page_hint={evidence.get('page_hint', 'unknown')}",
+                )
+                _human_sleep(0.65, 1.15, cap=1.5)
+                continue
+            page_pull = _write_seller_central_page_pull(
+                driver,
+                config,
+                context=context,
+                reason="sms_option_not_clickable",
+            )
+            _set_seller_central_login_attempt_control_for_reason(
+                config,
+                reason="sms_option_not_clickable",
+                source="seller_central_sms_option",
+            )
+            _record_seller_central_login_recovery(
+                config,
+                status="blocked",
+                reason="sms_option_not_clickable",
+                context=context,
+                signin_detected=signin_detected,
+                otp_detected=False,
+                requested_utc=requested_utc,
+                attempted=attempted,
+                notes=f"page_pull={page_pull.get('latest_json_path', '')}",
+            )
+            return "sms_option_not_clickable"
+        if evidence.get("authenticator_option_detected") and not evidence.get("sms_option_detected"):
+            page_pull = _write_seller_central_page_pull(
+                driver,
+                config,
+                context=context,
+                reason="authenticator_only_no_sms_option",
+            )
+            _set_seller_central_login_attempt_control_for_reason(
+                config,
+                reason="authenticator_only_no_sms_option",
+                source="seller_central_authenticator_only",
+            )
+            _record_seller_central_login_recovery(
+                config,
+                status="blocked",
+                reason="authenticator_only_no_sms_option",
+                context=context,
+                signin_detected=signin_detected,
+                otp_detected=False,
+                requested_utc=requested_utc,
+                attempted=attempted,
+                notes=f"page_pull={page_pull.get('latest_json_path', '')};page_hint={evidence.get('page_hint', 'unknown')}",
+            )
+            return "authenticator_only_no_sms_option"
+        if evidence["otp_detected"]:
+            otp_detected = True
+            break
+        if evidence["manual_challenge"]:
+            page_pull = _write_seller_central_page_pull(
+                driver,
+                config,
+                context=context,
+                reason="manual_challenge_required",
+            )
+            _set_seller_central_login_attempt_control_for_reason(
+                config,
+                reason="manual_challenge_required",
+                source="seller_central_otp_loop",
+            )
+            _record_seller_central_login_recovery(
+                config,
+                status="blocked",
+                reason="manual_challenge_required",
+                context=context,
+                signin_detected=signin_detected,
+                otp_detected=False,
+                requested_utc=requested_utc,
+                attempted=attempted,
+                notes=f"page_pull={page_pull.get('latest_json_path', '')}",
+            )
+            return "manual_challenge_required"
+        _human_sleep(0.45, 0.85, cap=1.0)
+
+    if not otp_detected:
+        evidence = _seller_central_page_evidence(driver, config)
+        blocked_reason = "otp_page_not_detected"
+        signin_now_visible = bool(evidence.get("signin_detected"))
+        if signin_now_visible and not evidence.get("otp_detected"):
+            blocked_reason = _seller_central_post_credentials_blocker(
+                driver,
+                evidence,
+                password_value_before_submit=password_value_before_submit,
+                submit_clicked=attempted,
+            )
+        _set_seller_central_login_attempt_control_for_reason(
+            config,
+            reason=blocked_reason,
+            source="seller_central_post_credentials",
+        )
+        page_pull = _write_seller_central_page_pull(
+            driver,
+            config,
+            context=context,
+            reason=blocked_reason,
+        )
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason=blocked_reason,
+            context=context,
+            signin_detected=signin_now_visible or signin_detected,
+            otp_detected=False,
+            requested_utc=requested_utc,
+            attempted=attempted,
+            notes=(
+                f"page_pull={page_pull.get('latest_json_path', '')};"
+                f"post_credentials_page={evidence.get('page_hint', 'unknown')}"
+            ),
+        )
+        return blocked_reason
+
+    page_pull = _write_seller_central_page_pull(
+        driver,
+        config,
+        context=context,
+        reason="otp_page_detected",
+    )
+    _record_seller_central_login_recovery(
+        config,
+        status="waiting_for_code",
+        reason="otp_page_detected",
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=True,
+        requested_utc=requested_utc,
+        attempted=attempted,
+        notes=f"page_pull={page_pull.get('latest_json_path', '')}",
+    )
+    code_result = wait_for_seller_central_code(config, requested_utc=requested_utc)
+    if code_result.status != "found":
+        evidence = _seller_central_page_evidence(driver, config)
+        blocked_reason = code_result.reason
+        otp_still_visible = bool(evidence.get("otp_detected"))
+        signin_now_visible = bool(evidence.get("signin_detected"))
+        if signin_now_visible and not otp_still_visible:
+            blocked_reason = "signin_or_passkey_page_after_code_wait"
+        page_pull = _write_seller_central_page_pull(
+            driver,
+            config,
+            context=context,
+            reason=blocked_reason,
+        )
+        _record_seller_central_login_recovery(
+            config,
+            status="expired" if code_result.status == "expired" and otp_still_visible else "blocked",
+            reason=blocked_reason,
+            context=context,
+            signin_detected=signin_now_visible or signin_detected,
+            otp_detected=otp_still_visible,
+            requested_utc=requested_utc,
+            message_ts_utc=code_result.message_ts_utc,
+            code_seen=False,
+            used_message=code_result.reason == "fresh_code_already_used",
+            attempted=attempted,
+            code_age_seconds=code_result.age_seconds,
+            source_message_id=code_result.message_id,
+            notes=(
+                f"page_pull={page_pull.get('latest_json_path', '')};"
+                f"code_source_reason={code_result.reason};"
+                f"post_code_wait_page={evidence.get('page_hint', 'unknown')}"
+            ),
+        )
+        return code_result.status
+
+    otp_element = _find_first_login_control(
+        driver,
+        config.otp_xpath,
+        ("input#auth-mfa-otpcode", "input[name='otpCode']", "input[name='code']"),
+    )
+    otp_button = _find_first_login_control(
+        driver,
+        config.otp_button_xpath,
+        (
+            "input#auth-signin-button",
+            "button#auth-signin-button",
+            "input[type='submit']",
+            "button[type='submit']",
+        ),
+    )
+    if otp_element is None or otp_button is None:
+        _record_seller_central_login_recovery(
+            config,
+            status="failed",
+            reason="otp_selectors_missing",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=True,
+            requested_utc=requested_utc,
+            message_ts_utc=code_result.message_ts_utc,
+            code_seen=True,
+            fresh_code=True,
+            attempted=attempted,
+            code_age_seconds=code_result.age_seconds,
+            source_message_id=code_result.message_id,
+        )
+        return "otp_selectors_missing"
+    if not _safe_replace_text_with_driver(driver, otp_element, code_result.code):
+        _record_seller_central_login_recovery(
+            config,
+            status="failed",
+            reason="otp_field_not_interactable",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=True,
+            requested_utc=requested_utc,
+            message_ts_utc=code_result.message_ts_utc,
+            code_seen=True,
+            fresh_code=True,
+            attempted=attempted,
+            code_age_seconds=code_result.age_seconds,
+            source_message_id=code_result.message_id,
+        )
+        return "otp_field_not_interactable"
+    otp_submitted = _safe_click_with_driver(driver, otp_button)
+    if otp_submitted:
+        mark_seller_central_code_message_used(
+            code_result,
+            context=context,
+            status="otp_submitted",
+        )
+    _record_seller_central_login_recovery(
+        config,
+        status="attempted",
+        reason="otp_code_submitted",
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=True,
+        requested_utc=requested_utc,
+        message_ts_utc=code_result.message_ts_utc,
+        code_seen=True,
+        fresh_code=True,
+        attempted=otp_submitted,
+        code_age_seconds=code_result.age_seconds,
+        source_message_id=code_result.message_id,
+    )
+    if _wait_for_seller_central_eligibility_success(driver, config, 12.0):
+        _record_seller_central_login_recovery(
+            config,
+            status="succeeded",
+            reason="eligibility_signal_visible",
+            context=context,
+            signin_detected=signin_detected,
+            otp_detected=True,
+            requested_utc=requested_utc,
+            message_ts_utc=code_result.message_ts_utc,
+            code_seen=True,
+            fresh_code=True,
+            attempted=otp_submitted,
+            succeeded=True,
+            code_age_seconds=code_result.age_seconds,
+            source_message_id=code_result.message_id,
+        )
+        return "succeeded"
+    _record_seller_central_login_recovery(
+        config,
+        status="failed",
+        reason="eligibility_signal_not_visible_after_code",
+        context=context,
+        signin_detected=signin_detected,
+        otp_detected=True,
+        requested_utc=requested_utc,
+        message_ts_utc=code_result.message_ts_utc,
+        code_seen=True,
+        fresh_code=True,
+        attempted=otp_submitted,
+        code_age_seconds=code_result.age_seconds,
+        source_message_id=code_result.message_id,
+    )
+    return "failed"
+
+
+def _seller_central_browser_wait_seconds(name: str, default: float, *, floor: float = 0.5, cap: float = 120.0) -> float:
+    return _clamp(_safe_float(os.getenv(name, ""), default), floor, cap)
+
+
+def _driver_window_handles(driver) -> list[str]:
+    try:
+        return [str(handle) for handle in (getattr(driver, "window_handles", []) or [])]
+    except Exception:
+        return []
+
+
+def _driver_current_window_handle(driver) -> str:
+    try:
+        return str(getattr(driver, "current_window_handle", "") or "")
+    except Exception:
+        return ""
+
+
+def _switch_to_window_handle(driver, handle: str) -> bool:
+    if not handle:
+        return False
+    try:
+        window = getattr(getattr(driver, "switch_to", None), "window", None)
+        if not callable(window):
+            return False
+        window(handle)
+        return True
+    except Exception:
+        return False
+
+
+def _seller_central_browser_context_present(
+    driver,
+    config: SellerCentralLoginRecoveryConfig,
+) -> tuple[bool, dict[str, bool]]:
+    evidence = _seller_central_page_evidence(driver, config)
+    if evidence["signin_detected"] or evidence["otp_detected"] or evidence["success_detected"]:
+        return True, evidence
+    try:
+        current_url = _normalize_lower(getattr(driver, "current_url", ""))
+    except Exception:
+        current_url = ""
+    url_suggests_seller_central = "sellercentral.amazon" in current_url or "/ap/signin" in current_url
+    return bool(url_suggests_seller_central), evidence
+
+
+def _wait_for_seller_central_browser_context(
+    driver,
+    *,
+    original_handle: str,
+    handles_before: list[str],
+    config: SellerCentralLoginRecoveryConfig,
+    seconds: float,
+) -> tuple[str, str, dict[str, bool]]:
+    deadline = time.monotonic() + max(0.0, seconds)
+    last_evidence = {
+        "signin_detected": False,
+        "otp_detected": False,
+        "manual_challenge": False,
+        "success_detected": False,
+    }
+    while time.monotonic() <= deadline:
+        handles_now = _driver_window_handles(driver)
+        new_handles = [handle for handle in handles_now if handle not in handles_before]
+        existing_handles = [handle for handle in handles_now if handle != original_handle and handle not in new_handles]
+        candidate_handles = new_handles + existing_handles
+        if original_handle:
+            candidate_handles.append(original_handle)
+        for handle in candidate_handles:
+            if not _switch_to_window_handle(driver, handle):
+                continue
+            present, evidence = _seller_central_browser_context_present(driver, config)
+            last_evidence = evidence
+            if present:
+                if handle == original_handle:
+                    return handle, "seller_central_same_tab_found", evidence
+                return handle, "seller_central_tab_found", evidence
+        _human_sleep(0.25, 0.55, cap=0.8)
+    return "", "seller_central_tab_missing", last_evidence
+
+
+def _click_bbp_seller_central_login_control(driver, dashboard_element) -> bool:
+    if _safe_click(dashboard_element):
+        return True
+    try:
+        clicked = driver.execute_script(
+            """
+            const el = arguments[0];
+            if (!el) {
+                return false;
+            }
+            const root = el.closest('button,a,[role="button"],[onclick]') || el.parentElement || el;
+            const candidates = [el, root, ...Array.from(root.querySelectorAll('a,button,[role="button"],[onclick]'))];
+            for (const candidate of candidates) {
+                const text = String(candidate.textContent || candidate.value || '').trim().toUpperCase();
+                const href = String(candidate.href || '').toLowerCase();
+                const role = String(candidate.getAttribute && candidate.getAttribute('role') || '').toLowerCase();
+                const looksClickable = candidate === el || text.includes('LOGIN') || role === 'button'
+                    || href.includes('sellercentral') || href.includes('/ap/signin');
+                if (!looksClickable) {
+                    continue;
+                }
+                candidate.click();
+                return true;
+            }
+            return false;
+            """,
+            dashboard_element,
+        )
+        if clicked:
+            return True
+    except Exception:
+        pass
+    try:
+        ActionChains(driver).move_to_element(dashboard_element).click().perform()
+        return True
+    except Exception:
+        return False
+
+
+def _switch_back_to_bbp_dashboard_frame(driver, original_handle: str) -> bool:
+    if original_handle and not _switch_to_window_handle(driver, original_handle):
+        return False
+    try:
+        default_content = getattr(getattr(driver, "switch_to", None), "default_content", None)
+        if callable(default_content):
+            default_content()
+    except Exception:
+        return False
+
+    iframe = None
+    try:
+        frames = driver.find_elements(By.ID, "bbp-frame")
+        iframe = frames[0] if frames else None
+    except Exception:
+        iframe = None
+    if iframe is None:
+        try:
+            iframe = WebDriverWait(
+                driver,
+                _scaled_wait_seconds(8.0, floor=2.0, cap=10.0),
+            ).until(EC.presence_of_element_located((By.ID, "bbp-frame")))
+        except Exception:
+            iframe = None
+    if iframe is None:
+        return False
+    try:
+        driver.switch_to.frame(iframe)
+        return True
+    except Exception:
+        return False
+
+
+def _bbp_dashboard_raw(driver) -> str:
+    try:
+        dashboard_element = driver.find_element(By.CSS_SELECTOR, "#dashboardYesOrNo")
+    except Exception:
+        return ""
+    return (
+        dashboard_element.text
+        or dashboard_element.get_attribute("value")
+        or dashboard_element.get_attribute("textContent")
+        or ""
+    ).strip().upper()
+
+
+def _wait_for_bbp_dashboard_signal_after_seller_central(driver, seconds: float) -> str:
+    deadline = time.monotonic() + max(0.0, seconds)
+    last_raw = ""
+    while time.monotonic() <= deadline:
+        last_raw = _bbp_dashboard_raw(driver)
+        if has_required_dashboard_signal(last_raw):
+            return last_raw
+        _human_sleep(0.35, 0.75, cap=1.0)
+    return last_raw
+
+
+def _dashboard_value_requires_seller_central_attempt(value: object) -> bool:
+    clean = _normalize_text(value).strip().upper()
+    return clean in {"", "LOGIN"}
+
+
+def _attempt_seller_central_login_from_bbp_dashboard(driver, dashboard_element, *, context: str) -> tuple[str, str]:
+    config = load_seller_central_login_recovery_config()
+    attempt_control = seller_central_login_attempt_control_for_config(config)
+    if not attempt_control.allows_attempt:
+        reason = attempt_control.mode or "normal_scan_only"
+        _record_seller_central_login_recovery(
+            config,
+            status="disabled" if reason in {"normal_scan_only", "login_cooldown"} else "blocked",
+            reason=reason,
+            context=context,
+            notes=(
+                "controller_freeze_before_bbp_login_click=1;"
+                f"login_attempt_control_reason={attempt_control.reason};"
+                f"cooldown_until_utc={attempt_control.cooldown_until_utc}"
+            ),
+        )
+        return reason, ""
+    original_handle = _driver_current_window_handle(driver)
+    handles_before = _driver_window_handles(driver)
+    if original_handle and original_handle not in handles_before:
+        handles_before.append(original_handle)
+
+    clicked = _click_bbp_seller_central_login_control(driver, dashboard_element)
+    if not clicked:
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason="bbp_login_control_click_failed",
+            context=context,
+        )
+        return "bbp_login_control_click_failed", ""
+
+    seller_handle, tab_reason, tab_evidence = _wait_for_seller_central_browser_context(
+        driver,
+        original_handle=original_handle,
+        handles_before=handles_before,
+        config=config,
+        seconds=_seller_central_browser_wait_seconds(
+            SELLER_CENTRAL_TAB_OPEN_WAIT_SECONDS_ENV,
+            20.0,
+            floor=1.0,
+            cap=90.0,
+        ),
+    )
+    if not seller_handle:
+        _record_seller_central_login_recovery(
+            config,
+            status="blocked",
+            reason=tab_reason,
+            context=context,
+            signin_detected=tab_evidence.get("signin_detected", False),
+            otp_detected=tab_evidence.get("otp_detected", False),
+            notes="bbp_login_control_clicked",
+        )
+        _switch_back_to_bbp_dashboard_frame(driver, original_handle)
+        return tab_reason, ""
+
+    logger.info("[Profile5] Seller Central login context opened through BBP dashboard (%s).", tab_reason)
+    seller_central_status = _attempt_seller_central_login_recovery(driver, context=context)
+
+    if not _switch_back_to_bbp_dashboard_frame(driver, original_handle):
+        _record_seller_central_login_recovery(
+            config,
+            status="failed",
+            reason="bbp_return_failed",
+            context=context,
+            attempted=seller_central_status == "succeeded",
+            succeeded=False,
+        )
+        return "bbp_return_failed", ""
+
+    dashboard_raw = ""
+    if seller_central_status == "succeeded" or seller_central_status in SELLER_CENTRAL_DASHBOARD_RECONCILE_RETURN_STATUSES:
+        dashboard_raw = _wait_for_bbp_dashboard_signal_after_seller_central(
+            driver,
+            _seller_central_browser_wait_seconds(
+                SELLER_CENTRAL_BBP_RETURN_WAIT_SECONDS_ENV,
+                15.0,
+                floor=1.0,
+                cap=60.0,
+            ),
+        )
+        if has_required_dashboard_signal(dashboard_raw):
+            _record_seller_central_success_from_bbp_dashboard_signal(
+                dashboard_raw,
+                context=context,
+                reason="bbp_dashboard_signal_visible_after_seller_central_return",
+            )
+            return "succeeded", dashboard_raw
+
+    if seller_central_status != "succeeded":
+        return seller_central_status, ""
+
+    _record_seller_central_login_recovery(
+        config,
+        status="failed",
+        reason="bbp_dashboard_not_refreshed_after_seller_central",
+        context=context,
+        succeeded=True,
+        notes=f"dashboard_value={dashboard_raw or 'missing'}",
+    )
+    return "bbp_dashboard_not_refreshed_after_seller_central", dashboard_raw
+
+
+def _log_bbp_login_recovery(
+    config: BBPLoginRecoveryConfig,
+    *,
+    status: str,
+    reason: str = "",
+    context: str = "",
+    attempted: bool = False,
+    succeeded: bool = False,
+    login_heading_detected: bool = False,
+) -> None:
+    proof = bbp_login_safe_proof_fields(
+        config,
+        status=status,
+        reason=reason,
+        context=context,
+        attempted=attempted,
+        succeeded=succeeded,
+        login_heading_detected=login_heading_detected,
+    )
+    logger.info(
+        "BBP_AUTO_LOGIN_RECOVERY status=%s context=%s reason=%s enabled=%s secret_file_exists=%s "
+        "email_present=%s password_present=%s heading_detected=%s attempted=%s succeeded=%s",
+        proof["status"],
+        proof["context"],
+        proof["reason"],
+        proof["auto_login_enabled"],
+        proof["secret_file_exists"],
+        proof["email_present"],
+        proof["password_present"],
+        proof["login_heading_detected"],
+        proof["attempted_flag"],
+        proof["succeeded_flag"],
+    )
+
+
+def _record_bbp_login_recovery(
+    config: BBPLoginRecoveryConfig,
+    *,
+    status: str,
+    reason: str = "",
+    context: str = "",
+    attempted: bool = False,
+    succeeded: bool = False,
+    login_heading_detected: bool = False,
+) -> None:
+    _log_bbp_login_recovery(
+        config,
+        status=status,
+        reason=reason,
+        context=context,
+        attempted=attempted,
+        succeeded=succeeded,
+        login_heading_detected=login_heading_detected,
+    )
+    append_bbp_login_recovery_proof(
+        config,
+        status=status,
+        reason=reason,
+        context=context,
+        attempted=attempted,
+        succeeded=succeeded,
+        login_heading_detected=login_heading_detected,
+    )
+    try:
+        record_login_controller_attempt(
+            context=context,
+            page_type="bbp_login",
+            action="bbp_auto_login" if attempted else "bbp_login_observe",
+            status=status,
+            reason=reason,
+            attempted=attempted,
+            succeeded=succeeded,
+            blocked_reason=reason if status in {"missing_secret_file", "missing_credentials", "missing_login_selector", "failed"} else "",
+            source="bbp_login_recovery",
+            notes=f"login_heading_detected={1 if login_heading_detected else 0}",
+            paths=_login_controller_paths_from_proof_env("BBP_LOGIN_RECOVERY_PROOF_PATH"),
+            extra_secrets=(config.email, config.password),
+        )
+    except Exception as exc:
+        logger.warning("F login controller record failed for BBP recovery: %s", exc)
+
+
+def _attempt_bbp_auto_login_recovery(driver, *, context: str) -> str:
+    config = load_bbp_login_recovery_config()
+    heading_detected = _bbp_login_heading_detected(driver, config)
+    if not heading_detected:
+        return "not_login_page"
+    if not config.file_exists:
+        _record_bbp_login_recovery(
+            config,
+            status="missing_secret_file",
+            reason="bbp_login_env_missing",
+            context=context,
+            login_heading_detected=True,
+        )
+        return "missing_secret_file"
+    if not config.auto_login_enabled:
+        _record_bbp_login_recovery(
+            config,
+            status="disabled",
+            reason="auto_login_disabled",
+            context=context,
+            login_heading_detected=True,
+        )
+        return "disabled"
+    if not config.credentials_present:
+        _record_bbp_login_recovery(
+            config,
+            status="missing_credentials",
+            reason="email_or_password_missing",
+            context=context,
+            login_heading_detected=True,
+        )
+        return "missing_credentials"
+
+    email_f = _find_first_xpath(driver, config.email_xpath)
+    pass_f = _find_first_xpath(driver, config.password_xpath)
+    login_b = _find_first_xpath(driver, config.button_xpath)
+    if email_f is None or pass_f is None or login_b is None:
+        _record_bbp_login_recovery(
+            config,
+            status="missing_login_selector",
+            reason="login_field_or_button_missing",
+            context=context,
+            login_heading_detected=True,
+        )
+        return "missing_login_selector"
+
+    try:
+        email_f.clear()
+        email_f.send_keys(config.email)
+        pass_f.clear()
+        pass_f.send_keys(config.password)
+        login_b.click()
+        _record_bbp_login_recovery(
+            config,
+            status="attempted",
+            reason="login_submitted",
+            context=context,
+            attempted=True,
+            login_heading_detected=True,
+        )
+        try:
+            WebDriverWait(driver, _scaled_wait_seconds(5.0, floor=2.0, cap=6.5)).until(
+                lambda d: d.find_elements(By.CSS_SELECTOR, "#txtBuyPrice")
+                or not d.find_elements(By.XPATH, config.button_xpath)
+            )
+        except Exception:
+            _human_sleep(0.6, 1.1, cap=1.6)
+        if _bbp_cost_field_present(driver):
+            _record_bbp_login_recovery(
+                config,
+                status="succeeded",
+                reason="cost_field_visible",
+                context=context,
+                attempted=True,
+                succeeded=True,
+                login_heading_detected=True,
+            )
+            return "succeeded"
+        if _bbp_login_heading_detected(driver, config) or _find_first_xpath(driver, config.button_xpath) is not None:
+            _record_bbp_login_recovery(
+                config,
+                status="failed",
+                reason="login_form_still_present",
+                context=context,
+                attempted=True,
+                login_heading_detected=True,
+            )
+            return "failed"
+        _record_bbp_login_recovery(
+            config,
+            status="submitted",
+            reason="login_form_not_present",
+            context=context,
+            attempted=True,
+            login_heading_detected=True,
+        )
+        return "submitted"
+    except Exception as exc:
+        _record_bbp_login_recovery(
+            config,
+            status="failed",
+            reason=f"exception_{type(exc).__name__}",
+            context=context,
+            attempted=True,
+            login_heading_detected=True,
+        )
+        return "failed"
+
+
+def _login_option_evidence(driver):
+    config = load_bbp_login_recovery_config()
+    if _bbp_login_heading_detected(driver, config):
+        for label, xpath in (
+            ("loginEmail", config.email_xpath),
+            ("loginPassword", config.password_xpath),
+            ("loginBtn", config.button_xpath),
+        ):
+            try:
+                if driver.find_elements(By.XPATH, xpath):
+                    return f"selector:{label}"
+            except Exception:
+                continue
     try:
         body_nodes = driver.find_elements(By.TAG_NAME, "body")
         body_text = " ".join(_normalize_text(getattr(node, "text", "")) for node in body_nodes).lower()
@@ -2574,7 +4958,7 @@ def _surface_bbp_profile_windows_via_powershell():
     if os.name != "nt":
         return False
     user_data_dir = _normalize_text(os.getenv("F061_BBP_USER_DATA_DIR") or r"C:\Users\Luke\AppData\Local\Chrome_UC136")
-    profile_dir = _normalize_text(os.getenv("F061_BBP_PROFILE_DIR") or "BBPProfile")
+    profile_dir = _normalize_text(os.getenv("F061_BBP_PROFILE_DIR") or "Profile 2")
     if not user_data_dir or not profile_dir:
         return False
     user_data_literal = user_data_dir.replace("'", "''")
@@ -2582,15 +4966,24 @@ def _surface_bbp_profile_windows_via_powershell():
     ps_command = rf'''
 $userData = '{user_data_literal}'
 $profileDir = '{profile_literal}'
-$rootPids = Get-CimInstance Win32_Process |
+$matchedProcesses = Get-CimInstance Win32_Process |
   Where-Object {{
     $_.Name -eq "chrome.exe" -and
     $_.CommandLine -and
-    $_.CommandLine -notmatch " --type=" -and
-    $_.CommandLine -like "*$userData*" -and
-    $_.CommandLine -like "*--profile-directory=$profileDir*"
-  }} |
-  Select-Object -ExpandProperty ProcessId
+    (
+      (
+        $_.CommandLine -like "*$userData*" -and
+        $_.CommandLine -like "*--profile-directory=$profileDir*"
+      ) -or
+      $_.CommandLine -like "*Chrome_91_F061*"
+    )
+  }}
+$rootPids = @(
+  $matchedProcesses | ForEach-Object {{
+    [int]$_.ProcessId
+    if ($_.ParentProcessId) {{ [int]$_.ParentProcessId }}
+  }}
+) | Sort-Object -Unique
 if (-not $rootPids) {{ exit 0 }}
 Add-Type @"
 using System;
@@ -2636,6 +5029,7 @@ public static class F061LoginShowApi {{
 }}
 "@
 $script:rootPids = @($rootPids | ForEach-Object {{ [int]$_ }})
+$script:shown = 0
 $callback = [F061LoginShowApi+EnumWindowsProc]{{
   param([IntPtr]$hWnd, [IntPtr]$lParam)
   [uint32]$windowProcessId = 0
@@ -2669,21 +5063,30 @@ $callback = [F061LoginShowApi+EnumWindowsProc]{{
       [F061LoginShowApi]::BringWindowToTop($hWnd) | Out-Null
       [F061LoginShowApi]::SetForegroundWindow($hWnd) | Out-Null
       [F061LoginShowApi]::SetWindowPos($hWnd, [IntPtr](-2), 20, 20, 1600, 950, 0x0040 -bor 0x0020) | Out-Null
+      $script:shown += 1
     }}
   }}
   return $true
 }}
 [F061LoginShowApi]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
+Write-Output $script:shown
 '''
     try:
         completed = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps_command],
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            text=True,
             timeout=10,
             check=False,
         )
-        return int(completed.returncode or 0) == 0
+        lines = [line.strip() for line in _normalize_text(getattr(completed, "stdout", "")).splitlines() if line.strip()]
+        if not lines:
+            return False
+        try:
+            return int(float(lines[-1])) > 0
+        except ValueError:
+            return False
     except Exception:
         return False
 
@@ -2694,6 +5097,14 @@ def _wait_for_visible_bbp_frame_or_container(driver, wait_seconds):
         return False
     if _bbp_frame_or_container_present(driver) or _bbp_cost_field_present(driver):
         return True
+    auto_login_status = _attempt_bbp_auto_login_recovery(driver, context="preflight_missing_bbp_frame")
+    if auto_login_status in {"succeeded", "submitted"}:
+        deadline = time.monotonic() + min(wait_seconds, 8.0)
+        while time.monotonic() < deadline:
+            if _bbp_frame_or_container_present(driver) or _bbp_cost_field_present(driver):
+                logger.info("BBP iframe/container became available after auto login recovery.")
+                return True
+            _human_sleep(0.35, 0.75, cap=1.0)
     evidence = _login_option_evidence(driver)
     if not evidence:
         logger.info("BBP iframe missing, but no real login option was detected; keeping scanner browser on normal hidden path.")
@@ -2722,19 +5133,22 @@ def _wait_for_visible_bbp_frame_or_container(driver, wait_seconds):
     return False
 
 
-def login_to_buybotpro(driver, email, password):
+def login_to_buybotpro(driver, email=None, password=None):
     """
     Logs into BuyBotPro if login fields are present.
     Returns one of: submitted, already_authenticated, not_required, login_required, skipped_error.
     """
     try:
-        email_fields = driver.find_elements(By.CSS_SELECTOR, "#loginEmail")
-        pass_fields = driver.find_elements(By.CSS_SELECTOR, "#loginPassword")
-        login_buttons = driver.find_elements(By.CSS_SELECTOR, "#loginBtn")
-        if email_fields and pass_fields and login_buttons:
+        config = load_bbp_login_recovery_config()
+        if _bbp_login_heading_detected(driver, config):
+            auto_login_status = _attempt_bbp_auto_login_recovery(driver, context="bbp_frame")
+            if auto_login_status in {"succeeded", "submitted"}:
+                logger.info("BBP login recovery completed inside scanner-owned browser.")
+                return "submitted"
+
             manual_wait_seconds = _manual_bbp_login_wait_seconds()
             if manual_wait_seconds > 0:
-                logger.warning("F061_LOGIN_OPTION_DETECTED selector:#loginEmail,#loginPassword,#loginBtn")
+                logger.warning("F061_LOGIN_OPTION_DETECTED selector:bbp_login_heading")
                 _surface_visible_login_browser(driver)
                 logger.warning(
                     "BBP manual login required; keeping the scanner-owned browser open for up to "
@@ -2752,28 +5166,11 @@ def login_to_buybotpro(driver, email, password):
                 logger.warning("BBP manual login timed out; login is still required.")
                 return "login_required"
 
-            email_f = email_fields[0]
-            pass_f = pass_fields[0]
-            login_b = login_buttons[0]
-            email_f.clear()
-            email_f.send_keys(email)
-            pass_f.clear()
-            pass_f.send_keys(password)
-            login_b.click()
-            logger.info("Submitted BBP login.")
-            try:
-                WebDriverWait(driver, _scaled_wait_seconds(5.0, floor=2.0, cap=6.5)).until(
-                    lambda d: d.find_elements(By.CSS_SELECTOR, "#txtBuyPrice")
-                    or not d.find_elements(By.CSS_SELECTOR, "#loginBtn")
-                )
-            except Exception:
-                _human_sleep(0.6, 1.1, cap=1.6)
-            if _bbp_cost_field_present(driver):
-                return "submitted"
-            if driver.find_elements(By.CSS_SELECTOR, "#loginBtn"):
-                logger.warning("BBP login form still present after automatic login attempt.")
-                return "login_required"
-            return "submitted"
+            logger.warning(
+                "BBP login required; auto login did not run or did not clear the login page "
+                f"(status={auto_login_status})."
+            )
+            return "login_required"
 
         # No login form. If the BBP cost field exists, the session is already authenticated.
         if _bbp_cost_field_present(driver):
@@ -3220,7 +5617,7 @@ def process_passed_product(
             driver.switch_to.frame(iframe)
             logger.info("[Profile5] Found BBP iframe.")
 
-            login_status = login_to_buybotpro(driver, "dan@drjhardware.co.uk", "Systembox-60811963")
+            login_status = login_to_buybotpro(driver)
             if login_status == "login_required":
                 return {"success": False, "scraped_data": {}, "error": "BBP_LOGIN_REQUIRED"}
             _human_sleep(0.55, 1.05, cap=1.5)
@@ -3287,12 +5684,65 @@ def process_passed_product(
                             else ""
                         )
                         logger.info(f"[Profile5] Dashboard yes/no => {bbp_dashboard_yes_or_no}{delivery_note}")
-                    elif dashboard_yes_or_no_raw == "LOGIN" and _bbp_cost_field_present(driver):
-                        bbp_dashboard_yes_or_no = ""
-                        logger.info(
-                            "[Profile5] Dashboard yes/no raw LOGIN ignored after authenticated cost field; "
-                            "treating dashboard as missing."
-                        )
+                        _record_seller_central_success_from_bbp_dashboard_signal(bbp_dashboard_yes_or_no)
+                    elif _dashboard_value_requires_seller_central_attempt(dashboard_yes_or_no_raw) and _bbp_cost_field_present(driver):
+                        try:
+                            seller_central_status, refreshed_dashboard_yes_or_no = (
+                                _attempt_seller_central_login_from_bbp_dashboard(
+                                    driver,
+                                    dashboard_yes_or_no_el,
+                                    context="dashboard_yes_no_login",
+                                )
+                            )
+                        except Exception as login_exc:
+                            _record_seller_central_login_recovery(
+                                load_seller_central_login_recovery_config(),
+                                status="failed",
+                                reason=f"seller_central_handoff_exception_{type(login_exc).__name__}",
+                                context="dashboard_yes_no_login",
+                                notes=f"dashboard_value={dashboard_yes_or_no_raw or 'missing'}",
+                            )
+                            logger.warning(
+                                "[Profile5] Seller Central dashboard handoff failed => %s",
+                                type(login_exc).__name__,
+                            )
+                            return {
+                                "success": False,
+                                "scraped_data": {},
+                                "error": SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR,
+                            }
+                        if seller_central_status == "succeeded":
+                            dashboard_yes_or_no_raw = (
+                                refreshed_dashboard_yes_or_no or _bbp_dashboard_raw(driver)
+                            ).strip().upper()
+                            if has_required_dashboard_signal(dashboard_yes_or_no_raw):
+                                bbp_dashboard_yes_or_no = dashboard_yes_or_no_raw
+                                delivery_classification = dashboard_delivery_classification(bbp_dashboard_yes_or_no)
+                                delivery_note = (
+                                    f"; delivery_classification={delivery_classification}"
+                                    if delivery_classification
+                                    else ""
+                                )
+                                logger.info(
+                                    f"[Profile5] Dashboard yes/no => {bbp_dashboard_yes_or_no}{delivery_note}"
+                                )
+                                _record_seller_central_success_from_bbp_dashboard_signal(bbp_dashboard_yes_or_no)
+                            else:
+                                return {
+                                    "success": False,
+                                    "scraped_data": {},
+                                    "error": SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR,
+                                }
+                        else:
+                            logger.warning(
+                                "[Profile5] Seller Central eligibility login required; "
+                                "BBP account login alone is not enough for dashboard yes/no."
+                            )
+                            return {
+                                "success": False,
+                                "scraped_data": {},
+                                "error": SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR,
+                            }
                     else:
                         bbp_dashboard_yes_or_no = ""
                         logger.info(
@@ -3300,10 +5750,27 @@ def process_passed_product(
                             f"{dashboard_yes_or_no_raw or 'missing'}"
                         )
                         if dashboard_yes_or_no_raw == "LOGIN":
-                            return {"success": False, "scraped_data": {}, "error": "BBP_LOGIN_REQUIRED"}
+                            return {
+                                "success": False,
+                                "scraped_data": {},
+                                "error": SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR,
+                            }
                 except Exception as e:
                     bbp_dashboard_yes_or_no = ""
                     logger.info(f"[Profile5] Dashboard yes/no missing => {type(e).__name__}")
+                    if _bbp_cost_field_present(driver):
+                        _record_seller_central_login_recovery(
+                            load_seller_central_login_recovery_config(),
+                            status="failed",
+                            reason=f"dashboard_yes_no_read_exception_{type(e).__name__}",
+                            context="dashboard_yes_no_login",
+                            notes="dashboard_value=missing",
+                        )
+                        return {
+                            "success": False,
+                            "scraped_data": {},
+                            "error": SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED_ERROR,
+                        }
 
                 hist_table = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "#asinAverageStatisticsDataTable"))

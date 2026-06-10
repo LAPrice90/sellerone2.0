@@ -246,6 +246,81 @@ F061_HANDOFF_BACKUP_MANIFEST_COLUMNS = [
     "notes",
 ]
 
+F061_RESCAN_RECOVERY_PREVIEW_COLUMNS = [
+    "preview_id",
+    "built_at_utc",
+    "supplier_id",
+    "supplier_name",
+    "run_id",
+    "candidate_id",
+    "candidate_base",
+    "asin",
+    "original_supplier_sku",
+    "original_barcode",
+    "original_status_reason",
+    "original_attempt_count",
+    "original_timeout_until_utc",
+    "latest_batch_id",
+    "source_match_method",
+    "source_match_count",
+    "proposed_action",
+    "eligible_apply_flag",
+    "block_reason",
+    "proposed_run_id",
+    "proposed_row_key",
+    "proposed_supplier_sku",
+    "proposed_supplier_title",
+    "proposed_barcode",
+    "proposed_unit_cost",
+    "proposed_currency",
+    "proposed_vat_rate",
+    "proposed_source_seen_at_utc",
+]
+
+F061_RESCAN_RECOVERY_SUMMARY_COLUMNS = [
+    "built_at_utc",
+    "total_parked_rows",
+    "requeue_rows",
+    "retry_exhausted_rows",
+    "source_blocked_rows",
+    "already_active_rows",
+    "blocked_rows",
+    "live_write_attempted",
+    "live_write_succeeded",
+    "preview_path",
+    "notes",
+]
+
+F061_RESCAN_RECOVERY_APPLY_ROW_COLUMNS = [
+    "apply_id",
+    "applied_at_utc",
+    "preview_id",
+    "supplier_id",
+    "candidate_id",
+    "proposed_action",
+    "apply_status",
+    "active_row_written",
+    "screening_row_updated",
+    "block_reason",
+    "backup_dir",
+]
+
+F061_RESCAN_RECOVERY_APPLY_SUMMARY_COLUMNS = [
+    "apply_id",
+    "applied_at_utc",
+    "preview_rows",
+    "requeue_rows",
+    "retry_exhausted_rows",
+    "source_blocked_rows",
+    "active_rows_added",
+    "screening_rows_updated",
+    "live_write_attempted",
+    "live_write_succeeded",
+    "backup_dir",
+    "apply_rows_path",
+    "notes",
+]
+
 F061_RECOVERY_PROGRESS_COLUMNS = [
     "imported_at_utc",
     "supplier_id",

@@ -1,0 +1,1053 @@
+# Active Coding Plan - F Login Controller Rewrite
+
+## Job
+- job_ref: F-LOGIN-CONTROLLER-REWRITE
+- owner: SellerOne Manager / F worker scope
+- status: monitored validation
+- started_uk: 2026-06-06 17:13
+
+## Current Phase
+- Phase: live scanner-owned login proof after focused code repair.
+- Allowed files for this phase:
+  - scripts/flows/F/legacy_scanner_2_1/Webscrape.py
+  - scripts/flows/F/login_controller.py
+  - out/systems/F/price_list_manager/live/f061_login_mode.requested
+  - out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv
+  - out/systems/F/price_list_manager/live/f_login_controller_attempts.csv
+  - out/systems/F/price_list_manager/live/f_login_controller_state.json
+  - out/systems/F/price_list_manager/live/f_login_controller_report_latest.md
+- Forbidden actions remain unchanged: no price changes, queue edits, Sheets writes, DB alignment, output deletion, supplier switching, purchase/order actions, or separate Chrome login window.
+
+## Code Changes Under Test
+- Dashboard Yes/No blank or LOGIN now routes into Seller Central login recovery instead of being silently treated as missing.
+- Seller Central recovery now logs fresh controller attempts when the BBP-to-Seller-Central handoff fails.
+- Login typing and clicking now catches non-interactable fields and uses a safer driver-click fallback for buttons.
+- The old operator UI login retry hold was reduced from 900 seconds to 60 seconds so the auto-login controller does not sit idle for 15 minutes between proof slices.
+- Seller Central verification detection now recognises alternate Amazon OTP/security-code pages and avoids mistaking the OTP submit button for the sign-in submit button.
+
+## Local Tests
+- Command: python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q
+- Result: 40 passed at 2026-06-06 17:33 UK time.
+
+## Latest Live Evidence
+- 2026-06-06 17:32 UK: F submitted Seller Central credentials in the scanner-owned browser.
+- 2026-06-06 17:32 UK: F detected the Amazon verification/code page. This proves the OTP detection repair moved the live blocker forward.
+- 2026-06-06 17:34 UK: F waited for a fresh approved email code and expired with `no_fresh_code`.
+- 2026-06-06 17:46 UK: F wrote a redacted scanner-owned page pull. The page text is `Two-Step Verification Enter the code`, URL family is Seller Central sign-in, and no fresh email code was available.
+- 2026-06-06 18:15 UK: the read-only OTP intake proof checked the approved `AmazonOTP` code source and recorded `otp_intake_missing`, `reason=no_fresh_code`, `code_seen=0`, `fresh=0`, `used_message=0`.
+- 2026-06-06 18:27 UK: latest page pull showed Amazon had returned to a password/passkey sign-in page after the code wait. F code was tightened so future proof labels this as `signin_or_passkey_page_after_code_wait` instead of hiding it under `no_fresh_code`.
+- 2026-06-06 18:30 UK: focused tests passed again, 42 passed.
+- 2026-06-06 18:45 UK: F found a fresh Seller Central code, submitted it, then proved Dashboard Yes/No as `YES` from the BBP dashboard signal.
+- 2026-06-06 18:50 UK: scanner continuation proof exists: auth was confirmed, `scanner_chunk` succeeded with 2 rows, pending moved from 5490 to 5489, and completed login backtrack evidence was promoted.
+- 2026-06-06 18:55 UK: F MOT proved `F-SELLER-CENTRAL-ELIGIBILITY`; the only remaining F MOT fail is separate protected `F-RESCAN-PRIORITY`, not login.
+- 2026-06-06 18:56 UK: `F-LOGIN-CONTROLLER-REWRITE` packet marked `proved`.
+- Current live status: F login controller rewrite is proved. Continue weekend Hometime at lower risk, watching for durable scanner progress and any future logout challenge.
+
+## Live Monitoring Cadence
+- First check: 2026-06-06 17:16 UK time.
+- Second check: 2026-06-06 17:21 UK time.
+- Then every 10 minutes until 2026-06-06 18:15 UK time.
+
+## Live Proof Targets
+- Inspect:
+  - out/systems/F/price_list_manager/live/f061_child_status.txt
+  - out/systems/F/price_list_manager/live/live_cycle_events.csv
+  - out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv
+  - out/systems/F/price_list_manager/live/f_login_controller_attempts.csv
+  - out/systems/F/price_list_manager/live/f_login_controller_report_latest.md
+- Pass condition:
+  - F logs a fresh post-fix controller attempt after 2026-06-06 17:13 UK time and either:
+    - Dashboard Yes/No becomes YES, NO, or LIKELY, or
+    - the affected login rows reduce, or
+    - F parks with a specific manual challenge reason such as missing OTP, captcha, or Amazon challenge.
+- Fail condition:
+  - Another post-fix pass records seller_central_handoff_exception_ElementNotInteractableException with no better evidence, or F does not launch another login proof slice within the monitoring window.
+
+## Automatic Next Step
+- Keep Hometime monitoring F scanner progress.
+- Do not reopen `F-LOGIN-CONTROLLER-REWRITE` unless a later natural logout challenge fails to classify the page, fails to submit an available code, or fails to prove Dashboard Yes/No afterward.
+- Do not ask Luke unless the proof clearly becomes a real manual Amazon challenge, a fresh code must be forwarded, or a missing protected permission blocks the code source.
+
+## Follow-Up Phase - F Browser Session Durability
+- job_ref: F-BROWSER-SESSION-DURABILITY
+- status: fixed_needs_live_retest
+- changed_uk: 2026-06-07 09:43
+- reason: latest saved F page pulls labelled some password/passkey pages as OTP/code pages because the detector could read Amazon background script text instead of only visible page wording.
+- code change under test:
+  - F now prefers visible page text when deciding what page Amazon is showing.
+  - F no longer treats loose background words like `otp` or `code` as proof of a real code-entry page when password/passkey controls are visible.
+  - F now labels SMS/text-message and authenticator options separately.
+  - If SMS/text is available, F tries that option before waiting for a forwarded code.
+  - If only authenticator is available, F parks with `authenticator_only_no_sms_option` instead of guessing.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q`
+  - result: 45 passed at 2026-06-07 09:42 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: read-only F MOT ran at 2026-06-07 09:43 UK and still shows the known protected F decision state, not a new code-repair failure.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central login challenge.
+- live success condition:
+  - page pull labels the real choice as `sms_option`, `authenticator_option`, `otp_code_page`, `password_or_passkey_page`, or manual challenge without mixing them.
+  - if SMS/text exists, F records `sms_delivery_option_selected`, then waits for/submits the fresh code and proves Dashboard Yes/No.
+  - if SMS/text is missing and only authenticator is shown, F records `authenticator_only_no_sms_option` and stops cleanly.
+- remediation path if it fails:
+  - keep F inside `F-BROWSER-SESSION-DURABILITY`.
+  - inspect the newest redacted page pull and add one more precise page-state label.
+  - do not open a separate Chrome window, edit queues, restart workers, bypass Amazon security, or treat credentials submitted as proof.
+
+## Follow-Up Phase Update - 2026-06-07 10:13 UK
+- status: fixed_needs_live_retest
+- reason for update: a natural live proof row at 2026-06-07 09:43 UTC still recorded the weak reason `otp_page_not_detected` after credentials, while the page hint showed Seller Central sign-in/password/passkey controls. That is F-owned classifier work, not a Luke decision.
+- code change under test:
+  - F now records `signin_or_passkey_page_after_credentials` when the page after credentials is still the sign-in/password/passkey page.
+  - F writes the new redacted browser-session durability files:
+    - `out/systems/F/price_list_manager/live/f_browser_session_events.csv`
+    - `out/systems/F/price_list_manager/live/f_browser_session_durability_state.json`
+    - `out/systems/F/price_list_manager/live/f_browser_session_durability_report_latest.md`
+  - FPM130 now keeps parked Seller Central login prompts minimized when the scanner-owned window has already been shown or a PC-usability pause is active.
+  - F MOT now treats F-owned login classifier blockers as warnings with `luke_action_required=0`; it only asks Luke for a real manual challenge such as authenticator-only, captcha, missing credentials, missing secret, or auto-login disabled.
+- artifact correction:
+  - a focused test initially wrote fake session events into the live browser-session files.
+  - those files were moved to `out/systems/F/price_list_manager/live/proof_backups/20260607T1015_f_browser_session_test_artifact/`.
+  - the current live browser-session state was rewritten from the real latest login proof as `reason_code=unknown`, `luke_needed=false`.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py tests/manager/test_hourly_mot.py -q`
+  - result: 254 passed at 2026-06-07 10:11 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 10:07 UK.
+  - broader F proof command returned 335 passed and 3 failures in older FPM130 rescan/review-pack tests; these are not part of the Seller Central login fix and remain separate FPM130 cleanup work.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: Seller Central eligibility login is now `warn` with `luke_action_required=0`; the remaining F fail is separate protected `F-RESCAN-PRIORITY`.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central login challenge after 2026-06-07 10:13 UK.
+- live success condition:
+  - the next post-fix login attempt records one of: `signin_or_passkey_page_after_credentials`, `sms_delivery_option_selected`, `authenticator_only_no_sms_option`, `otp_page_detected`, `manual_challenge_required`, or Dashboard Yes/No proof.
+  - F scanner keeps reducing pending rows, or parks with one exact blocker that is not vague `otp_page_not_detected`.
+- timeout/remediation path:
+  - if no natural login challenge appears, continue monitoring F scanner progress only.
+  - if the next natural login challenge still writes `otp_page_not_detected`, keep F inside `F-BROWSER-SESSION-DURABILITY`, inspect the newest redacted page pull, and add the missing precise page label.
+  - do not ask Luke unless the latest page is a real manual challenge or a protected boundary.
+
+## Live Evidence Update - 2026-06-07 11:28 UK
+- status: live evidence improved, not proved.
+- trigger seen: a natural scanner-owned Seller Central login challenge after the 10:13 UK code change.
+- evidence:
+  - F submitted credentials at 2026-06-07 10:27 UTC.
+  - F no longer wrote the vague `otp_page_not_detected` blocker.
+  - F wrote the precise page label `signin_or_passkey_page_after_credentials`.
+  - the redacted page pull says the live page is the Amazon password/passkey sign-in page, not an SMS or authenticator choice page.
+  - F scanner chunks kept reducing pending rows after the login event, so the wider scanner is still moving.
+- current interpretation:
+  - this is useful F-owned evidence.
+  - Luke is not needed right now because Amazon is not asking for an SMS code, authenticator-only challenge, captcha, or manual approval on the captured page.
+  - the remaining login question is why the page stayed on password/passkey after credentials were submitted.
+- next safe tactic:
+  - keep `F-BROWSER-SESSION-DURABILITY` open.
+  - on the next repeated `signin_or_passkey_page_after_credentials` event, add proof that separates `password_not_entered`, `password_rejected`, `submit_not_accepted`, and `amazon_forced_passkey`.
+  - do not open a separate browser, edit queues, restart workers, bypass Amazon security, or treat this as Dashboard Yes/No proof.
+
+## Follow-Up Phase Update - 2026-06-07 12:08 UK
+- status: fixed_needs_live_retest.
+- code change under test:
+  - F now checks whether the Seller Central password field actually contains text before it clicks sign-in.
+  - If the field is still empty, F records `password_not_entered` and stops that attempt instead of overtrying.
+  - If the sign-in click cannot be accepted, F records `submit_not_accepted`.
+  - If Amazon explicitly says the password is incorrect, F records `password_rejected`.
+  - If Amazon removes the password path and leaves only a passkey-style path, F records `amazon_forced_passkey`.
+  - The manager/MOT layer treats `password_not_entered` and `submit_not_accepted` as F-owned repair warnings, while `password_rejected` and `amazon_forced_passkey` are protected blockers that can need Luke.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py tests/manager/test_hourly_mot.py -q`
+  - result: 256 passed at 2026-06-07 12:04 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 12:05 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: current F MOT still shows the known separate protected F decision state; no new Luke blocker was created by this classifier change.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central login challenge after 2026-06-07 12:08 UK.
+- live success condition:
+  - the next stuck post-credential sign-in page records one of `password_not_entered`, `password_rejected`, `submit_not_accepted`, or `amazon_forced_passkey`.
+  - if Seller Central reaches OTP or Dashboard Yes/No instead, F records that normal proof and keeps scanning.
+- remediation path:
+  - if the next live event still records the broad `signin_or_passkey_page_after_credentials`, keep F inside `F-BROWSER-SESSION-DURABILITY` and add the missing finer label.
+  - do not ask Luke unless the new evidence is `password_rejected`, `amazon_forced_passkey`, a real manual challenge, or another protected boundary.
+
+## Live Evidence Update - 2026-06-07 12:31 UK
+- status: live evidence improved, waiting for code proof.
+- trigger seen:
+  - the natural scanner-owned Seller Central path produced new post-fix evidence after the 12:08 UK classifier change.
+- evidence:
+  - at 2026-06-07 11:28 UTC, F recorded `password_not_entered`, which means the password field was still empty before submit and F stopped that attempt instead of blindly overtrying.
+  - at 2026-06-07 11:31 UTC, the latest redacted page pull showed `otp_code_page` with page hint `sellercentral_url|signin_url|otp_field|otp_text`.
+  - the browser-session durability state now records `reason_code=amazon_forced_mfa` and `status=waiting_for_code`.
+  - this does not prove Dashboard Yes/No yet.
+- current interpretation:
+  - the immediate page issue is not "SMS option missing" in the captured page.
+  - the captured page is the normal two-step verification code-entry page.
+  - F now needs the approved code source to produce a fresh code, submit it, and prove Dashboard Yes/No afterward.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py tests/manager/test_hourly_mot.py -q`
+  - result: 257 passed at 2026-06-07 12:30 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 12:30 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: F MOT still has protected F decisions, but the login durability report now shows the live OTP waiting state instead of only the older broad blocker.
+- live monitoring trigger:
+  - next natural code-source result or Seller Central login-controller row after 2026-06-07 12:31 UK.
+- live success condition:
+  - F records fresh code found/submitted and then Dashboard Yes/No as `YES`, `NO`, or `LIKELY`, or
+  - F parks with an exact code-source blocker such as no fresh code, authenticator-only, captcha, passkey/security-key, or missing approved code source.
+- remediation path:
+  - if F remains on `otp_code_page` without a fresh code-source result, keep F inside `F-BROWSER-SESSION-DURABILITY` and inspect the approved code-source proof path.
+  - do not open a separate Chrome window, bypass Amazon security, store OTPs, edit queues, restart workers, or treat OTP visibility as Dashboard Yes/No proof.
+
+## Live Evidence Update - 2026-06-07 12:55 UK
+- status: scanner continuation improved, Dashboard Yes/No proof still missing for this challenge.
+- trigger seen:
+  - after the OTP waiting state, FPM observed a clean scanner-owned child and cleared the auth-attention flag.
+- evidence:
+  - at 2026-06-07 11:33 UTC, `f061_auth_attention` changed to `cleared` with `clean_child_seen`.
+  - scanner chunks then continued in minimized/authenticated mode.
+  - pending rows moved down from 2691 to 2616 by 2026-06-07 11:51 UTC.
+  - F MOT now shows login mode as OK again.
+  - F MOT still fails Seller Central eligibility because the login controller state has not recorded Dashboard Yes/No after this challenge.
+- current interpretation:
+  - F is no longer sitting idle on the visible login page.
+  - the scanner is moving again, which is good Monday-readiness evidence.
+  - this is not full Seller Central proof until Dashboard Yes/No is written as `YES`, `NO`, or `LIKELY`, or the remaining rows are parked with an exact blocker.
+- live monitoring trigger:
+  - next Seller Central controller row, Dashboard Yes/No proof row, or scanner continuation/backtrack proof after 2026-06-07 12:55 UK.
+- live success condition:
+  - Dashboard Yes/No becomes `YES`, `NO`, or `LIKELY`, and scanner continuation remains visible.
+- remediation path:
+  - if scanner continuation stays healthy but the Seller Central controller state remains stale on `password_not_entered`, keep F inside `F-BROWSER-SESSION-DURABILITY` and add a safe reconcile step that does not mark proof without Dashboard Yes/No.
+  - do not edit queues, restart workers, open a separate browser, or treat moving scanner chunks alone as login proof.
+
+## Follow-Up Phase Update - 2026-06-07 13:10 UK
+- status: code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - the latest real screenshot showed Seller Central's first sign-in step with email filled and a yellow `Continue` button.
+  - F had labelled that screenshot as `password_not_entered` because Amazon includes a hidden autofill password hint in the page controls.
+  - that label was misleading: F had not reached the real password box yet.
+- code change under test:
+  - F now ignores hidden/autofill password hint controls when deciding whether a real password field is visible.
+  - F labels this page as `email_continue_page` and can record `email_continue_not_advanced` if pressing Continue does not reach the password step.
+  - page-pull JSON now includes the screenshot path when a PNG is captured, so the visual proof is easier to trace.
+  - `email_continue_not_advanced` is treated as F-owned repair evidence, not a Luke protected challenge.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q`
+  - result: 52 passed at 2026-06-07 13:10 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 13:10 UK.
+  - `python -m pytest tests/manager/test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 13:10 UK.
+- read-only F MOT:
+  - still shows live failures because the latest live Seller Central proof row is older than this code change and still says `password_not_entered`.
+  - this is pending live retest, not confirmed live success.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central sign-in challenge after 2026-06-07 13:10 UK.
+- live success condition:
+  - if Amazon shows the email/Continue page again, F records `email_continue_page` or advances to the password field without calling it `password_not_entered`.
+  - full success still requires Dashboard Yes/No as `YES`, `NO`, or `LIKELY`, plus scanner continuation.
+- remediation path:
+  - if a future screenshot still contradicts the label, keep F inside `F-BROWSER-SESSION-DURABILITY` and add one more exact page-state rule.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, or treat scanning movement alone as Seller Central proof.
+
+## Live Evidence Update - 2026-06-07 13:26 UK
+- status: partial live movement after the screenshot-label fix; full Dashboard Yes/No proof still pending.
+- trigger seen:
+  - Hometime pulse and F MOT refreshed after the 13:10 UK code fix.
+- evidence:
+  - F MOT fail count reduced from 3 to 2.
+  - at 2026-06-07 12:16 UTC, FPM saw a clean scanner-owned child and cleared `f061_auth_attention`.
+  - at 2026-06-07 12:16 UTC, the scanner processed another 25-row chunk and pending rows moved from 2542 to 2517.
+  - at 2026-06-07 12:23 UTC, F promoted 17 completed backtrack rows from live login recovery evidence.
+  - the current child is still running in login-required manager mode, so this is not a settled proof state.
+  - the latest login-controller report still says `password_not_entered`, and the latest page pull after that shows an OTP code page.
+- current interpretation:
+  - F is not simply stuck doing nothing.
+  - the scanner is still moving and recovered rows, which is useful forward-progress evidence.
+  - F is still not 100 percent proved because the login controller has not yet written a clean post-fix Dashboard Yes/No result.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central challenge or Dashboard Yes/No controller row after 2026-06-07 13:26 UK.
+- live success condition:
+  - Dashboard Yes/No becomes `YES`, `NO`, or `LIKELY`, and scanner continuation remains visible, or
+  - F parks with one exact blocker such as no fresh code, authenticator-only, captcha, passkey/security-key, missing approved code source, or email Continue not advancing.
+- remediation path:
+  - if the next post-fix Seller Central challenge still records `password_not_entered`, inspect the matching screenshot and add one more exact page-state rule inside `F-BROWSER-SESSION-DURABILITY`.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, or treat scanner movement alone as Seller Central proof.
+
+## Follow-Up Phase Update - 2026-06-07 13:58 UK
+- status: code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - the latest repeated live blocker is now precise: Amazon is showing the first Seller Central sign-in step with the email box and yellow Continue button.
+  - F is no longer confusing that page with a real password page.
+  - the remaining source issue is that the normal Continue click can leave Amazon on the same email page.
+- code change under test:
+  - F now treats the email Continue step as its own mini-flow.
+  - It fills the email, clicks Continue, and waits for a real page change.
+  - If Amazon stays on the same page, F safely tries Enter on the email field and then a form-submit fallback.
+  - If the page still does not advance, F records `email_continue_not_advanced` with attempt notes showing whether click, Enter, and form submit were attempted.
+  - If the page advances directly to OTP, SMS/authenticator choice, manual challenge, or success, F now continues to the correct downstream path instead of mislabelling it as missing sign-in selectors.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q`
+  - result: 53 passed at 2026-06-07 13:58 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 13:58 UK.
+  - `python -m pytest tests/manager/test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 13:58 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: still shows the previous live `email_continue_not_advanced` blocker because no live scanner-owned retest has occurred after this code change.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central email Continue challenge after 2026-06-07 13:58 UK.
+- live success condition:
+  - F advances from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No without repeating the old no-detail blocker, or
+  - if Amazon still refuses to move, the next proof row includes the exact click/Enter/form-submit attempt notes and a matching screenshot/page pull.
+- remediation path:
+  - if the next live proof still shows `email_continue_not_advanced` after click, Enter, and form-submit all attempted, classify it as an Amazon-side page refusal and keep F parked with that exact blocker unless a safe approved tactic exists.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, disable MFA, or treat email-page movement as Dashboard Yes/No proof.
+
+## Live Evidence Update - 2026-06-07 14:24 UK
+- status: live retest produced new exact evidence; code tactic updated again and isolated proof passed.
+- trigger seen:
+  - two natural scanner-owned Seller Central login attempts after the 13:58 UK email Continue repair.
+- evidence:
+  - at 2026-06-07 13:15 UTC and 2026-06-07 13:19 UTC, F again reached the Seller Central email Continue page.
+  - the email field was present and filled.
+  - the normal Continue click fired (`click=1`) but Amazon stayed on the same email page.
+  - the previous Enter and form-submit fallbacks did not fire in the live browser (`enter=0;form_submit=0`), so this was not enough to advance.
+  - no SMS, authenticator, captcha, passkey, password rejection, or protected Luke challenge appeared in the captured page.
+- code change under test:
+  - F now adds a separate JavaScript Enter fallback on the email field itself.
+  - F now submits the form using either the email field form or the Continue button form, instead of relying only on the Continue button.
+  - Future stuck rows should include `js_enter=0/1` and `form_submit=0/1` in the redacted notes.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q`
+  - result: 54 passed at 2026-06-07 14:24 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 14:24 UK.
+  - `python -m pytest tests/manager/test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 14:25 UK.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central email Continue challenge after 2026-06-07 14:24 UK.
+- live success condition:
+  - F advances from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or
+  - if Amazon still refuses to move, the latest row includes click, Enter, JavaScript Enter, form-submit, email-value, screenshot, and page-pull proof.
+- remediation path:
+  - if the next live proof still shows `email_continue_not_advanced` with all fallback attempts made, park F with exact blocker `email_continue_not_advanced` and treat the page as an Amazon-side refusal unless a safe approved tactic exists.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, disable MFA, or mark login proved without Dashboard Yes/No.
+
+## Follow-Up Phase Update - 2026-06-07 14:35 UK
+- status: code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - a live post-fix row at 2026-06-07 13:28 UTC proved the JavaScript Enter fallback fired (`js_enter=1`) but Amazon still stayed on the email Continue page.
+  - the page still did not expose password, OTP, SMS/authenticator choice, captcha, passkey, or Dashboard Yes/No.
+- code change under test:
+  - F now adds a JavaScript button-click fallback after normal Continue click fails to advance.
+  - Future stuck rows should show `js_click=0/1` before the Enter, JavaScript Enter, and form-submit evidence.
+- isolated proof:
+  - `python -m pytest tests/test_f_login_controller.py tests/test_f_legacy_webscrape_money_input.py -q`
+  - result: 55 passed at 2026-06-07 14:35 UK.
+  - `python -m pytest tests/test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 14:35 UK.
+  - `python -m pytest tests/manager/test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 14:36 UK.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central email Continue challenge after 2026-06-07 14:35 UK.
+- live success condition:
+  - F advances from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or
+  - if Amazon still refuses to move, the latest row includes click, JavaScript click, Enter, JavaScript Enter, form-submit, email-value, screenshot, and page-pull proof.
+- remediation path:
+  - if the next live proof still shows `email_continue_not_advanced` after `js_click=1`, `js_enter=1`, and form submit is unavailable or fails, park F with exact blocker `email_continue_not_advanced` unless a safe approved tactic exists.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, disable MFA, or mark login proved without Dashboard Yes/No.
+
+## Live Evidence Parked - 2026-06-07 14:55 UK
+- status: parked with exact blocker.
+- reason for parking:
+  - repeated natural scanner-owned login attempts after the 14:35 UK fallback change still stopped on the same Seller Central email Continue page.
+  - the email value was present.
+  - the normal Continue click fired.
+  - the JavaScript Continue click fired.
+  - the JavaScript Enter fallback fired.
+  - the form-submit fallback was unavailable or did not advance the page.
+  - Amazon still did not expose password, OTP, SMS/authenticator choice, captcha, passkey, manual challenge, or Dashboard Yes/No.
+- latest blocker label:
+  - `email_continue_not_advanced`
+- conclusion:
+  - F is no longer stuck because it cannot see the page.
+  - F can capture the page and screenshot, and it can prove the exact stage.
+  - The current problem is that Amazon is refusing to move past the first email Continue page after all approved scanner-owned click/submit tactics have been tried.
+- live success condition still missing:
+  - Dashboard Yes/No is not currently proved for this later challenge.
+  - Login durability is not 100 percent proven until the page advances to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No and the scanner continues from there.
+- remediation path:
+  - do not keep retrying the same automated Continue tactics with no new evidence.
+  - keep F parked with exact blocker `email_continue_not_advanced`.
+  - if Luke is physically present and the scanner-owned browser is visible, the safest human help is to press Continue or complete whatever Amazon shows inside that scanner-owned browser only.
+  - do not open a separate Chrome workaround, edit queues, restart workers, bypass Amazon security, disable MFA, expose credentials/tokens, or mark login proved without Dashboard Yes/No.
+- resume trigger:
+  - a future scanner-owned page pull shows a new Amazon state after Continue, or
+  - Luke completes the stuck email Continue step inside the scanner-owned browser and F then captures password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No proof.
+
+## Post-Park Evidence Update - 2026-06-07 15:28 UK
+- status: still parked, but the latest evidence is more specific.
+- new evidence after parking:
+  - at 2026-06-07 14:00 UTC, F briefly reached the Seller Central OTP/code page.
+  - at 2026-06-07 14:02 UTC, the approved code source did not provide a fresh code, so F recorded `no_fresh_code`.
+  - after the code wait expired, Amazon returned F to the email Continue page.
+  - at 2026-06-07 14:06 UTC, 14:07 UTC, and 14:22 UTC, F again recorded `email_continue_not_advanced`.
+- current interpretation:
+  - the SMS/authenticator choice page is not visible in the latest captured page.
+  - the latest captured page is the first Amazon email Continue page.
+  - F can sometimes reach OTP, but it still needs a fresh approved code and then Dashboard Yes/No proof.
+  - without that proof, scanner movement alone is not enough to call login durability complete.
+- current blocker set:
+  - primary visible blocker: `email_continue_not_advanced`.
+  - latest code-source blocker when OTP appeared: `no_fresh_code`.
+- remediation path:
+  - if a fresh human code is available while the scanner-owned browser is on the OTP page, use only that scanner-owned browser path and let F capture Dashboard Yes/No afterward.
+  - if the browser is back on email Continue, press Continue only inside the scanner-owned browser if Luke is physically at the machine.
+  - do not open a separate Chrome workaround, edit queues, restart workers, bypass Amazon security, disable MFA, store OTPs, or mark login proved without Dashboard Yes/No.
+
+## Follow-Up Phase Update - 2026-06-07 20:51 UK
+- status: code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - Luke confirmed the expected Amazon sequence is email, then password, then code.
+  - latest live page pull still showed only the first Seller Central email Continue page.
+  - latest proof rows showed email present, normal Continue click fired, JavaScript click fired, JavaScript Enter fired, and Amazon still stayed on the same page.
+- code change under test:
+  - after F types the email, F now explicitly commits the email field with browser input/change/blur events before pressing Continue.
+  - before later fallbacks, F re-finds the current email and Continue controls so it is not using stale page elements if Amazon refreshed the same-looking page.
+  - the form-submit fallback now searches the current Seller Central sign-in form from the live page before trying requestSubmit/click/submit.
+  - future stuck rows include `email_finalize=0/1` before the click/Enter/form-submit proof notes.
+- isolated proof:
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py -q`
+  - result: 56 passed at 2026-06-07 20:49 UK.
+  - `python -m pytest tests\test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 20:50 UK.
+  - `python -m pytest tests\manager\test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 20:50 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: still decision-needed because current MOT is reading older live evidence; no live scanner-owned retest has proved the new email-finalize repair yet.
+- live monitoring trigger:
+  - next natural scanner-owned Seller Central email Continue challenge after 2026-06-07 20:51 UK.
+- live success condition:
+  - F advances from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or
+  - if Amazon still refuses to move, the next proof row includes `email_finalize=1` plus click, JavaScript click, Enter, JavaScript Enter, form-submit, email-value, screenshot, and page-pull proof.
+- remediation path:
+  - if the next live proof still shows `email_continue_not_advanced` with `email_finalize=1` and all safe fallbacks attempted, keep F parked with exact blocker `email_continue_not_advanced` and treat it as Amazon refusing the first step unless Luke can press Continue inside the scanner-owned browser.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, disable MFA, expose credentials/tokens, or mark login proved without Dashboard Yes/No.
+
+## Evidence Correction - 2026-06-07 21:04 UK
+- status: evidence hygiene fixed, live proof still pending.
+- issue found:
+  - focused tests isolated the Seller Central proof CSV but did not isolate the Seller Central page-pull directory.
+  - this allowed test-created redacted page pulls to temporarily overwrite `latest_seller_central_page_pull.json`.
+  - the false latest page looked like an OTP/code page, but there was no matching live controller row after 2026-06-07 19:41 UTC.
+- correction made:
+  - the focused F test fixture now sets `F_LOGIN_CONTROLLER_PAGE_PULL_DIR` to a temporary test folder.
+  - test-created page-pull JSON files from the live folder were preserved under `out/systems/F/price_list_manager/live/page_pulls/proof_backups/`.
+  - `latest_seller_central_page_pull.json` was restored to the newest real scanner-owned page pull: 2026-06-07 19:41:25 UTC, `email_continue_page`, reason `email_continue_not_advanced`.
+- isolated proof:
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py -q`
+  - result: 56 passed at 2026-06-07 21:03 UK, and the live latest page-pull pointer stayed on the restored real 19:41 UTC page.
+  - `python -m pytest tests\test_fpm130_live_cycle.py -k seller_central -q`
+  - result: 6 passed at 2026-06-07 21:04 UK.
+  - `python -m pytest tests\manager\test_hourly_mot.py -q`
+  - result: 207 passed at 2026-06-07 21:04 UK.
+- live monitoring trigger:
+  - next real scanner-owned Seller Central login attempt after this correction.
+- live success condition:
+  - future page-pull latest files must be real scanner-owned evidence, not unit-test evidence.
+  - F must still advance from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No before login durability is proved.
+
+## Live Evidence Update - 2026-06-07 21:07 UK
+- status: live retest failed with exact blocker; no new code tactic approved.
+- trigger seen:
+  - a natural scanner-owned Seller Central login attempt after the 20:51 UK email-finalize repair.
+- evidence:
+  - at 2026-06-07 20:05 UTC, F again captured the Seller Central email Continue page.
+  - the email value was present.
+  - `email_finalize=1` proved the email field was committed with browser input/change/blur events before Continue.
+  - normal Continue click fired.
+  - JavaScript Continue click fired.
+  - JavaScript Enter fired.
+  - form submit fired.
+  - Amazon still did not advance to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No.
+- current interpretation:
+  - the latest proof now matches Luke's expected first step and proves F tried the safe scanner-owned equivalent of that step.
+  - this is not an SMS/authenticator issue yet because the page has not reached the code-choice or code-entry stage.
+  - scanner progress still exists, but the child is in Login Required mode and Seller Central durability is not proved.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open with exact blocker `email_continue_not_advanced`.
+  - do not add more blind automated retries of the same first-step action.
+  - if Luke is at the machine, the safest human help is pressing Continue only inside the scanner-owned browser and then letting F capture the next page.
+  - do not open a separate browser, edit queues, restart workers, bypass Amazon security, disable MFA, expose credentials/tokens, or mark login proved without Dashboard Yes/No.
+
+## Follow-Up Phase Update - 2026-06-07 22:33 UK
+- status: code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - Luke confirmed manual intervention is not an acceptable solution and the script-owned browser was not visible.
+  - latest live proof after 21:00 UTC still repeated `email_continue_not_advanced`.
+  - F proved the email was present and committed, normal Continue click fired, JavaScript click fired, JavaScript Enter fired, form-submit fired, and Amazon still stayed on the first email page.
+- code change under test:
+  - FPM130 now treats a fully exhausted hidden `email_continue_not_advanced` proof as requiring the next scanner-owned child to be visible.
+  - the old "auto-login can continue hidden" shortcut no longer wins over this exact exhausted email-Continue state.
+  - an old inactive login request file can no longer force the next child hidden when current proof says the stuck email-Continue state requires a visible scanner-owned child.
+  - this does not open a separate Chrome workaround and does not ask Luke to click anything.
+- isolated proof:
+  - `python -m pytest tests\test_fpm130_live_cycle.py -k "seller_central or email_continue or login_mode" -q`
+  - result: 21 passed at 2026-06-07 22:29 UK.
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py tests\test_fpm130_live_cycle.py -k "seller_central or email_continue or login_mode or login_controller or visible" -q`
+  - result: 66 passed at 2026-06-07 22:32 UK.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: F still decision-needed because live scanner proof has not yet observed the next child after this code change.
+- known unrelated test gap:
+  - full `tests\test_fpm130_live_cycle.py` currently has three older rescan/review-pack failures that also fail when run alone.
+  - they are not in the Seller Central login path touched here, but they prevent calling the full FPM130 file clean.
+- live monitoring trigger:
+  - next natural scanner-owned F child after 2026-06-07 21:33 UTC that hits Seller Central email Continue.
+- live success condition:
+  - `f061_child_status.txt` or `live_cycle_events.csv` shows the next stuck-email login child using `browser_mode=visible` or `next_child_browser_mode=visible`, and then
+  - F advances from email Continue to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or parks with a new exact blocker from the visible scanner-owned attempt.
+- remediation path:
+  - if the next post-change Seller Central child is still hidden for `email_continue_not_advanced`, fix the remaining launcher/environment override before touching the login form again.
+  - if the visible scanner-owned child reaches password or code but fails the next step, repair that exact page state inside `F-BROWSER-SESSION-DURABILITY`.
+  - do not edit queues, restart workers, open a separate browser, bypass Amazon security, disable MFA, expose credentials/tokens, or mark login proved without Dashboard Yes/No.
+
+## Follow-Up Phase Update - 2026-06-07 22:42 UK
+- status: second code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - the first post-change child after 21:33 UTC still started with `browser_mode=minimized` and `browser_visibility=hidden`.
+  - this means the already-running FPM parent process can keep using its old in-memory launcher rule until it naturally reloads.
+- code change under test:
+  - F061 now has its own child-level guard before opening Chrome.
+  - if the latest redacted Seller Central proof says hidden `email_continue_not_advanced` retries are exhausted, the fresh child self-promotes from minimized to visible.
+  - this bypasses the stale parent-env problem without restarting workers, editing queues, opening a separate browser, or asking Luke to intervene.
+- isolated proof:
+  - `python -m pytest tests\test_f061_run_legacy_first_checks_local.py -k "background_browser_mode or visible_chrome_command or visible_bbp_chrome_startup or place_browser_window" -q`
+  - result: 4 passed at 2026-06-07 22:40 UK.
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py tests\test_fpm130_live_cycle.py tests\test_f061_run_legacy_first_checks_local.py -k "seller_central or email_continue or login_mode or login_controller or visible or background_browser_mode" -q`
+  - result: 76 passed at 2026-06-07 22:42 UK.
+- live monitoring trigger:
+  - next fresh F061 child process after 2026-06-07 21:42 UTC.
+- live success condition:
+  - if Seller Central still shows the exhausted email Continue state, `f061_child_status.txt` shows `browser_mode=visible` or `live_cycle_events.csv` shows `next_child_browser_mode=visible`.
+  - then F either advances to password, OTP, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or records the next exact visible-browser blocker.
+- remediation path:
+  - if the next fresh F061 child is still hidden with the exhausted email-Continue proof, inspect the child startup command and environment handoff.
+  - if the next fresh F061 child is visible but still cannot advance Amazon, repair the next exact page-state evidence instead of adding blind retries.
+
+## Follow-Up Phase Update - 2026-06-07 23:15 UK
+- status: third code fix applied, isolated verification passed, live proof pending.
+- reason for update:
+  - the latest live status still showed `browser_mode=minimized` and `browser_visibility=hidden` while Seller Central was stuck on the email/Continue page.
+  - the page pull shows the first Seller Central email step, not SMS, authenticator, password, captcha, or passkey.
+  - the likely remaining source was that the F061 child could self-promote internally while the old parent-side launch environment still left the window-hider helper active.
+- code change under test:
+  - when F061 sees exhausted `email_continue_not_advanced` proof, it now updates its own process environment to visible:
+    - `F061_BACKGROUND_BROWSER_MODE=visible`
+    - `F061_SHOW_WINDOWS=1`
+    - `FPM_LIVE_HIDE_SCRAPER_WINDOWS=0`
+  - the F061 child now stops the `f_hide_scraper_windows.ps1` helper once for that visible-login child, so the scanner-owned login window is not immediately hidden again.
+- isolated proof:
+  - `python -m pytest tests\test_f061_run_legacy_first_checks_local.py -k "background_browser_mode or visible_chrome_command or visible_bbp_chrome_startup or place_browser_window or email_continue_exhaustion" -q`
+  - result: 5 passed at 2026-06-07 23:10 UK.
+  - `python -m pytest tests\test_fpm130_live_cycle.py -k "seller_central or email_continue or login_mode" -q`
+  - result: 21 passed at 2026-06-07 23:10 UK.
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py tests\test_fpm130_live_cycle.py tests\test_f061_run_legacy_first_checks_local.py -k "seller_central or email_continue or login_mode or login_controller or visible or background_browser_mode" -q`
+  - result: 77 passed at 2026-06-07 23:15 UK.
+- live monitoring trigger:
+  - next natural F061 child after this code change, or the next natural Seller Central email/Continue challenge.
+- live success condition:
+  - if Seller Central still shows the email/Continue page, the child should no longer stay hidden because of the window-hider boundary.
+  - F should either advance to password, OTP/code, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or park with one exact blocker and a visible-page screenshot/page pull.
+- remediation path:
+  - if a new post-fix child still reports `browser_visibility=hidden` while the latest proof is exhausted `email_continue_not_advanced`, keep `F-BROWSER-SESSION-DURABILITY` open and inspect the parent owner reload boundary.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, or treat visible email-page proof as Dashboard Yes/No proof.
+
+## Live Evidence Update - 2026-06-07 23:39 UK
+- status: visibility fix has live evidence; Seller Central login still blocked at email Continue.
+- trigger seen:
+  - a natural F061 child started after the child-side visibility fix.
+- evidence:
+  - the child log shows `F061_DRIVER_LAUNCH_BEGIN ... browser_mode=visible` after the fix.
+  - `f061_browser_visibility_state.txt` now records `state=visible`, `auth_state=LOGIN_REQUIRED`, `reason=auth_attention_required`.
+  - the manager child-status line can still lag behind and show the parent launch value as `browser_mode=minimized`, but the driver log and visibility-state file prove the child-level visible path did fire.
+  - the latest Seller Central proof still records `email_continue_not_advanced`.
+  - the latest page pull still shows the first Seller Central email/Continue page, not password, SMS, authenticator, captcha, passkey, OTP, or Dashboard Yes/No.
+- current interpretation:
+  - the avoidable hidden-window boundary is improved.
+  - the remaining live blocker is Amazon refusing to advance from the first email/Continue step despite filled email, normal click, JavaScript click, JavaScript Enter, and form-submit fallback.
+  - this is not an SMS-option problem yet because F has not reached the code-choice or code-entry step.
+- live monitoring trigger:
+  - next natural visible F061 Seller Central attempt after 2026-06-07 22:39 UTC.
+- live success condition:
+  - F advances from email Continue to password, OTP/code, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or
+  - F parks with the exact visible-browser blocker `email_continue_not_advanced` and matching page-pull/screenshot proof.
+- remediation path:
+  - do not add blind repeated retries of the same first-step action.
+  - inspect the visible-page form/action details and browser profile/session proof inside `F-BROWSER-SESSION-DURABILITY` for why Amazon accepts the click event but does not advance.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, or treat visible email-page proof as Dashboard Yes/No proof.
+
+## Live Evidence Update - 2026-06-08 00:07 UK
+- status: scanner recovered and is moving again; Seller Central eligibility proof still not complete.
+- trigger seen:
+  - the next natural F pulse after the visible-login evidence.
+- evidence:
+  - F MOT improved from 3 fails / 2 warnings to 2 fails / 1 warning.
+  - `f061_child_status.txt` now shows `manager_mode=Scanning Hidden`.
+  - `f061_browser_visibility_state.txt` shows `auth_state=LOGGED_IN`, `reason=auth_attention_cleared`.
+  - `live_cycle_events.csv` recorded `f061_auth_attention` as `cleared` with `clean_child_seen;next_child_browser_mode=minimized`.
+  - scanner chunks continued and pending moved down to 800.
+  - the latest Seller Central controller state still points at the older `email_continue_not_advanced` blocker, so Dashboard Yes/No is not proved from this recovery.
+- current interpretation:
+  - F is not stuck idle and is not currently waiting on Luke.
+  - the visible-login durability repair helped enough for the scanner to recover and continue hidden scanning.
+  - the remaining F fail is narrower: Seller Central eligibility proof still needs Dashboard Yes/No or a reconciled exact blocker.
+- live monitoring trigger:
+  - next Seller Central controller row, Dashboard Yes/No proof row, or scanner continuation/backtrack proof after 2026-06-07 23:07 UTC.
+- live success condition:
+  - Dashboard Yes/No becomes `YES`, `NO`, or `LIKELY`, or
+  - F keeps scanning and parks remaining Seller Central rows with exact visible-page blockers rather than vague login-required state.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open.
+  - add a safe reconcile/proof step only if it can avoid marking Dashboard Yes/No without real dashboard evidence.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat scanning movement alone as Seller Central proof.
+
+## Live Evidence Update - 2026-06-08 00:39 UK
+- status: browser-session durability repair has stronger live evidence; Seller Central Dashboard proof is still pending.
+- trigger seen:
+  - a later natural F auth-attention event appeared at 2026-06-08 00:20 UTC.
+- evidence:
+  - `live_cycle_events.csv` recorded `f061_auth_attention` as `attention_needed` with `next_child_browser_mode=visible`.
+  - the next child started at 2026-06-08 00:35 UTC with `browser_mode=visible_from_start`.
+  - that same child then recorded `f061_auth_attention` as `cleared`.
+  - scanner work continued, with a successful scanner chunk and pending count moving to 429.
+  - the latest child state now shows `auth_state=LOGGED_IN` and `reason=auth_attention_cleared`.
+  - Seller Central controller proof still shows the repeated first email Continue blocker from 2026-06-08 00:28 UTC, so Dashboard Yes/No is not yet proved.
+- current interpretation:
+  - the visibility and auth-attention recovery part of `F-BROWSER-SESSION-DURABILITY` is now live-proven more strongly.
+  - F is not idle and is not waiting on Luke.
+  - the remaining proof gap is still Seller Central Dashboard Yes/No, not SMS/authenticator choice and not a hidden-window failure.
+- live monitoring trigger:
+  - next Seller Central controller row after 2026-06-08 00:35 UTC, especially any password, OTP/code, SMS/authenticator choice, manual challenge, or Dashboard Yes/No proof.
+- live success condition:
+  - Dashboard Yes/No becomes `YES`, `NO`, or `LIKELY`, or F parks remaining Seller Central rows with exact page-level blockers while scanner progress continues.
+- remediation path:
+  - keep monitoring under the approved F packet.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat scanner movement alone as Seller Central proof.
+
+## Live Proof Milestone - 2026-06-08 01:09 UK
+- status: Seller Central eligibility proof restored; browser-session durability still needs reason-code cleanup.
+- trigger seen:
+  - a natural scanner-owned Seller Central login event after the visibility and auth-attention fixes.
+- evidence:
+  - at 2026-06-08 00:54 UTC, F submitted the Seller Central credentials from the scanner-owned flow.
+  - Amazon then showed the OTP/code page, which F labelled as `amazon_forced_mfa`.
+  - F submitted the available code.
+  - at 2026-06-08 00:55 UTC, F proved Dashboard Yes/No with value `NO`.
+  - F MOT now marks `f_seller_central_eligibility_auth_state` as `ok` with value `eligibility_auth_proved`.
+  - F MOT improved from 2 FAIL / 1 WARN to 1 FAIL / 2 WARN. The remaining FAIL is the already-known protected RESCAN timeout decision.
+  - live scanner evidence still shows the child alive, backtrack promotion continuing, and recent scanner progress, though the live owner row is currently warning as `alive_no_progress`.
+- current interpretation:
+  - the core Seller Central login proof is complete again.
+  - this confirms F can move through email/password/code and regain Dashboard Yes/No proof in the scanner-owned path.
+  - the remaining durability cleanup is to classify the final successful session reason better than `unknown` and keep watching for renewed row progress after the brief alive/no-progress warning.
+- live monitoring trigger:
+  - next F MOT and next scanner chunk after 2026-06-08 01:09 UTC.
+- live success condition:
+  - F keeps Seller Central eligibility as `ok`, row progress resumes or remains within the allowed warning window, and future session events carry clear reason labels where possible.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open for reason-code cleanup and ongoing evidence.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the separate protected RESCAN fail as part of login durability.
+
+## Live Monitoring Update - 2026-06-08 02:09 UK
+- status: Seller Central proof stayed OK; scanner progress resumed after login proof, then returned to a watch-only no-row-progress warning.
+- evidence:
+  - F MOT still marks `f_seller_central_eligibility_auth_state` as `ok` with value `eligibility_auth_proved`.
+  - the BBP iframe/plugin warning cleared back to `ok`.
+  - after the 01:09 UK login-proof milestone, `live_cycle_events.csv` recorded `login_mode_authenticated`, `f061_auth_attention` cleared, and a scanner chunk at 2026-06-08 01:36 UTC with `pending_after=354`.
+  - a later child started at 2026-06-08 02:08 UTC, but F MOT still keeps `f_live_owner_status` at warning `running/alive_no_progress`.
+  - the remaining FAIL is still the known protected RESCAN timeout decision, not login durability.
+- current interpretation:
+  - the post-login row-progress gate did get fresh evidence, so the earlier no-progress warning did not become a new login blocker.
+  - F is still in monitoring because the newest MOT sees another quiet interval after the last scanner chunk.
+  - no Luke action is needed unless this warning worsens into a fresh progress fail or Amazon presents a real manual challenge.
+- live monitoring trigger:
+  - next F MOT and next scanner chunk after 2026-06-08 02:09 UTC.
+- live success condition:
+  - F keeps Seller Central eligibility as `ok`, the live owner warning clears or remains warning-only without becoming a fresh fail, and future session events carry clearer reason labels where possible.
+- remediation path:
+  - continue passive monitoring under `F-BROWSER-SESSION-DURABILITY`.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Proof Milestone - 2026-06-08 04:09 UK
+- status: Seller Central proof restored again with clearer two-step option evidence; browser-session durability still needs reason-code cleanup.
+- trigger seen:
+  - a natural scanner-owned Seller Central login event after the prior 02:09 UK monitoring check.
+- evidence:
+  - at 2026-06-08 02:54 UTC, F again captured the first Seller Central email/Continue page and labelled it as `email_continue_not_advanced`.
+  - at 2026-06-08 02:55 UTC, F submitted credentials and reached the Seller Central two-step page.
+  - the latest redacted page pull showed Amazon saying SMS could not be sent to the phone ending 598, with WhatsApp and voice-call choices visible instead.
+  - F labelled that state as `sms_option_not_clickable` instead of hiding it behind a vague login failure.
+  - at 2026-06-08 03:02 UTC, F also captured a password/passkey page with `submit_not_accepted`, giving a more exact label for one failed password-step attempt.
+  - at 2026-06-08 03:04 UTC, F again reached the two-step option page and labelled `sms_option_not_clickable`.
+  - at 2026-06-08 03:04 UTC, F restored Dashboard Yes/No proof with value `LIKELY`.
+  - F MOT still marks Seller Central eligibility as `ok`; the remaining FAIL is still the known protected RESCAN timeout decision.
+  - F MOT now has warning-only `f_live_owner_status` and `f_bbp_iframe_plugin_state`; neither requires Luke right now.
+- current interpretation:
+  - this directly answers the SMS-option question: normal SMS was not available on the captured page; Amazon offered WhatsApp or voice call instead.
+  - the scanner-owned path still recovered to authenticated Dashboard proof without a separate browser workaround.
+  - the remaining durability cleanup is to classify the successful session reason better than `unknown` and keep watching whether the row-progress warning clears or worsens.
+- notification:
+  - evidence email sent to `laprice90@gmail.com` at this milestone because this is new browser-session durability evidence, not routine scanning progress.
+- live monitoring trigger:
+  - next F MOT and next scanner chunk after 2026-06-08 03:09 UTC.
+- live success condition:
+  - F keeps Seller Central eligibility as `ok`, the row-progress warning clears or stays warning-only, and future successful session events use clearer reason labels where possible.
+- remediation path:
+  - continue passive monitoring under `F-BROWSER-SESSION-DURABILITY`.
+  - if `sms_option_not_clickable` repeats without recovery, inspect the safe option-selection logic for WhatsApp/voice labelling and park with an exact blocker rather than adding blind retries.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Monitoring Update - 2026-06-08 04:40 UK
+- status: Seller Central proof temporarily back to code-wait; no fresh approved code available yet.
+- trigger seen:
+  - the next F MOT after the 04:09 UK proof milestone.
+- evidence:
+  - F MOT changed `f_seller_central_eligibility_auth_state` from `ok` to warning `otp_page_detected`.
+  - the login controller reached an Amazon code page at 2026-06-08 03:34 UTC and again at 2026-06-08 03:38 UTC.
+  - the approved code source did not provide a fresh code in the wait window, so the latest controller report records `no_fresh_code`.
+  - this is a specific blocker, not a hidden browser failure, not an SMS-option question, and not a password/passkey misclassification.
+  - the child heartbeat is fresh and still running under the scanner-owned flow.
+  - the remaining hard FAIL is still the known protected RESCAN timeout decision.
+- current interpretation:
+  - F can still reach the code step, but the latest attempt did not have a fresh approved code to submit.
+  - this is a warning state and should stay under passive monitoring unless the code challenge persists or turns into a real manual challenge.
+- live monitoring trigger:
+  - next Seller Central controller row, next F MOT, or next scanner chunk after 2026-06-08 03:40 UTC.
+- live success condition:
+  - F obtains and submits a fresh code, then restores Dashboard Yes/No to `YES`, `NO`, or `LIKELY`, or parks with one exact non-retry blocker.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open and watch the approved code-source proof path.
+  - do not add blind retries, restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Monitoring Update - 2026-06-08 05:10 UK
+- status: Seller Central eligibility worsened from warning to fail on the repeated email Continue blocker.
+- trigger seen:
+  - the next F MOT after the 04:40 UK code-wait update.
+- evidence:
+  - F MOT now shows 2 FAIL and 2 WARN.
+  - the new non-protected F fail is `f_seller_central_eligibility_auth_state`, value `email_continue_not_advanced`.
+  - the latest page pull is the first Seller Central email/Continue page.
+  - the email field is present, the email value is present, and F recorded safe attempts through normal click, JavaScript click, JavaScript Enter, and form-submit.
+  - the scanner-owned child heartbeat is fresh.
+  - live cycle events still show the normal scanner-owned browser path, including a visible Seller Central required child at 2026-06-08 03:46 UTC.
+  - a later event at 2026-06-08 03:55 UTC restored `auth_confirmed`, but the current controller state is again blocked on `email_continue_not_advanced`.
+  - the separate protected RESCAN timeout remains unchanged.
+- current interpretation:
+  - this is a material worse state versus the last code-wait warning because Seller Central proof is now failing on the first email Continue step again.
+  - this is still not a Luke manual challenge, not an SMS/authenticator choice page, and not a separate-browser issue.
+  - the repeated first-step blocker needs F-owned repair or a precise park condition; more blind retries are not useful.
+- live monitoring trigger:
+  - next Seller Central controller row, next F MOT, or next scanner chunk after 2026-06-08 04:10 UTC.
+- live success condition:
+  - F advances past email Continue to password, OTP/code, SMS/authenticator choice, manual challenge, or Dashboard Yes/No, or parks with a stronger exact blocker explaining why the scanner-owned click is not accepted.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open.
+  - inspect the email Continue form/session state and add one precise repair only if the root cause is visible from redacted proof.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Proof Milestone - 2026-06-08 06:42 UK
+- status: Seller Central eligibility proof restored; SMS delivery option was selected in the scanner-owned flow.
+- trigger seen:
+  - the next F MOT after the repeated email Continue fail.
+- evidence:
+  - F MOT improved from 2 FAIL / 2 WARN to 1 FAIL / 1 WARN.
+  - the Seller Central eligibility fail cleared.
+  - at 2026-06-08 05:37 UTC, F repeatedly recorded `sms_delivery_option_selected` on the Seller Central two-step page.
+  - at 2026-06-08 05:38 UTC, F restored Dashboard Yes/No proof with value `LIKELY`.
+  - the scanner-owned child heartbeat is fresh.
+  - the browser visibility state is logged in with `auth_confirmed`.
+  - the remaining FAIL is still only the known protected RESCAN timeout decision.
+  - the remaining WARN is still live-owner no-row-progress watch.
+- current interpretation:
+  - this is useful F browser-session durability evidence: when an SMS/code delivery option was available, F selected it inside the scanner-owned path.
+  - the path then recovered to Dashboard proof without a separate Chrome workaround.
+  - this does not fully close durability because the successful final reason is still `unknown` and row progress remains warning-only.
+- notification:
+  - evidence email sent to `laprice90@gmail.com` at this milestone because it is new F durability evidence.
+- live monitoring trigger:
+  - next F MOT and next scanner chunk after 2026-06-08 05:42 UTC.
+- live success condition:
+  - F keeps Seller Central eligibility as `ok`, scanner progress resumes or stays warning-only without becoming a fresh fail, and future successful session events use clearer reason labels where possible.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open for reason-code cleanup and row-progress watch.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Monitoring Update - 2026-06-08 07:12 UK
+- status: Seller Central eligibility regressed again after the SMS-selection proof milestone.
+- trigger seen:
+  - the next F MOT after the 06:42 UK proof milestone.
+- evidence:
+  - F MOT moved back to 2 FAIL / 2 WARN.
+  - Seller Central eligibility changed from `ok` to fail.
+  - F reached the OTP/code page at 2026-06-08 06:08 UTC.
+  - the approved code source did not provide a fresh code, so F recorded `no_fresh_code` at 2026-06-08 06:10 UTC.
+  - the latest controller state then returned to `email_continue_not_advanced` at 2026-06-08 06:11 UTC.
+  - the scanner-owned child heartbeat is fresh and browser visibility state still says logged in / `auth_confirmed`.
+  - the remaining protected RESCAN timeout is unchanged.
+- current interpretation:
+  - F can still move between email Continue, password/code attempt, SMS-option evidence, and Dashboard recovery, but it is not staying durably proved.
+  - the latest blocker is not a Luke manual challenge; it is still F-owned durability/classification and code-source timing evidence.
+  - this should stay inside `F-BROWSER-SESSION-DURABILITY` rather than asking Luke to intervene.
+- live monitoring trigger:
+  - next Seller Central controller row, next F MOT, or next scanner chunk after 2026-06-08 06:12 UTC.
+- live success condition:
+  - F restores Dashboard Yes/No to `YES`, `NO`, or `LIKELY` and keeps Seller Central eligibility `ok` through the next MOT, or parks with one exact blocker that does not oscillate between email Continue and no fresh code.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open.
+  - inspect code-source timing and the email Continue/session state only through redacted proof.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Live Monitoring Update - 2026-06-08 07:44 UK
+- status: Seller Central is still not durably logged in; this is the same F-owned durability loop, not a new Luke manual challenge.
+- trigger seen:
+  - the next F MOT after the 07:12 UK regression update.
+- evidence:
+  - F MOT still shows 2 FAIL and now 3 WARN.
+  - `f_seller_central_eligibility_auth_state` remains failed on `email_continue_not_advanced`.
+  - F briefly restored Dashboard Yes/No proof at 2026-06-08 06:26 UTC and 2026-06-08 06:33 UTC with value `LIKELY`.
+  - after those brief recoveries, F repeatedly returned to the Amazon first email/Continue page from 2026-06-08 06:38 UTC through 2026-06-08 06:43 UTC.
+  - the latest redacted page pull says the page is Amazon Sign In with "enter mobile number or email" and a Continue button.
+  - the email value is present, but normal click, JavaScript click, JavaScript Enter, and form-submit did not advance the page.
+  - browser-session durability still labels the reason code as `unknown`; profile and cookie state are still `unknown`.
+  - the scanner-owned child heartbeat is fresh, but the browser visibility state is parked as Seller Central eligibility login required.
+  - the protected RESCAN timeout remains separate and unchanged.
+- current interpretation:
+  - F can intermittently get back to Dashboard proof, but it is not holding the session long enough to be Monday-ready.
+  - the live proof now points at an avoidable session/browser durability gap or Amazon first-step form/session rejection, still inside `F-BROWSER-SESSION-DURABILITY`.
+  - no Luke intervention is useful right now because Amazon is not presenting a human-only captcha/passkey/manual challenge in the latest proof.
+- live monitoring trigger:
+  - next controller event, next F MOT, or next scanner chunk after 2026-06-08 06:44 UTC.
+- live success condition:
+  - F restores Dashboard Yes/No to `YES`, `NO`, or `LIKELY` and keeps Seller Central eligibility `ok` through the next MOT, or parks with one exact non-oscillating blocker that explains the first email/Continue rejection.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open and focus on profile/cookie/session reason labelling and the first email/Continue form state.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Evidence Note - 2026-06-08 08:36 UK
+- status: the 01:54 UK Seller Central code event produced useful timing evidence.
+- evidence:
+  - at 2026-06-08 00:54:19 UTC, F submitted Seller Central credentials.
+  - at 2026-06-08 00:54:25 UTC, F reached the OTP/code page and labelled it as Amazon-forced MFA.
+  - at 2026-06-08 00:54:32 UTC, F saw a fresh approved code and submitted it.
+  - at 2026-06-08 00:54:45 UTC, F marked the attempt failed because the Seller Central eligibility signal was not yet visible after code submission.
+  - at 2026-06-08 00:55:11 UTC, Dashboard Yes/No proof appeared with value `NO`.
+- interpretation:
+  - the code source and code submission path worked for this event.
+  - the important clue is timing: the controller declared failure about 13 seconds after code submission, but the Dashboard proof appeared about 26 seconds after that failure marker.
+  - this points to a post-code wait/proof timing issue or stale success label, not an SMS-option absence and not a Luke-only manual challenge.
+- remediation path:
+  - keep `F-BROWSER-SESSION-DURABILITY` open.
+  - inspect the post-code success wait and Dashboard proof merge logic before changing any retry behaviour.
+  - keep all code values redacted and do not store OTPs, bypass MFA, restart workers, edit queues, or open a separate browser workaround.
+
+## Live Monitoring Update - 2026-06-08 08:44 UK
+- status: Seller Central still oscillates, but the latest run supports the same timing/proof-merge theory rather than a new Luke challenge.
+- trigger seen:
+  - the next F MOT after the 08:36 UK evidence note.
+- evidence:
+  - F MOT is still 2 FAIL / 2 WARN.
+  - the non-protected F fail is again `f_seller_central_eligibility_auth_state`, now back from a brief `ok` state to `email_continue_not_advanced`.
+  - at 2026-06-08 07:21 UTC, F selected the SMS delivery option on the Seller Central MFA page.
+  - at 2026-06-08 07:21:24 UTC, F labelled the next page as `otp_page_not_detected`.
+  - at 2026-06-08 07:22:03 UTC, Dashboard Yes/No proof appeared with value `LIKELY`.
+  - at 2026-06-08 07:27 UTC, F again submitted credentials, reached `sms_option_not_clickable`, and then restored Dashboard proof at 2026-06-08 07:28:57 UTC with value `LIKELY`.
+  - after those recoveries, F returned to repeated `email_continue_not_advanced` from 2026-06-08 07:35 UTC onward.
+  - browser visibility state remains logged in/auth-confirmed, but the controller state is blocked; profile and cookie state are still `unknown`.
+- current interpretation:
+  - the new useful clue is consistent with the 01:54 UK code event: the controller can mark a post-MFA step as blocked before the Dashboard proof appears.
+  - this is not an SMS-option absence and not a Luke-only manual challenge.
+  - the repair target remains the post-MFA wait/proof merge and the first email/Continue session rejection reason labelling.
+- live monitoring trigger:
+  - next controller event, next F MOT, or next scanner chunk after 2026-06-08 07:44 UTC.
+- live success condition:
+  - F keeps Seller Central eligibility `ok` through the next MOT after Dashboard proof, or parks with one exact blocker that no longer hides a later Dashboard success.
+- remediation path:
+  - continue `F-BROWSER-SESSION-DURABILITY` with focus on post-MFA proof timing and profile/cookie/session reason labels.
+  - do not restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, or treat the protected RESCAN fail as part of login durability.
+
+## Monday F Direction Change - 2026-06-08 10:09 UK
+- status: Seller Central auto-login attempts are intentionally paused while F builds a cooldown/switch system.
+- trigger:
+  - Luke reported Amazon's phone security message: `For added security, we need to verify your phone number. We are unable to send an SMS to the phone number ending with 598 at this time.`
+- action taken:
+  - `SELLER_CENTRAL_AUTO_LOGIN_ENABLED` was set to `0` in the Seller Central login env file.
+  - a timestamped backup was created before changing the flag.
+  - new approved F job created: `F-LOGIN-COOLDOWN-SWITCH`.
+  - F cycle manager heartbeat was reactivated for `F-LOGIN-COOLDOWN-SWITCH` only.
+- current interpretation:
+  - repeated phone/SMS login attempts may be contributing to Amazon cooldown/security limits.
+  - F should not keep hammering phone login.
+  - F needs an explicit login-attempt mode, normal scan-only mode, login cooldown mode, and manual-challenge mode.
+- success condition:
+  - F stops phone/SMS attempts when cooldown evidence appears, continues safe normal scanning where possible, writes redacted reason/cooldown proof, and can later re-enter login attempt mode only when explicitly allowed.
+- forbidden while this is open:
+  - do not turn auto-login back on, attempt live Seller Central login, restart workers, edit queues, open a separate browser, bypass Amazon security, disable MFA, store OTPs, change prices, write Sheets, or treat protected RESCAN as part of this job.
+
+## F Login Cooldown Switch Code Proof - 2026-06-08 10:53 UK
+- job_ref: `F-LOGIN-COOLDOWN-SWITCH`
+- status: code fix applied and isolated verification passed; live loop verification not yet proven.
+- changed behavior:
+  - Seller Central login recovery now has a redacted control state file with modes `normal_scan_only`, `login_attempt_mode`, `login_cooldown`, and `manual_challenge`.
+  - F will not type credentials, click phone/SMS options, or wait for manual visible login unless login attempt mode is explicitly enabled and auto-login is enabled.
+  - Amazon phone/SMS unavailable evidence, SMS option not clickable, authenticator-only, captcha, passkey, or manual challenge now writes a redacted reason and switches to `login_cooldown` or `manual_challenge`.
+- isolated proof:
+  - `python -m pytest tests\test_f_login_controller.py tests\test_f_legacy_webscrape_money_input.py -q` passed: 58 passed.
+  - `python -m pytest tests\test_f_seller_central_login_recovery.py -q` passed: 7 passed.
+- read-only MOT proof:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` completed without running F061 live.
+  - F MOT still truthfully reports live F as `decision_needed` with existing live scanner/login blockers; this is expected because auto-login remains paused and no live proof window was run.
+- manager packet state:
+  - `F-LOGIN-COOLDOWN-SWITCH` was moved to `fixed_needs_retest`.
+- live verification trigger:
+  - after Luke approves a future F login-attempt proof window, inspect `out/systems/F/price_list_manager/live/f_login_attempt_control_state.json`, `out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv`, and the next read-only F MOT.
+- live success condition:
+  - in `normal_scan_only` or `login_cooldown`, F records no new phone/SMS login attempts.
+  - if login attempt mode is explicitly enabled later, a phone/SMS unavailable page must switch back to `login_cooldown` with a redacted reason and a future `cooldown_until_utc`.
+- remediation path if live proof fails:
+  - leave auto-login off, keep F061 stopped from login-attempt mode, inspect the control-state and proof rows, then patch the earliest gate that allowed a credential/SMS attempt outside explicit login-attempt mode.
+
+## F Controlled Restart Proof - 2026-06-08 11:18 UK
+- trigger:
+  - Luke approved a controlled F proof/restart window after F showed `286` pending and stale child evidence.
+- protected actions approved for this window:
+  - controlled F owner/child recycle through `FPM170_supervise_live_cycle.py`.
+  - cancel the stale `f061_login_mode.requested` marker so F could restart in scan-only mode.
+- protected actions not performed:
+  - no price changes, queue edits, Sheet writes, DB alignment, output deletion, separate Chrome login workaround, MFA bypass, cookie/token edits, or credential/OTP storage.
+- rollback snapshot:
+  - backup folder created before control changes: `backups/f_controlled_restart_20260608_110439`.
+- actions taken:
+  - wrote `f_login_attempt_control_state.json` as `normal_scan_only` with auto-login still disabled.
+  - supervisor launched a new F manager after the stale owner/child chain was missing.
+  - old login-mode child came back visible, so the stale login-mode request was set to `canceled`.
+  - supervisor then recycled that child/manager into a hidden scan-only child.
+- evidence:
+  - new manager pid: `21328`.
+  - new child pid: `9876`.
+  - child status became `browser_mode=minimized`, `browser_visibility=hidden`, `manager_mode=Scanning Hidden`, then later `Login Required`.
+  - child heartbeat was fresh at the 11:16 UK MOT.
+  - child output showed one post-restart scanner chunk processed `25` rows with `pending_rows=278`, down from the restarted manager status of `281`.
+  - Seller Central recovery proof wrote `normal_scan_only` with `auto_login_enabled=0`; no credential, OTP, or SMS attempt was recorded by the switch.
+  - read-only F MOT after restart:
+    - child heartbeat: `ok`.
+    - login mode state: `warn` on `canceled`.
+    - Seller Central eligibility auth: `warn` on `normal_scan_only`.
+    - live owner status still needs a normal supervisor/status refresh because it still references the restart-manager state.
+    - protected RESCAN rows remain separate and still failed on `parked_timeout=170`.
+- manager packet state:
+  - `F-LOGIN-COOLDOWN-SWITCH` marked `proved`.
+- current operational truth:
+  - F is no longer a dead stale-child run.
+  - F is moving in hidden scan-only mode where it can, but Seller Central eligibility still parks some rows because auto-login remains intentionally off.
+  - F is not Monday-ready until the remaining Seller Central/login-policy and protected RESCAN decisions are handled.
+- next check trigger:
+  - wait until the next F manager status/supervisor refresh after the 11:18 UK restart proof.
+- success condition for next check:
+  - F MOT should stop showing stale/restart-manager ownership mismatch, while child heartbeat stays fresh and no phone/SMS login attempts appear while `normal_scan_only` is active.
+- remediation path if it fails:
+  - if owner status still disagrees after the next refresh, package a bounded F owner-status classification fix.
+  - if the child heartbeat becomes stale again, use a controlled F restart proof window only with Luke approval.
+
+## SellerOne 2.1 Control-System Freeze - 2026-06-08 12:00 UK
+- trigger:
+  - Luke asked to pause manager automations and move SellerOne toward a cleaner SellerOne 2.1 operating model before further repair work.
+- action taken:
+  - Codex app automations were checked and all active manager/heartbeat automations were paused.
+  - confirmed Codex automation active count: `0`.
+  - created blueprint: `blueprints/SELLERONE_2_1_AI_OPERATING_BLUEPRINT.md`.
+- current interpretation:
+  - the immediate problem is not only F login or any single cycle.
+  - the control layer has accumulated too many generations of instructions, prompts, managers, logs, automations, and task stores.
+  - SellerOne 2.1 should consolidate to one human-facing control desk, one canonical queue, bounded workers, fresh-context review, and one custodian for health/storage/token discipline.
+- protected actions not performed:
+  - no worker cycles were started.
+  - no prices, queues, Sheets, local DB facts, output deletion, purchase actions, or Amazon login/security settings were changed.
+- recommended next work:
+  - start `SO21-CONTROL-INVENTORY` from the blueprint.
+  - inspect and label every current control path as keep, merge, archive, or retire.
+  - do not rewrite business scripts until the control inventory and queue contract are agreed.
+
+## SellerOne 2.1 Control Inventory Complete - 2026-06-08 11:50 UK
+- job_ref: `SO21-CONTROL-INVENTORY`
+- status: complete_first_pass
+- outputs created:
+  - `CONTROL/ARCHITECTURE_DECISIONS.md`
+  - `CONTROL/CURRENT_STATE.md`
+  - `CONTROL/SELLERONE_2_1_CONTROL_INVENTORY.md`
+- summary:
+  - approved task packets are the strongest canonical queue candidate.
+  - `current_state.json` is stale compared with MOT and should be machine support only.
+  - `CODING_PLAN.md` is overloaded and should be split into current tickets, backlog, and archive history.
+  - old prompt/thread/goal/project-thread folders should become template/history sources, not live instructions.
+  - all 19 Codex app automations remain paused.
+- recommended next work:
+  - continue with `SO21-QUEUE-CONTRACT`.
+  - define the canonical queue, status values, archive folder, source-of-truth priority, and how MOT worklist rows become ticket candidates.
+
+## SellerOne 2.1 Queue Contract Complete - 2026-06-08 12:08 UK
+- job_ref: `SO21-QUEUE-CONTRACT`
+- status: complete_control_document
+- outputs created:
+  - `CONTROL/QUEUE_CONTRACT.md`
+  - `tasks/archive/README.md`
+- architecture update:
+  - added `ADR-0007 - Rep And Operations Are Separated`.
+  - updated the blueprint so Operations is a back-office reporting function, not a visible manager.
+- contract result:
+  - approved task packets are the canonical queue system.
+  - Manager Task Board and briefing are read-only views.
+  - MOT worklist rows are evidence/candidates until promoted into packets.
+  - `CODING_PLAN.md`, prompt folders, old plans, chat, and paused automations are not queue sources.
+  - current packet statuses are defined: `proposed`, `approved`, `in_progress`, `fixed_needs_retest`, `retest_failed`, `reopened`, `blocked_needs_luke`, `parked`, `proved`, and archive handling.
+  - archive folder exists but bulk movement is blocked until Custodian/archive policy exists.
+- protected actions not performed:
+  - no worker cycles, price changes, queue edits, Sheets writes, DB alignment, output deletion, purchase actions, Amazon actions, or automation restarts.
+- recommended next work:
+  - continue with `SO21-CURRENT-STATE-GENERATOR`.
+  - reason: `CURRENT_STATE.md` is currently manual, and the Rep needs a reliable generated state file before Operations/Custodian reports or automations can safely feed ticket candidates.
+
+## SellerOne 2.1 Current State Generator Complete - 2026-06-08 11:13 UTC
+- job_ref: `SO21-CURRENT-STATE-GENERATOR`
+- status: proved_control_document_and_generator
+- code created:
+  - `sellerone_manager/current_state_markdown.py`
+  - CLI command: `python -m sellerone_manager.app --current-state-md`
+  - focused tests: `tests/manager/test_current_state_markdown.py`
+- output generated:
+  - `CONTROL/CURRENT_STATE.md`
+- generator inputs:
+  - MOT evidence from `out/systems/M/mot/`
+  - approved packet index from `out/systems/M/approved_task_packets.csv`
+  - blocked packet evidence from packet status and `tasks/blocked/`
+  - Codex automation state
+  - architecture decisions from `CONTROL/ARCHITECTURE_DECISIONS.md`
+- generated state includes:
+  - current phase
+  - queue summary
+  - health summary
+  - active work
+  - blocked work
+  - recommended next task
+- proof:
+  - `python -m pytest tests\manager\test_current_state_generation.py tests\manager\test_current_state_markdown.py -q`
+  - result: 12 passed.
+  - live generation command completed with `status=written`.
+  - live generated state reports: active automations `0`, active work `11`, blocked work `4`, recommended next task `SO21-CUSTODIAN-POLICY`.
+- protected actions not performed:
+  - no worker cycles, queue edits, automation changes, business runtime changes, data deletion, Sheet writes, DB alignment, price changes, purchase actions, Amazon actions, or output deletion.
+- recommended next work:
+  - continue with `SO21-CUSTODIAN-POLICY`.
+  - reason: the Rep now has a generated state file; the next missing control layer is Custodian ownership of disk, tokens, logs, archives, temp files, old outputs, stale packets, dead automations, dead schedulers, and stale locks.

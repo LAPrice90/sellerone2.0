@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 ALLOC_PATH = Path("out/transaction_expense_allocations.csv")
 OUT_PATH = Path("out/transaction_expense_coverage_daily.csv")
@@ -54,7 +56,7 @@ def main() -> None:
 
     daily = daily.sort_values(by=["date", "currency"])
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    daily.to_csv(OUT_PATH, index=False)
+    safe_to_csv(daily, OUT_PATH, index=False)
 
     print({"status": "success", "rows": len(daily), "out": str(OUT_PATH)})
 

@@ -1,0 +1,84 @@
+{
+  "id": "FPM016_fetch_gmail_email_sources",
+  "display_name": "FPM016 Gmail Email Source Intake",
+  "flow": "F",
+  "purpose": "Register the Gmail attachment intake step so the manager can prove active email price-list suppliers have local Gmail label, attachment, and import evidence without downloading or deleting anything from MOT.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM016_fetch_gmail_email_sources.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM016_fetch_gmail_email_sources.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "gmail_fetch_reconciliation",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_registry",
+      "path": "config/feeder/price_list_manager/suppliers.csv",
+      "required": true,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "gmail_oauth_token_presence",
+      "path": "secrets/price_list_manager/gmail_token.json",
+      "required": false,
+      "max_age_minutes": 100000
+    }
+  ],
+  "outputs": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "price_list_batches",
+      "path": "out/systems/F/price_list_manager/test_mode/price_list_batches.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "gmail_source_proof_warn_after_10080_minutes",
+    "gmail_source_proof_fail_after_20160_minutes"
+  ],
+  "needs_user_signals": [
+    "gmail_oauth_missing",
+    "gmail_authorization_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "download_gmail_attachment",
+    "delete_gmail_message",
+    "delete_local_price_file",
+    "write_live_scanner_inbox",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager proof registration only. MOT may read FPM016/FPM011 evidence and local OAuth file presence, but must not call the downloader, fetch attachments, delete Gmail, delete files, run F061, or change queue/pricing state."
+}

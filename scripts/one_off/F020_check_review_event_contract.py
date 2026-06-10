@@ -20,7 +20,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from scripts.flows.F._schemas import get_f_output_contract
 
 
-VALID_REVIEW_DECISIONS = {"", "pass", "fail"}
+VALID_REVIEW_DECISIONS = {"", "pass", "fail", "rescan"}
 VALID_REVIEW_REASON_CODES = {
     "",
     "wrong_product",

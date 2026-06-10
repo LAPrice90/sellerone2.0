@@ -1,4 +1,11 @@
 check,status,first_seen_utc,last_seen_utc,consecutive_runs
-b_cycle_recent_fail_lines,warn,2026-02-18T10:30:23.316812+00:00,2026-02-18T11:29:13.163543+00:00,4
-h_e_outputs_latest_asof,warn,2026-02-18T10:30:23.316812+00:00,2026-02-18T11:29:13.163543+00:00,4
-h_floor_referral_source_coverage,warn,2026-02-18T10:30:23.316812+00:00,2026-02-18T11:29:13.163543+00:00,4
+h_ceiling_events_required_fields_non_blank,fail,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_strategy_sample_size_multi_seller_ladder_cap,warn,2026-04-24T06:18:31.183688+00:00,2026-05-27T06:25:01.931454+00:00,10
+h_strategy_sample_size_single_rival_reset,warn,2026-04-17T09:54:01.644050+00:00,2026-05-27T06:25:01.931454+00:00,14
+h_strategy_sample_size_suppression_reactivation,warn,2026-05-11T10:40:49.384425+00:00,2026-05-27T06:25:01.931454+00:00,3
+h_market_context_fill_nonzero,fail,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_seller_snapshot_landed_non_null_training,warn,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_seller_snapshot_landed_ge_listing,warn,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_seller_snapshot_shipping_non_negative,warn,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_listing_offer_seller_history_idempotent_today,warn,2026-05-27T06:25:01.931454+00:00,2026-05-27T06:25:01.931454+00:00,1
+h_floor_referral_source_coverage,warn,2026-04-24T06:18:31.183688+00:00,2026-05-27T06:25:01.931454+00:00,10

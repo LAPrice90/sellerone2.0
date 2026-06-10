@@ -17,6 +17,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 TXN_LEDGER = Path("out/transaction_ledger.csv")
 SHIPMENT_CONTENTS = Path("out/inbound_shipment_contents.csv")
@@ -109,7 +111,7 @@ def main() -> None:
 
     alloc = pd.DataFrame(rows)
     OUT_ALLOC.parent.mkdir(parents=True, exist_ok=True)
-    alloc.to_csv(OUT_ALLOC, index=False)
+    safe_to_csv(alloc, OUT_ALLOC, index=False)
 
     summary = (
         alloc.groupby(["status", "transaction_type", "breakdown_type", "currency"], dropna=False)
@@ -118,7 +120,7 @@ def main() -> None:
         .sort_values(by=["status", "transaction_type", "breakdown_type"])
     )
     OUT_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUT_SUMMARY, index=False)
+    safe_to_csv(summary, OUT_SUMMARY, index=False)
 
     print(
         {

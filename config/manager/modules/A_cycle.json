@@ -1,0 +1,61 @@
+{
+  "id": "A_cycle",
+  "display_name": "A Daily Orchestration",
+  "flow": "A",
+  "purpose": "Register the A daily orchestration flow so the manager can classify maintenance state against A expectations without running A scripts.",
+  "owner_entrypoint": "scripts/cycles/run_A_all.py",
+  "worker_entrypoint": "scripts/cycles/run_A_all.py",
+  "health_sources": [
+    {
+      "name": "checklist_A",
+      "path": "out/cycle_alerts/checklist_A.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "expectations_A",
+      "path": "project_control/EXPECTATIONS/A_cycle_expectations.md",
+      "required": true,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "A_manifests",
+      "path": "out/manifests/A",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "A_manager_state",
+      "path": "out/systems/M/flow_maintenance_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "A_checklist_warn_after_1440_minutes",
+    "A_manager_must_not_run_A015_ad_hoc"
+  ],
+  "needs_user_signals": [
+    "business_decision_required",
+    "credentials_required",
+    "missing_protected_secret"
+  ],
+  "safe_actions": [
+    "read_status",
+    "create_manager_task"
+  ],
+  "forbidden_actions": [
+    "run_worker_cycle",
+    "run_A015_ad_hoc",
+    "write_legacy_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "align_local_db",
+    "delete_outputs"
+  ],
+  "manager_notes": "Manager registration only. A proof must use A-owned evidence or an explicitly approved proof window."
+}

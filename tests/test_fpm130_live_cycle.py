@@ -37,6 +37,36 @@ def _write_csv(path: Path, rows: list[dict[str, str]], columns: list[str]) -> No
         writer.writerows(rows)
 
 
+def _seed_seller_central_dashboard_proof(live_dir: Path, *, value: str = "YES") -> None:
+    live_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-05-12T12:00:30Z",
+                "context": "dashboard_yes_no_login",
+                "status": "succeeded",
+                "reason": "eligibility_signal_visible",
+                "seller_central_signin_detected": "0",
+                "seller_central_otp_detected": "0",
+                "requested_utc": "2026-05-12T12:00:00Z",
+                "message_ts_utc": "",
+                "code_seen_flag": "0",
+                "fresh_code_flag": "0",
+                "used_message_flag": "0",
+                "attempted_flag": "1",
+                "succeeded_flag": "1",
+                "auto_login_enabled": "1",
+                "secret_file_exists": "1",
+                "credentials_present": "1",
+                "gmail_label": "AmazonOTP",
+                "code_age_seconds": "",
+                "source_message_id": "",
+                "notes": f"dashboard_value={value}",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+
 def _seed_active_f061(root: Path, *, supplier_id: str = "entertainment_trading", rows: int = 5) -> None:
     active_rows = []
     for index in range(1, rows + 1):
@@ -458,6 +488,7 @@ def test_fpm130_promotes_completed_login_backtrack_before_current_supplier_pendi
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=auth_confirmed|updated_utc=2026-05-12T12:00:00Z\n",
         encoding="ascii",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
     (live_dir / "f061_login_mode.requested").write_text(
         "\n".join(
             [
@@ -613,6 +644,116 @@ def test_fpm130_promotes_ai_rescan_before_current_supplier_pending(tmp_path: Pat
     assert list(audit["status"]) == ["promoted"]
 
 
+def test_fpm130_promotes_operator_rescan_event_before_normal_pending_rows(tmp_path: Path) -> None:
+    _seed_active_f061(tmp_path, supplier_id="td_synnex", rows=3)
+    test_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "test_mode"
+    _write_csv(
+        test_dir / "batch_rows.csv",
+        [
+            {
+                "batch_id": "entertainment_trading_source_1",
+                "supplier_id": "entertainment_trading",
+                "row_key": "et-row-1",
+                "supplier_sku": "KONKKS",
+                "supplier_title": "Yu-Gi-Oh! Kuriboh Kollection Card Sleeves",
+                "barcode": "9120106661682",
+                "unit_cost": "12.34",
+                "currency": "GBP",
+                "vat_rate": "20",
+                "source_row_hash": "et-row-1",
+                "row_change_status": "new",
+                "scan_eligibility": "scan_now",
+                "eligibility_reason": "operator_rescan",
+                "last_memory_key": "",
+                "cooldown_until_utc": "",
+            }
+        ],
+        BATCH_ROW_COLUMNS,
+    )
+    handoff = (
+        tmp_path
+        / "out"
+        / "systems"
+        / "F"
+        / "price_list_manager"
+        / "review_handoffs"
+        / "entertainment_trading"
+        / "fpm_entertainment_trading_test"
+    )
+    handoff.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "supplier_id": "entertainment_trading",
+                "supplier_name": "Entertainment Trading",
+                "run_id": "fpm_entertainment_trading_test",
+                "source_seen_at_utc": "2026-05-21T10:00:00Z",
+                "source_file_path": "",
+            }
+        ]
+    ).to_csv(handoff / "candidate_manifest.csv", index=False)
+    write_f_contract_df(
+        tmp_path,
+        "feeder_review_events",
+        pd.DataFrame(
+            [
+                {
+                    "event_utc": "2026-05-21T12:10:00Z",
+                    "event_id": "operator-rescan-1",
+                    "active_supplier_id": "entertainment_trading",
+                    "active_run_id": "fpm_entertainment_trading_test",
+                    "review_pack_type": "near_misses",
+                    "review_batch_id": "near_miss_batch_001",
+                    "candidate_id": "et-row-1",
+                    "supplier_sku": "KONKKS",
+                    "asin_raw": "B09HKZWBDN",
+                    "asin_padded": "B09HKZWBDN",
+                    "amazon_dp_url": "https://www.amazon.co.uk/dp/B09HKZWBDN",
+                    "review_decision": "rescan",
+                    "review_reason_code": "",
+                    "review_note": "needs fresh scanner evidence before ordering",
+                    "actor": "tester",
+                    "source_reference": "unit_test",
+                    "title": "Yu-Gi-Oh! Kuriboh Kollection Card Sleeves",
+                }
+            ]
+        ),
+    )
+    calls: list[str] = []
+
+    def scanner(root: Path, *, supplier_id: str, chunk_rows: int) -> dict[str, object]:
+        calls.append(supplier_id)
+        return {"status": "success", "processed_rows": 0, "pending_rows": 3, "notes": "probe"}
+
+    summary = run_live_cycle_once(
+        root=tmp_path,
+        chunk_rows=5,
+        refresh_before_select=False,
+        scanner_func=scanner,
+        observed_utc="2026-05-21T12:15:00Z",
+        cycle_run_id="cycle_operator_rescan",
+    )
+
+    assert summary["supplier_id"] == "entertainment_trading"
+    assert calls == ["entertainment_trading"]
+    active = read_f_contract_df(tmp_path, "supplier_price_list_active_run")
+    promoted = active[active["supplier_id"] == "entertainment_trading"].iloc[0]
+    assert promoted["scan_status"] == "pending"
+    assert promoted["scan_reason"] == "rescan_retry_required"
+    assert promoted["completion_block_reason"] == "rescan_retry_pending"
+    assert promoted["supplier_sku"] == "KONKKS"
+    assert promoted["barcode"] == "9120106661682"
+    audit = pd.read_csv(handoff / "ai_rescan_promotion_audit.csv", dtype=str).fillna("")
+    assert list(audit["status"]) == ["promoted"]
+    assert list(audit["notes"]) == ["source_queue=operator_rescan_events.csv"]
+    status = pd.read_csv(
+        tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live" / "ai_rescan_promotion_status.csv",
+        dtype=str,
+    ).fillna("")
+    assert status.iloc[-1]["queue_rows"] == "1"
+    assert status.iloc[-1]["promoted_rows"] == "1"
+
+
 def test_fpm130_ai_rescan_promotion_is_idempotent(tmp_path: Path) -> None:
     test_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "test_mode"
     _write_csv(
@@ -707,6 +848,7 @@ def test_fpm130_promotes_backtrack_when_auth_confirmed_even_if_request_was_still
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=auth_confirmed|updated_utc=2026-05-12T12:00:00Z\n",
         encoding="ascii",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
     (live_dir / "f061_login_mode.requested").write_text(
         "\n".join(
             [
@@ -780,6 +922,7 @@ def test_fpm130_upgrades_existing_active_pending_row_to_login_backtrack(tmp_path
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=auth_confirmed|updated_utc=2026-05-12T12:00:00Z\n",
         encoding="ascii",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
     write_f_contract_df(
         tmp_path,
         "f_login_backtrack_evidence_live",
@@ -1004,6 +1147,7 @@ def test_fpm130_login_mode_request_forces_visible_child_env(monkeypatch, tmp_pat
             [
                 "requested_utc=2026-05-09T11:20:00Z",
                 "requested_by=operator_ui",
+                "controller_owner=F_LOGIN_CONTROLLER_REWRITE_V1",
                 "mode=login_recovery",
                 "supplier_id=stax",
                 "run_id=fpm_stax_20260507T151124Z",
@@ -1029,6 +1173,8 @@ def test_fpm130_login_mode_request_forces_visible_child_env(monkeypatch, tmp_pat
     assert env["F061_LOGIN_HOLD_SECONDS"] == "45"
     assert env["F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"] == "45"
     assert env["F061_LOGIN_MODE_REQUEST_PATH"] == str(request_path)
+    assert env["SELLER_CENTRAL_LOGIN_ATTEMPT_MODE"] == "1"
+    assert env["SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH"] == str(request_path)
 
 
 def test_fpm130_login_mode_request_minimizes_child_when_auth_is_saved(monkeypatch, tmp_path: Path) -> None:
@@ -1043,6 +1189,7 @@ def test_fpm130_login_mode_request_minimizes_child_when_auth_is_saved(monkeypatc
             [
                 "requested_utc=2026-05-09T11:20:00Z",
                 "requested_by=operator_ui",
+                "controller_owner=F_LOGIN_CONTROLLER_REWRITE_V1",
                 "mode=login_recovery",
                 "supplier_id=stax",
                 "run_id=fpm_stax_20260507T151124Z",
@@ -1058,6 +1205,7 @@ def test_fpm130_login_mode_request_minimizes_child_when_auth_is_saved(monkeypatc
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=login_mode_authenticated|updated_utc=2026-05-09T11:21:00Z\n",
         encoding="utf-8",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
 
     env = fpm130._build_scanner_child_env(tmp_path)
 
@@ -1068,6 +1216,260 @@ def test_fpm130_login_mode_request_minimizes_child_when_auth_is_saved(monkeypatc
     assert env["F061_LOGIN_HOLD_SECONDS"] == "45"
     assert env["F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"] == "45"
     assert env["F061_LOGIN_MODE_REQUEST_PATH"] == str(request_path)
+
+
+def test_fpm130_still_required_seller_central_proof_keeps_scanner_browser_visible(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("F061_BACKGROUND_BROWSER_MODE", raising=False)
+    monkeypatch.delenv("F061_SHOW_WINDOWS", raising=False)
+    monkeypatch.delenv("FPM_LIVE_HIDE_SCRAPER_WINDOWS", raising=False)
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    request_path = live_dir / "f061_login_mode.requested"
+    request_path.write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-02T09:40:00Z",
+                "requested_by=operator_ui",
+                "mode=login_recovery",
+                "supplier_id=td_synnex",
+                "run_id=fpm_td_synnex_20260519T095000Z",
+                "status=still_required",
+                "hold_seconds=45",
+                "reason=operator_login_button",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    (live_dir / "f061_browser_visibility_state.txt").write_text(
+        "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=login_mode_authenticated|updated_utc=2026-06-02T09:41:00Z\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-02T09:41:26Z",
+                "context": "dashboard_yes_no_login",
+                "status": "disabled",
+                "reason": "auto_login_disabled",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert fpm130._scanner_browser_mode_for_next_child(tmp_path) == "visible"
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert env["F061_SHOW_WINDOWS"] == "1"
+    assert env["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] == "0"
+    assert env["F061_LOGIN_MODE"] == "1"
+    assert env["F061_LOGIN_HOLD_SECONDS"] == "45"
+    assert env["F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"] == "45"
+    assert env["F061_LOGIN_MODE_REQUEST_PATH"] == str(request_path)
+
+
+def test_fpm130_auto_capable_seller_central_proof_does_not_force_manual_visible_mode(
+    tmp_path: Path,
+) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    request_path = live_dir / "f061_login_mode.requested"
+    request_path.write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-06T14:30:00Z",
+                "requested_by=operator_ui",
+                "mode=login_recovery",
+                "status=still_required",
+                "hold_seconds=45",
+                "reason=operator_login_button",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-06T14:31:00Z",
+                "context": "dashboard_yes_no_login",
+                "status": "waiting_for_code",
+                "reason": "otp_page_detected",
+                "seller_central_signin_detected": "0",
+                "seller_central_otp_detected": "1",
+                "auto_login_enabled": "1",
+                "secret_file_exists": "1",
+                "credentials_present": "1",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    request = fpm130._read_login_mode_request(live_dir)
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert fpm130._seller_central_eligibility_login_pending(live_dir) is True
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is False
+    assert fpm130._login_mode_request_active_for_child(live_dir=live_dir, request=request) is False
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "minimized"
+    assert env["F061_SHOW_WINDOWS"] == "0"
+    assert "F061_LOGIN_MODE" not in env
+
+
+def test_fpm130_exhausted_email_continue_forces_visible_child_after_first_prompt(
+    tmp_path: Path,
+) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "f061_seller_central_window_shown.marker").write_text(
+        "2026-06-07T20:54:13Z\n",
+        encoding="utf-8",
+    )
+    request_path = live_dir / "f061_login_mode.requested"
+    request_path.write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-05T13:43:19Z",
+                "requested_by=operator_ui",
+                "mode=login_recovery",
+                "status=authenticated_backlog_remaining",
+                "hold_seconds=60",
+                "reason=operator_login_button",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-07T20:54:13Z",
+                "context": "dashboard_yes_no_login",
+                "status": "failed",
+                "reason": "email_continue_not_advanced",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+                "auto_login_enabled": "1",
+                "secret_file_exists": "1",
+                "credentials_present": "1",
+                "notes": (
+                    "page_hint=sellercentral_url|signin_url|email_field|continue_button;"
+                    "email_finalize=1;click=1;js_click=1;enter=0;js_enter=1;"
+                    "form_submit=1;email_value=present"
+                ),
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    request = fpm130._read_login_mode_request(live_dir)
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert fpm130._seller_central_eligibility_login_pending(live_dir) is True
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is True
+    assert fpm130._login_mode_request_active_for_child(live_dir=live_dir, request=request) is True
+    assert fpm130._scanner_browser_mode_for_next_child(tmp_path) == "visible"
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert env["F061_SHOW_WINDOWS"] == "1"
+    assert env["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] == "0"
+    assert env["F061_LOGIN_MODE"] == "1"
+    assert env["F061_LOGIN_MODE_REQUEST_PATH"] == str(request_path)
+
+
+def test_fpm130_inactive_request_cannot_hide_exhausted_email_continue_child(
+    tmp_path: Path,
+) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "f061_login_mode.requested").write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-05T13:43:19Z",
+                "requested_by=operator_ui",
+                "mode=login_recovery",
+                "status=canceled",
+                "hold_seconds=0",
+                "reason=old_request",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-07T20:54:13Z",
+                "context": "dashboard_yes_no_login",
+                "status": "failed",
+                "reason": "email_continue_not_advanced",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+                "auto_login_enabled": "1",
+                "secret_file_exists": "1",
+                "credentials_present": "1",
+                "notes": (
+                    "page_hint=sellercentral_url|signin_url|email_field|continue_button;"
+                    "email_finalize=1;click=1;js_click=1;enter=0;js_enter=1;"
+                    "form_submit=1;email_value=present"
+                ),
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is True
+    assert fpm130._scanner_browser_mode_for_next_child(tmp_path) == "visible"
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert env["F061_SHOW_WINDOWS"] == "1"
+    assert env["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] == "0"
+    assert env["F061_LOGIN_MODE"] == "1"
+
+
+def test_fpm130_manual_challenge_still_uses_manual_visible_fallback(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    request_path = live_dir / "f061_login_mode.requested"
+    request_path.write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-06T14:30:00Z",
+                "requested_by=f_login_controller",
+                "mode=login_recovery",
+                "status=still_required",
+                "hold_seconds=45",
+                "reason=manual_challenge_required",
+            ]
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-06T14:31:00Z",
+                "context": "dashboard_yes_no_login",
+                "status": "blocked",
+                "reason": "manual_challenge_required",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+                "auto_login_enabled": "1",
+                "secret_file_exists": "1",
+                "credentials_present": "1",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    request = fpm130._read_login_mode_request(live_dir)
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is True
+    assert fpm130._login_mode_request_active_for_child(live_dir=live_dir, request=request) is True
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert env["F061_LOGIN_MODE"] == "1"
 
 
 def test_fpm130_reactivates_drained_login_mode_for_remaining_backtrack_rows(tmp_path: Path) -> None:
@@ -1089,6 +1491,7 @@ def test_fpm130_reactivates_drained_login_mode_for_remaining_backtrack_rows(tmp_
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=login_mode_authenticated|updated_utc=2026-05-12T14:04:37Z\n",
         encoding="utf-8",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
     active = pd.DataFrame(
         [
             {
@@ -1120,6 +1523,8 @@ def test_fpm130_clears_stale_login_mode_env_without_request(monkeypatch, tmp_pat
     monkeypatch.setenv("F061_LOGIN_HOLD_SECONDS", "60")
     monkeypatch.setenv("F061_LOGIN_MODE_REQUEST_PATH", "stale.requested")
     monkeypatch.setenv("F061_MANUAL_BBP_LOGIN_WAIT_SECONDS", "60")
+    monkeypatch.setenv("SELLER_CENTRAL_LOGIN_ATTEMPT_MODE", "1")
+    monkeypatch.setenv("SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH", "stale-control-path")
     monkeypatch.delenv("F061_BACKGROUND_BROWSER_MODE", raising=False)
 
     env = fpm130._build_scanner_child_env(tmp_path)
@@ -1129,9 +1534,11 @@ def test_fpm130_clears_stale_login_mode_env_without_request(monkeypatch, tmp_pat
     assert "F061_LOGIN_HOLD_SECONDS" not in env
     assert "F061_LOGIN_MODE_REQUEST_PATH" not in env
     assert "F061_MANUAL_BBP_LOGIN_WAIT_SECONDS" not in env
+    assert "SELLER_CENTRAL_LOGIN_ATTEMPT_MODE" not in env
+    assert "SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH" not in env
 
 
-def test_fpm130_still_required_login_request_is_inactive(monkeypatch, tmp_path: Path) -> None:
+def test_fpm130_still_required_login_request_stays_active(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("F061_BACKGROUND_BROWSER_MODE", "visible")
     monkeypatch.delenv("F061_SHOW_WINDOWS", raising=False)
     monkeypatch.delenv("FPM_LIVE_HIDE_SCRAPER_WINDOWS", raising=False)
@@ -1144,8 +1551,134 @@ def test_fpm130_still_required_login_request_is_inactive(monkeypatch, tmp_path: 
 
     env = fpm130._build_scanner_child_env(tmp_path)
 
-    assert env["F061_BACKGROUND_BROWSER_MODE"] == "minimized"
-    assert "F061_LOGIN_MODE" not in env
+    assert env["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert env["F061_LOGIN_MODE"] == "1"
+    assert env["F061_LOGIN_HOLD_SECONDS"] == "60"
+    assert env["F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"] == "60"
+    assert env["SELLER_CENTRAL_LOGIN_ATTEMPT_MODE"] == "1"
+
+
+def test_fpm130_holds_td_synnex_for_second_check_and_selects_next_supplier(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    write_f_contract_df(
+        tmp_path,
+        "supplier_price_list_active_run",
+        pd.DataFrame(
+            [
+                {
+                    "run_id": "td_run",
+                    "supplier_id": "td_synnex",
+                    "supplier_name": "TD Synnex",
+                    "row_key": "td_row_1",
+                    "supplier_sku": "TD-1",
+                    "barcode": "501",
+                    "supplier_title": "TD Login Row",
+                    "unit_cost": "1.00",
+                    "currency": "GBP",
+                    "vat_rate": "20",
+                    "scan_status": "login_backtrack_pending",
+                    "scan_reason": "login_backtrack_required",
+                    "attempt_count": "1",
+                    "last_attempt_utc": "2026-06-09T16:00:00Z",
+                    "finished_utc": "",
+                    "source_seen_at_utc": "2026-06-09T08:00:00Z",
+                    "completion_block_reason": "dashboard_yes_no_backtrack_required",
+                },
+                {
+                    "run_id": "stax_run",
+                    "supplier_id": "stax",
+                    "supplier_name": "Stax",
+                    "row_key": "stax_row_1",
+                    "supplier_sku": "STAX-1",
+                    "barcode": "502",
+                    "supplier_title": "Stax Row",
+                    "unit_cost": "2.00",
+                    "currency": "GBP",
+                    "vat_rate": "20",
+                    "scan_status": "pending",
+                    "scan_reason": "",
+                    "attempt_count": "0",
+                    "last_attempt_utc": "",
+                    "finished_utc": "",
+                    "source_seen_at_utc": "2026-06-09T08:00:00Z",
+                    "completion_block_reason": "",
+                },
+            ]
+        ),
+    )
+    write_f_contract_df(
+        tmp_path,
+        "supplier_price_list_run_state",
+        pd.DataFrame(
+            [
+                {
+                    "supplier_id": "td_synnex",
+                    "supplier_name": "TD Synnex",
+                    "run_id": "td_run",
+                    "run_status": "running",
+                    "source_url": "",
+                    "source_file_path": "td_synnex.csv",
+                    "source_seen_at_utc": "2026-06-09T08:00:00Z",
+                    "normalized_utc": "2026-06-09T08:00:00Z",
+                    "total_rows": "1",
+                    "pending_rows": "1",
+                    "done_rows": "0",
+                    "failed_rows": "0",
+                    "held_rows": "0",
+                    "next_row_index": "1",
+                    "updated_at_utc": "2026-06-09T08:00:00Z",
+                    "completed_at_utc": "",
+                },
+                {
+                    "supplier_id": "stax",
+                    "supplier_name": "Stax",
+                    "run_id": "stax_run",
+                    "run_status": "running",
+                    "source_url": "",
+                    "source_file_path": "stax.csv",
+                    "source_seen_at_utc": "2026-06-09T08:00:00Z",
+                    "normalized_utc": "2026-06-09T08:00:00Z",
+                    "total_rows": "1",
+                    "pending_rows": "1",
+                    "done_rows": "0",
+                    "failed_rows": "0",
+                    "held_rows": "0",
+                    "next_row_index": "1",
+                    "updated_at_utc": "2026-06-09T08:00:00Z",
+                    "completed_at_utc": "",
+                },
+            ]
+        ),
+    )
+
+    summary = fpm130._hold_supplier_for_seller_central_second_check(
+        root=tmp_path,
+        live_dir=live_dir,
+        observed_utc="2026-06-09T17:30:00Z",
+        cycle_run_id="cycle_logged_out_continuation",
+        supplier_id="td_synnex",
+        f061_run_id="td_run",
+        scanner_summary={"login_mode_active": True, "login_mode_runtime_status": "still_required"},
+    )
+
+    active = read_f_contract_df(tmp_path, "supplier_price_list_active_run")
+    run_state = read_f_contract_df(tmp_path, "supplier_price_list_run_state")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    td_row = active[active["supplier_id"] == "td_synnex"].iloc[0]
+    stax_state = fpm130._active_f061_state(tmp_path)
+    td_state = run_state[run_state["supplier_id"] == "td_synnex"].iloc[0]
+    event = events[events["event_type"] == "seller_central_second_check_hold"].iloc[0]
+
+    assert summary["status"] == "held_for_login"
+    assert summary["next_supplier_id"] == "stax"
+    assert td_row["scan_status"] == "second_check_after_login"
+    assert td_row["scan_reason"] == "seller_central_second_check_after_login"
+    assert td_state["run_status"] == "held_for_login"
+    assert td_state["pending_rows"] == "0"
+    assert td_state["held_rows"] == "1"
+    assert stax_state["supplier_id"] == "stax"
+    assert "return_supplier_id=td_synnex" in event["notes"]
 
 
 def test_fpm130_auth_attention_overrides_stale_hidden_auth_state(monkeypatch, tmp_path: Path) -> None:
@@ -1193,6 +1726,7 @@ def test_fpm130_transient_browser_block_does_not_request_visible_after_auth_conf
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=auth_confirmed|updated_utc=2026-05-12T15:17:14Z\n",
         encoding="utf-8",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
 
     result = fpm130._record_auth_attention_after_chunk(
         live_dir=live_dir,
@@ -1378,6 +1912,49 @@ def test_fpm130_hides_login_backtrack_child_when_auth_already_confirmed(monkeypa
     assert "state=hidden" in (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
 
 
+def test_fpm130_bbp_auth_does_not_hide_seller_central_manual_wait(monkeypatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(fpm130, "_ensure_scraper_window_hider", lambda root, force=False: calls.append(f"hide:{force}"))
+    monkeypatch.setattr(fpm130, "_stop_scraper_window_hider", lambda root: calls.append("stop_hider"))
+    monkeypatch.setattr(fpm130, "_show_scraper_windows_once", lambda root, **kwargs: calls.append("show"))
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-02T10:13:07Z",
+                "context": "dashboard_yes_no_login",
+                "status": "waiting_for_code",
+                "reason": "manual_seller_central_login_wait",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+    stdout_path = live_dir / "f061_child_stdout.log"
+    stderr_path = live_dir / "f061_child_stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text("BBP login skipped: already authenticated.\n", encoding="utf-8")
+
+    state = fpm130._update_child_auth_visibility_from_logs(
+        root=tmp_path,
+        live_dir=live_dir,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        stdout_start_offset=0,
+        stderr_start_offset=0,
+        current_state="visible",
+        login_mode=True,
+    )
+
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    assert state == "visible"
+    assert calls == ["stop_hider", "show"]
+    assert "state=visible" in state_text
+    assert "auth_state=SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED" in state_text
+    assert "reason=seller_central_eligibility_login_still_required" in state_text
+
+
 def test_fpm130_hidden_auth_signal_updates_stale_child_started_marker(monkeypatch, tmp_path: Path) -> None:
     calls: list[str] = []
     monkeypatch.setattr(fpm130, "_ensure_scraper_window_hider", lambda root, force=False: calls.append(f"hide:{force}"))
@@ -1411,7 +1988,7 @@ def test_fpm130_hidden_auth_signal_updates_stale_child_started_marker(monkeypatc
     assert calls == ["hide:True"]
     state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
     assert "state=hidden" in state_text
-    assert "auth_state=LOGGED_IN" in state_text
+    assert "auth_state=BBP_AUTHENTICATED" in state_text
     assert "reason=auth_confirmed" in state_text
 
 
@@ -1442,6 +2019,33 @@ def test_fpm130_auth_required_log_shows_hidden_child_by_default(monkeypatch, tmp
     state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
     assert "state=visible" in state_text
     assert "reason=bbp_login_required" in state_text
+
+
+def test_fpm130_missing_bbp_iframe_does_not_request_login_window(monkeypatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(fpm130, "_show_scraper_windows_once", lambda root, **kwargs: calls.append("show"))
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    stdout_path = live_dir / "f061_child_stdout.log"
+    stderr_path = live_dir / "f061_child_stderr.log"
+    stdout_path.write_text("", encoding="utf-8")
+    stderr_path.write_text("No BBP iframe => Message:\n", encoding="utf-8")
+
+    state = fpm130._update_child_auth_visibility_from_logs(
+        root=tmp_path,
+        live_dir=live_dir,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        stdout_start_offset=0,
+        stderr_start_offset=0,
+        current_state="hidden",
+        allow_visible_auth_required=True,
+        login_mode=True,
+    )
+
+    assert state == "hidden"
+    assert calls == []
+    assert not (live_dir / "f061_browser_visibility_state.txt").exists()
 
 
 def test_fpm130_login_mode_records_scanner_owned_visible_and_surfaces_once(monkeypatch, tmp_path: Path) -> None:
@@ -1478,12 +2082,16 @@ def test_fpm130_login_mode_records_scanner_owned_visible_and_surfaces_once(monke
     assert "reason=bbp_login_required_scanner_owned" in state_text
 
 
-def test_fpm130_does_not_repeat_show_for_login_mode_after_marker(monkeypatch, tmp_path: Path) -> None:
+def test_fpm130_does_not_repeat_login_mode_show_after_marker(monkeypatch, tmp_path: Path) -> None:
     calls: list[str] = []
     monkeypatch.setattr(fpm130, "_show_scraper_windows_once", lambda root, **kwargs: calls.append(f"show:{kwargs.get('login_mode')}"))
     live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
     live_dir.mkdir(parents=True, exist_ok=True)
     (live_dir / "f061_login_mode_window_shown.marker").write_text("2026-05-09T13:00:00Z\n", encoding="utf-8")
+    (live_dir / "f061_browser_visibility_state.txt").write_text(
+        "state=visible|browser_state=VISIBLE|auth_state=BBP_LOGIN_REQUIRED|reason=bbp_login_required_scanner_owned|updated_utc=2026-05-09T13:00:00Z\n",
+        encoding="utf-8",
+    )
     stdout_path = live_dir / "f061_child_stdout.log"
     stderr_path = live_dir / "f061_child_stderr.log"
     stdout_path.write_text("", encoding="utf-8")
@@ -1503,8 +2111,7 @@ def test_fpm130_does_not_repeat_show_for_login_mode_after_marker(monkeypatch, tm
 
     assert state == "visible"
     assert calls == []
-    events_path = live_dir / "live_cycle_events.csv"
-    assert not events_path.exists() or "auth_required_scanner_owned" not in events_path.read_text(encoding="utf-8")
+    assert not (live_dir / "live_cycle_events.csv").exists()
 
 
 def test_fpm130_clears_stale_login_mode_show_marker_for_new_child(tmp_path: Path) -> None:
@@ -1647,6 +2254,7 @@ def test_fpm130_login_mode_show_filter_targets_configured_profile(monkeypatch, t
 
         class Completed:
             returncode = 0
+            stdout = "1\n"
 
         return Completed()
 
@@ -1663,7 +2271,64 @@ def test_fpm130_login_mode_show_filter_targets_configured_profile(monkeypatch, t
     command_text = " ".join(captured[0])
     assert "Chrome_UC136" in command_text
     assert "--profile-directory=Profile\\ 2(\\s|`\"|$)" in command_text
+    assert "Chrome_91_F061" in command_text
+    assert "ParentProcessId" in command_text
     assert "BBPProfile1" not in command_text
+
+
+def test_fpm130_default_bbp_profile_is_plugin_profile() -> None:
+    assert fpm130.DEFAULT_F061_BBP_USER_DATA_DIR == r"C:\Users\Luke\AppData\Local\Chrome_UC136"
+    assert fpm130.DEFAULT_F061_BBP_PROFILE_DIR == "Profile 2"
+
+
+def test_fpm130_child_env_declares_approved_bbp_profile(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("F061_BBP_USER_DATA_DIR", raising=False)
+    monkeypatch.delenv("F061_BBP_PROFILE_DIR", raising=False)
+    monkeypatch.setattr(fpm130, "_scanner_browser_mode_for_next_child", lambda root: "minimized")
+    monkeypatch.setattr(fpm130, "_read_login_mode_request", lambda live_dir: {})
+    monkeypatch.setattr(fpm130, "_login_mode_request_active_for_child", lambda **kwargs: False)
+    monkeypatch.setattr(fpm130, "_apply_login_mode_env", lambda env, request, force_active=False: None)
+    monkeypatch.setattr(fpm130, "_apply_authenticated_login_mode_browser_policy", lambda **kwargs: None)
+
+    env = fpm130._build_scanner_child_env(tmp_path)
+
+    assert env["F061_BBP_USER_DATA_DIR"] == r"C:\Users\Luke\AppData\Local\Chrome_UC136"
+    assert env["F061_BBP_PROFILE_DIR"] == "Profile 2"
+
+
+def test_fpm130_visible_signal_records_missing_when_no_window_surfaces(monkeypatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(fpm130, "_stop_scraper_window_hider", lambda root: calls.append("stop_hider"))
+    monkeypatch.setattr(fpm130, "_show_scraper_windows_once", lambda root, **kwargs: False)
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+
+    state = fpm130._apply_browser_visibility_signal(
+        root=tmp_path,
+        live_dir=live_dir,
+        state="visible",
+        reason="seller_central_eligibility_login_still_required",
+    )
+
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    assert state == "missing"
+    assert calls == ["stop_hider"]
+    assert "state=missing" in state_text
+    assert "auth_state=SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED" in state_text
+    assert "reason=seller_central_login_window_missing" in state_text
+    assert events.iloc[-1]["status"] == "missing"
+
+
+def test_fpm130_manager_mode_names_missing_login_window() -> None:
+    mode = fpm130._manager_mode_for_child(
+        auth_state=fpm130.AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED,
+        browser_mode="visible",
+        browser_visibility_state="missing",
+        login_mode_child=True,
+    )
+
+    assert mode == "Login Window Missing"
 
 
 def test_fpm130_remote_debugging_ports_from_command_lines_dedupes() -> None:
@@ -1750,7 +2415,7 @@ def test_fpm130_records_auth_attention_then_clears_after_clean_chunk(monkeypatch
     assert events.iloc[-1]["status"] == "cleared"
     state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
     assert "state=hidden" in state_text
-    assert "auth_state=LOGGED_IN" in state_text
+    assert "auth_state=BBP_AUTHENTICATED" in state_text
     assert "reason=auth_attention_cleared" in state_text
     assert fpm130._auth_attention_active(live_dir) is False
 
@@ -1798,6 +2463,7 @@ def test_fpm130_hidden_child_start_preserves_previous_confirmed_auth(tmp_path: P
         "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=auth_confirmed|updated_utc=2026-05-13T12:08:25Z\n",
         encoding="utf-8",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
 
     reason = fpm130._child_started_visibility_reason(
         live_dir,
@@ -1855,6 +2521,39 @@ def test_fpm130_login_mode_blocked_chunk_stays_on_login_mode_path(monkeypatch, t
     assert "next_child_browser_mode=minimized" in events.iloc[-1]["notes"]
 
 
+def test_fpm130_bbp_iframe_plugin_block_is_not_reported_as_catching_up(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+
+    result = fpm130._record_auth_attention_after_chunk(
+        live_dir=live_dir,
+        event_utc="2026-06-05T11:49:38Z",
+        cycle_run_id="cycle",
+        scanner_summary={
+            "processed_rows": 5,
+            "scanner_speed_browser_blocked_rows": 4,
+            "bbp_iframe_plugin_blocked_rows": 4,
+            "login_mode_active": True,
+            "login_mode_runtime_status": "bbp_iframe_plugin_blocked",
+        },
+    )
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    mode = fpm130._manager_mode_for_child(
+        auth_state=fpm130._saved_auth_state(live_dir),
+        browser_mode="minimized",
+        browser_visibility_state="hidden",
+        login_mode_child=True,
+    )
+
+    assert result == "bbp_iframe_plugin_blocked"
+    assert "reason=bbp_iframe_plugin_blocked" in state_text
+    assert "auth_state=BBP_IFRAME_PLUGIN_BLOCKED" in state_text
+    assert events.iloc[-1]["status"] == "bbp_iframe_plugin_blocked"
+    assert "bbp_iframe_plugin_blocked_rows=4" in events.iloc[-1]["notes"]
+    assert mode == "BBP Plugin Blocked"
+
+
 def test_fpm130_authenticated_login_mode_chunk_hides_browser(tmp_path: Path) -> None:
     live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
     live_dir.mkdir(parents=True, exist_ok=True)
@@ -1862,6 +2561,7 @@ def test_fpm130_authenticated_login_mode_chunk_hides_browser(tmp_path: Path) -> 
         "state=visible|browser_state=VISIBLE|auth_state=LOGIN_REQUIRED|reason=child_started_visible|updated_utc=2026-05-12T13:10:41Z\n",
         encoding="utf-8",
     )
+    _seed_seller_central_dashboard_proof(live_dir)
 
     result = fpm130._record_auth_attention_after_chunk(
         live_dir=live_dir,
@@ -1883,6 +2583,155 @@ def test_fpm130_authenticated_login_mode_chunk_hides_browser(tmp_path: Path) -> 
     assert "reason=login_mode_authenticated" in state_text
     assert events.iloc[-1]["status"] == "cleared"
     assert "login_mode_authenticated" in events.iloc[-1]["notes"]
+
+
+def test_fpm130_seller_central_pending_chunk_stays_visible(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "f061_browser_visibility_state.txt").write_text(
+        "state=hidden|browser_state=HIDDEN|auth_state=LOGGED_IN|reason=login_mode_authenticated|updated_utc=2026-06-02T09:41:00Z\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-02T09:41:26Z",
+                "context": "dashboard_yes_no_login",
+                "status": "disabled",
+                "reason": "auto_login_disabled",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    result = fpm130._record_auth_attention_after_chunk(
+        live_dir=live_dir,
+        event_utc="2026-06-02T09:42:00Z",
+        cycle_run_id="cycle",
+        scanner_summary={
+            "processed_rows": 5,
+            "scanner_speed_browser_blocked_rows": 0,
+            "login_mode_active": True,
+            "login_mode_runtime_status": "authenticated_backlog_remaining",
+        },
+    )
+
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    assert result == "deferred_login_mode"
+    assert "state=visible" in state_text
+    assert "auth_state=SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED" in state_text
+    assert "reason=seller_central_eligibility_login_still_required" in state_text
+    assert (live_dir / "f061_seller_central_window_shown.marker").exists()
+    assert events.iloc[-1]["status"] == "deferred_login_mode"
+    assert "next_child_browser_mode=visible" in events.iloc[-1]["notes"]
+
+
+def test_fpm130_seller_central_pending_after_first_prompt_parks_next_child(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "f061_seller_central_window_shown.marker").write_text(
+        "2026-06-02T09:41:30Z\n",
+        encoding="utf-8",
+    )
+    (live_dir / "f061_browser_visibility_state.txt").write_text(
+        "state=visible|browser_state=VISIBLE|auth_state=SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED|reason=seller_central_eligibility_login_still_required|updated_utc=2026-06-02T09:41:30Z\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-02T09:42:26Z",
+                "context": "dashboard_yes_no_login",
+                "status": "disabled",
+                "reason": "auto_login_disabled",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    result = fpm130._record_auth_attention_after_chunk(
+        live_dir=live_dir,
+        event_utc="2026-06-02T09:43:00Z",
+        cycle_run_id="cycle",
+        scanner_summary={
+            "processed_rows": 5,
+            "scanner_speed_browser_blocked_rows": 0,
+            "login_mode_active": True,
+            "login_mode_runtime_status": "authenticated_backlog_remaining",
+        },
+    )
+
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    assert fpm130._seller_central_eligibility_login_pending(live_dir) is True
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is False
+    assert fpm130._scanner_browser_mode_for_next_child(tmp_path) == "minimized"
+    assert result == "deferred_login_mode"
+    assert "state=hidden" in state_text
+    assert "reason=seller_central_eligibility_login_waiting_parked" in state_text
+    assert events.iloc[-1]["status"] == "deferred_login_mode"
+    assert "next_child_browser_mode=minimized" in events.iloc[-1]["notes"]
+
+
+def test_fpm130_pc_usability_pause_blocks_seller_central_visible_loop(tmp_path: Path) -> None:
+    live_dir = tmp_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (live_dir / "f061_login_mode.requested").write_text(
+        "\n".join(
+            [
+                "requested_utc=2026-06-04T08:19:44Z",
+                "requested_by=operator_ui",
+                "mode=login_recovery",
+                "status=canceled",
+                "hold_seconds=0",
+                "reason=user_pc_unusable_visibility_loop_paused",
+                "last_status_note=operator_logged_in;visible_window_loop_paused_for_pc_usability",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (live_dir / "f061_browser_visibility_state.txt").write_text(
+        "state=hidden|browser_state=HIDDEN|auth_state=SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED|reason=user_pc_unusable_visibility_loop_paused|updated_utc=2026-06-04T08:40:42Z\n",
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-04T08:41:26Z",
+                "context": "dashboard_yes_no_login",
+                "status": "disabled",
+                "reason": "auto_login_disabled",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+            }
+        ]
+    ).to_csv(live_dir / "seller_central_login_recovery_proof.csv", index=False)
+
+    result = fpm130._record_auth_attention_after_chunk(
+        live_dir=live_dir,
+        event_utc="2026-06-04T08:42:00Z",
+        cycle_run_id="cycle",
+        scanner_summary={
+            "processed_rows": 5,
+            "scanner_speed_browser_blocked_rows": 0,
+            "login_mode_active": True,
+            "login_mode_runtime_status": "authenticated_backlog_remaining",
+        },
+    )
+
+    state_text = (live_dir / "f061_browser_visibility_state.txt").read_text(encoding="utf-8")
+    events = pd.read_csv(live_dir / "live_cycle_events.csv", dtype=str).fillna("")
+    assert fpm130._seller_central_eligibility_login_requires_visible(live_dir) is False
+    assert fpm130._scanner_browser_mode_for_next_child(tmp_path) == "minimized"
+    assert result == "deferred_login_mode"
+    assert "state=hidden" in state_text
+    assert "reason=seller_central_dashboard_proof_paused_unproved" in state_text
+    assert events.iloc[-1]["status"] == "deferred_login_mode"
+    assert "next_child_browser_mode=minimized" in events.iloc[-1]["notes"]
 
 
 def test_fpm130_backtrack_pending_without_browser_block_does_not_request_visible_child(tmp_path: Path) -> None:

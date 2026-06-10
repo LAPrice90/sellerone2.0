@@ -1,0 +1,60 @@
+{
+  "id": "B_cycle",
+  "display_name": "B Daytime Orders And Tokens",
+  "flow": "B",
+  "purpose": "Register the B daytime loop so the manager can classify maintenance state against B expectations without overlapping the live B owner.",
+  "owner_entrypoint": "scripts/cycles/run_B_supervisor.py",
+  "worker_entrypoint": "scripts/cycles/run_B_cycle.py",
+  "health_sources": [
+    {
+      "name": "checklist_B",
+      "path": "out/cycle_alerts/checklist_B.csv",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "expectations_B",
+      "path": "project_control/EXPECTATIONS/B_cycle_expectations.md",
+      "required": true,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "B_manifests",
+      "path": "out/manifests/B",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "outputs": [
+    {
+      "name": "B_manager_state",
+      "path": "out/systems/M/flow_maintenance_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "B_checklist_warn_after_180_minutes",
+    "B_manual_proof_requires_maintenance_handoff"
+  ],
+  "needs_user_signals": [
+    "business_decision_required",
+    "token_correction_approval_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "create_manager_task"
+  ],
+  "forbidden_actions": [
+    "run_worker_cycle",
+    "overlap_B_owner",
+    "write_legacy_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "align_local_db",
+    "delete_outputs"
+  ],
+  "manager_notes": "Manager registration only. B repair proof must preserve maintenance handoff safety."
+}

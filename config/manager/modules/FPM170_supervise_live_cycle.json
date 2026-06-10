@@ -1,0 +1,78 @@
+{
+  "id": "FPM170_supervise_live_cycle",
+  "display_name": "FPM170 Live Cycle Supervisor",
+  "flow": "F",
+  "purpose": "Watch the F price-list live cycle owner evidence and report whether the supervisor state is fresh, paused, or restarted by the worker-owned supervisor.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM170_supervise_live_cycle.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM170_supervise_live_cycle.py",
+  "health_sources": [
+    {
+      "name": "live_cycle_status",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_status.csv",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "f061_child_status",
+      "path": "out/systems/F/price_list_manager/live/f061_child_status.txt",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "live_cycle_lock",
+      "path": "out/systems/F/price_list_manager/live/live_cycle.lock",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supervisor_state",
+      "path": "out/systems/F/price_list_manager/live/fpm_live_supervisor_state.txt",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "supervisor_log",
+      "path": "out/systems/F/price_list_manager/live/fpm_live_supervisor.log",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "supervisor_state",
+      "path": "out/systems/F/price_list_manager/live/fpm_live_supervisor_state.txt",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "supervisor_log",
+      "path": "out/systems/F/price_list_manager/live/fpm_live_supervisor.log",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "supervisor_state_warn_after_180_minutes",
+    "live_cycle_status_warn_after_180_minutes"
+  ],
+  "needs_user_signals": [
+    "f061_visible_login_requested",
+    "global_maintenance_request"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "kill_process"
+  ],
+  "manager_notes": "V1.3 registration only. The manager may read this script's evidence but must not use it to restart or supervise workers."
+}

@@ -1,4 +1,9 @@
 check,status,first_seen_utc,last_seen_utc,consecutive_runs
-b_cycle_recent_fail_lines,warn,2026-02-18T09:24:18.696002+00:00,2026-02-18T11:37:37.358686+00:00,35
-h_e_outputs_latest_asof,warn,2026-02-18T07:06:59.366026+00:00,2026-02-18T11:37:37.358686+00:00,37
-h_floor_referral_source_coverage,warn,2026-02-17T17:43:23.964340+00:00,2026-02-18T11:37:37.358686+00:00,233
+order_master_placeholder_cogs_rows,warn,2026-06-06T05:25:36.707583+00:00,2026-06-10T05:25:37.393362+00:00,15
+token_shortages_by_sku,fail,2026-06-06T05:25:36.707583+00:00,2026-06-10T05:25:37.393362+00:00,15
+fee_rules_unknown_countries,warn,2026-06-08T22:21:59.271884+00:00,2026-06-10T05:25:37.393362+00:00,10
+h_ceiling_events_required_fields_non_blank,fail,2026-05-27T05:30:03.603580+00:00,2026-06-10T05:25:37.393362+00:00,24
+h_strategy_sample_size_multi_seller_ladder_cap,warn,2026-04-18T05:06:13.272345+00:00,2026-06-10T05:25:37.393362+00:00,58
+h_strategy_sample_size_single_rival_reset,warn,2026-04-17T05:04:38.511598+00:00,2026-06-10T05:25:37.393362+00:00,59
+h_strategy_sample_size_suppression_reactivation,warn,2026-06-10T05:25:37.393362+00:00,2026-06-10T05:25:37.393362+00:00,1
+h_floor_referral_source_coverage,warn,2026-04-28T16:28:24.311030+00:00,2026-06-10T05:25:37.393362+00:00,53

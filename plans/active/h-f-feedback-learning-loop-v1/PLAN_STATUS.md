@@ -1,0 +1,238 @@
+# Plan Status
+
+## Summary
+- Plan slug: `h-f-feedback-learning-loop-v1`
+- Current stage: execution in progress
+- Current phase: Phase 9 bounded recovery complete
+- Current batch: Phase 9 bounded capture-rebuild loop
+- Overall status: `coding phases complete through Phase 9; archive blocked by remaining scrape-gap warning and runtime promotion still not proven`
+- Execution readiness score:
+  - `97/100` after Phase 9 isolated proof and bounded live rounds
+- Monitoring window:
+  - none active yet
+- Next step:
+  - open follow-up plan for root-cause scrape-gap missing-rate reduction
+- Notification mode:
+  - passive during one-off build and proof runs
+
+## Checklist
+- [x] Project brief written
+- [x] Research report written
+- [x] Blueprint written
+- [x] Data contracts written
+- [x] Runbook written
+- [x] Coding plan written
+- [x] Frozen input manifest template written
+- [x] Phase scorecard template written
+- [x] Batch 000 ready
+- [x] Batch 001 ready
+- [x] Prep gate complete
+- [x] Batch 000 complete
+- [x] Batch 001 complete
+- [x] Batch 002 complete
+- [x] Phase 3 health checks complete
+- [x] Batch 003 shadow calibration complete
+- [x] Batch 004 operator report complete
+- [x] Batch 005 evidence-hook review complete
+- [x] Batch 006 signoff decision complete
+- [x] Phase 6 signoff complete
+- [x] Phase 9 bounded recovery complete
+- [ ] Ready to archive
+
+## Open blockers
+- No blocker to planning.
+- Implementation dependencies to respect:
+  - Frozen-input rule:
+    - keep `FROZEN_INPUT_MANIFEST.md` unchanged through Batch 003 unless the phase is explicitly reset
+  - Foundation-first rule:
+    - identity bridge, assumption snapshots, foundation metrics, and joined baseline outputs are built and must stay frozen for Batch 003
+  - H scoped warnings are still open and must stay visible:
+    - `h_strategy_expired_share_multi_seller_ladder_cap = 90.36`
+    - `h_strategy_sample_size_single_rival_reset = 1`
+  - Aggregate global H checklist still carries an older contradictory fail and must not be used as fresh scoped proof for this ticket.
+  - F PO handoff ready output is currently `0` rows, so Batch 000 must use approval-decision lineage as the initial buy-time anchor.
+  - Batch 000 data truth to carry forward:
+    - `identity_resolution_rate = 0.0000`
+    - root cause on frozen inputs: F candidate ASIN set and H listing ASIN set have `0` overlap
+    - treat as explicit coverage warning, not a silent join failure
+  - Batch 001 data truth to carry forward:
+    - scrape gap output is nonzero and explicit:
+      - `missing=49637`
+      - `thin=365`
+      - `ok=2337`
+      - `stale=0`
+    - this is a coverage baseline, not a runtime fault
+  - Batch 002 data truth to carry forward:
+    - alignment output is deterministic but currently all rows classify as `missing_expected_baseline`
+    - this is an explicit data-coverage signal and should drive shadow calibration and collection routing
+  - Archive blockers:
+    - `hf_scrape_gap_missing_rate` warning remains high (`0.9484`)
+    - signoff is complete but promotion remains `not yet proven`
+  - F live backtest owner outputs are currently empty:
+    - `feeder_backtest_input_view_live.csv`
+    - `feeder_backtest_replay_daily_live.csv`
+    - `feeder_backtest_summary_live.csv`
+    - `feeder_backtest_health.csv`
+  - Batch 001 must therefore use the current analysis packs as the evidence baseline and document the owner-path recovery plan separately.
+  - H runtime edit rule:
+    - any Phase 5 H-runtime code edit must use the controlled restart-drain payload:
+    - `requested_by=controlled_restart_gate|reason=overnight_restart_eval`
+    - and must wait for `out/systems/H/live/H_restart_drain.ready` before edit and restart
+
+## Latest proof snapshot
+- Date: `2026-04-17`
+- Evidence:
+  - Prep gate proof:
+    - `FROZEN_INPUT_MANIFEST.md` locked at `2026-04-17T17:03:25Z`
+    - `pytest tests/test_hf_learning_prep_freeze.py` -> pass
+    - `python -m py_compile scripts/one_off/HF000_prep_freeze_learning_inputs.py tests/test_hf_learning_prep_freeze.py` -> pass
+  - Batch 000 proof:
+    - `python -m py_compile scripts/one_off/HF000_build_learning_foundation.py tests/test_hf_learning_foundation.py` -> pass
+    - `pytest tests/test_hf_learning_prep_freeze.py tests/test_hf_learning_foundation.py -q` -> pass (`5`)
+    - `python scripts/one_off/HF000_build_learning_foundation.py` run twice -> stable row counts
+    - deterministic key fingerprints (run1 == run2):
+      - identity key sha: `946501f266a0a811f30e2076dad112dcc96628ce6a68a7a743cdf8e5da9ec953`
+      - assumption key sha: `c0937de9f9cae520b1e29a5dd07edd79724eb0161dd1e07a9c1393d0749246d0`
+      - metrics key sha: `a209e5543e9fae9274b70f397c5007ad541368131508558880154aad77290d32`
+    - new output:
+      - `out/analysis_reports/hf_learning_foundation_metrics_latest.csv` -> `12` rows
+    - key coverage facts:
+      - `identity_rows_total=52339`
+      - `identity_rows_resolved=0`
+      - `identity_rows_unresolved=52339`
+      - `identity_asin_present_rate=0.1018`
+      - `identity_resolution_rate=0.0000`
+      - `assumption_rows_total=9552`
+      - `assumption_stage_count:approval_decision=9552`
+  - Batch 001 proof:
+    - `python -m py_compile scripts/one_off/HF001_build_learning_baseline.py tests/test_hf_learning_baseline.py` -> pass
+    - `pytest tests/test_hf_learning_prep_freeze.py tests/test_hf_learning_foundation.py tests/test_hf_learning_baseline.py -q` -> pass (`6`)
+    - `python scripts/one_off/HF001_build_learning_baseline.py` run twice -> stable row counts
+    - deterministic key fingerprints (run1 == run2):
+      - market facts key sha: `ffe96cfacdb4e9be90a58fc4d244b56a7c440843237314d6227bc8860ba13993`
+      - action outcomes key sha: `0fa7005088ce7799f0c8f6f57a654d03e8bc5c244b8aa7260dcf292b4762b873`
+      - scrape gap key sha: `2aa5ce8eecbfea1a0b8e1e0f0a7e8835f079bfb87255de4b62bedaf6304aa5c2`
+    - output counts:
+      - `hf_learning_market_facts_latest.csv` -> `2462`
+      - `hf_learning_action_outcomes_latest.csv` -> `10080`
+      - `hf_learning_scrape_gap_report_latest.csv` -> `52339`
+    - scanner-owned source proof:
+      - `scanner_source_hash_verified=1` on both Batch 001 runs
+  - Batch 002 proof:
+    - `python -m py_compile scripts/one_off/HF002_build_learning_alignment.py tests/test_hf_learning_alignment.py` -> pass
+    - `pytest tests/test_hf_learning_prep_freeze.py tests/test_hf_learning_foundation.py tests/test_hf_learning_baseline.py tests/test_hf_learning_alignment.py -q` -> pass (`7`)
+    - `python scripts/one_off/HF002_build_learning_alignment.py` run twice -> stable row counts
+    - deterministic key fingerprints (run1 == run2):
+      - alignment key sha: `12dfaa5c591e7f81cb43e5c4e6da32808eaa8306b00e42ef21432a7dc1b0bf71`
+      - factor key sha: `73eea6e946902ddb246c39dd6ef8269f82c74cee77cabf4a45e6fedb26d1aca8`
+    - output counts:
+      - `hf_learning_alignment_30d_latest.csv` -> `95`
+      - `hf_learning_factor_impacts_latest.csv` -> `1`
+    - trigger proof:
+      - `rescrape_missing_rate=0.9516`
+      - `rescrape_trigger_flag=1`
+      - `rescrape_trigger_reason=missing_rate_gt_80pct`
+  - Phase 3 health proof:
+    - `python -m py_compile scripts/one_off/HF003_build_learning_health_checks.py tests/test_hf_learning_health_checks.py` -> pass
+    - `pytest tests/test_hf_learning_prep_freeze.py tests/test_hf_learning_foundation.py tests/test_hf_learning_baseline.py tests/test_hf_learning_alignment.py tests/test_hf_learning_health_checks.py -q` -> pass (`9`)
+    - `python scripts/one_off/HF003_build_learning_health_checks.py` run twice -> stable checklist hash
+      - checklist key sha: `827bdebbffefd6c8a4cf0190d081336c2831407ff26cdd826d9d43bdef239213`
+    - checklist status:
+      - `fail=0`
+      - `warn=2` (`hf_scrape_gap_missing_rate`, `hf_alignment_expected_coverage`)
+  - Phase 4 shadow calibration proof:
+    - `python -m py_compile scripts/flows/F/F080_build_feedback_calibration_shadow.py tests/test_f080_build_feedback_calibration_shadow.py` -> pass
+    - `pytest tests/test_f080_build_feedback_calibration_shadow.py -q` -> pass (`2`)
+    - `python scripts/flows/F/F080_build_feedback_calibration_shadow.py` run twice -> stable key hash
+      - shadow key sha: `5fcdfa814c52492ce62fec3bfb94ffbec6f167f83df6ee9025ebcbfdcd2f5aa2`
+    - shadow output:
+      - `out/systems/F/live/feeder_feedback_calibration_live.csv` -> `1` row
+      - `shadow_only_flag=1`
+      - `apply_to_live_decisions_flag=0`
+      - `source_hash_verified=1`
+  - Phase 5 operator report proof:
+    - `python -m py_compile scripts/one_off/HF005_build_learning_operator_report.py tests/test_hf_learning_operator_report.py` -> pass
+    - `pytest tests/test_hf_learning_operator_report.py -q` -> pass (`1`)
+    - `python scripts/one_off/HF005_build_learning_operator_report.py` run twice -> stable key hash
+      - report key sha: `01345692fe0bc06f130e15b3f5e6135bb4ffae0c609b648772f25a7f46c33ce9`
+    - operator report output:
+      - `out/reports/hf_learning_operator_report_latest.csv` -> `18` rows
+      - `health_fail_count=0`
+      - `health_warn_count=2`
+  - Phase 6 signoff proof:
+    - signoff pack written:
+      - `plans/active/h-f-feedback-learning-loop-v1/PHASE6_SIGNOFF.md`
+    - Phase 5 evidence-hook review:
+      - existing `hf_learning_action_outcomes_latest.csv` fields already expose eligible/decision/attempted/applied states, so no H runtime code hook was required in this ticket
+    - promotion decision:
+      - keep outputs as one-off or shadow-only
+      - runtime promotion is `not yet proven`
+  - Phase 9 bounded recovery proof:
+    - `python -m py_compile scripts/one_off/HF007_run_alignment_coverage_recovery.py tests/test_hf_alignment_coverage_recovery.py` -> pass
+    - `pytest tests/test_hf_alignment_coverage_recovery.py tests/test_hf_learning_baseline.py tests/test_hf_alignment_missing_asin_pack.py tests/test_hf_learning_alignment.py tests/test_hf_learning_health_checks.py tests/test_hf_learning_operator_report.py -q` -> pass (`13`)
+    - live bounded rounds using `HF007`:
+      - first run exposed rollback root cause where per-batch `F009` rewrote latest facts
+      - fix applied: manifest-union input to `F009`, preserving prior successful captures
+      - post-fix bounded rounds delivered:
+        - `expected_coverage_rate: 0.2105 -> 0.3158`
+        - `no_source_rows: 75 -> 65`
+        - `full_capture_asin rows: 20 -> 30`
+      - final health state:
+        - `fail=0`
+        - `warn=1` (`hf_scrape_gap_missing_rate`)
+  - H evidence inventory:
+    - `out/h_strategy_outcome_log.csv` -> `9958` rows
+    - `out/h_strategy_outcome_daily.csv` -> `33` rows
+    - `out/listing_offer_snapshot_latest.csv` -> `65` rows
+    - `out/listing_offer_seller_snapshot_latest.csv` -> `119` rows
+    - `out/listing_offer_history.csv` -> `2462` rows
+    - `out/listing_offer_seller_observation_history.csv` -> `9614` rows
+    - `out/hos_daily_market_snapshot_latest.csv` -> `57` rows
+    - `out/sku_performance_summary.csv` -> `159` rows
+    - `out/sku_sales_velocity.csv` -> `477` rows
+  - F evidence inventory:
+    - `out/systems/F/live/f_screening_row_state_live.csv` -> `42786` rows
+    - `out/systems/F/live/feeder_approval_queue_live.csv` -> `9552` rows
+    - `out/systems/F/history/feeder_approval_decisions_log.csv` -> `9552` rows
+    - `out/systems/F/live/feeder_po_handoff_ready_live.csv` -> `0` rows
+    - `out/analysis_reports/f_backtest_calibration_set_latest.csv` -> `18` rows
+    - `out/analysis_reports/f_sales_history_validation_latest.csv` -> `3433` rows
+    - `out/analysis_reports/f_full_capture_monthly_points_latest.csv` -> `1306` rows
+    - `out/analysis_reports/f_full_capture_normalized_facts_latest.csv` -> `106` rows
+    - `out/analysis_reports/f_live_asin_validation_pack_latest.csv` -> `12` rows
+  - H scoped health source:
+    - `out/cycle_alerts/checklist_H.csv` at `2026-04-17T14:33:02Z`
+    - status: `WARN`, `fail=0`, `warn=2`
+  - Aggregate H health contradiction:
+    - `out/system_health_checklist.csv` last write `2026-04-17T05:04:49Z`
+    - contains older aggregate `h_ceiling_effective_floor_integrity = fail`
+    - treated as stale aggregate context for this ticket
+
+## Notes
+- This ticket is now in execution mode on frozen inputs.
+- This execution pass is now defined as frozen-input mode:
+  - no fresh scrape or new live evidence inside the perfection pass
+- Batch 000 is complete with deterministic proof and explicit coverage metrics.
+- Batch 001 should consume Batch 000 frozen outputs as-is:
+  - `hf_learning_identity_bridge_latest.csv`
+  - `hf_learning_assumption_snapshots_latest.csv`
+  - `hf_learning_foundation_metrics_latest.csv`
+- Batch 001 is complete and produced the first joined evidence baseline plus scrape-gap truth.
+- Batch 002 is complete and produced deterministic alignment and factor outputs.
+- Phase 3 health checks are complete with `fail=0` and `warn=2`.
+- Batch 003 shadow calibration is complete and remains shadow-only.
+- Batch 004 operator report is complete and deterministic.
+- Phase 6 signoff is complete with promotion state `not yet proven`.
+- Phase 9 bounded recovery is complete and cumulative capture behavior is now preserved.
+- Batch 001 should not change live repricer logic.
+- Follow-up work should not depend on any ad-hoc `A` run.
+- Fresh scrape, when needed, should be routed through the current F owner path:
+  - `F007_prepare_targeted_rescrape_subset.py` to prepare the subset
+  - `F061_run_legacy_first_checks_local.py` to own the actual scrape write path
+  - `F008_capture_full_bbp_evidence_pack.py` for sampled deep validation only
+- For fresh scrape to support learning evidence, prefer `F061_MODE=data_collection`.
+- Stop/start rules by phase:
+  - Prep through Phase 3: kill nothing
+  - Phase 4: stop only a manual `F061` run if editing that path
+  - Phase 5: use H controlled restart-drain and restart through `run_H_cycle.bat`
+- The first useful sign-off point for this plan is a reconciled foundation layer plus joined evidence mart, not a live runtime claim.

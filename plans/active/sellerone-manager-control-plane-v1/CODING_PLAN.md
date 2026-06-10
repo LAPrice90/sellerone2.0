@@ -1,0 +1,4549 @@
+# Coding Plan
+
+## Current Phase
+Phase 1 to Phase 4 implementation for read-only F price-list manager control plane.
+
+## Allowed Files
+- `sellerone_manager/`
+- `config/manager/modules/F_price_list_manager.json`
+- `plans/active/sellerone-manager-control-plane-v1/`
+- `tests/test_sellerone_manager_control_plane.py`
+- `project_control/backups/sellerone_manager_control_plane_v1_20260526T105313Z/README.md`
+
+## Not Allowed
+- No Google Sheets writes.
+- No local DB alignment.
+- No F061 live queue edits.
+- No A/B/E/H/F worker runs.
+- No worker restarts.
+
+## Tests And Proof
+- Compile manager package and focused tests.
+- Run `pytest tests/test_sellerone_manager_control_plane.py -q`.
+- Run `python -m sellerone_manager.app --flow F_price_list_manager --read-only --write-report`.
+
+## Success Threshold
+- Focused tests pass.
+- Dry-run exits with code `0`.
+- Manager writes all planned outputs under `out/systems/M/`.
+- `manager_execution_errors=0`.
+- Storage drift is classified as the blocker before supplier queue state.
+
+## Proof Update - 2026-05-26T11:02Z
+- Compile passed for the manager package and focused test file.
+- Focused pytest passed: `6 passed`.
+- Dry-run command passed:
+  - `python -m sellerone_manager.app --flow F_price_list_manager --read-only --write-report`
+- Dry-run result:
+  - `status=blocked`
+  - `manager_execution_errors=0`
+  - snapshot supplier: `CLF`
+  - queue state: `Recommended`
+  - live state: `blocked_storage_drift`
+  - earliest blocker: `storage_drift_preflight`
+- Manager-owned outputs written under `out/systems/M/`.
+- No worker-owned files were edited or run by the manager command.
+
+## Manager Wording Correction - 2026-05-26T11:15Z
+- User clarified that the active task is the manager, not manual repair of the worker system.
+- Manager behavior is updated so technical blockers become Codex-owned repair queue rows in `out/systems/M/codex_repair_queue.csv`.
+- Report wording now says there is no direct user task unless user input is truly required.
+
+## Repair Queue Persistence Update - 2026-05-26T11:25Z
+- Codex repair task IDs are now stable per flow, incident code, and root artifact.
+- Repeated blocker sightings update the same row with `last_seen_utc` and `seen_count`.
+- If a previously queued blocker disappears, the row changes to `cleared_pending_review` instead of being silently dropped.
+- Verification passed:
+  - compile passed
+  - focused pytest passed: `9 passed`
+  - live read-only manager run returned `status=blocked` and `manager_execution_errors=0`
+  - live repair queue now has one stable task: `F_storage_drift_preflight_4ddda80247`
+  - live repair queue `seen_count=2`
+  - output header check returned `header_errors=0`
+
+## Manager Completion Batch - 2026-05-26T11:27Z
+- Added append-only Codex repair event history at `out/systems/M/codex_repair_events.csv`.
+- Added manager CLI task lifecycle update support:
+  - `python -m sellerone_manager.app --task-status <task_id> --status <status> --note "<note>"`
+- Updated the report shape so Luke sees the plain-English answer first, then true Luke actions, then Codex-owned technical tasks.
+- Updated data contracts and runbook for the event log and task lifecycle command.
+- Verification passed:
+  - compile passed
+  - focused pytest passed: `11 passed`
+  - live read-only manager command passed three times during this batch
+  - live status remained `blocked`
+  - `manager_execution_errors=0`
+  - output header check returned `header_errors=0`
+  - live repair queue remained one stable task: `F_storage_drift_preflight_4ddda80247`
+  - live repair queue `seen_count=5`
+  - event log contains a backfilled history row for the existing stable Codex task
+- No worker-owned files were intentionally edited by the manager command.
+- No F061 queue edits, worker restarts, Google Sheets writes, local DB alignment, or A/B/E/H/F worker runs were performed.
+
+## First Manager-Controlled Repair Loop - 2026-05-26T11:50Z
+- Manager task `F_storage_drift_preflight_4ddda80247` was moved through the lifecycle:
+  - `queued`
+  - `in_progress`
+  - `cleared_pending_review`
+  - `completed`
+- Codex repaired the scoped blocker outside the manager package with an isolated one-off SQL-newer recovery tool.
+- The manager verified the result with a read-only run:
+  - `status=ok`
+  - `manager_execution_errors=0`
+  - no active F manager blocker
+  - no direct user task
+  - no active Codex repair task
+- This proves the intended loop:
+  - manager identifies root blocker
+  - Codex owns technical task
+  - scoped tool repairs the worker-owned artifact
+  - manager verifies and closes the task
+
+## H Repair Packet - 2026-05-27T07:31Z
+- Manager packet: `sellerone_manager/tasks/approved/MGR_H_repair_h_ceiling_events_required_fields_non_blank.md`.
+- Code fix applied at `2026-05-27T07:31:04Z`.
+- Allowed scope used:
+  - `scripts/phase1/phase1_main_loop.py`
+  - `scripts/cycles/run_H_pricing_cycle.py`
+  - `tests/test_phase1_main_loop.py`
+  - `tests/test_h_worker_lifecycle_contract.py`
+- Isolated verification passed:
+  - `python -m pytest tests/test_phase1_main_loop.py::Phase1MainLoopTests::test_emit_h_ceiling_event_safe_clamp_is_bucketed_non_actionable tests/test_phase1_main_loop.py::Phase1MainLoopTests::test_emit_h_ceiling_event_floor_priority_conflict_is_actionable tests/test_phase1_main_loop.py::Phase1MainLoopTests::test_emit_h_ceiling_event_skips_rows_without_binding_ceiling -q`
+  - `python -m pytest tests/test_h_worker_lifecycle_contract.py::HWorkerLifecycleContractTests::test_item_offers_rc0_missing_output_uses_inline_fallback -q`
+  - `python -m py_compile scripts/phase1/phase1_main_loop.py scripts/cycles/run_H_pricing_cycle.py`
+- Live proof status: not yet proven because this packet forbids running H.
+- Existing stale output evidence before live proof:
+  - `out/h_ceiling_events.csv` still has `3` rows with blank `true_binding_ceiling_gbp`.
+  - `out/listing_offer_snapshot_latest.csv` still has `0` filled rows for `buy_box_channel`, `lowest_fba_price`, `lowest_fbm_price`, `offer_count_fba`, and `offer_count_fbm`.
+- Trigger/time to check: after the next manager-approved guarded H proof window finalizes.
+- Artifact to inspect: refreshed `out/cycle_alerts/checklist_H.csv` after H finalization, plus refreshed `out/h_ceiling_events.csv` and `out/listing_offer_snapshot_latest.csv`.
+- Success condition: `h_ceiling_events_required_fields_non_blank` is not FAIL and `h_market_context_fill_nonzero` is not FAIL in the refreshed H checklist.
+- Remediation path if it fails: inspect the refreshed H run logs and run-scoped snapshot outputs for the same two checks; do not hand-edit output CSVs or widen outside H without a new manager packet.
+
+## H Boundary Finalizer Packet - 2026-05-31T09:22Z
+- Manager packet: `sellerone_manager/tasks/approved/MGR_H_repair_h_boundary_finalizer_truth.md`.
+- Code repair applied at `2026-05-31T09:22:50Z`.
+- Scope used:
+  - `scripts/phase1/phase1_main_loop.py`
+  - `scripts/flows/H/H110_run_phase1_h_pilot.py`
+  - `tests/test_phase1_main_loop.py`
+- Plain-English fault isolated:
+  - H completed the useful 50/50 scan-state work, then the parent watchdog had little fresh proof while the post-scan strategy outcome cleanup and final payload path continued.
+  - The repair adds watchdog-visible progress around that cleanup and batches daily rollup rebuilds once per affected strategy group.
+- Isolated verification passed:
+  - `python -m py_compile scripts\phase1\phase1_main_loop.py scripts\flows\H\H110_run_phase1_h_pilot.py`
+  - `python -m pytest tests\test_phase1_main_loop.py::Phase1MainLoopTests::test_close_pending_strategy_outcomes_tick_batches_daily_rollup_rebuilds tests\test_phase1_main_loop.py::Phase1MainLoopTests::test_close_pending_strategy_outcomes_tick_writes_watchdog_progress -q`
+  - `python -m pytest tests\test_phase1_main_loop.py tests\test_h_worker_lifecycle_contract.py -q`
+  - `python -m pytest tests\manager -q`
+- Live proof status: not yet proven because this packet forbids Codex from running H, changing scheduler ownership, publishing, changing prices, editing queues, writing Sheets, aligning local DB, deleting outputs, or restarting workers.
+- Trigger/time to check: after the next normal H-owned run that starts after `2026-05-31T09:22:50Z` finalizes.
+- Artifact to inspect: refreshed independent H MOT from `python -m sellerone_manager.app --hourly-mot --mot-flow H`, plus latest H manifest, terminal info, and publish info.
+- Success condition: latest H run finalizes cleanly and independent H MOT reports `h_boundary_finalizer_truth=ok`, with terminal state `finalized` and publish status `ok` or a safe parked status.
+- Remediation path if it fails: keep this packet open, inspect the refreshed post-scan progress checkpoints, and prepare the next bounded H finalizer packet without running H or changing scheduler ownership unless a separate approved proof window exists.
+
+## H Boundary Finalizer Proof Update - 2026-05-31T09:46Z
+- Live proof status: proved.
+- Proof run: natural H-owned run `20260531T091704Z`.
+- Terminal proof:
+  - state `finalized`
+  - stage `phase1_publish`
+  - publish_status `ok`
+- Independent manager proof:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - result `fail_count=0`, `warn_count=3`
+  - boundary/finalizer failures cleared
+- Combined manager proof:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow all`
+  - result `fail_count=0`, `warn_count=13`
+- Manager task state:
+  - `MGR_H_repair_h_boundary_finalizer_truth` marked `proved`
+  - `MOT_H_H_BOUNDARY_FINALIZER_TRUTH` marked `proved`
+  - `MOT_H_H_TERMINAL_PUBLISH_TRUTH` marked `proved`
+  - `MOT_H_H_LATEST_MANIFEST_STATE` cleared from active MOT worklist; worklist row is `proved`
+- Remaining H state: warning-labelled only. No active H MOT failure remains. Do not treat older H health snapshot rows as a repair trigger by themselves.
+
+## B API Refund Fee Shipping ROI Proof Packet - 2026-05-31T09:55Z
+- Manager goal file created:
+  - `sellerone_manager/goals/active/B_REFUND_FEE_SHIPPING_ROI_API_PROOF_20260531.md`
+- Repair package created:
+  - `plans/active/sellerone-manager-control-plane-v1/B_REPAIR_PACKAGE_B_REFUND_FEE_SHIPPING_ROI_API_PROOF_20260531.md`
+- Approved manager packet created:
+  - `sellerone_manager/tasks/approved/MGR_B_repair_b_refund_fee_shipping_roi_api_proof.md`
+- Manager task state:
+  - status `approved`
+  - authority `standing_safe_code_repair`
+  - `luke_action_required=0`
+- Proof boundary:
+  - worker may improve manager/MOT proof readers and tests for refund, fee, shipping, and ROI API proof labels
+  - worker may inspect named proof outputs read-only
+  - worker must not run or restart B, edit locks, write Sheets, correct data, align local DB, delete outputs, change prices or queues, or use Sellerboard values as final ROI/restocking truth
+- Verification:
+  - `python -m sellerone_manager.app --refresh-approved-tasks` returned `approved_count=1`
+  - `python -m sellerone_manager.app --what-next` shows Codex task `MGR_B_repair_b_refund_fee_shipping_roi_api_proof`
+- Next step:
+  - claim the approved packet and implement the manager/MOT API-proof labels inside its boundary
+
+## B Refund Return-Token Proof Update - 2026-06-03T19:34Z
+- Current phase: manager-controlled B refund-return proof and protected local repair.
+- Approved packet: `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`.
+- Safe actions completed:
+  - tightened B042 proof mapping so stale allocation token IDs can fall back to live order/SKU ledger proof
+  - applied protected B008 reproof for one API/Sellerboard/Amazon-proved sellable return after a matching B maintenance handoff
+  - applied protected B009 reuse repair for the same return after B008 proof created returned-pending token state
+  - cleared only the matching B maintenance markers after each apply
+- Protected actions not taken:
+  - no B run or restart
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard-as-final ROI/restocking use
+- Verification passed:
+  - focused B refund-return tests passed: 169 tests
+  - read-only B MOT returned `fail_count=0`, `warn_count=5`
+  - B refund-return workpack now has 25 warning rows, 3 lanes, 0 unclassified rows
+  - B008 and B009 ready repair rows are now 0
+  - maintenance markers are clear
+- Remaining parked lanes:
+  - 15 Amazon return coverage proof rows
+  - 9 protected non-sellable disposition conflict rows
+  - 1 protected original returned-token live-status conflict row
+- Monitoring target:
+  - artifact: `out/systems/B/refunds/b_refund_return_warning_workpack.csv`
+  - success condition: remaining rows stay explicitly lane-labelled, with 0 unclassified rows and no ROI/restocking use allowed
+  - automatic next step: package the next exact lane only after a manager-approved B packet targets Amazon return coverage proof or a protected disposition/original-return decision
+  - stop rule: stop before token correction, B run/restart, Sheet write, DB alignment, output deletion, ROI/restocking use, price/queue change, or widened B scope
+
+## B Amazon Return Coverage Proof Update - 2026-06-03T19:58Z
+- Current phase: Amazon return coverage proof lane.
+- Code changed:
+  - B052 now records whether the customer-return report window covers each refund date.
+
+## B Fallback Token Cost Proof - 2026-06-05T13:05Z
+- Current phase: B fallback token cost audit and future-proofing.
+- Approved packets:
+  - `B-FALLBACK-COST-AUDIT`
+  - `B-FALLBACK-COST-SOURCE`
+- Allowed files:
+  - `scripts/flows/B/B009_apply_stock_adjustments_to_tokens.py`
+  - new/read-only B fallback cost audit builder under `scripts/flows/B/`
+  - `sellerone_manager/app.py`
+  - `sellerone_manager/hourly_mot.py`
+  - focused tests for B009, the audit builder, and B MOT mapping
+- Protected actions not allowed:
+  - no historical token cost correction
+  - no B run or restart
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no ROI/restocking use of weak fallback cost
+- Tests and proof:
+  - run the read-only fallback cost audit
+  - run focused tests
+  - rerun read-only B MOT
+  - refresh Manager Task Board
+- Success condition:
+  - fallback tokens are labelled as receipt-proved, source-token-proved, weak, or unproved
+  - B009 future fallback creation requires a proven cost basis
+  - old weak rows, if any, remain warning-labelled and become `B-FALLBACK-DATA-CORRECTION` preview/decision work rather than silent ROI truth
+
+### Completion - 2026-06-05T13:52Z
+- B070 read-only fallback cost audit built:
+  - fallback tokens checked: 3120
+  - receipt-proved rows: 2
+  - source-token-proved rows: 3118
+  - weak or unproved rows: 0
+  - live-use rows: 0
+- B009 future-proofing completed:
+  - future fallback-token creation requires receipt/source-token proof before copying a cost
+  - no historical token data was corrected
+- B071 reconciliation added:
+  - source-token cost valid for source tracing: 1444 rows
+  - requires batch-link proof before clean H/O trust: 1676 rows across 12 SKUs
+  - H next-available blocked SKU: A2-T2AC-TW3L
+  - live-use rows: 0
+- B-SHEET-TOKEN-COUNT-CHECK completed:
+  - two direct Sheet count mismatches classified read-only
+  - 5Q-LUQ1-L14K / SR-20260413-009: one local receipt-token count missing
+  - MY-KL21-NMV5 / SR-20260318-014: duplicate batch comparison row already matched elsewhere
+  - wrong direct-cost rows: 0
+- Focused tests:
+  - 210 passed
+- Read-only B MOT:
+  - 0 fail
+  - 5 warn
+- Remaining state:
+  - B is manager-ready with parked truth warnings
+  - existing fallback-token value correction remains protected and parked
+  - H/O clean trust remains blocked where batch-link proof is missing
+
+### H/O Handoff - 2026-06-05T14:15Z
+- O token-cost trust gate updated:
+  - O025 now reads B071 fallback-cost reconciliation as well as the original B070 fallback audit
+  - rows where B071 says `requires_batch_link_proof` are blocked from clean buy/PO trust
+  - live read-only O025 proof: 161 rows checked, 23 untrusted, 23 weak fallback, 0 missing cost, 0 not-verified
+  - `O-TOKEN-COST-TRUST-GATE` marked proved
+- H token-floor source guard updated:
+  - H MOT now reads B071 and labels current floors that need batch-link proof
+  - latest H read-only MOT: 89 floor rows, 5 fallback rows, 1 batch-link-proof-needed row, 39 risky/unknown rows, 0 unknown-source rows
+  - `H-TOKEN-FLOOR-SOURCE` marked proved as a controlled warning/parked truth lane, not a live H repair
+- Focused tests:
+  - O025 and H MOT focused tests: 32 passed
+  - broader manager/MOT retest covering this board behavior: 232 passed
+- Protected actions still not taken:
+  - no B run or restart
+  - no H run or publish
+  - no price, queue, Sheet, local DB, token correction, output deletion, or buying/restocking action
+- Remaining state:
+  - O and H can now see B weak-cost proof instead of silently trusting it
+  - historical fallback-token value correction remains a protected `B-FALLBACK-DATA-CORRECTION` decision
+  - unrelated O and H readiness failures remain separate manager-board jobs
+
+## B Refund-Token Returned-Pending Lane - 2026-06-05T15:20Z
+- Current phase: B refund-token bridge warning split into exact proof/decision lanes.
+- Safe work completed:
+  - B041 return-token repair preview refreshed: 52 rows classified
+  - B042 refund-token reproof preview refreshed: 28 rows classified
+  - B072 token-ledger gap review added and run
+- Current B042 proof:
+  - ready B008 state-reproof rows: 22
+  - token-ledger gap rows: 5
+  - token-state conflict rows: 1
+  - live-write allowed rows: 0
+  - ROI/restocking allowed rows: 0
+  - Sellerboard-final-truth rows: 0
+- Current B072 proof:
+  - review rows: 5
+  - protected ledger-alignment rows: 5
+  - unclassified rows: 0
+  - unsafe rows: 0
+- Manager Task Board updates:
+  - `B-B008-TOKEN-LEDGER-GAPS` proved
+  - `B-B008-REPROOF-APPLY` created as blocked Luke-gate protected token repair
+  - `B-B008-TOKEN-STATE-CONFLICT` created as blocked Luke-gate protected token-state decision
+- Focused tests:
+  - B072, B042, and B manager MOT tests: 212 passed
+- Read-only B MOT:
+  - 0 active B failures
+  - refund-token bridge remains warning-labelled because the remaining rows are protected/parked, not silently trusted
+- Protected actions still not taken:
+  - no B run or restart
+  - no token correction
+  - no stock recovery exception
+  - no allocation/COGS correction
+  - no Sheet write, local DB alignment, output deletion, price/queue change, or ROI/restocking use
+- Next state:
+  - Safe proof work for the 5 token-ledger gaps is complete
+  - Clearing the 22 ready rows requires Luke to approve a protected B008 reproof repair window
+  - The 1 token-state conflict requires separate protected review before any correction
+
+### Protected Apply Attempt - 2026-06-05T15:35Z
+- Luke approved proceeding with `B-B008-REPROOF-APPLY`.
+- B043 refused to apply because B currently has active owner locks and no matching `maintenance.ready` proof.
+- Applied rows: 0
+- Token rows updated: 0
+- Refund event rows updated: 0
+- Snapshot created: no, because the repair did not reach the write stage
+- Board state:
+  - `B-B008-REPROOF-APPLY` remains `blocked_needs_luke`
+- Next required decision:
+  - approve a protected B maintenance pause/ready window, then rerun B043 with the same 22 eligible rows
+- Still forbidden:
+  - no forced lock clearing
+  - no B restart
+  - no Sheet write
+  - no local DB alignment
+  - no output deletion
+  - no ROI/restocking use before B MOT retests the same rows
+
+### Protected B008 Apply Completed - 2026-06-05T15:39Z
+- Luke approved the protected B maintenance-ready window.
+- Maintenance request:
+  - request_id: `CODEX_B043_B008_REPROOF_20260605T1538Z`
+  - B wrote matching `maintenance.ready`
+  - maintenance was released after the repair
+- B043 result:
+  - status: applied
+  - eligible rows: 22
+  - applied rows: 25
+  - token rows updated: 25
+  - refund event rows updated: 22
+  - blocked rows: 0
+  - snapshot exists under B008 reproof snapshots
+- Retest:
+  - B refund proof chain refreshed
+  - B042 now has no ready B008 rows left
+  - B041 now shows 22 B009 order-aware returned-token rows
+  - read-only B MOT has 0 active B failures
+  - focused B008/B009/B072 tests: 23 passed
+- Board state:
+  - `B-B008-REPROOF-APPLY` proved
+  - `B-B009-RETURN-REUSE-APPLY` created as blocked Luke-gate protected token repair
+- Still forbidden:
+  - no B009 reusable-token creation until Luke approves the separate protected B009 repair window
+  - no ROI/restocking use until the B009 lane clears and B MOT retests
+
+## H Defensive Listing Frustrate System v2 - 2026-06-04T11:37Z
+- Current phase: H defensive listing source fix complete; live proof pending.
+- Approved packets:
+  - `H-DEFENSIVE-LISTING-STAND`
+  - `H-DEFENSIVE-LISTING-VISIBILITY`
+- Code/config changed:
+  - B06 config now uses `pressure_then_match`: pressure with 1p undercut for 30 active rival days, then match.
+  - H defensive guard now stands down when the rival is absent, equal, above us, or market proof is stale/unclear.
+  - The old slow-share-hold path is disabled for this mode.
+  - H MOT now reads B06 action/daily proof rows and flags stand-down violations.
+- Isolated verification passed:
+  - `python -m pytest tests/test_phase1_defensive_listing.py tests/test_phase1_main_loop.py -q`: 62 passed.
+  - `python -m pytest tests/manager/test_h_hourly_mot.py -q`: 21 passed.
+  - `python -m py_compile scripts/phase1/phase1_defensive_listing.py scripts/phase1/phase1_main_loop.py sellerone_manager/hourly_mot.py tests/test_phase1_defensive_listing.py tests/test_phase1_main_loop.py tests/manager/test_h_hourly_mot.py`: passed.
+- Read-only H MOT after the source fix:
+  - `h_defensive_listing_protection_mode=fail` because the latest existing B06 proof row is the old bad row: current 6.98, rival 6.98, target 6.97, write applied.
+  - This is expected until a new H-owned proof row is produced after the source fix.
+  - H also still has manifest, terminal/publish, boundary/finalizer, and reliability failures unrelated to this defensive listing source fix.
+- Live proof status: not yet proven.
+- Latest check: `2026-06-04T11:54:50Z` read-only H MOT still shows the latest B06 proof row as the old equal-rival applied write from `2026-06-04T10:48:46Z`; no clean post-fix B06 proof row has appeared yet.
+- Latest check: `2026-06-04T12:04:06Z` read-only H MOT still fails `h_defensive_listing_protection_mode` from the old equal-rival applied write. A post-fix normal H-owned run is active (`20260604T115527Z`, started `2026-06-04T11:57:07Z`), but it has not finalized and has not produced a new B06 proof row yet.
+- Latest check: `2026-06-04T12:33:08Z` H run `20260604T115527Z` is still alive with a fresh heartbeat. The latest terminal proof is still the prior run, and the B06 action/daily proof still contains only the old pre-fix equal-rival applied write. Board state refreshed: `H-DEFENSIVE-LISTING-STAND` is `fixed_needs_retest`; `H-DEFENSIVE-LISTING-PROTECTION` is `in_progress`.
+- Latest check: `2026-06-04T12:45:20Z` H run `20260604T115527Z` has finalized ok, but no new B06 proof row appeared; read-only H MOT still fails from the old pre-fix equal-rival applied write. A newer normal H run `20260604T124059Z` started at `2026-06-04T12:43:44Z` and is alive. Next check target is after this newer run finalizes.
+- Latest check: `2026-06-04T12:47:54Z` H run `20260604T124059Z` is still alive with a fresh heartbeat. Terminal proof remains the prior finalized run `20260604T115527Z`, and the latest B06 proof row is still the old pre-fix `2026-06-04T10:48:46Z` equal-rival applied write. No user action needed.
+- Latest check: `2026-06-04T12:52:52Z` H run `20260604T124059Z` is still alive with a fresh heartbeat. Terminal proof remains the prior finalized run, and B06 action/daily proof still has no post-fix row after `2026-06-04T11:37:00Z`.
+- Latest check: `2026-06-04T12:57:51Z` H run `20260604T124059Z` is still alive with a fresh heartbeat. Terminal proof remains the prior finalized run, and B06 action/daily proof still has no post-fix row after `2026-06-04T11:37:00Z`.
+- Completion check: `2026-06-04T13:37Z` post-fix B06 proof is present and clean. Latest B06 row is `2026-06-04T12:40:59Z`, mode `pressure_then_match`, phase `normal_h_control`, current `6.97`, rival `6.98`, no target, no attempted write, no applied write. H MOT now reports `h_defensive_listing_protection_mode=ok`; the old equal-rival applied write remains visible as `historical_stand_down_violation_rows=1` but no longer blocks current proof.
+- Board status: `H-DEFENSIVE-LISTING-PROTECTION` proved; `H-DEFENSIVE-LISTING-STAND` proved. Temporary heartbeat `h-b06-defensive-listing-proof-monitor` deleted because the proof window completed.
+- Verification:
+  - `python -m pytest tests/manager/test_h_hourly_mot.py -q`: 22 passed.
+  - `python -m py_compile sellerone_manager/hourly_mot.py tests/manager/test_h_hourly_mot.py`: passed.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H`: defensive listing protection ok; H still has separate reliability-window fail.
+- B06 proof monitor status: complete. No further B06 heartbeat check is needed unless a new H defensive-listing MOT failure appears.
+
+## H Reliability Window - 2026-06-04T13:45Z
+- Current phase: evidence wait, not code repair.
+- Board status: `H-RELIABILITY-WINDOW-02` parked because the current failure is a real last-10-run window condition, not a manager-code bug.
+- Current proof: read-only H MOT reports `h_reliability_window=fail` with `window_runs=10;clean_runs=0;warned_runs=9;failed_runs=1;target_clean_runs=8`.
+- Failed receipt in window: `H_20260604T101005Z` failed with `CHILD_RC_NONZERO / atexit_without_success_marker`.
+- Recovery proof after that failure: newer H runs `H_20260604T104846Z`, `H_20260604T115527Z`, and `H_20260604T124059Z` completed. H run `20260604T132114Z` was alive with a fresh heartbeat at `2026-06-04T13:45:55Z`.
+- Trigger/time to check: after enough normal H-owned runs complete to push `H_20260604T101005Z` out of the last-10 window. If the current cadence continues, first useful retest is around `2026-06-04T18:15:00Z`.
+- Artifact to inspect: refreshed `out/systems/M/hourly_mot_H.csv` after running read-only `python -m sellerone_manager.app --hourly-mot --mot-flow H`.
+- Success condition: `h_reliability_window` has `failed_runs=0`. It may still be `warn` if the remaining receipts are warning-quality; that is a separate warning-quality cleanup path, not this failed-run window repair.
+- Remediation path if it fails: if a new failed or ambiguous H run appears, package that exact run as a bounded H proof/finalizer task. If there are no failed runs but the window remains warning-heavy, continue with the old H checklist proof rows separately without running H manually, restarting workers, changing scheduler ownership, editing queues, writing Sheets, aligning DB data, deleting outputs, publishing, or manually changing prices.
+
+  - B052 now records whether the source stock event is order-level safe or only an inventory-ledger signal.
+- Proof result:
+  - 15 parked Amazon coverage rows
+  - 15 covered by the current Amazon customer-return report date window
+  - 0 exact order/SKU customer-return matches
+  - 15 inventory-ledger signals that are not order-level customer-return proof
+  - 0 source-event rows safe for ROI/restocking stock recovery
+  - 0 unclassified rows
+- Verification:
+  - `tests/test_b052_build_amazon_return_coverage_audit.py`: 2 passed
+  - B refund-return focused tests: 38 passed
+  - B MOT-focused manager tests: 46 passed
+  - read-only B MOT: `fail_count=0`, `warn_count=5`
+- Current interpretation:
+  - these are stock-movement clues, not proved customer-return stock recovery
+  - they stay blocked from live ROI/restocking use unless direct Amazon customer-return proof appears or Luke approves a protected exception/correction packet
+- Next safe work:
+  - continue with protected disposition conflict preview only if the manager packet explicitly targets that lane
+  - otherwise keep the 15 Amazon coverage rows parked and visible in MOT
+
+## B Disposition Conflict Preview Update - 2026-06-03T20:16Z
+- Current phase: protected non-sellable return conflict proof.
+- Code changed:
+  - added B058 read-only disposition conflict preview
+  - added B058 CLI command through the manager app
+  - added B058 independent MOT row
+  - added B058 to the B order-truth proof gate
+- Proof result:
+  - 9 rows where Amazon says the return is non-sellable but B has reusable-token proof
+  - 9 rows also have return COGS recovery proof
+  - 9 reusable tokens are already allocated to later orders
+  - 0 live-write rows
+  - 0 ROI/restocking-use rows
+  - 0 Sellerboard-final-truth rows
+  - 0 unclassified rows
+- Verification:
+  - B refund-return focused tests: 40 passed
+  - B MOT-focused manager tests: 46 passed
+  - read-only B proof rebuild completed
+  - read-only B MOT: `fail_count=0`, `warn_count=6`
+- Current interpretation:
+  - the 9 rows are real protected disposition conflicts
+  - stock recovery for those rows must stay blocked from ROI/restocking unless a protected correction or explicit exception is approved
+- Next safe work:
+  - build a protected correction/exception preview for the 9 disposition conflicts only if the packet explicitly treats downstream allocated orders as protected
+  - stop before any token correction, B run/restart, Sheet write, DB alignment, output deletion, ROI/restocking use, price/queue change, or wider scope
+
+## B Disposition Conflict Decision Preview Update - 2026-06-03T20:34Z
+- Current phase: protected correction/exception decision preview.
+- Code changed:
+  - added B059 read-only correction/exception decision preview
+  - added B059 CLI command through the manager app
+  - added B059 independent MOT row
+  - added B059 to the B order-truth proof gate
+- Proof result:
+  - 9 preview rows
+  - 9 protected decision rows
+  - 9 downstream allocated order rows
+  - 9 return COGS rows
+  - all 9 rows classified as `downstream_allocated_non_sellable_reuse_with_cogs`
+  - 0 live-write rows
+  - 0 ROI/restocking-use rows
+  - 0 Sellerboard-final-truth rows
+  - 0 unclassified rows
+- Verification:
+  - B refund-return focused tests: 42 passed
+  - B MOT-focused manager tests: 48 passed
+  - read-only B MOT: `fail_count=0`, `warn_count=6`
+- Current interpretation:
+  - this is a protected business/data decision, not an automatic worker repair
+  - correction would affect token state, return COGS, and downstream order truth
+  - exception would need explicit labelling so ROI/restocking does not treat it as normal clean proof
+- Next safe work:
+  - prepare a plain-English Luke decision packet from B059
+  - stop before any live token correction, downstream order correction, COGS correction, B run/restart, Sheet write, DB alignment, output deletion, ROI/restocking use, price/queue change, or wider scope
+
+## B Disposition Conflict Decision Packet - 2026-06-03T20:39Z
+- Decision packet created:
+  - `sellerone_manager/tasks/blocked/MOT_B_B_DISPOSITION_CONFLICT_DECISION.md`
+- Current state:
+  - Luke decision is required before this lane can move from proof to correction or exception.
+  - Manager recommendation is protected correction review, not automatic correction.
+  - No live data write is approved by the decision packet itself.
+- Decision choices:
+  - protected correction review
+  - protected business exception
+  - keep parked
+- Stop rule:
+  - stop before live token correction, downstream order correction, COGS correction, B run/restart, Sheet write, DB alignment, output deletion, ROI/restocking use, price/queue change, or scope widening
+
+## B Correction Impact And Apply Preview - 2026-06-03T22:35Z
+- Current phase: protected non-sellable return correction scoping.
+- Code changed:
+  - added B060 read-only correction-impact preview
+  - added B061 read-only protected apply preview
+  - added B060 and B061 CLI commands through the manager app
+  - added B060 and B061 independent MOT rows
+  - added B060 and B061 to the B order-truth proof gate
+- Proof result:
+  - B060 has 9 impact rows, 9 downstream allocated order rows, 9 downstream item matches, and 9 return COGS rows
+  - B061 has 9 apply-preview rows
+  - 4 rows are replacement-swap preview-ready
+  - 4 rows need replacement date validation
+  - 1 row has no clean replacement token and needs shortage/exception review
+  - B061 reserves replacement candidates so one replacement token cannot be suggested for two later orders
+  - 0 live-write rows
+  - 0 ROI/restocking-use rows
+  - 0 Sellerboard-final-truth rows
+  - 0 unclassified rows
+- Verification:
+  - py_compile passed for B060, B061, manager app, and hourly MOT
+  - B refund-return focused tests passed: 47
+  - B MOT-focused manager tests passed: 52
+  - read-only B MOT: `fail_count=0`, `warn_count=6`
+- Safety boundary:
+  - no B run or restart
+  - no live token correction
+  - no downstream allocation correction
+  - no COGS correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Next safe work:
+  - create a guarded live-apply plan for the 4 replacement-swap preview-ready rows only
+  - keep the 4 date-validation rows and 1 no-replacement row parked unless Luke explicitly approves a shortage/exception rule
+  - stop before live apply until a protected correction window is approved
+
+## Manager Packet Naming Simplification - 2026-05-31
+- Problem found:
+  - repair package task IDs were guessed from the first `b_...` or `h_...` code found anywhere in the markdown
+  - this let a package that mentioned an old warning first collapse into the wrong old task
+- Code change:
+  - `sellerone_manager/task_packets.py` now reads explicit package identity sections first:
+    - `Approved Check`
+    - `Task Id`
+    - `Task ID`
+    - `Manager Task Id`
+    - `Manager Task ID`
+  - only if those sections are missing does it fall back to scanning the whole document
+- Tests added:
+  - B package uses `Approved Check` over the first warning code
+  - H package uses `Approved Check` over the first warning code
+- Verification:
+  - `python -m py_compile sellerone_manager\task_packets.py`
+  - `python -m pytest tests\manager\test_task_packets.py -q`
+  - `python -m pytest tests\manager -q`
+  - `python -m sellerone_manager.app --refresh-approved-tasks`
+  - `python -m sellerone_manager.app --what-next`
+- Result:
+  - manager still shows one approved task: `MGR_B_repair_b_refund_fee_shipping_roi_api_proof`
+  - no worker cycles were run
+  - no protected action was taken
+
+## Manager V1.1 F Self-Organisation Report - 2026-05-26T12:08Z
+- Added manager-owned F script registration report under `out/systems/M/self_organisation/`.
+- New outputs:
+  - `latest_f_script_registration_report.csv`
+  - `latest_f_script_registration_report.json`
+  - `latest_f_self_organisation_report.md`
+- Scope stayed F-only:
+  - no A/B/E/H expansion
+  - no safe dispatching
+
+## B Refund Feature Completion Packet - 2026-06-01T11:19:54Z
+- User correction:
+  - this packet is the refund feature only
+  - token correction stays parked unless it directly blocks refund proof
+- Code phase status:
+  - isolated implementation complete
+  - live loop verification not yet proven
+- Scope used:
+  - B refund proof builder
+  - D daily P&L refund unit rows and double-count guard
+  - E performance refund-rate proof fields
+  - O restock refund confidence fields
+  - manager MOT refund proof checks for B, E, and O
+- Outputs planned by B refund proof builder:
+  - `out/systems/B/refunds/b_refund_pnl_bridge.csv`
+  - `out/systems/B/refunds/b_sku_refund_rate.csv`
+- Isolated tests passed:
+  - `python -m pytest tests\test_b037_build_refund_pnl_bridge.py tests\test_d001_build_pnl_daily_refunds.py tests\test_e004_build_performance_summary.py tests\test_o001_restock_source_view.py tests\manager\test_hourly_mot.py -q`
+  - result: `85 passed`
+- Read-only MOT status after code change:
+  - B refund proof builder output is not yet proven because the live B loop was active and the new B step has not run at a safe B boundary
+  - E and O live outputs are not yet proven because they have not been refreshed with the new refund fields
+- Protected actions not taken:
+  - no B, E, or O live cycle was run or restarted
+  - no Google Sheets write
+  - no price or queue change
+  - no local DB alignment
+  - no output deletion
+  - no Sellerboard estimate was promoted into live ROI/restocking truth
+- Trigger/time to check:
+  - after Luke approves a controlled B/E/O refund proof window, or after the next safe owner-managed B/E/O refresh that includes the new refund builder
+- Artifacts to inspect:
+  - `out/systems/B/refunds/b_refund_pnl_bridge.csv`
+  - `out/systems/B/refunds/b_sku_refund_rate.csv`
+  - refreshed E performance summary
+  - refreshed O restock source view
+  - read-only MOT rows for B, E, and O refund proof
+- Success condition:
+  - B refund bridge exists and uses API refund money as truth
+  - Sellerboard-only rows remain labelled as bridge estimates
+  - P&L refund unit rows reconcile to the B refund bridge
+  - E carries refund-rate proof fields and uses API-proved refund drag where available
+  - O carries refund confidence labels and does not treat weak proof as business-ready
+  - B/E/O MOT refund rows clear or show honest labelled warnings only
+- Remediation path if proof fails:
+  - keep work inside the refund packet
+  - fix the earliest source in the chain that failed
+  - do not switch back to token work unless the proof shows tokens directly block refund evidence
+  - do not run or restart live cycles, write Sheets, align local DB, delete outputs, or change prices/queues without Luke approval
+
+## B Refund Return API Proof Probe - 2026-06-03T09:11:54Z
+- User instruction:
+  - prove the refund/return data source before hard-coding permanent ROI or restock behavior
+- Probe status:
+  - complete
+  - live ROI wiring not started
+  - permanent parser not yet approved
+- Read-only Amazon source tested:
+  - `GET_FBA_FULFILLMENT_CUSTOMER_RETURNS_DATA`
+  - UK marketplace proof sample
+  - return window `2026-05-26T00:00:00Z` to `2026-06-02T23:59:59Z`
+- Proof result:
+  - Amazon returned 1 FBA customer return row
+  - returned columns included order ID, SKU, ASIN, FNSKU, return date, quantity, detailed disposition, reason, status, fulfilment centre, LPN, and customer comments
+  - the returned row joined to the B refund bridge by order ID and SKU
+  - the refund money state for the joined row was `api_proved`
+  - the return stock disposition was `SELLABLE`
+  - the Amazon status said the unit was returned to inventory
+- Proof outputs:
+  - `out/systems/M/b_refund_return_api_probe/b_refund_return_api_probe_summary.csv`
+  - `out/systems/M/b_refund_return_api_probe/b_fba_customer_returns_probe.csv`
+  - `out/systems/M/b_refund_return_api_probe/b_refund_return_api_probe_join.csv`
+  - `out/systems/M/b_refund_return_api_probe/b_refund_return_api_probe_manifest.json`
+- Safety:
+  - no B run or restart
+  - no worker restart
+  - no business output write
+  - no Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no live ROI or restock change
+- What this proves:
+  - Amazon has a direct API report route for physical return status
+  - the report can prove whether a returned unit is sellable or not
+  - the report can be joined to refund money through order ID and SKU
+- What remains not yet proven:
+  - all-marketplace coverage for return reports
+  - larger sample coverage across 30 and 90 days
+  - complete mapping of every Amazon detailed disposition into the business labels `returned_to_sellable_stock`, `returned_unsellable`, `refund_without_return`, and `return_state_not_yet_proven`
+  - permanent MOT coverage for this report
+- Next approved implementation shape, if Luke approves:
+  - build a permanent read-only B return-state proof builder
+  - keep output under manager/B proof folders first
+  - add tests for sellable, unsellable, missing refund match, and refund without return
+  - add MOT rows that warn when refund money is proved but return stock state is missing
+  - do not feed return-state values into live ROI/restocking until Luke approves that business rule
+  - no worker cycles
+  - no worker logic edits
+  - no Google Sheets writes
+  - no sibling repo move
+- Current self-organisation counts:
+  - registered: `2`
+  - unregistered: `29`
+  - needs review: `34`
+  - one-off exempt: `43`
+  - legacy exempt: `20`
+- F operation status remained OK:
+  - `status=ok`
+  - `manager_execution_errors=0`
+  - no active F manager blocker
+  - no direct user task
+  - no active Codex repair task
+- Verification passed:
+  - compile passed
+  - focused manager tests passed: `17 passed`
+  - dry-run command passed:
+    - `python -m sellerone_manager.app --flow F_price_list_manager --read-only --write-report`
+  - output header check returned `header_errors=0`
+
+## Manager V1.2 F Manifest Priority Ranking - 2026-05-26T12:22Z
+- Added manager-owned F manifest priority ranking under `out/systems/M/self_organisation/`.
+- New outputs:
+  - `latest_f_manifest_priority_ranking.csv`
+  - `latest_f_manifest_priority_ranking.json`
+  - `latest_f_manifest_priority_report.md`
+- Scope stayed manager-only:
+  - no new manifests created
+  - no worker scripts edited
+  - no worker cycles run
+  - no safe dispatching added
+  - no Google Sheets writes
+  - no A/B/E/H expansion
+- Current top 3 manifest candidates:
+  - `scripts/flows/F/price_list_manager/FPM170_supervise_live_cycle.py`
+  - `scripts/flows/F/price_list_manager/FPM129_storage_drift_guard.py`
+  - `scripts/flows/F/price_list_manager/FPM050_build_next_action_report.py`
+- F operation status remained OK:
+  - `status=ok`
+  - `manager_execution_errors=0`
+- Verification passed:
+  - compile passed
+  - focused manager tests passed: `19 passed`
+  - dry-run command passed:
+    - `python -m sellerone_manager.app --flow F_price_list_manager --read-only --write-report`
+  - output header check returned `header_errors=0`
+
+## Manager V1.3 Top 3 F Script Manifests - 2026-05-26T12:30Z
+- Added exactly 3 script-level F manager manifests:
+  - `config/manager/modules/FPM170_supervise_live_cycle.json`
+  - `config/manager/modules/FPM129_storage_drift_guard.json`
+  - `config/manager/modules/FPM050_build_next_action_report.json`
+- Updated self-organisation registration to read all F manifests in `config/manager/modules/`.
+- Registered count moved from `2` to `5`.
+- The 3 new scripts now classify as `registered` with no missing manifest fields:
+  - `scripts/flows/F/price_list_manager/FPM170_supervise_live_cycle.py`
+  - `scripts/flows/F/price_list_manager/FPM129_storage_drift_guard.py`
+  - `scripts/flows/F/price_list_manager/FPM050_build_next_action_report.py`
+- Priority ranking moved on to new unregistered candidates:
+  - `scripts/flows/F/price_list_manager/FPM060_build_status_dashboard.py`
+  - `scripts/flows/F/price_list_manager/FPM070_stage_f061_handoff.py`
+  - `scripts/flows/F/price_list_manager/FPM100_apply_f061_handoff.py`
+- F operation status remained OK:
+  - `status=ok`
+  - `manager_execution_errors=0`
+- Verification passed:
+  - compile passed
+  - focused manager tests passed: `21 passed`
+  - dry-run command passed:
+    - `python -m sellerone_manager.app --flow F_price_list_manager --read-only --write-report`
+  - output header check returned `header_errors=0`
+- Scope stayed manager-only:
+  - no worker scripts edited
+  - no worker cycles run
+  - no safe dispatching added
+  - no Google Sheets writes
+  - no manifests created beyond the 3 requested files
+
+## Manager UX V1 Operational Front Door - 2026-05-26T12:41Z
+- Added the operator front-door command:
+  - `python -m sellerone_manager.app --what-next`
+- Added canonical current manager state:
+  - `sellerone_manager/current_state.json`
+- The front door reads existing manager outputs only:
+  - `out/systems/M/f_price_list_manager_snapshot.csv`
+  - `out/systems/M/manager_health.csv`
+  - `out/systems/M/manager_incidents.csv`
+  - `out/systems/M/codex_repair_queue.csv`
+  - `out/systems/M/self_organisation/latest_f_manifest_priority_ranking.csv`
+- Current live front-door result:
+  - `SYSTEM STATUS: OK`
+  - `LUKE ACTION REQUIRED: no`
+  - `CODEX TASK AVAILABLE: yes`
+  - `manager_execution_errors: 0`
+  - output length: `31` lines
+- Verification passed:
+  - focused UX tests passed: `5 passed`
+  - focused manager tests passed: `26 passed`
+  - front-door command passed:
+    - `python -m sellerone_manager.app --what-next`
+- Scope stayed manager-only:
+  - no worker scripts edited
+  - no worker cycles run
+  - no safe dispatching added
+  - no Google Sheets writes
+  - no raw worker evidence inspection inside `--what-next`
+
+## H Strategy Outcome Count Repair - 2026-05-26T20:36Z
+- Current phase: monitored validation.
+- Manager task: `MGR_H_repair_h_strategy_outcome_daily_count_integrity`.
+- Current task state: `fixed_needs_retest`.
+- Allowed files for this phase:
+  - `scripts/phase1/phase1_main_loop.py`
+  - `scripts/one_off/H162_rebuild_strategy_outcome_daily.py`
+  - focused H rollup tests under `tests/`
+  - `out/h_strategy_outcome_daily.csv` only through generated rebuild path after timestamped backup and only when H lock is safe
+- Not allowed:
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no scheduler ownership changes
+  - no local DB alignment
+  - no lock edits
+  - no health/checklist hand edits
+  - no H live run or worker restart
+- Isolated proof already passed:
+  - `python -m py_compile scripts\phase1\phase1_main_loop.py scripts\phase1\phase1_storage.py`
+  - `python -m pytest tests\test_phase1_main_loop.py::Phase1MainLoopTests::test_strategy_daily_rollup_rebuilds_known_53_row_group_from_source_log -q`
+  - `python -m pytest tests\test_phase1_storage.py tests\test_phase1_main_loop.py tests\test_h162_rebuild_strategy_outcome_daily.py -q`
+  - `python -m pytest tests\manager -q`
+  - `python scripts\one_off\H162_rebuild_strategy_outcome_daily.py --daily-only --dry-run`
+- Live proof target:
+  - wait for `out/H_pricing_cycle.lock` to be absent or stale enough to prove H is not actively writing
+  - create timestamped backup of `out/h_strategy_outcome_daily.csv`
+  - run `python scripts\one_off\H162_rebuild_strategy_outcome_daily.py --daily-only`
+  - confirm the `2026-05-13|multi_seller_ladder_cap|MULTI_SELLER_LADDER_CAP` row has `decision_rows=53`
+  - confirm `applied_rows + no_write_rows == decision_rows`
+  - confirm `resolved_rows + pending_rows == decision_rows`
+  - confirm terminal rows do not exceed decision rows
+- Poll cadence:
+  - first check after 5 minutes
+  - second check after 10 minutes
+  - then every 15 minutes
+  - stop after 60 minutes if the H lock never reaches a safe boundary
+- Timeout rule:
+  - if the lock remains active for the full window, keep the task at `fixed_needs_retest`
+  - record status as parked pending next H proof window, with the exact lock heartbeat and daily row mismatch still visible
+- Automatic next step:
+  - when the safe boundary appears, run the generated daily-only rebuild and then rerun manager state
+  - mark the manager task `proved` only if evidence clears through the manager/H proof path
+
+### Monitoring Result - 2026-05-26T21:38Z
+- The monitored validation window expired without a safe H output-write boundary.
+- Evidence seen:
+  - `out/H_pricing_cycle.lock` remained active for the full window
+  - latest observed lock: `pid=24476`, `run_id=20260526T212125Z`, `heartbeat=2026-05-26T21:38:18Z`
+  - current daily row still has `decision_rows=52`, `resolved_rows=53`, and terminal rows `53`
+- Threshold still missing:
+  - a safe H proof window where `out/h_strategy_outcome_daily.csv` can be rebuilt without racing the active H owner
+- Durable follow-up:
+  - `project_control/DUE_CHECK_REGISTER.csv` row `H_STRATEGY_DAILY_COUNT_RETEST_20260526`
+- Current status:
+  - parked pending next H proof window
+  - do not mark proved until the generated daily-only rebuild and manager/H proof clear the checklist failure
+
+### H Proof Window Result - 2026-05-27T06:27Z
+- Luke approved the controlled H proof window.
+- Admin-only isolation pause was unavailable from this shell, so the official H drain marker path was used instead.
+- H reached boundary wait:
+  - `out/systems/H/live/H_restart_drain.ready`
+  - both H cycle lock files were absent before the rebuild
+- Backup created:
+  - `out/backups/h_strategy_outcome_daily_integrity/20260527T062429Z/h_strategy_outcome_daily.csv`
+- Generated rebuild command:
+  - `python scripts\one_off\H162_rebuild_strategy_outcome_daily.py --daily-only`
+- Rebuild result:
+  - `log_rows=121830`
+  - `daily_rows=358`
+  - source-log normalization counts all stayed `0`
+- Target row proof:
+  - `2026-05-13|multi_seller_ladder_cap|MULTI_SELLER_LADDER_CAP`
+  - `decision_rows=53`
+  - `applied_rows=34`
+  - `no_write_rows=19`
+  - `resolved_rows=53`
+  - `pending_rows=0`
+  - terminal rows `53`
+- H scoped health proof:
+  - `python scripts\flows\A\A015_build_system_health_check.py --profile h --no-toast`
+  - `h_strategy_outcome_daily_count_integrity=ok`
+  - `checked_rows=358;samples=none`
+- Manager task:
+  - `MGR_H_repair_h_strategy_outcome_daily_count_integrity` marked `proved`
+- H ownership:
+  - maintenance request marker was cleared
+  - H launcher cleared drain-ready and resumed normal ownership
+- Remaining H failures are separate from this repair:
+  - `h_ceiling_events_required_fields_non_blank`
+  - `h_market_context_fill_nonzero`
+
+## A001 Local Refresh Split - 2026-05-26T15:10Z
+- Current phase: repair the first manager MOT work item, `MOT_A_A001_LISTINGS_LATEST`.
+- Plain-English goal: A001 must still refresh local listing files even when old Google Sheet writing is disabled.
+- Allowed files for this phase:
+  - `scripts/flows/A/A001_run_listings_to_sheet.py`
+  - `scripts/cycles/run_A_all.py`
+  - `scripts/run_A_all.py`
+  - focused tests that prove the split
+  - this coding plan
+- Forbidden actions:
+  - no Google Sheets writes
+  - no local DB alignment
+  - no queue edits
+  - no pricing changes
+  - no A worker cycle run unless Luke approves the A-owned proof window
+  - no hand-editing MOT results or A output files
+- Isolated proof:
+  - compile the changed files
+  - run focused tests for A cycle and A001 local-only behavior
+  - run manager MOT read-only after the code change to confirm the failure is still honest until real A output refresh happens
+- Live proof target:
+  - next approved A-owned proof window or next scheduled A run updates `out/merchant_listings_latest.csv`
+  - after that, `python -m sellerone_manager.app --hourly-mot --mot-flow A` should no longer report `a001_listings_latest` as failed
+- Timeout/park rule:
+  - if no A proof window runs, status remains `code fix applied, not yet proven`
+  - the MOT work item must not be marked `proved` until the file is truly refreshed and the MOT check clears
+
+## A001 Local Refresh Split Proof - 2026-05-26T15:11Z
+- Code fix applied:
+  - `A001_run_listings_to_sheet.py` now supports `A001_WRITE_LEGACY_SHEETS=0`
+  - `run_A_all.py` no longer skips A001 when legacy Sheet output steps are disabled
+  - when the skip flag is active, A passes `A001_WRITE_LEGACY_SHEETS=0` into A001
+- Isolated verification passed:
+  - compile passed for A001 and A runner files
+  - focused A tests passed: `8 passed`
+  - manager tests passed: `21 passed`
+  - flow/runtime/storage focused tests passed: `14 passed`
+  - combined focused suite passed: `43 passed`
+- MOT verification:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow A` ran successfully
+  - MOT still reports 3 A failures because no real A-owned refresh has run yet
+  - this is expected and proves the MOT was not hand-cooked
+- Work item state:
+  - `MOT_A_A001_LISTINGS_LATEST` moved to `in_progress`
+  - note: code split applied; waiting for A-owned proof window to refresh output before MOT can mark proved
+
+## A No-Sheets Source-Fact Batch - 2026-05-26T15:25Z
+- Current phase: implement the first no-Sheets A source-fact batch from the approved plan.
+- Plain-English goal: A should refresh facts locally while the UI/O side owns user viewing and user-editable product data.
+- Code changes in this batch:
+  - A002 supports `A002_WRITE_LEGACY_SHEETS=0` so catalog facts can refresh without opening Google Sheets.
+  - A004 defaults to `A004_WRITE_LEGACY_SHEETS=0` and reads local SQL/O product evidence before legacy CSV fallback.
+  - normal A run order no longer includes Sheet-only Product DB steps `dedupe_product_db.py` and `sync_product_db_to_main_sheet.py`.
+  - normal A run disables stock receipt Sheet intake by default until the UI/O receipt event replacement is implemented.
+  - A003 is launched with local-only Product DB and token recon settings from the A runner.
+- Allowed proof now:
+  - compile A scripts and runner
+  - focused no-Sheets unit tests
+  - manager/MOT tests
+  - read-only MOT retest
+- Not allowed in this phase:
+  - no Google Sheets reads or writes
+  - no A worker cycle run
+  - no local DB alignment
+  - no queue edits
+  - no pricing changes
+- Live proof remains pending until the next scheduled A run or explicitly approved A-owned proof window refreshes real outputs.
+
+## A No-Sheets Source-Fact Batch Proof - 2026-05-26T15:23Z
+- Code fix applied:
+  - A001 local listings refresh is no-Sheets by default unless `A001_WRITE_LEGACY_SHEETS=1` is explicitly set.
+  - A002 local catalog refresh is no-Sheets by default and can write `out/catalog_items_flat.csv` without opening Google Sheets.
+  - A004 local fee refresh defaults away from Google Sheets and reads local product evidence before legacy fallback.
+  - A004 now appends each missing order SKU into the local fee refresh candidate set instead of only keeping the final loop item.
+  - the underlying A runner defaults `A_SKIP_LEGACY_SHEET_OUTPUT_STEPS=1`.
+  - normal A run order excludes Sheet-only Product DB sync steps.
+  - normal A runner disables stock receipt Sheet intake by default.
+  - normal A runner passes local-only switches into A001, A002, A003, and A004.
+- Isolated verification passed:
+  - compile passed for changed A scripts, A runners, and focused tests
+  - focused no-Sheets A tests passed: `15 passed`
+  - manager tests passed: `21 passed`
+  - related A/O/storage tests passed: `39 passed`
+- MOT verification:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow A` ran successfully
+  - MOT still reports `fail_count=3`
+  - failing checks remain A001 listings, A002 catalog, and A004 fees because no real A-owned refresh has run yet
+  - this is expected and proves the MOT was not hand-edited or cooked
+- Manager front door verification:
+  - `python -m sellerone_manager.app --what-next` ran successfully
+  - Luke action required: `no`
+  - Codex task available: `yes`
+- Work item state:
+  - `MOT_A_A001_LISTINGS_LATEST` remains `in_progress`
+  - `MOT_A_A002_CATALOG_ITEMS` moved to `in_progress`
+  - `MOT_A_A004_FEES_LATEST` moved to `in_progress`
+  - none of these are marked `proved` until a real A-owned proof window refreshes the files and MOT clears them
+- Still forbidden:
+  - no Google Sheets writes
+  - no A worker cycle run without Luke approving the A-owned proof window
+  - no queue edits
+  - no pricing changes
+  - no local DB alignment
+
+## A No-Sheets Source-Fact Live Proof - 2026-05-26T18:11Z
+- Luke approved the A-owned proof window with `now please`.
+- First proof attempt:
+  - B handoff worked correctly through `maintenance.requested` -> `maintenance.ready` -> `maintenance.active`.
+  - A001 failed to refresh because Amazon did not finish the listings report inside the old wait window.
+  - A runner stopped at A001, wrote partial manifest `out/manifests/A/2026-05-26/20260526T172656Z.json`, cleared maintenance, and B resumed.
+- Repair applied before retry:
+  - A001 now uses the same longer report wait shape as the underlying merchant-listings report tool by default.
+  - A001 now exits nonzero if the report fails instead of printing an error while returning success.
+  - `run_A_all.bat` now defaults `A_ENABLE_STOCK_RECEIPTS_SHEET=0`, matching the no-Sheets A direction.
+- Retry proof result:
+  - A-owned run `20260526T173722Z` completed.
+  - Final manifest: `out/manifests/A/2026-05-26/20260526T173722Z.json`.
+  - A001 refreshed `out/merchant_listings_latest.csv` with `300` rows and `legacy_sheet_writes=False`.
+  - A002 refreshed `out/catalog_items_flat.csv` with `335` rows and `legacy_sheet_writes=False`.
+  - A004 refreshed `out/fees_latest.csv` with `141` rows, local SQL product source, and `legacy_sheet_writes=False`.
+  - `process_stock_receipts_sheet.py` was skipped by config because `A_ENABLE_STOCK_RECEIPTS_SHEET=0`.
+  - B resumed after A and the manager front door showed B calm.
+- Independent MOT result:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow A` returned `status=ok`, `fail_count=0`, `warn_count=0`.
+  - MOT work items moved to `proved`:
+    - `MOT_A_A001_LISTINGS_LATEST`
+    - `MOT_A_A002_CATALOG_ITEMS`
+    - `MOT_A_A004_FEES_LATEST`
+    - `MOT_A_A_LATEST_MANIFEST`
+    - `MOT_A_A_MANIFEST_STEP_TRAVERSAL`
+- Test proof after live run:
+  - focused no-Sheets A tests passed: `15 passed`
+  - manager tests passed: `21 passed`
+  - compile passed for A001/A002/A004 and A runner
+- Remaining separate A note:
+  - manager front door still has an A WARN classification task because the A health check saw the earlier failed proof manifest before the successful final manifest was written.
+  - this is not the same as the MOT source-fact blockage; the MOT blockage is proved clear.
+
+## A020 Daily Finance Sheet Leak Patch - 2026-05-26T18:11Z
+- During the successful A proof run, A001/A002/A004 proved no-Sheets, but a later A020 token/stock-adjustment step still reported `write_sheets=True`.
+- Patch applied:
+  - `A020_run_daily_finance.py` now applies no-Sheet defaults before launching its child finance/token scripts.
+  - Defaults include `STOCK_EVENTS_WRITE_SHEETS=0`, `TOKEN_EVENTS_WRITE_SHEETS=0`, `REFUND_EVENTS_WRITE_SHEETS=0`, token report Sheet flags `0`, and `FIN_L3_SKIP_SHEETS=1`.
+  - Explicit environment overrides are still respected for a deliberately approved legacy run.
+- Isolated verification passed:
+  - focused no-Sheets A tests passed: `17 passed`
+  - manager tests passed: `21 passed`
+  - compile passed for `A020_run_daily_finance.py`
+- Live proof status:
+  - not yet proven by a later A020/A-owned run because this patch was applied after the successful A proof window.
+  - next proof should confirm the A020 stock-adjustment/token child output reports `write_sheets=False`.
+
+## A020 Daily Finance No-Sheets Live Proof - 2026-05-26T19:06Z
+- Luke approved continuing the A-owned proof work.
+- The stale A checklist warning was cleared by rerunning the A-scoped health check after the successful A manifest existed.
+- A020 live proof initially exposed real source faults:
+  - `B003_run_financial_events_level3.py` crashed on a brittle marker write.
+  - `D018_build_token_batch_report.py` crashed on a brittle weekly CSV overwrite.
+  - `B005_run_financial_transactions_v2024.py` crashed on a brittle marker write.
+  - `D012_build_fee_vat_ledger.py` crashed on a brittle CSV overwrite.
+- Repair applied:
+  - B marker writers now use temp-file replace with short retries.
+  - A020 report outputs now use safe CSV writes where the proof chain exposed brittle direct overwrites.
+  - A020 now also defaults `VAT_REPORT_WRITE_SHEETS=0` and `PNL_WRITE_SHEETS=0`.
+  - D013 VAT report and D001 P&L now respect those no-Sheets flags.
+- Isolated verification passed:
+  - compile passed for changed A/B/D/core files.
+  - focused tests passed: `34 passed`.
+  - manager tests passed: `21 passed`.
+- Live proof passed:
+  - B maintenance handoff worked before A020 ran.
+  - A020 proof command returned `a020_rc=0`.
+  - Proof log: `out/proof_runs/A020_no_sheets_proof_20260526T200014.out.log`.
+  - A020 reached `[A_daily_finance] done`.
+  - token/refund/stock/P&L/VAT proof lines reported `write_sheets=False`.
+  - A015 after A020 returned `a015_rc=0`.
+  - A split checklist has 0 non-OK rows.
+  - B maintenance markers were cleared and B heartbeat resumed.
+- Independent MOT result:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow A` returned `status=ok`, `fail_count=0`, `warn_count=0`.
+  - manager front door shows A as `ok / calm`.
+- Remaining note:
+  - stderr still contains Pandas warning text from B013/B021, but the A020 process returned success and those warnings did not block the proof.
+  - manager overall status still says blocked because unrelated B/H blockers remain outside this A batch.
+
+## Manager Standing Authority Bridge V1 - 2026-05-26T19:32Z
+- Problem addressed:
+  - the manager could identify work, but Codex was still falling back to chat approval instead of a claimed manager task packet.
+- Implementation applied:
+  - added approved task packet index at `out/systems/M/approved_task_packets.csv`.
+  - added durable packets under `sellerone_manager/tasks/approved/` and blocked packets under `sellerone_manager/tasks/blocked/`.
+  - added commands:
+    - `python -m sellerone_manager.app --refresh-approved-tasks`
+    - `python -m sellerone_manager.app --claim-approved-task`
+    - `python -m sellerone_manager.app --approved-task-status <task_id> --status <status>`
+  - `--what-next` now refreshes approved packets and prefers an approved packet over raw MOT or manager candidate noise.
+  - MOT-sourced packet status updates sync back to `mot_worklist.csv` and `mot_retest_queue.csv`.
+  - safe non-Luke code repairs inside a claimed packet now have standing approval.
+  - protected actions still require Luke.
+- Durable operating rules updated:
+  - `AGENTS.md`
+  - `sellerone_manager/AGENTS.md`
+  - `sellerone_manager/MANAGER_CHAT.md`
+  - `sellerone_manager/MANAGER_CHARTER.md`
+  - `sellerone_manager/CODEX_START_HERE.md`
+- Verification passed:
+  - manager package compile passed.
+  - manager tests passed: `27 passed`.
+  - live refresh command returned `approved_count=4`, `blocked_count=3`.
+  - live `--what-next` now says Codex must work from approved packet `MGR_H_repair_out_cycle_alerts_checkli`.
+- Manual proof boundary:
+  - claim/status lifecycle is proven in unit tests.
+  - no live approved task was claimed during this bridge implementation because claiming a real production task without doing that task would create false in-progress state.
+
+## H Current Active Failure Repair - 2026-05-27T07:42Z
+- Current phase: worker repair under manager-approved packet.
+- Manager packaging task:
+  - `MGR_H_repair_out_cycle_alerts_checkli`
+  - status: proved after package creation.
+- Active repair task:
+  - `MGR_H_repair_h_ceiling_events_required_fields_non_blank`
+  - status: in_progress.
+- Current H failures in scope:
+  - `h_ceiling_events_required_fields_non_blank`
+  - `h_market_context_fill_nonzero`
+- Package file:
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MGR_H_repair_out_cycle_alerts_checkli_20260527_current_failures.md`
+- Allowed files for this phase:
+  - H-owned source files that build or write `out/h_ceiling_events.csv`
+  - H-owned source files that build or write `out/listing_offer_snapshot_latest.csv`
+  - H-owned market-context merge helpers for listing offer snapshots
+  - H-scoped checklist mapping only if needed to understand the checks
+  - H-scoped focused tests
+  - this coding plan and the active H repair package
+- Not allowed:
+  - no H live run
+  - no A015 run
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no scheduler ownership changes
+  - no local DB alignment or edits
+  - no output deletion
+  - no widening into A, B, E, F, or O
+- Isolated proof target:
+  - compile touched H files
+  - run focused H tests for the touched builders or validators
+  - keep manager tests passing after task-packet bridge changes
+- Live proof target:
+  - use a manager-approved H proof window only after isolated tests pass
+  - confirm H reaches terminal/finalizer evidence before reading H checklist
+  - success means both current H fail checks are no longer FAIL
+- Poll cadence after live proof starts:
+  - first check at +5 minutes
+  - second check at +10 minutes
+  - then every +15 minutes
+  - stop at +60 minutes unless the proof plan sets a narrower window
+- Timeout rule:
+  - if no safe H proof window exists, leave the repair packet at `fixed_needs_retest`
+  - record status as `parked pending next proof window`
+  - do not mark proved from code edits or stale health output
+- Automatic next step:
+  - if the worker applies a safe code fix and isolated tests pass, update the approved packet to `fixed_needs_retest`
+  - then create or use the H proof-window plan before any live validation
+
+### H Current Active Failure Repair Update - 2026-05-27T07:37Z
+- Code repair applied by worker under approved packet:
+  - `scripts/phase1/phase1_main_loop.py`
+  - `scripts/cycles/run_H_pricing_cycle.py`
+  - `tests/test_phase1_main_loop.py`
+  - `tests/test_h_worker_lifecycle_contract.py`
+- Plain-English root cause:
+  - H was writing a ceiling-event proof row even when there was no real binding ceiling value.
+  - H item-offer lookup returned market context keyed by ASIN, while the snapshot writer needed SKU lookup keys as well.
+- Isolated verification passed:
+  - `python -m py_compile scripts\phase1\phase1_main_loop.py scripts\cycles\run_H_pricing_cycle.py`
+  - `python -m pytest tests\test_phase1_main_loop.py tests\test_h_worker_lifecycle_contract.py -q`
+  - `python -m pytest tests\manager -q`
+- Manager task state:
+  - `MGR_H_repair_h_ceiling_events_required_fields_non_blank` moved to `fixed_needs_retest`
+- Forced proof-window plan:
+  - `python scripts\one_off\P002_plan_forced_proof_window.py --flow h`
+  - result: controlled H isolation is possible, but H scheduler ownership must be paused first.
+- Protected blocker:
+  - live proof now requires scheduler ownership pause and a guarded H controlled one-shot.
+  - this is a protected action, so the repair cannot be marked `proved` from isolated tests alone.
+- Current status:
+  - code fix applied
+  - isolated verification passed
+  - live H proof blocked until the manager has explicit approval for the H isolation pause and guarded proof run
+
+## A Cycle Manager Blueprint V1 - 2026-05-27T08:00Z
+- Current phase: implement A manager setup, not live A repair.
+- Plain-English goal:
+  - A manager should prove whether the morning source-fact cycle refreshed facts, avoided Sheets, left health evidence, and handed over safely around B.
+- Blueprint artifact:
+  - `plans/active/sellerone-manager-control-plane-v1/A_CYCLE_MANAGER_BLUEPRINT_V1.md`
+- Allowed files for this phase:
+  - `sellerone_manager/hourly_mot.py`
+  - `sellerone_manager/multi_flow.py`
+  - `scripts/cycles/run_A_all.py`
+  - focused manager and A maintenance tests
+  - this coding plan and the A blueprint file
+- Not allowed:
+  - no A live run
+  - no A015 proof run
+  - no B intervention
+  - no Google Sheets reads or writes
+  - no local DB alignment or data correction
+  - no queue edits
+  - no price changes
+  - no output deletion
+- Implementation targets:
+  - A018 floor support is proof-only for this batch.
+  - Missing A018 proof is `not_checked` / `not_verified`, not an A runtime failure.
+  - A runner writes durable maintenance handoff proof after runs.
+  - MOT and manager reconciliation can read handoff proof without editing lock files.
+  - Failed handoff proof blocks A honestly.
+- Proof target:
+  - compile touched files
+  - run manager tests
+  - run focused A maintenance tests
+  - do not claim full live proof until a normal A run or approved A-owned proof window writes the new handoff artifact
+
+## Tomorrow Combined Manager Readiness - 2026-05-27T15:55Z
+- Current phase: prepare the manager to run Quiet Autonomy while Luke is away on 2026-05-28.
+- Plain-English goal:
+  - The main manager is the single front desk. It combines A/B/E/F/O MOT evidence, keeps H high-risk, and lets safe Codex work continue without repeatedly asking Luke.
+- Durable readiness artifact:
+  - `plans/active/sellerone-manager-control-plane-v1/TOMORROW_COMBINED_MANAGER_READINESS_20260528.md`
+- Durable due check:
+  - `project_control/DUE_CHECK_REGISTER.csv` row `COMBINED_MANAGER_TOMORROW_READY_20260528`
+- Authority change:
+  - controlled technical pause/resume is allowed only when the current policy allows it and required controller proof exists.
+  - business decisions are still not delegated.
+- Allowed tomorrow:
+  - manager MOT refreshes
+  - safe code repairs from approved task packets
+  - boundary-safe proof runs
+  - controlled H pause/resume only when the packet proves H restored afterward
+- Not allowed tomorrow:
+  - price changes
+  - queue edits
+  - Google Sheets writes
+  - Product DB or local DB alignment
+  - output deletion
+  - publishing
+  - purchase commitment, receiving, or send-to-Amazon
+  - approving uncertain F or O business rows
+  - hiding bad data downstream
+- Implementation targets:
+  - A/B/E/F/O appear in `out/systems/M/mot/mot_rollup_latest.md`.
+  - F parked Entertainment Trading decision stays parked and does not block safe manager work.
+  - O/H controlled market-proof pause is parked until controller install proof exists.
+  - H repair packets blocked only for scheduler pause can reopen only when the policy and controller proof allow it.
+- Proof target:
+  - compile touched manager files
+  - run manager tests
+  - run `python -m sellerone_manager.app --hourly-mot --mot-flow all`
+  - run `python -m sellerone_manager.app --refresh-approved-tasks`
+  - run `python -m sellerone_manager.app --what-next`
+
+## End-Of-Day Quiet Autonomy - 2026-05-27T16:10Z
+- Current phase: leave the manager safe while Luke is away from the desk.
+- Plain-English goal:
+  - Codex may continue safe approved manager work, but H/O pause-based proof stays parked unless the H maintenance controller install proof already exists.
+- Active policy:
+  - `config/manager/autonomy_policy.json`
+  - mode: `quiet_autonomy`
+- Allowed:
+  - manager MOT refreshes
+  - safe code repairs from approved task packets
+  - read-only proof checks
+  - controlled H/O pause only if controller install proof exists and the packet proves restore afterward
+- Not allowed:
+  - price changes
+  - queue edits
+  - Google Sheets writes
+  - Product DB or local DB alignment
+  - output deletion
+  - publishing
+  - business decisions on uncertain F/O rows
+  - broad H autonomy before the H independent manager/MOT layer exists
+- Proof target:
+  - compile touched manager files
+  - run manager tests
+  - run combined MOT
+  - refresh approved tasks
+  - confirm `sellerone_manager/current_state.json` shows no Luke decision for routine safe work
+
+## B Management Ready Status - 2026-05-27T16:15Z
+- Current phase: fold B sub-manager result into the main manager memory.
+- Plain-English status:
+  - B Management is ready for maintenance.
+  - B order recovery is no longer the active blocker.
+  - The missing Amazon.ae order `171-1388771-2409132` is in the live B chain and survived a normal B cycle.
+  - Sellerboard now shows 0 shipped orders missing from SellerOne.
+  - B finished final proof with 0 B gate fails.
+- Remaining B work:
+  - B order truth is not complete until refund, fee, shipping, and ROI allocation have API-backed proof or clear labels.
+- Allowed next B work:
+  - bounded B manager checks
+  - Sellerboard comparison reports
+  - recovery scans
+  - promotion-preview logic
+  - retests and code fixes inside approved B repair packets
+- Still blocked:
+  - using Sellerboard estimates in ROI/restocking
+  - writing Sheets
+  - changing prices or queues
+  - deleting outputs
+  - merging unproved data
+  - widening beyond B
+
+## Rest-Of-Day Quiet Autonomy Proof - 2026-05-27T18:40Z
+- Current phase: overnight control-desk stabilisation.
+- Plain-English result:
+  - A is no longer treated as a live repair failure. The interrupted A proof is parked until the next normal A-owned run because the handoff and cleanup evidence was safe.
+  - B remains maintenance-ready with refund/fee/shipping/ROI proof gaps visible as warnings, not as tonight's repair fight.
+  - E remains code/proof-ready with coverage warnings only.
+  - H repair is parked as high-risk until the independent H manager/MOT layer exists.
+  - F and O protected decisions are parked during Quiet Autonomy and should not interrupt Luke.
+- Manager behavior changed:
+  - Quiet Autonomy parks B bridge-gap warning worklist rows instead of creating active MOT repair jobs.
+  - Quiet Autonomy parks H repair-package packets and leaves only the safe H manager/MOT planning packet active.
+  - The front desk reports active approved manager work as `WARN`, not `BLOCKED`, when no Luke decision or execution error exists.
+- Proof run:
+  - `python -m py_compile sellerone_manager/autonomy_policy.py sellerone_manager/hourly_mot.py sellerone_manager/multi_flow.py sellerone_manager/task_packets.py sellerone_manager/current_state.py`
+  - `python -m pytest tests/manager -q` passed with `134 passed`.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow all` returned `fail_count=0`, `warn_count=6`, and no active MOT work item.
+  - `python -m sellerone_manager.app --refresh-approved-tasks` returned `blocked_count=0`.
+  - `python -m sellerone_manager.app --what-next` returned `SYSTEM STATUS: WARN`, `LUKE ACTION REQUIRED: no`, and next safe batch `Plan H independent manager/MOT layer`.
+- Still not allowed:
+  - worker cycle runs
+  - H repair
+  - scheduler pause/resume without controller proof
+  - prices, queues, Sheets, DB alignment, output deletion, publishing, or business decisions
+- Next verifier:
+  - `project_control/DUE_CHECK_REGISTER.csv` row `A_MAINTENANCE_HANDOFF_NEXT_NORMAL_PROOF_20260528`
+  - `project_control/DUE_CHECK_REGISTER.csv` row `COMBINED_MANAGER_TOMORROW_READY_20260528`
+
+## H Safety Manager Layer - 2026-05-30T19:50Z
+- Current phase: Phase 4 H independent manager/MOT layer complete.
+- Plain-English result:
+  - H is now visible to the manager from outside proof instead of old checklist noise.
+  - H remains parked and high-risk; no broad H autonomy was granted.
+  - The old generic "plan H manager layer" task is no longer reopened once the Phase 4 completion record exists.
+  - Active H failures are now split into bounded proof packets instead of chat chaos.
+- Current H read-only MOT state:
+  - status: `fail`
+  - fail_count: `3`
+  - warn_count: `2`
+  - ok rows: latest manifest, terminal/publish truth, decision/execution rows, lock/heartbeat ownership, boundary/finalizer truth
+  - fail rows: market context proof, floor/ceiling safety fields, manager readiness
+  - warn rows: old health checklist clue, storage cleanup safety
+- Allowed files for this phase:
+  - `sellerone_manager/multi_flow.py`
+  - `tests/manager/test_multi_flow_manager.py`
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MOT_H_current_active_failures_20260530.md`
+  - `sellerone_manager/project_threads/PHASE_4_H_MANAGER_LAYER_COMPLETE.md`
+  - this `CODING_PLAN.md`
+  - H MOT output files written by the read-only retest under `out/systems/M/`
+- Not allowed:
+  - no H run
+  - no scheduler pause or resume
+  - no publishing
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+- Proof run:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H` returned `status=fail`, `fail_count=3`, `warn_count=2`.
+  - `python -m py_compile sellerone_manager/multi_flow.py` passed.
+  - `python -m pytest tests/manager/test_multi_flow_manager.py tests/manager/test_h_hourly_mot.py -q` passed with `24 passed`.
+  - `python -m pytest tests/manager -q` passed with `152 passed`.
+- Active H repair package:
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MOT_H_current_active_failures_20260530.md`
+- Active H MOT proof packets expected from the same MOT proof:
+  - `MOT_H_H_MARKET_CONTEXT_PROOF`
+  - `MOT_H_H_FLOOR_CEILING_SAFETY_FIELDS`
+  - `MOT_H_H_MANAGER_READINESS`
+- Final front-desk state:
+  - `sellerone_manager/current_state.json` says Luke action required is false.
+  - The next approved packet is `MOT_H_H_FLOOR_CEILING_SAFETY_FIELDS`.
+  - H flow itself remains parked with classification `high_risk_bounded_repair_only`.
+- Stop rule:
+  - Phase 4 stops after H is independently visible, expectation-mapped, packaged, and parked.
+  - H repair starts only in a later manager-approved phase from a bounded H MOT packet and needs H-owned proof before anything is called fixed.
+
+## Phase 5 H Manager Proof Repair - 2026-05-30T21:04Z
+- Current phase: complete.
+- Plain-English result:
+  - H active FAIL rows are clear in the independent MOT.
+  - The repair was to the manager inspector, not to live repricing.
+  - The manager no longer treats deliberate no-write skip rows as unsafe repricing failures.
+  - H remains warning-level only, not fully autonomous.
+- Files changed:
+  - `sellerone_manager/hourly_mot.py`
+  - `sellerone_manager/multi_flow.py`
+  - `tests/manager/test_h_hourly_mot.py`
+  - `tests/manager/test_multi_flow_manager.py`
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MOT_H_current_active_failures_20260530.md`
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MGR_H_classification_out_systems_M_hourly_mot_20260530_warns.md`
+  - `sellerone_manager/project_threads/PHASE_5_H_MANAGER_PROOF_REPAIR_COMPLETE.md`
+- What changed:
+  - H floor/ceiling MOT now requires ceiling proof only for rows where H actually wrote, attempted, or held write-capable/suppression proof.
+  - H market-context MOT no longer treats `skip_no_market_data` as a missing-proof failure.
+  - H manager-readiness is summary-only and is parked instead of becoming a direct repair packet.
+  - H warning classification no longer reopens after the warning package exists.
+- Proof run:
+  - `python -m py_compile sellerone_manager/hourly_mot.py sellerone_manager/multi_flow.py` passed.
+  - `python -m pytest tests/manager/test_multi_flow_manager.py tests/manager/test_h_hourly_mot.py -q` passed with `29 passed`.
+  - `python -m pytest tests/manager -q` passed with `157 passed`.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H` returned `status=warn`, `fail_count=0`, `warn_count=3`.
+  - `python -m sellerone_manager.app --what-next` moved the next approved task away from H to B proof coverage.
+- Still not allowed:
+  - no H run
+  - no scheduler pause or resume
+  - no publishing
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+- Remaining H warning state:
+  - old H checklist remains clue-only
+  - H storage cleanup remains warning-level
+  - H manager-readiness is ready with warnings
+- Next safe manager batch:
+  - `MGR_B_proof_gap_project_control_EXPECTAT`
+
+## B Proof Coverage Package - 2026-05-31T06:00Z
+- Current phase: complete for B manager proof coverage.
+- Plain-English result:
+  - B is maintenance-ready from the manager side.
+  - B order outputs, token outputs, P and L, stock/parking proof, ownership, maintenance markers, Sellerboard intake, Sellerboard order comparison, recovery quarantine, and duplicate guards are covered by independent MOT evidence.
+  - B full order truth is not complete yet because refund, fee, shipping, and ROI proof remains warning-level.
+- Files changed:
+  - `sellerone_manager/multi_flow.py`
+  - `tests/manager/test_multi_flow_manager.py`
+  - `plans/active/sellerone-manager-control-plane-v1/B_PROOF_PACKAGE_MGR_B_proof_gap_project_control_EXPECTAT_20260531.md`
+  - `sellerone_manager/project_threads/B_PROOF_COVERAGE_COMPLETE_20260531.md`
+  - this `CODING_PLAN.md`
+- What changed:
+  - Added a durable B proof package for the current manager proof gap.
+  - Added manager logic so a completed B proof package stops reopening the same generic B proof-gap task.
+  - Kept B warnings visible instead of pretending order truth is complete.
+- Current B warning meaning:
+  - Sellerboard outside comparison is working, but marketplace coverage remains a watch item.
+  - Refund, fee, shipping, and ROI values need API proof or explicit bridge/not-proven labels.
+  - B management readiness and order truth completion are summary lights, not direct repair jobs.
+- Still not allowed:
+  - no B run or restart
+  - no Google Sheets writes
+  - no token/data correction
+  - no recovered-order live merge
+  - no local DB alignment
+  - no output deletion
+  - no Sellerboard values feeding ROI/restocking as final truth
+  - no price or queue changes
+- Next B-specific work:
+  - create or claim a bounded refund, fee, shipping, and ROI proof packet.
+
+## B Refund Fee Shipping ROI Proof Packet - 2026-05-31T07:35Z
+- Current phase: complete for B manager proof labelling.
+- Plain-English result:
+  - B refund, fee, shipping, and ROI warning is now a labelled proof gap, not a vague warning.
+  - Sellerboard values remain outside comparison evidence only.
+  - The manager now writes and reads explicit labels for refund proof, fee/shipping proof, ROI refund proof, and whether bridge values are safe for live ROI.
+- Files changed:
+  - `sellerone_manager/sellerboard_bridge.py`
+  - `sellerone_manager/hourly_mot.py`
+  - `sellerone_manager/task_packets.py`
+  - `tests/manager/test_sellerboard_bridge.py`
+  - `tests/manager/test_hourly_mot.py`
+  - `tests/manager/test_task_packets.py`
+  - `plans/active/sellerone-manager-control-plane-v1/B_REPAIR_PACKAGE_MOT_B_B_SELLERBOARD_REFUND_FEE_ROI_BRIDGE_20260531.md`
+- Current B proof after read-only bridge rebuild and MOT retest:
+  - `b_sellerboard_refund_fee_roi_bridge` remains `warn`
+  - `return_refund_gap=1`
+  - `fee_detail_rows=0`
+  - `roi_refund_rows=0`
+  - `refund_proof_state=not_yet_proven`
+  - `fee_shipping_proof_state=not_yet_proven`
+  - `roi_refund_proof_state=not_yet_proven`
+  - `bridge_values_safe_for_live_roi=0`
+- Approved packet:
+  - `MGR_B_repair_b_sellerboard_refund_fee_roi_bridge` was claimed, moved to `fixed_needs_retest`, retested, then marked `proved`.
+- Verification:
+  - `python -m py_compile sellerone_manager/sellerboard_bridge.py sellerone_manager/hourly_mot.py sellerone_manager/task_packets.py` passed.
+  - focused B/packet tests passed: `5 passed`.
+  - full manager tests passed: `160 passed`.
+  - `python -m sellerone_manager.app --b-sellerboard-bridge` rebuilt read-only bridge outputs.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow B` returned `status=warn`, `fail_count=0`, `warn_count=4`.
+- Still not allowed:
+  - no B run or restart
+  - no B lock or marker edit
+  - no Google Sheets write
+  - no token/order/refund/fee/shipping/stock/ROI data correction
+  - no local DB alignment
+  - no output deletion
+  - no live merge
+  - no Sellerboard values feeding live ROI/restocking as final truth
+  - no price or queue change
+- Next B-specific work:
+  - build or approve the API-backed fee/refund allocation path only if this warning needs to become clean API truth rather than labelled bridge evidence.
+
+## H Boundary Finalizer Truth - 2026-05-31T08:13Z
+- Current phase: read-only monitored proof under approved packet `MOT_H_H_BOUNDARY_FINALIZER_TRUTH`.
+- Plain-English expectation:
+  - H should either clear at the next natural H-owned boundary, or remain parked with exact failure evidence.
+  - Codex is not running H or repairing repricing logic in this phase.
+- Current evidence:
+  - latest completed H manifest at the start of this phase: `H_20260531T072631Z`
+  - final state: `failed`
+  - terminal state: `failed`
+  - failure code: `TIMEOUT_STALLED`
+  - failed stage: `phase1_pilot`
+  - publish status: `not_started`
+  - a newer H owner was already running as `20260531T075811Z`
+- Allowed files for this phase:
+  - H read-only proof files under `out/systems/H/live/`
+  - H manifests under `out/manifests/H/`
+  - manager MOT outputs under `out/systems/M/`
+  - this `CODING_PLAN.md`
+- Not allowed:
+  - no H run by Codex
+  - no scheduler pause or resume
+  - no publishing
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+- Monitoring target:
+  - watch the existing H owner run only by reading proof files
+  - retest with `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - success means `h_boundary_finalizer_truth`, `h_latest_manifest_state`, and `h_terminal_publish_truth` clear for the latest completed H run
+- Poll cadence:
+  - first check immediately after this plan update
+  - then every 5 minutes for up to 20 minutes while the existing H owner is active
+- Timeout rule:
+  - if the owner keeps running without terminal proof, leave the approved task in progress and keep H parked
+  - if the owner finalizes failed again, keep the packet in progress and record the latest failed run evidence
+  - if the owner finalizes cleanly, retest and mark the packet `proved`
+
+### H Boundary Finalizer Result - 2026-05-31T08:31Z
+- Result:
+  - the already-running H owner `20260531T075811Z` also failed
+  - failure code: `TIMEOUT_STALLED`
+  - terminal state: `failed`
+  - publish status: `not_started`
+  - H completed useful pilot progress before failure: `advanced_count=50 status=ok`
+  - a newer H owner `20260531T082447Z` then started by itself
+- Manager retest:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - returned `status=fail`, `fail_count=4`, `warn_count=2`
+- Durable package created:
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_MOT_H_H_BOUNDARY_FINALIZER_TRUTH_20260531_REPEATED_TIMEOUT.md`
+- Current interpretation:
+  - this is a repeated H boundary/finalizer timeout after phase 1 pilot progress, not four unrelated H failures
+  - H remains parked/high-risk until a bounded H finalizer repair packet is worked
+- Safety:
+  - Codex did not run H
+  - Codex did not pause or resume scheduler ownership
+  - Codex did not publish
+  - Codex did not change prices
+  - Codex did not edit queues
+  - Codex did not write Sheets
+  - Codex did not align local DB data
+  - Codex did not delete outputs
+  - Codex did not restart workers
+
+## F BBP vs Seller Central Login Split - 2026-06-01T11:15Z
+- Correction from Luke:
+  - BBP has two separate login states.
+  - The first login state is BBP account access, which shows the BBP information page.
+  - The second login state is Amazon Seller Central connection inside BBP, which is needed for sell-eligibility data.
+- Proven so far:
+  - BBP account login only.
+  - The normal F061 scanner-owned browser detected the BBP `Login` heading, submitted the BBP credentials from the local secret file, and reached BBP page evidence again.
+- Not proven:
+  - Amazon Seller Central eligibility login/connection inside BBP.
+  - The manager must not treat `auth_state=LOGGED_IN` as proof that Seller Central eligibility data is available.
+- Current operating interpretation:
+  - F can be described as BBP-account logged in.
+  - F cannot yet be described as Seller-Central-eligibility ready.
+  - Rows that need Seller Central eligibility proof may still stay unscanned, incomplete, parked, or require a separate recovery path.
+- Safety boundary:
+  - Do not solve Seller Central eligibility by opening a separate Chrome login window.
+  - Do not restart F061.
+  - Do not edit queues, prices, Sheets, local DB facts, or scanner outputs.
+  - Any Seller Central eligibility recovery needs a separate manager-approved task packet and proof window.
+- Required follow-up:
+  - Add a manager-visible split between `bbp_account_login_state` and `seller_central_eligibility_auth_state`.
+  - Future success means F can clearly say: BBP logged in, Seller Central connected, Seller Central waiting for human login, Seller Central blocked, or Seller Central proof missing.
+
+## F Seller Central Eligibility Login Code Setup - 2026-06-01T12:12Z
+- Current phase:
+  - code setup complete, live proof not approved yet.
+- Implemented:
+  - separate disabled-by-default Seller Central secret file at `secrets/price_list_manager/seller_central_login.env`
+  - redacted Seller Central login/code helper
+  - scanner-owned F061 detection for Seller Central sign-in, SMS code, success, timeout, and manual challenge states
+  - separate queue block reason for `seller_central_eligibility_login_required`
+  - manager manifest `FPM165_seller_central_code_handoff`
+  - F MOT checks for `f_bbp_account_login_state` and `f_seller_central_eligibility_auth_state`
+- Safety held:
+  - no F061 run
+  - no live Amazon login proof
+  - no separate Chrome login window
+  - no queue edits
+  - no price changes
+  - no Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+- Offline verification:
+  - `python -m py_compile scripts\flows\F\seller_central_login_recovery.py scripts\flows\F\legacy_scanner_2_1\Webscrape.py scripts\flows\F\F061_run_legacy_first_checks_local.py scripts\flows\F\_scanner_state.py sellerone_manager\hourly_mot.py`
+  - `python -m pytest tests\test_f_seller_central_login_recovery.py tests\test_f_legacy_webscrape_money_input.py tests\test_f_scanner_state.py tests\test_f061_run_legacy_first_checks_local.py tests\manager\test_hourly_mot.py -q`
+  - result: 167 passed
+  - `python -m pytest tests\manager\test_f_self_organisation.py tests\manager\test_hourly_mot.py -q`
+  - result: 76 passed
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+  - result: `status=warn`, `fail_count=0`, `warn_count=5`
+- Known current F interpretation:
+  - BBP account login proof is OK.
+  - Seller Central eligibility proof is WARN/missing until Luke supplies credentials, sets SMS forwarding to Gmail label `AmazonLoginCode`, and approves a live F061 proof window.
+- Full manager sweep note:
+  - `python -m pytest tests\manager -q` currently has one E expectation-mapping failure outside this F task.
+  - Do not widen this F task to repair E.
+- Resume trigger:
+  - Luke fills Seller Central credentials, confirms SMS forwarding into the existing Gmail path, and approves the live scanner-owned proof window.
+- Success condition for next phase:
+  - `seller_central_login_recovery_proof.csv` records fresh redacted proof with requested, code seen, attempted, and succeeded flags.
+  - F MOT changes `f_seller_central_eligibility_auth_state` from WARN to OK.
+- If next phase fails:
+  - keep `SELLER_CENTRAL_AUTO_LOGIN_ENABLED=0`
+  - leave affected rows in login backtrack state
+  - create a bounded selector/code-forwarding repair packet
+  - do not edit queues, prices, Sheets, local DB facts, or scanner outputs
+
+## Manager Automation Takeover Progress - 2026-05-31T12:30Z
+- Current phase set:
+  - Phase 2 B money truth proof: proved at manager level
+  - Phase 3 E ROI consumption safety: proved at manager level
+  - Phase 4 H high-risk control: warning-labelled and parked, no broad autonomy
+  - Phase 5 F scanner/source-proof control: source-proof refresh package parked
+  - Phase 6 O mid-build coverage: warning-labelled, stage map clear
+  - Phase 7-10 takeover controls: lifecycle tests, hourly automation, worker instructions, and quiet manager contract verified
+- B result:
+  - B bridge now names refund, commission, FBA fee, shipping income, shipping fee, and ROI money confidence separately.
+  - B still warns because refund/fee/shipping/ROI proof is incomplete, but the warning is explicit and not hidden.
+- E result:
+  - E now reads the B money-proof labels as outside manager evidence.
+  - E stays warning-labelled when B money proof is bridge-only or not yet proven.
+- H result:
+  - Read-only H MOT has `fail_count=0`.
+  - H terminal, publish, and boundary/finalizer proof are OK.
+  - H remains high-risk for broad autonomy; protected H/O pause lanes stay parked until controller proof is clean.
+- F result:
+  - F scanner heartbeat and live owner state are OK.
+  - F source-proof warnings are stale-proof work, not scanner repair.
+  - `MGR_F_repair_f_source_proof_refresh` is parked because clearing it would require protected source actions such as supplier download, Gmail fetch, F061, queue work, or worker restart.
+- O result:
+  - O is correctly labelled as mid-build.
+  - Built, bridge, proof-only, not-started, not-verified, and unsafe-blocker stages are visible.
+  - No purchase, receiving, send-to-Amazon, or business judgement action was taken.
+- Lifecycle proof:
+  - B and E packets moved through claim, code/proof work, MOT retest, and `proved`.
+  - F packet moved to `parked` with a protected-boundary note.
+  - Retest queue is empty after current manager retests.
+- Scheduled automation proof:
+  - Windows task `SellerOne Manager Hourly MOT` is `Ready`.
+  - Last task result is `0`.
+  - Next hourly run is scheduled.
+- Safety boundary held:
+  - no prices
+  - no queues
+  - no Sheets
+  - no publishing
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+  - no live flow run outside approved proof
+  - no business judgement delegated
+- Final acceptance command set:
+  - `python -m pytest tests\manager -q`
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow all`
+  - `python -m sellerone_manager.app --refresh-approved-tasks`
+  - `python -m sellerone_manager.app --what-next`
+
+## F Manager Snapshot Proof - 2026-05-31T06:18Z
+- Current phase: complete for F manager snapshot proof.
+- Plain-English result:
+  - F did not need a scanner repair.
+  - The F manager snapshot failure was stale MOT evidence.
+  - A read-only F MOT refresh proved `f_manager_snapshot_current` is ok.
+- Files changed:
+  - `sellerone_manager/project_threads/F_MANAGER_SNAPSHOT_PROOF_COMPLETE_20260531.md`
+  - this `CODING_PLAN.md`
+- What changed:
+  - The approved task `MOT_F_F_MANAGER_SNAPSHOT_CURRENT` was claimed, retested, and marked proved.
+  - F snapshot proof is now current and readable.
+- Proof run:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` returned `status=warn`, `fail_count=0`, `warn_count=4`.
+  - `f_manager_snapshot_current` is `ok`.
+- Still not allowed:
+  - no F061 run
+  - no scanner repair
+  - no queue edit
+  - no handoff approval
+  - no worker restart
+  - no Google Sheets write
+  - no price change
+  - no local DB alignment
+  - no output deletion
+- Remaining F warning state:
+  - source intake proof is stale
+  - URL source proof is getting old
+  - email price-list source proof is getting old
+  - queue recommendation proof is readable but stale
+- Next F-specific work:
+  - create or claim a bounded source-proof refresh package if those stale source warnings need clearing.
+
+## F BBP Login Recovery Code Setup - 2026-06-01T10:23Z
+- Current phase: code fix applied; isolated verification passed; live scanner proof not yet proven.
+- Manager packet:
+  - `MGR_F_repair_F_REPAIR_PACKAGE_F_BBP_LOGIN_RECOVERY_20260601`
+  - status moved to `fixed_needs_retest`
+- Files changed:
+  - `scripts/flows/F/bbp_login_recovery.py`
+  - `scripts/flows/F/legacy_scanner_2_1/Webscrape.py`
+  - `tests/test_f_legacy_webscrape_money_input.py`
+  - this `CODING_PLAN.md`
+- Plain-English result:
+  - F061 now has a disabled-by-default BBP auto-login recovery path inside the normal scanner-owned browser.
+  - The old hardcoded login submit path was removed from the legacy BBP scraper.
+  - The helper reads `secrets/price_list_manager/bbp_login.env`, detects the supplied `Login` heading first, fills the BBP email/password only when `BBP_AUTO_LOGIN_ENABLED=1`, and writes proof without secret values.
+- Isolated proof passed:
+  - `python -m py_compile scripts\flows\F\bbp_login_recovery.py scripts\flows\F\legacy_scanner_2_1\Webscrape.py`
+  - `python -m pytest tests\test_f_legacy_webscrape_money_input.py -q` returned `24 passed`
+  - `python -m pytest tests\test_f061_run_legacy_first_checks_local.py -q` returned `65 passed`
+  - `python -m pytest tests\test_f_scanner_state.py -q` returned `4 passed`
+- Read-only manager retest:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` returned `status=fail`, `fail_count=1`, `warn_count=4`
+  - remaining fail is `f_login_mode_state=holding`
+  - this is not cleared by code setup because F061 live login proof was not run
+- Not allowed in this phase:
+  - no F061 run
+  - no scanner restart
+  - no queue edit
+  - no handoff approval
+  - no separate Chrome login workaround
+  - no Chrome profile reset
+  - no prices
+  - no Google Sheets
+  - no local DB alignment
+  - no output deletion
+- Live proof trigger:
+  - only after Luke has filled `BBP_LOGIN_EMAIL` and `BBP_LOGIN_PASSWORD`, set `BBP_AUTO_LOGIN_ENABLED=1`, and approved a separate F061 live login proof window
+- Live proof artifact to inspect:
+  - `out/systems/F/price_list_manager/live/bbp_login_recovery_proof.csv`
+  - refreshed `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+- Success condition:
+  - proof shows BBP login heading detected, login attempted, and succeeded without exposing secrets
+  - F061 returns to normal BBP evidence and continues the current row without queue edits
+  - F MOT no longer reports `f_login_mode_state=holding` for this recovery case
+- Remediation path if it fails:
+  - set `BBP_AUTO_LOGIN_ENABLED=0`
+  - keep affected rows in login backtrack state
+  - inspect only the scanner-owned browser proof and BBP recovery logs
+  - do not edit queues, reset Chrome profile, delete outputs, or use a separate login browser without a new approved packet
+
+## F BBP Login Recovery Proof Update - 2026-06-01T10:58Z
+- Current phase: parked pending next natural BBP login challenge.
+- What happened:
+  - Luke filled the BBP password locally and approved the live F061 proof window.
+  - `BBP_AUTO_LOGIN_ENABLED` was set to `1`.
+  - The active F061 child had already entered the old manual login hold while auto-login was disabled.
+  - That scanner-owned browser recovered to `auth_state=LOGGED_IN` and returned to hidden/catching-up mode without a restart or separate Chrome window.
+- Proof seen:
+  - `out/systems/F/price_list_manager/live/bbp_login_recovery_proof.csv` contains the earlier disabled login-page detection row with `login_heading_detected=1`, `email_present=1`, and `password_present=1`.
+  - `out/systems/F/price_list_manager/live/f061_manager_mode_state.txt` reports `auth_state=LOGGED_IN`, `browser_visibility=hidden`, and `mode=Catching Up`.
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` returned `status=warn`, `fail_count=0`, `warn_count=4`.
+  - F MOT row `f_login_mode_state` is now `ok`.
+  - MOT work item `MOT_F_F_LOGIN_MODE_STATE` is `proved`.
+- What is not yet proven:
+  - The new auto-fill branch has not yet written an `attempted` or `succeeded` row, because no BBP login page was re-entered after the flag was enabled.
+- Current manager task state:
+  - `MGR_F_repair_F_REPAIR_PACKAGE_F_BBP_LOGIN_RECOVERY_20260601` is parked.
+- Trigger to check next:
+  - next natural BBP login challenge while `BBP_AUTO_LOGIN_ENABLED=1`.
+- Artifact to inspect:
+  - `out/systems/F/price_list_manager/live/bbp_login_recovery_proof.csv`
+  - refreshed `python -m sellerone_manager.app --hourly-mot --mot-flow F`
+- Success condition:
+  - proof CSV shows `auto_login_enabled=1`, `login_heading_detected=1`, `attempted_flag=1`, and `succeeded_flag=1` with no secret values exposed.
+  - refreshed F MOT keeps `f_login_mode_state=ok`.
+- Remediation path if it fails:
+  - immediately set `BBP_AUTO_LOGIN_ENABLED=0`
+  - keep rows in login backtrack state
+  - create a new bounded F BBP selector/login-behavior packet
+  - do not restart F061, edit queues, reset the Chrome profile, delete outputs, or use a separate browser without approval
+
+## F BBP Login Recovery Final Proof - 2026-06-01T11:07Z
+- Live proof status: proved.
+- Proof artifact:
+  - `out/systems/F/price_list_manager/live/bbp_login_recovery_proof.csv`
+- Proof rows:
+  - `2026-06-01T10:59:16Z` recorded `auto_login_enabled=1`, `login_heading_detected=1`, `attempted_flag=1`, `status=attempted`.
+  - `2026-06-01T10:59:33Z` recorded `auto_login_enabled=1`, `login_heading_detected=1`, `attempted_flag=1`, `succeeded_flag=1`, `status=succeeded`, `reason=cost_field_visible`.
+- Manager proof:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` returned `status=warn`, `fail_count=0`, `warn_count=4`.
+  - F MOT row `f_login_mode_state` is `ok`.
+  - MOT work item `MOT_F_F_LOGIN_MODE_STATE` is `proved`.
+- Runtime state after proof:
+  - F061 child remains scanner-owned.
+  - `auth_state=LOGGED_IN`.
+  - browser visibility returned to `hidden`.
+  - manager mode is `Catching Up`.
+- Manager task state:
+  - `MGR_F_repair_F_REPAIR_PACKAGE_F_BBP_LOGIN_RECOVERY_20260601` marked `proved`.
+- Safety held:
+  - no F061 restart by Codex
+  - no queue edits
+  - no separate Chrome login workaround
+  - no Chrome profile reset
+  - no prices
+  - no Sheets
+  - no local DB alignment
+  - no output deletion
+
+## H Token Network Boundary Package - 2026-06-02T09:23Z
+- Current phase: bounded H manager repair packaging under approved packet `MOT_H_H_BOUNDARY_FINALIZER_TRUTH`.
+- Plain-English result:
+  - The latest failed H run was a real failure, not a bad MOT display.
+  - H failed before publish because token/network lookup failed during own-offer snapshot refresh.
+  - The finalizer and terminal marker correctly reported failure.
+- Durable package created:
+  - `plans/active/sellerone-manager-control-plane-v1/H_REPAIR_PACKAGE_H_TRANSIENT_TOKEN_NETWORK_BOUNDARY_20260602.md`
+- Active grouped checks:
+  - `h_latest_manifest_state`
+  - `h_terminal_publish_truth`
+  - `h_boundary_finalizer_truth`
+  - `h_manager_readiness`
+- Allowed files for the next bounded repair:
+  - H token/network boundary code named in the package
+  - focused H and manager MOT tests
+  - this coding plan
+- Not allowed:
+  - no H run by Codex
+  - no scheduler pause or resume
+  - no publishing
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+  - no hand-editing H proof outputs
+- Monitoring target:
+  - watch the already-started scheduler-owned H run `20260602T085154Z` only by reading proof files
+  - retest with `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+- Success condition:
+  - latest H manifest final state becomes `completed`
+  - terminal state becomes `finalized`
+  - publish status becomes `ok` or a clearly safe parked state
+  - H MOT clears the three core proof failures
+- Remediation path if it fails:
+  - keep H parked
+  - work only from the new bounded token/network package
+  - do not run H, change scheduler ownership, publish, touch prices, edit queues, write Sheets, align DB data, delete outputs, or restart workers
+
+## H Floor Ceiling Safety Proof Fix - 2026-06-02T09:36Z
+- Current phase: code fix applied, isolated verification passed, live H proof not yet proven.
+- Manager packet:
+  - `MOT_H_H_FLOOR_CEILING_SAFETY_FIELDS`
+- Plain-English fault:
+  - H recorded a controlled floor write as applied, but the safety proof left the final ceiling blank.
+  - The fix does not change prices. It only makes the proof layer carry the hard floor as the binding ceiling when the applied write is clearly a floor write.
+- Scope used:
+  - `scripts/h/h_suppression_truth.py`
+  - `tests/test_h_suppression_truth.py`
+- Isolated verification passed:
+  - `python -m py_compile scripts\h\h_suppression_truth.py`
+  - `python -m pytest tests\test_h_suppression_truth.py -q`
+  - `python -m pytest tests\manager\test_h_hourly_mot.py -q`
+- Live proof status:
+  - not yet proven
+  - the current H process was already running before this code change, so this fix is not proven in live output yet
+- Trigger/time to check:
+  - after the next H-owned run that starts from a fresh process after this code change, or after Luke approves a protected H restart/proof window
+- Artifact to inspect:
+  - refreshed `out/phase1_runtime_floor_snapshot_latest.csv`
+  - refreshed `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+- Success condition:
+  - `h_floor_ceiling_safety_fields` is `ok`
+  - `h_manager_readiness` has no remaining fail caused by floor/ceiling safety proof
+- Remediation path if it fails:
+  - keep H parked
+  - inspect the refreshed row and reason codes
+  - do not run H, change scheduler ownership, publish, change prices, edit queues, write Sheets, align DB data, delete outputs, or restart workers without a protected approval window
+
+## H Boundary Finalizer Truth - 2026-05-31T06:48Z
+- Current phase: read-only monitored classification under approved packet `MOT_H_H_BOUNDARY_FINALIZER_TRUTH`.
+- Plain-English expectation:
+  - H should either finish its already-running scheduler-owned run and clear the latest boundary proof, or stay parked with one clear H boundary-stall repair package.
+  - This is not a price repair and not a live H rerun by Codex.
+- Current evidence:
+  - latest completed H manifest at the start of this phase: `H_20260531T060309Z`
+  - final state: `failed`
+  - terminal state: `failed`
+  - failure code: `TIMEOUT_STALLED`
+  - failed stage: `phase1_pilot`
+  - publish status: `not_started`
+  - a newer H owner was already running as `20260531T063208Z`
+- Allowed files for this phase:
+  - H read-only proof files under `out/systems/H/live/`
+  - H manifests under `out/manifests/H/`
+  - manager MOT outputs under `out/systems/M/`
+  - bounded H repair package files under this plan folder
+  - this `CODING_PLAN.md`
+- Not allowed:
+  - no H run by Codex
+  - no scheduler pause or resume
+  - no publishing
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+- Monitoring target:
+  - watch the existing H owner run only by reading proof files
+  - retest with `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - success means `h_boundary_finalizer_truth`, `h_latest_manifest_state`, and `h_terminal_publish_truth` clear for the latest completed H run
+- Poll cadence:
+  - first check immediately after this plan update
+  - then every 5 minutes for up to 20 minutes while the existing H owner is active
+- Timeout rule:
+  - if the owner keeps running without terminal proof, leave the approved task in progress and keep the H package current
+  - if the owner finalizes failed again, write a bounded H boundary-stall repair package
+  - if the owner finalizes cleanly, retest and mark the packet `proved`
+
+### H Boundary Finalizer Result - 2026-05-31T07:01Z
+- Result:
+  - the already-running H owner `20260531T063208Z` finalized cleanly
+  - manifest final state became `completed`
+  - terminal state became `finalized`
+  - publish status became `ok`
+- Manager retest:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - returned `status=warn`, `fail_count=0`, `warn_count=3`
+- Approved packet:
+  - `MOT_H_H_BOUNDARY_FINALIZER_TRUTH` marked `proved`
+- Current front desk:
+  - `python -m sellerone_manager.app --what-next`
+  - system status: `WARN`
+  - Luke action required: `no`
+  - Codex task available: `no`
+  - A/F/O are calm
+  - B/E/H have warning-level incomplete-proof work only
+- Safety:
+  - Codex did not run H
+  - Codex did not pause or resume scheduler ownership
+  - Codex did not publish
+  - Codex did not change prices
+  - Codex did not edit queues
+  - Codex did not write Sheets
+  - Codex did not align local DB data
+  - Codex did not delete outputs
+  - Codex did not restart workers
+
+## F Seller Central Existing Browser Tab Handoff - 2026-06-02T09:30Z
+- Current phase: code and offline proof for `TASK_F007_build_seller_central_existing_browser_tab_handoff`.
+- Plain-English expectation:
+  - F should treat BBP account login and Seller Central eligibility login as two different doors.
+  - When BBP dashboard says `LOGIN`, F should click the BBP login control, follow the Seller Central tab inside the same F061-owned browser, then return to BBP and reread the yes/no proof.
+- Allowed files for this phase:
+  - `scripts/flows/F/legacy_scanner_2_1/Webscrape.py`
+  - `tests/test_f_legacy_webscrape_money_input.py`
+  - this coding plan
+- Not allowed:
+  - no F061 run by Codex
+  - no scanner restart
+  - no separate Chrome login workaround
+  - no queue edits
+  - no prices
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no Chrome profile reset
+- Isolated proof:
+  - compile touched F scanner code
+  - run focused F fake-browser tests for the tab handoff
+  - run existing Seller Central login recovery tests
+  - run read-only F MOT after code tests if no live scanner action is needed
+- Live proof boundary:
+  - live proof remains blocked until Luke approves an F061 scanner-owned proof window and Amazon SMS is available
+  - live proof must use the normal F061 browser path only
+
+## H Fresh-Code Proof Window Plan - 2026-06-02T09:55Z
+- Current phase: retest planning after `MOT_H_H_FLOOR_CEILING_SAFETY_FIELDS` was fixed and moved to `fixed_needs_retest`.
+- Plain-English expectation:
+  - H is already running, so the first test is to let the current H run finish and inspect its proof.
+  - A restart is not the first move, because restart is a protected action and may interrupt a live owner.
+- Current owner snapshot:
+  - active H run: `20260602T093038Z`
+  - owner process: live and responding when checked
+  - current proof state: run is still in progress, so this is not final proof yet
+- Test A - read-only current-run proof:
+  - wait for active run `20260602T093038Z` to finalize
+  - inspect the refreshed manifest, terminal marker, publish marker, and runtime floor snapshot
+  - run `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - success means `h_floor_ceiling_safety_fields=ok`, the three core proof rows stay `ok`, and `h_manager_readiness` has no floor/ceiling blocker
+  - limitation: this proves the current live H state, but may not prove the code change if the running process loaded the old module before the fix
+- Test B - true fresh-code proof:
+  - use only if Test A is stale, contradictory, or still shows the old blank-ceiling proof
+  - requires a protected H fresh-process proof window before any restart or scheduler ownership change
+  - before restart: confirm H is not mid-publish and owner markers are not contradictory
+  - after fresh process starts: wait for a completed run after the code-change time, then run `python -m sellerone_manager.app --hourly-mot --mot-flow H`
+  - success means the fresh run completes, publish proof is clear, `h_floor_ceiling_safety_fields=ok`, and no new H fail row appears
+- Not allowed without a separate approval:
+  - no price changes
+  - no queue edits
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+  - no worker restart
+  - no scheduler ownership pause or resume
+- Stop condition:
+  - if current H proof shows mid-publish, duplicate ownership, dead ownership, or contradictory markers, do not restart
+  - package the exact failure into a bounded H worker task instead
+
+### H Fresh-Code Proof Result - 2026-06-02T10:15Z
+- Result:
+  - H run `20260602T093038Z` finalized cleanly after the floor/ceiling proof fix
+  - read-only H MOT completed with `fail_count=0`
+  - `h_floor_ceiling_safety_fields` is now `ok`
+  - `MOT_H_H_FLOOR_CEILING_SAFETY_FIELDS` was marked `proved`
+- Remaining H state:
+  - H is still warning-level, not failure-level
+  - remaining warnings are manager-readiness/cleanup/checklist clue visibility, not the active floor/ceiling failure
+- Safety:
+  - no H restart
+  - no scheduler ownership change
+  - no publish action by Codex
+  - no price change by Codex
+  - no queue edit
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+
+## F Seller Central Manual Visibility Repair - 2026-06-02T09:55Z
+- Current phase: code and local proof for the hidden-browser root cause.
+- Plain-English root cause:
+  - FPM130 was using one saved `LOGGED_IN` flag for both BBP account login and Seller Central eligibility login.
+  - Because BBP was logged in, FPM130 could minimize the next scanner child even when Seller Central proof showed Amazon sign-in was still waiting.
+- Allowed files for this phase:
+  - `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`
+  - `tests/test_fpm130_live_cycle.py`
+  - this coding plan
+- Not allowed:
+  - no F061 run by Codex
+  - no scanner restart
+  - no separate Chrome login workaround
+  - no queue edits
+  - no prices
+  - no Google Sheets writes
+  - no local DB alignment
+  - no output deletion
+- Isolated proof:
+  - compile `FPM130_run_live_cycle.py`
+  - run focused FPM130 tests
+  - run read-only F MOT
+- Runtime note:
+  - existing already-running FPM130 owners may still have the old in-memory rule until their next normal boundary or restart
+  - manual login must still happen only in the scanner-owned F061 browser
+
+## F Seller Central WhatsApp Manual Login Monitoring - 2026-06-02T10:00Z
+- Current phase: monitored validation while Luke completes the Seller Central WhatsApp login inside the visible F061 browser.
+- Monitoring target:
+  - `out/systems/F/price_list_manager/live/f061_manager_mode_state.txt`
+  - `out/systems/F/price_list_manager/live/f061_browser_visibility_state.txt`
+  - `out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv`
+  - `out/systems/F/price_list_manager/live/live_cycle_status.csv`
+  - `out/systems/F/price_list_manager/live/live_cycle_events.csv`
+- Poll cadence:
+  - first check immediately
+  - then every 30 seconds for up to 15 minutes while Luke is logging in
+- Success condition:
+  - Seller Central proof records `status=succeeded`, or F manager state moves away from Seller Central login-required and normal scanning output resumes
+- Failure or park condition:
+  - if proof stays disabled/login-required after the visible window times out, keep F in login-required state and create a narrow follow-up packet
+  - if Amazon shows captcha, unusual approval, or WhatsApp failure, stop and keep it as a Luke decision
+- Safety:
+  - no F061 restart
+  - no queue edits
+  - no prices
+  - no Sheets
+  - no local DB alignment
+  - no output deletion
+  - no separate Chrome login window
+
+### Finding - Pre-Browser Hold Was Not Useful
+- Additional root cause:
+  - the visible login hold was sleeping before the scanner browser adapter was created
+  - this could make F say `Login Window Open` while no active scanner-owned Chrome window was available for Luke to use
+- Code correction:
+  - pre-browser sleep is disabled by default
+  - the useful wait now happens inside the Seller Central tab after BBP opens it
+- Proof required:
+  - compile F061 and Webscrape
+  - run focused F061/FPM130/Webscrape tests
+- Runtime boundary:
+  - the already-running child that entered the old sleep may not pick up this change until it exits or is restarted
+  - restarting the child remains a protected action and needs Luke approval
+
+### Finding - BBP Auth Hid Seller Central Manual Wait
+- Additional root cause:
+  - the scanner log said BBP was already authenticated
+  - the manager treated that as full login proof and hid the browser
+  - Seller Central proof still said `waiting_for_code`, so the browser should have stayed visible
+- Code correction:
+  - FPM130 now refuses to hide the scanner browser on a BBP authenticated signal when Seller Central eligibility login still requires visibility
+  - FPM130 records the visible state as `SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py` passed
+  - `python -m pytest tests\test_fpm130_live_cycle.py -q` passed with 74 tests
+  - `python -m pytest tests\test_f_legacy_webscrape_money_input.py tests\test_f061_run_legacy_first_checks_local.py tests\test_fpm130_live_cycle.py -q` passed with 170 tests
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` returned `fail_count=0`
+- Live state after repair:
+  - the existing child still showed Seller Central manual login proof as `waiting_for_code`
+  - Codex re-surfaced the existing scanner-owned browser without restarting F061
+  - no queue edit, price change, Sheet write, local DB alignment, output deletion, or worker restart was performed
+- Runtime boundary:
+  - the currently running FPM130 owner may still carry stale in-memory wording until the next normal boundary or an approved controlled restart
+  - if the visible browser is not usable, the next safe step is Luke approval for one controlled F061 child restart so the new visibility rule loads fresh
+
+### Finding - Login Window Proof Was Too Loose
+- Additional root cause:
+  - FPM130 could record `visible` after asking Windows to show Chrome even when no usable scanner-owned login window actually appeared
+  - the targeted login-window matcher expected the configured `Profile 2` clue, but the live Chrome process family exposed `Chrome_91_F061` on child processes instead
+  - this made Luke wait for a browser that the manager could not reliably prove was on-screen
+- Code correction:
+  - FPM130 now includes parent Chrome process ids when surfacing the scanner browser
+  - FPM130 now treats `Chrome_91_F061` as a valid F061-owned Chrome clue during login mode
+  - FPM130 now records `missing` instead of `visible` if the show helper cannot prove a window was surfaced
+  - F061's own login surface helper now uses the same parent-process and `Chrome_91_F061` fallback
+  - manager wording can now show `Login Window Missing`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\flows\F\legacy_scanner_2_1\Webscrape.py` passed
+  - `python -m pytest tests\test_fpm130_live_cycle.py -q` passed with 76 tests
+  - `python -m pytest tests\test_f_legacy_webscrape_money_input.py tests\test_f061_run_legacy_first_checks_local.py tests\test_fpm130_live_cycle.py -q` passed with 172 tests
+- Live proof seen:
+  - the old running child first failed targeted surfacing and recorded `seller_central_login_window_missing`
+  - after the matcher fallback was added, the corrected targeted show command returned `surfaced=True`
+  - the current F061 child then ended and the manager moved to idle, so there is no active scanner-owned browser left for Luke to log into right now
+- Next live proof trigger:
+  - requires Luke approval for one controlled F061 child restart or the next normal F061 child launch
+  - success means a browser appears promptly, stays open for the manual Seller Central login window, and `seller_central_login_recovery_proof.csv` moves from `waiting_for_code` to `succeeded` or a clear blocked reason
+- Remediation if it fails:
+  - if the window is still missing, keep F in `Login Window Missing` and repair the window-surfacing path only
+  - if Amazon shows captcha, WhatsApp failure, or unusual challenge, keep it as a Luke decision
+  - no queue edit, price change, Sheet write, local DB alignment, output deletion, or separate Chrome login window
+
+### Manual Login Fallback UX Debt - 2026-06-02T10:42Z
+- Luke completed the manual Seller Central login, but the fallback path was still poor:
+  - the scanner-owned browser took too long to appear
+  - other pages/windows jumped in front while Luke typed
+  - the manual login path is still necessary even if auto-login later works, because Amazon can change challenges
+- Durable task:
+  - recorded in `project_control/TASK_QUEUE.md` as `Clean up F061 manual Seller Central login fallback UX`
+- Success condition:
+  - the browser appears promptly
+  - the same scanner-owned browser stays foreground and stable during the whole login hold
+  - other scanner pages do not jump in front while Luke types
+  - the manager says `Login Window Missing` if it cannot prove a real visible window
+  - proof records succeeded or a clear blocked reason
+
+### Current Manual Login Proof Watch - 2026-06-02T10:43Z
+- Current child:
+  - F061 child pid `12584`
+  - supplier `td_synnex`
+  - login mode active
+- Trigger:
+  - Luke reported manual Seller Central login completed while the scanner-owned window was open
+- Artifacts to inspect:
+  - `out/systems/F/price_list_manager/live/seller_central_login_recovery_proof.csv`
+  - `out/systems/F/price_list_manager/live/f061_manager_mode_state.txt`
+  - `out/systems/F/price_list_manager/live/f061_browser_visibility_state.txt`
+  - `out/systems/F/price_list_manager/live/f061_child_stderr.log`
+- Expected success:
+  - proof row changes to `status=succeeded`, or the next scanner evidence shows Seller Central eligibility/dashboard yes-no is readable
+- Timeout rule:
+  - if the current 15-minute manual hold expires without success, record this as `manual_login_completed_but_scanner_did_not_detect_success`
+  - next remediation must be a bounded F worker task to improve post-login success detection and window stability
+- Safety:
+  - no F061 restart
+  - no queue edit
+  - no price change
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no separate Chrome login window
+
+### Current Manual Login Proof Result - 2026-06-02T10:54Z
+- Result:
+  - Luke completed the manual Seller Central login
+  - F did not write a `succeeded` Seller Central proof row during the manual wait
+  - F wrote `status=blocked` with `reason=manual_seller_central_login_wait_timeout` at `2026-06-02T10:52:45Z`
+  - immediately after that, F read BBP evidence, including cost, sales history, and `Dashboard yes/no => YES`
+  - operationally, the manual login appears to have worked
+- Remaining defect:
+  - the proof system did not reconcile the later readable dashboard/eligibility evidence back into Seller Central login proof
+  - the manager then returned to `Catching Up` from BBP/auth evidence, which can still overclaim if Seller Central proof is not reconciled
+- Durable follow-up:
+  - `project_control/TASK_QUEUE.md` now records `Clean up F061 manual Seller Central login fallback UX and post-login proof`
+- Safety:
+  - no restart
+  - no queue edit
+  - no price change
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no separate Chrome login window
+
+### Post-Login Proof Reconciliation Fix - 2026-06-02T12:03Z
+- Code fix applied:
+  - F061 now records Seller Central login success when BBP later shows a real dashboard YES/NO after a manual login wait had timed out or stayed pending
+  - the handoff return path also checks for a delayed dashboard YES/NO before leaving the Seller Central proof blocked
+  - the delayed-dashboard wait is limited to realistic recoverable states, so captcha/manual hard blockers do not sit in an unnecessary proof wait
+  - repeated normal scans do not spam success rows after the latest Seller Central proof is already `succeeded`
+- Touched files:
+  - `scripts/flows/F/legacy_scanner_2_1/Webscrape.py`
+  - `tests/test_f_legacy_webscrape_money_input.py`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\legacy_scanner_2_1\Webscrape.py` passed
+  - `python -m pytest tests\test_f_legacy_webscrape_money_input.py -q` passed with 34 tests
+  - `python -m pytest tests\test_f_legacy_webscrape_money_input.py tests\test_f061_run_legacy_first_checks_local.py tests\test_fpm130_live_cycle.py tests\test_f_seller_central_login_recovery.py -q` passed with 182 tests
+- Read-only MOT:
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow F` still reports the old live Seller Central proof as `decision_needed`
+  - this is expected until a fresh F061 child loads the new code or a later normal scan writes the new reconciliation success row
+- Current live boundary:
+  - F061 is scanning hidden again and producing output
+  - Codex did not restart F061
+  - Codex did not edit queue files, prices, Sheets, local DB facts, or outputs
+- Next verifier:
+  - next fresh F061 child that encounters a Seller Central manual-login recovery or later BBP dashboard YES/NO after pending proof
+  - success means `seller_central_login_recovery_proof.csv` gains a `status=succeeded` row with reason `bbp_dashboard_signal_visible_after_manual_login` or `bbp_dashboard_signal_visible_after_seller_central_return`
+
+### O-to-F Re Scan Bridge Fix - 2026-06-02T13:20Z
+- Code fix applied:
+  - O New Product Review now accepts `Re scan` as a real operator decision and writes it as `rescan`
+  - F review event contract now accepts `rescan` as a valid decision
+  - FPM130 now reads latest operator `rescan` events and converts them into scanner-safe retry rows before ordinary pending rows
+- Touched files:
+  - `scripts/flows/O/O400_operator_ui.py`
+  - `scripts/one_off/F020_check_review_event_contract.py`
+  - `scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`
+  - `tests/test_o_ui_operator_view.py`
+  - `tests/test_f020_check_review_event_contract.py`
+  - `tests/test_fpm130_live_cycle.py`
+- Isolated proof:
+  - `python -m py_compile scripts\flows\O\O400_operator_ui.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py scripts\one_off\F020_check_review_event_contract.py` passed
+  - `python -m pytest tests\test_o_ui_operator_view.py::test_feeder_review_submission_accepts_rescan_decision tests\test_fpm130_live_cycle.py::test_fpm130_promotes_operator_rescan_event_before_normal_pending_rows tests\test_f020_check_review_event_contract.py -q` passed with 5 tests
+  - `python -m pytest tests\test_o_ui_operator_view.py tests\test_fpm130_live_cycle.py tests\test_f020_check_review_event_contract.py -q` passed with 169 tests
+- Runtime boundary:
+  - Codex did not run F061
+  - Codex did not edit the live F061 queue
+  - Codex did not restart workers, change prices, write Sheets, change local DB facts, delete outputs, publish, or approve rows
+- Additional read-only finding:
+  - current F inbox proof shows 24 operator review events: 6 `pass`, 18 `fail`, 0 `rescan`
+  - old AI decision proof shows 13 `rescan_needed` decisions across 9 handoffs, but the matching `ai_rescan_queue.csv` files are empty
+  - at least one of those handoffs has a built pass output that contradicts the later `rescan_needed` decision file, so those old AI rows must be reconciled through FPM155/gate proof before any scanner priority promotion
+  - durable follow-up recorded in `project_control/TASK_QUEUE.md` as `Reconcile AI rescan_needed decisions with built F rescan queues before using them for scanner priority`
+- Next verifier:
+  - trigger: the next normal FPM130 cycle after Luke/operator submits a `Re scan` decision in O New Product Review
+  - inspect: `out/systems/F/price_list_manager/live/ai_rescan_promotion_status.csv`
+  - success means `queue_rows` and `promoted_rows` show the operator rescan event was promoted, and the promoted active row has `scan_reason=rescan_retry_required`
+  - if it fails, repair the O event-to-F rescan bridge; do not hand-edit queue rows or run F061 outside an approved proof window
+
+### F061 Login Window Flash Suppression - 2026-06-02T13:08Z
+- Trigger:
+  - Luke reported Seller Central / scanner windows flashing over the screen
+- Cause found:
+  - current F evidence showed login-mode browser visibility events repeating every few seconds for `bbp_login_required_scanner_owned`
+  - the code allowed repeated show-window calls even after the login-mode window had already been surfaced once
+- Immediate control action:
+  - parked `f061_browser_visibility_state.txt` as hidden/minimized at `2026-06-02T13:06:21Z`
+  - did not restart FPM, run F061 manually, edit queues, change prices, write Sheets, change local DB facts, delete outputs, publish, or approve rows
+- Code fix applied:
+  - FPM130 now suppresses repeated login-mode show-window calls when the same scanner-owned login reason is already saved and the login window marker exists
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py` passed
+  - focused anti-repeat tests passed with 3 tests
+  - full `tests\test_fpm130_live_cycle.py` passed with 77 tests
+  - 20-second live event watch showed no new `f061_browser_visibility` repeat events after the parked state
+- Runtime boundary:
+  - the active FPM owner was not restarted, so the code patch becomes active on the next normal FPM owner reload unless Luke approves a controlled restart
+- Next verifier:
+  - inspect `out/systems/F/price_list_manager/live/live_cycle_events.csv` after the next FPM owner reload or controlled restart
+  - success means one login-window surface event at most for the same login reason, not a repeated every-few-seconds flash loop
+  - if it fails, keep F in hidden/minimized mode and repair the visibility gate before any further manual-login proof
+
+### BBP Iframe False Login Classification Fix - 2026-06-02T13:14Z
+- Trigger:
+  - Luke reported F was asking for BBP login again shortly after a successful BBP login
+- Cause found:
+  - recent F061 proof showed BBP was authenticated and readable: iframe found, `BBP login skipped: already authenticated`, cost read, sales chart read, dashboard yes/no read
+  - later `No BBP iframe` errors were being treated as BBP login evidence
+  - that was too broad: a missing BBP iframe can be a slow page, plugin load, or browser-frame failure, not proof Luke needs to log in again
+- Immediate control action:
+  - canceled the stale `f061_login_mode.requested` file with reason `false_bbp_iframe_login_request_canceled`
+  - kept `f061_browser_visibility_state.txt` hidden/minimized
+  - did not run F061 manually, restart workers, edit queues, change prices, write Sheets, change local DB facts, delete outputs, publish, or approve rows
+- Code fix applied:
+  - `_scanner_state.py` no longer maps `No BBP iframe` to `BBP_LOGIN_REQUIRED`
+  - `F061_run_legacy_first_checks_local.py` no longer turns `No BBP iframe` or BBP iframe preflight failure into login backtrack
+  - FPM130 has a regression test proving missing BBP iframe does not request a login window
+- Isolated proof:
+  - `python -m py_compile scripts\flows\F\_scanner_state.py scripts\flows\F\F061_run_legacy_first_checks_local.py scripts\flows\F\price_list_manager\FPM130_run_live_cycle.py` passed
+  - focused classification tests passed with 7 tests
+  - broader F scanner/FPM proof passed with 147 tests
+  - 30-second live watch showed the login request stayed `canceled`, browser state stayed hidden, and no new login-window visibility event appeared
+- Runtime boundary:
+  - current FPM owner was not restarted, so FPM130 manager-side code reload waits for the next normal owner reload or a Luke-approved controlled restart
+  - new F061 child processes can load the F061-side classification fix from disk
+- Next verifier:
+  - inspect `out/systems/F/price_list_manager/live/live_cycle_events.csv` and `out/systems/F/price_list_manager/live/f061_login_mode.requested` after the next BBP iframe failure
+  - success means `No BBP iframe` does not create a new BBP login request or repeated visible-login window event
+  - if it fails, use a controlled FPM owner restart to load the FPM130-side patch before any further manual-login proof
+
+### B Refund Return Token Bridge - 2026-06-03T09:44Z
+- Trigger:
+  - Luke approved tying refund proof into the existing B return-token system instead of creating a second return process
+- Code fix applied:
+  - added a B038 read-only proof bridge joining API refund rows, Amazon FBA customer return report rows, token-ledger return state, return COGS ledger evidence, and Sellerboard witness labels
+  - added a B MOT row `b_refund_return_token_bridge`
+  - added the new check to the B refund/fee/shipping/ROI manager group and warning worklist routing
+- Safety boundary:
+  - did not run B
+  - did not restart B
+  - did not write Sheets
+  - did not align local DB facts
+  - did not edit token allocation or create reusable tokens
+  - did not feed Sellerboard values or return-token bridge values into live ROI/restocking
+- Isolated proof:
+  - `pytest -q tests/test_b038_build_refund_return_token_bridge.py tests/test_b037_build_refund_pnl_bridge.py tests/test_b008_apply_refunds_to_tokens.py tests/test_b009_apply_stock_adjustments_to_tokens.py` passed with 12 tests
+  - focused B MOT tests for the new bridge and refund API proof passed
+  - `py_compile` passed for B038, manager app, hourly MOT, and multi-flow mapping
+- Manager proof:
+  - `python -m sellerone_manager.app --b-refund-return-token-bridge` built 218 bridge rows and 87 warning-labelled rows
+  - `python -m sellerone_manager.app --hourly-mot --mot-flow B` returned `fail_count=0`, `warn_count=6`
+  - `b_refund_pnl_roi_api_proof` is `ok`
+  - `b_refund_return_token_bridge` is `warn` with 1 sellable return missing reusable-token proof and 86 token-reuse rows missing Amazon return proof
+- Next verifier:
+  - trigger: after the next approved B refund-return repair packet or a wider Amazon return-report pull
+  - inspect: `out/systems/B/refunds/b_refund_return_token_bridge.csv` and B MOT row `b_refund_return_token_bridge`
+  - success means sellable returns have matching reusable-token and return-COGS proof, unsellable/researching returns do not create reusable stock, and token reuse without Amazon return proof is zero or separately approved
+  - if it fails, create a bounded B repair task for B008/B009 proof mapping or wider Amazon return-report coverage; do not hand-edit tokens, run B, write Sheets, align DB facts, or feed unproved stock recovery into ROI/restocking
+
+### B Backdated FBA Customer Returns Pull - 2026-06-03T09:55Z
+- Trigger:
+  - the first return-token bridge had only the small API proof sample, so Luke approved continuing with wider proof before hard-coding token or ROI behavior
+- Code fix applied:
+  - added B039 read-only FBA customer returns puller for `GET_FBA_FULFILLMENT_CUSTOMER_RETURNS_DATA`
+  - added manager command `--b-fba-customer-returns-pull`
+  - corrected B038 so a reusable returned token counts as reuse proof even if it has since been allocated again
+- Safety boundary:
+  - did not run or restart B
+  - did not write Sheets
+  - did not align local DB facts
+  - did not edit token allocation or create reusable tokens
+  - did not feed return bridge values into live ROI/restocking
+- Isolated proof:
+  - targeted B refund/return/token tests passed with 19 tests
+  - `py_compile` passed for B038, B039, manager app, hourly MOT, and multi-flow mapping
+- Manager proof:
+  - backdated Amazon return report window: `2025-10-25T09:54:17Z` to `2026-06-02T09:54:17Z`
+  - participating Amazon marketplaces checked: 12
+  - Amazon return rows pulled: 120 raw, 118 normalized, 115 unique order/SKU return keys
+  - corrected B return-token bridge rows: 218
+  - clean sellable reuse proof: 13 rows
+  - safe unsellable/no-reuse proof: 49 rows
+  - warning rows still visible: 95
+  - warning breakdown: 33 sellable returns still missing token-reuse proof, 52 token-reuse rows still missing Amazon return proof, 71 API refund rows still without Amazon return proof
+  - B MOT remains warning-only with `fail_count=0`
+- Next verifier:
+  - trigger: after a bounded B worker repair maps the remaining return/token mismatches or after a further Amazon returns/report coverage finding explains them
+  - inspect: `out/systems/B/refunds/b_refund_return_token_bridge.csv` and B MOT row `b_refund_return_token_bridge`
+  - success means warning rows drop because sellable returns, token reuse, and Amazon return proof agree by order/SKU, or remaining exceptions are explicitly labelled and approved
+  - if it fails, keep ROI/restocking blocked from stock-return recovery and create a bounded B008/B009 proof-mapping task; do not hand-edit tokens, run B, write Sheets, align DB facts, or publish bridge values into ROI
+
+### B Return Token Matching Audit - 2026-06-03T10:20Z
+- Trigger:
+  - Luke confirmed this work should future-proof the B return system, not patch individual token rows
+- Code fix applied:
+  - added B040 read-only matching audit for B refund return-token warning rows
+  - added manager command `--b-return-token-matching-audit`
+  - added B MOT row `b_return_token_matching_audit`
+  - added the audit to the B refund/fee/shipping/ROI manager group
+  - tightened the audit so every warning row gets a worker-ready diagnosis instead of a vague manual bucket
+- Safety boundary:
+  - did not run or restart B
+  - did not clear locks or maintenance markers
+  - did not write Sheets
+  - did not align local DB facts
+  - did not edit token allocation, create reusable tokens, or correct return/token data
+  - did not feed Sellerboard values or return-token bridge values into live ROI/restocking
+- Isolated proof:
+  - focused B038/B039/B040 and manager MOT tests passed with 16 tests
+  - `py_compile` passed for B038, B039, B040, manager app, hourly MOT, and multi-flow mapping
+- Manager proof:
+  - B040 audit classified 95 warning rows into 11 diagnosis types
+  - B MOT returned `fail_count=0`, `warn_count=6`
+  - `b_return_token_matching_audit` is `ok` with `unclassified_rows=0`
+  - `b_refund_return_token_bridge` remains `warn` with 95 real warning rows
+  - top unresolved proof groups are 33 sellable returns missing token reuse proof, 52 token reuse rows missing Amazon return proof, 52 B008 missing-or-zero applied rows, and 9 non-sellable reuse conflicts
+- Next verifier:
+  - trigger: after a bounded B008/B009 worker repair improves order/SKU return matching or return COGS trace proof
+  - inspect: `out/systems/B/refunds/b_return_token_matching_audit.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_return_token_matching_audit` and `b_refund_return_token_bridge`
+  - success means the audit stays fully classified and the bridge warning count drops because Amazon return proof, token reuse proof, and return COGS proof agree by order/SKU
+  - if it fails, keep ROI/restocking blocked from stock-return recovery and create a smaller B008/B009 repair packet for the remaining diagnosis group; do not hand-edit tokens, run B, write Sheets, align DB facts, or publish bridge values into ROI
+
+### B Return Token Repair Preview - 2026-06-03T10:45Z
+- Trigger:
+  - Luke approved continuing with future-proofing the B refund/return/token chain, not patching individual token rows
+- Code fix applied:
+  - added B041 read-only repair preview for B return-token warning rows
+  - added manager command `--b-return-token-repair-preview`
+  - added B MOT row `b_return_token_repair_preview`
+  - added the preview to the B refund/fee/shipping/ROI manager group and B order-truth completion checks
+- Safety boundary:
+  - did not run or restart B
+  - did not clear locks or maintenance markers
+  - did not write Sheets
+  - did not align local DB facts
+  - did not edit token allocation, create reusable tokens, or correct return/token data
+  - did not feed Sellerboard values or return-token bridge values into live ROI/restocking
+- Isolated proof:
+  - focused B038/B039/B040/B041 and manager MOT tests passed with 21 tests
+  - `py_compile` passed for B038, B039, B040, B041, manager app, hourly MOT, and multi-flow mapping
+- Manager proof:
+  - B041 preview classified all 95 bridge warning rows with zero unclassified rows
+  - B041 preview has zero live-write flags, zero ROI/restocking-use flags, and zero Sellerboard-as-final-truth flags
+  - repair lanes are 52 Amazon-return coverage reviews, 21 rows waiting for returned-pending token proof, 9 protected disposition conflicts, 7 B008 reproof candidates, 5 original-allocation gaps, and 1 return COGS trace row
+  - no rows are immediately ready for a straight B009 live repair because the matching returned_pending token proof is not visible yet
+  - B MOT returned `fail_count=0`, `warn_count=6`
+  - `b_return_token_repair_preview` is `ok`
+  - `b_refund_return_token_bridge` remains `warn` with 95 real warning rows
+- Next verifier:
+  - trigger: after a bounded B008/allocation proof repair or Amazon-return coverage repair improves the preview lanes
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_return_token_repair_preview` and `b_refund_return_token_bridge`
+  - success means B041 remains safe and classified, and B038 warning rows drop because order/SKU refund proof, Amazon return proof, token reuse proof, and return COGS proof agree
+  - if it fails, split the remaining lane into a smaller worker packet; do not hand-edit tokens, run B, write Sheets, align DB facts, or publish bridge values into ROI
+
+### B008 Refund Token Reproof Preview - 2026-06-03T11:05Z
+- Trigger:
+  - B041 showed B009 cannot safely be the first live return-token repair because matching returned_pending proof is not visible
+- Code fix applied:
+  - added B042 read-only B008 refund-token reproof preview
+  - added manager command `--b-refund-token-reproof-preview`
+  - added B MOT row `b_refund_token_reproof_preview`
+  - added the preview to the B refund/fee/shipping/ROI manager group and B order-truth completion checks
+- Safety boundary:
+  - did not run or restart B
+  - did not clear locks or maintenance markers
+  - did not write Sheets
+  - did not align local DB facts
+  - did not edit token allocation, create reusable tokens, or correct return/token data
+  - did not feed Sellerboard values or B008 preview values into live ROI/restocking
+- Isolated proof:
+  - focused B038/B040/B041/B042 and manager MOT tests passed with 24 tests
+  - `py_compile` passed for B038, B040, B041, B042, manager app, hourly MOT, and multi-flow mapping
+- Manager proof:
+  - B042 preview classified all 33 B008-side rows with zero unclassified rows
+  - B042 preview has zero live-write flags, zero ROI/restocking-use flags, and zero Sellerboard-as-final-truth flags
+  - repair lanes are 7 direct B008 order/SKU reproof candidates, 21 B008 event-ledger state drift rows, and 5 original allocation proof gaps
+  - there are zero token-state conflict rows in this B008 preview
+  - B MOT returned `fail_count=0`, `warn_count=6`
+  - `b_refund_token_reproof_preview` is `ok`
+  - `b_refund_return_token_bridge` remains `warn` with 95 real warning rows
+- Next verifier:
+  - trigger: after a bounded B008 code repair makes applied refund events and current token ledger state agree, or after allocation proof repairs the 5 missing-allocation rows
+  - inspect: `out/systems/B/refunds/b_refund_token_reproof_preview.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_refund_token_reproof_preview`, `b_return_token_repair_preview`, and `b_refund_return_token_bridge`
+  - success means B042 stays safe and classified, B008-side rows move from missing/ledger-drift into visible returned_pending or already-closed/reused proof, and B038 bridge warnings drop
+  - if it fails, split the remaining B008 lane into a smaller worker packet; do not hand-edit tokens, run B, write Sheets, align DB facts, or publish bridge values into ROI
+
+### Controlled B008 Local Reproof Apply - 2026-06-03T11:03Z
+- Trigger:
+  - Luke approved the controlled B008 local repair window after the staged B008 plan
+- Code fix applied:
+  - added B043 protected local B008 reproof writer
+  - added manager command `--b-refund-token-reproof-apply --approve-protected-b008-repair`
+  - tightened B042 so an allocation token missing from the current token ledger becomes a blocked token-ledger gap, not a ready row
+- Safety boundary:
+  - did not run or restart B
+  - did not clear locks or maintenance markers
+  - did not write Sheets
+  - did not align local DB facts or SQL tables
+  - did not change prices or queues
+  - did not feed return-token values into live ROI/restocking
+  - wrote only the approved local B008 token/refund proof files after snapshot
+- Snapshot:
+  - snapshot directory: `out/systems/B/refunds/b008_reproof_snapshots/20260603_110329Z`
+  - snapshot covered the local token ledger, B live token-ledger copy, refund-token events, and B008 preview proof where present
+- Isolated proof:
+  - focused B038/B040/B041/B042/B043 and manager MOT tests passed with 28 tests
+  - `py_compile` passed for B038, B040, B041, B042, B043, manager app, hourly MOT, and multi-flow mapping
+- Repair result:
+  - protected B008 apply status: `applied`
+  - eligible B008 rows: 27
+  - token rows updated: 32
+  - refund-token event rows updated: 27
+  - blocked rows during apply: 0
+- Manager proof after rebuild:
+  - B042 B008 preview dropped from 33 rows to 6 rows
+  - remaining B042 rows are 5 original allocation gaps and 1 token-ledger gap
+  - B041 repair preview moved 27 rows into B009 order-aware candidates
+  - B008 missing/zero-applied count in B040 dropped from 52 to 46
+  - B038 bridge still has 95 warning rows because B009 stock-return reuse has not been applied
+  - B MOT returned `fail_count=0`, `warn_count=6`
+- Next verifier:
+  - trigger: after Luke approves a controlled B009 local repair window
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_return_token_repair_preview`, `b_refund_token_reproof_preview`, and `b_refund_return_token_bridge`
+  - success means the 27 B009 order-aware candidates close returned_pending tokens through normal B009 logic, create reusable returned-token proof where Amazon says sellable, write return COGS trace proof, and reduce B038 bridge warning rows
+  - if it fails, restore from the B008 snapshot if needed and split B009 into a smaller protected repair packet; do not hand-edit tokens, run B, write Sheets, align DB facts, or publish bridge values into ROI
+
+### B009 Repair Window Blocked By Active B Owner - 2026-06-03T11:31Z
+- Trigger:
+  - Luke approved proceeding with the controlled B009 local repair window for the 27 order-aware sellable candidates
+- Safety finding:
+  - B owner and B supervisor locks were active with fresh heartbeats
+  - the current token ledger did not show the B008 repaired tokens as `returned_pending`
+  - the B008 apply manifest said rows were applied, but fresh read-only proof contradicted the token status in the current ledger
+- Control action:
+  - stopped before any B009 write
+  - rebuilt B038, B040, B041, B042, and B MOT read-only from current files
+  - moved the approved task packet to `blocked_needs_luke`
+- Current proof:
+  - B041 B009 order-aware candidates returned to 0
+  - B042 B008 preview returned to 33 rows
+  - 27 rows are now classified as B008 event-ledger state drift
+  - B MOT remains `fail_count=0`, `warn_count=6`
+- Next verifier:
+  - trigger: after Luke approves a B maintenance handoff, or confirms B is stopped and the token ledger is not owner-written during repair
+  - inspect: B locks, B042 preview, token ledger status for the 27 B008 rows, and B MOT rows `b_refund_token_reproof_preview`, `b_return_token_repair_preview`, and `b_refund_return_token_bridge`
+  - success means B008 repaired tokens persist as `returned_pending`, B041 shows the 27 B009 order-aware candidates again, and only then B009 local repair can be applied
+  - if it fails, do not write B009; repair the B008 persistence path inside maintenance first
+
+### Controlled B009 Return Token Reuse Apply And B007 Guard - 2026-06-03T12:10Z
+- Trigger:
+  - Luke approved a B maintenance handoff and controlled B008/B009 return-token repair window
+- Code fix applied:
+  - added B044 protected local B009 order-aware returned-token reuse writer
+  - added manager command `--b-return-token-reuse-apply --approve-protected-b009-repair`
+  - added B007 allocation guard so allocation housekeeping cannot overwrite return lifecycle statuses: `returned_pending`, `returned_complete`, `research_pending`, `unsellable`, or `disposed`
+  - extended B044 so a prior B009 apply manifest can restore original tokens to `returned_complete` without creating duplicate reusable returned-stock tokens
+- Safety boundary:
+  - used B-scoped maintenance handoff markers only
+  - archived and cleared only the two B maintenance markers created for this repair
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not change prices or queues
+  - did not use Sellerboard values as live ROI/restocking truth
+  - did not backfill or promote orders
+- Snapshots:
+  - B008 snapshot: `out/systems/B/refunds/b008_reproof_snapshots/20260603_115423Z`
+  - B009 create-reuse snapshot: `out/systems/B/refunds/b009_return_token_reuse_snapshots/20260603_115525Z`
+  - B009 restore-original-status snapshot: `out/systems/B/refunds/b009_return_token_reuse_snapshots/20260603_120426Z`
+  - maintenance markers archived under `out/locks/archive/`
+- Isolated proof:
+  - focused tests passed: 25 tests for B007, B041, B042, B043, and B044
+  - `py_compile` passed for B007, B044, and manager app
+- Repair result:
+  - B008 reproof reapplied 32 token rows and 27 refund-token event rows while B was held at boundary
+  - B009 order-aware repair created 32 reusable returned-stock tokens from 27 sellable return rows
+  - B009 wrote 32 return ledger rows and 32 stock-adjustment event proof rows
+  - after the old B007 pass overwrote original statuses, B007 was fixed and B044 restored the 32 original tokens to `returned_complete` without creating duplicates
+- Live-loop proof:
+  - after B resumed and B007 ran again with the guard loaded, the 32 original tokens stayed `returned_complete`
+  - the 32 reusable returned-stock tokens stayed `available`
+  - B038 bridge warnings dropped from 95 to 68
+  - B040 audit rows dropped from 95 to 68
+  - B041 B009 order-aware rows dropped from 27 to 0
+  - B042 B008 reproof rows dropped from 33 to 6, with 0 ready B008 state-reproof rows
+  - B MOT returned `fail_count=0`, `warn_count=6`
+- Remaining proof gap:
+  - `b_refund_return_token_bridge` remains `warn` because 68 wider rows are still not fully proved
+  - the remaining rows are separate proof groups, mainly Amazon-return coverage gaps and refund/fee/ROI bridge gaps
+  - approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE` was set to `retest_failed` because the targeted repair worked but the full bridge MOT row is not clean yet
+- Next verifier:
+  - trigger: next B refund/return-token worker packet should target the remaining 68 bridge warning rows by diagnosis group
+  - inspect: `out/systems/B/refunds/b_refund_return_token_bridge.csv`, `out/systems/B/refunds/b_return_token_matching_audit.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, and B MOT rows `b_refund_return_token_bridge`, `b_return_token_matching_audit`, and `b_return_token_repair_preview`
+  - success means the next diagnosis group reduces B038 warning rows without creating duplicate returned tokens, without using Sellerboard as final truth, and without changing ROI/restocking confidence until API proof is clean
+  - if it fails, keep ROI/restocking blocked from stock-return recovery and create a smaller B proof packet for the failing diagnosis group
+
+### B037 Recovered COGS Proof Tightening - 2026-06-03T12:31Z
+- Trigger:
+  - continued approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`
+  - goal was to reduce the remaining bridge warning rows by diagnosis group without running B or changing live business data
+- Code fix applied:
+  - tightened B037 recovered COGS proof so stock recovery is counted only when the token return ledger and the reusable returned token both prove the same order/SKU
+  - stopped B037 from treating `return_order_id` on its own as enough proof that stock came back
+  - added isolated tests for both weak and clean returned-stock COGS proof
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - focused B refund/token tests passed: 35 tests
+  - `py_compile` passed for B037, B038, B040, B041, B042, B044, and manager app
+- Runtime proof:
+  - B037 output refreshed after the code change through the normal B owner, not a manual B run
+  - B038 bridge warning rows dropped from 68 to 35
+  - B040 audit rows dropped from 68 to 35
+  - B041 repair preview has 35 rows, 0 unclassified rows, 0 live-write allowed rows, and 0 ROI/restock allowed rows
+  - B042 refund-token reproof preview remains 6 rows with 0 ready automatic B008 reproof rows
+  - B MOT returned `fail_count=0`, `warn_count=6`
+- Remaining proof gap:
+  - `b_refund_return_token_bridge` remains `warn`, not proved
+  - remaining warnings are 19 Amazon-return coverage review rows, 9 protected disposition conflicts, 6 sellable-return/token gaps, and 1 return COGS trace issue
+  - these are manager-visible repair lanes, not silent ROI/restocking inputs
+- Next verifier:
+  - trigger: next approved B refund/return-token worker packet targets the remaining 35 warning rows by lane
+  - inspect: `out/systems/B/refunds/b_return_token_matching_audit.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT row `b_refund_return_token_bridge`
+  - success means the 35 warning rows either clear through API/Amazon/token proof or stay warning-labelled with protected decisions blocked
+  - if it fails, split the packet into Amazon return coverage, protected unsellable conflict review, sellable-token gap repair, and return COGS trace repair
+
+### B038/B040/B041 Original Return Token Conflict Lane - 2026-06-03T12:58Z
+- Trigger:
+  - continued approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`
+  - target was the 19-row Amazon-return coverage bucket left after the B037 proof tightening
+- Code fix applied:
+  - B038 no longer treats an original returned token as reusable stock just because it has `last_return_order_id`
+  - reusable returned stock now requires the token-return duplicate marker `return_sellable_dup`
+  - B038 exposes `unsafe_original_return_tokens` so the manager can see original returned tokens that have live stock status
+  - B040 diagnoses those rows as original returned-token live-status conflicts
+  - B041 packages those rows into `protected_original_return_status_conflict`, not generic Amazon-return coverage review
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - focused B refund/token tests passed: 38 tests
+  - `py_compile` passed for B037, B038, B040, B041, B042, B044, and manager app
+- Manager proof:
+  - B038 bridge still has 218 rows and 35 warning rows
+  - the former 19-row Amazon coverage bucket is now 19 protected original-token status conflicts
+  - B041 has 0 generic Amazon coverage review rows, 19 protected original status conflict rows, 9 protected disposition conflict rows, 5 B008 allocation gaps, 1 B009 waiting row, and 1 B008 marking row
+  - B041 has 0 live-write allowed rows, 0 ROI/restock allowed rows, and 0 Sellerboard-final-truth allowed rows
+  - B MOT returned `fail_count=0`, `warn_count=6`
+- Remaining proof gap:
+  - `b_refund_return_token_bridge` remains `warn`, not proved
+  - most remaining rows are now protected token-state conflicts, not missing Amazon email/report proof
+- Next verifier:
+  - trigger: next approved B refund-return worker packet targets protected token-state conflict review
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_return_token_matching_audit.csv`, and B MOT row `b_refund_return_token_bridge`
+  - success means protected token-state conflicts are either repaired through B008/B009 lifecycle proof, exception-labelled with manager approval, or remain blocked from ROI/restocking
+  - if it fails, do not correct tokens directly; create a smaller B lifecycle repair packet for the original returned-token status conflict group
+
+### B Protected Original Token ID Proof Detail - 2026-06-03T13:04Z
+- Trigger:
+  - continued approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`
+  - target was the 19 protected original returned-token status conflicts
+- Code fix applied:
+  - B038 now writes `unsafe_original_token_ids`
+  - B040 carries those exact IDs into the matching audit
+  - B041 writes those IDs into their own preview column instead of mixing them into reusable returned-token proof
+  - B041 now separates unsafe original token IDs from real returned-stock duplicate token IDs
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - focused B refund/token tests passed: 38 tests
+  - `py_compile` passed for B037, B038, B040, B041, B042, B044, and manager app
+- Manager proof:
+  - B038 bridge still has 218 rows and 35 warning rows
+  - B041 still has 35 preview rows and 0 unclassified rows
+  - B041 now shows 19 protected original-token status conflicts with exact unsafe original token IDs
+  - B041 has 0 generic Amazon coverage review rows
+  - B041 has 0 live-write allowed rows, 0 ROI/restock allowed rows, and 0 Sellerboard-final-truth allowed rows
+  - B042 has 7 rows, all blocked from live writes and ROI/restocking use
+  - B MOT returned `fail_count=0`, `warn_count=6`
+- Remaining proof gap:
+  - `b_refund_return_token_bridge` remains `warn`, not proved
+  - protected token lifecycle correction is not allowed inside this manager-proof packet
+- Next verifier:
+  - trigger: Luke-approved protected token lifecycle repair window, or a new manager packet that only builds a no-write correction preview
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT row `b_refund_return_token_bridge`
+  - success means original returned tokens are no longer live-status conflicts, returned-stock duplicate tokens remain deduped, and ROI/restocking still ignore unproved stock recovery
+  - if it fails, keep all 19 rows protected and split by whether the row has a reusable duplicate token, no reusable duplicate token, or conflicting allocation evidence
+
+### B045 Original Return Status Conflict No-Write Preview - 2026-06-03T13:17Z
+- Trigger:
+  - continued approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`
+  - target was to make the 19 protected original-token conflicts decision-ready without editing tokens
+- Code fix applied:
+  - added B045 read-only original returned-token live-status conflict preview
+  - added manager command `--b-original-return-status-conflict-preview`
+  - added a B MOT row `b_original_return_status_conflict_preview`
+  - added manager tests proving the preview is OK only when classified and blocks live writes, ROI/restocking use, and Sellerboard-final truth
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - focused B refund/return and manager MOT tests passed: 128 tests
+  - focused B refund/token tests passed: 38 tests
+  - `py_compile` passed for B037, B038, B040, B041, B042, B044, B045, manager app, and hourly MOT
+- Manager proof:
+  - B045 preview has 21 unsafe original token rows from 19 source conflicts
+  - 16 rows have a separate reusable returned-stock duplicate token
+  - 5 rows have no reusable returned-stock duplicate token
+  - all 21 unsafe original tokens currently show allocated status
+  - B045 has 0 live-write allowed rows, 0 ROI/restock allowed rows, and 0 Sellerboard-final-truth allowed rows
+  - B MOT returned `fail_count=0`, `warn_count=6`
+  - B MOT row `b_original_return_status_conflict_preview` is `ok`
+  - B MOT row `b_refund_return_token_bridge` remains `warn`
+- Remaining proof gap:
+  - B refund-return bridge is still not proved because 35 warning rows remain
+  - the 21 unsafe original token rows are now decision-ready for a protected lifecycle repair preview/window, but no token correction is approved in this packet
+- Next verifier:
+  - trigger: Luke-approved protected token lifecycle repair window, or a manager-approved no-write repair-design packet for the 21 unsafe original token rows
+  - inspect: `out/systems/B/refunds/b_original_return_status_conflict_preview.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, and B MOT rows `b_original_return_status_conflict_preview` and `b_refund_return_token_bridge`
+  - success means each unsafe original token is either repaired through protected B008/B009 lifecycle rules, exception-labelled, or remains blocked from stock recovery and ROI/restocking
+  - if it fails, split into two packets: 16 rows with reusable duplicates and 5 rows without reusable duplicates
+
+### B046 Protected Original Return Status Repair - 2026-06-03T13:49Z
+- Trigger:
+  - Luke approved the protected token lifecycle repair window for the 21 unsafe original returned-token rows
+- Protected repair applied:
+  - added B046 protected original returned-token status repair
+  - added manager command `--b-original-return-status-conflict-apply --approve-protected-original-return-status-repair`
+  - snapshot created before writing: `out/systems/B/refunds/b046_original_return_status_snapshots/20260603_134553Z`
+  - updated 21 named original tokens only
+  - changed original tokens with `return_closed` markers back to `returned_complete`
+  - changed original tokens with `return_unsellable` markers back to `unsellable`
+- Safety boundary:
+  - no active B worker or supervisor lock was present before apply
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed refund/Sellerboard values into ROI or restocking
+- Apply proof:
+  - B046 manifest status `applied`
+  - eligible rows: 21
+  - applied rows: 21
+  - blocked rows: 0
+  - B045 unsafe original-token preview went from 21 rows to 0 rows
+  - B041 protected original status conflict rows went from 19 to 0
+  - B038 refund-return bridge warnings dropped from 35 to 31
+- Isolated proof:
+  - focused B refund/return and manager MOT tests passed: 131 tests
+  - `py_compile` passed for B037, B038, B040, B041, B042, B044, B045, B046, manager app, and hourly MOT
+- Manager proof:
+  - B MOT row `b_original_return_status_conflict_preview` is `ok`
+  - B MOT row `b_refund_return_token_bridge` remains `warn` with 31 warning rows
+  - B MOT returned `fail_count=0`, `warn_count=4`
+  - B MOT status is `decision_needed` because `b_pnl_daily` is blocked by a separate protected token shortage decision
+- Remaining proof gap:
+  - original returned-token live-status conflict is fixed
+  - B refund-return bridge is not fully proved yet because 31 wider refund/return rows remain
+  - the separate P&L token-shortage decision is not part of this original-return repair packet
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target the remaining 31 bridge warnings
+  - inspect: `out/systems/B/refunds/b_refund_return_token_bridge.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, and B MOT rows `b_refund_return_token_bridge`, `b_return_token_repair_preview`, and `b_pnl_daily`
+  - success means remaining bridge warnings reduce without using Sellerboard as final truth or feeding weak stock recovery into ROI/restocking
+  - if it fails, keep ROI/restocking blocked from unproved stock recovery and split the 31 rows by lane: 15 Amazon-return coverage, 9 protected non-sellable conflicts, 7 sellable missing/token gaps
+
+### B048 Protected Token Shortage Repair - 2026-06-03T14:09Z
+- Trigger:
+  - Luke approved the separate bounded stock/token shortage repair after B MOT showed `b_pnl_daily` blocked by protected token shortages
+  - approved SKUs only: `AK-OB6V-HIYD` missing 2 sale tokens and `T8-6UWL-I3E1` missing 1 sale token with one older Amazon stock adjustment still open
+- Protected repair applied:
+  - added B047 read-only protected token shortage repair preview
+  - added B048 protected token shortage repair apply
+  - added manager commands `--b-token-shortage-repair-preview` and `--b-token-shortage-repair-apply --approve-protected-token-shortage-repair`
+  - snapshot created before writing: `out/systems/B/token_shortage_repair/b048_token_shortage_repair_snapshots/20260603_140809Z`
+  - created 4 manager-approved token rows only:
+    - 2 allocated sale tokens for `AK-OB6V-HIYD`
+    - 1 allocated sale token for `T8-6UWL-I3E1`
+    - 1 disposed token to close Amazon stock adjustment `20016618004617`
+  - removed the 3 now-repaired rows from `orders_missing_tokens.csv`
+  - left unrelated `MW-9K5M-VKW8` legacy baseline shortage visible and untouched
+- Safety boundary:
+  - no active B worker or supervisor lock was present before apply
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not write Order Master, Level 1, or live ROI/restocking outputs
+  - did not delete outputs
+  - did not change prices or queues
+- Isolated proof:
+  - focused B047/B048 tests passed: 4 tests
+  - `py_compile` passed for B047, B048, and manager app
+  - B047 live preview after apply returned 0 remaining rows for the approved repair boundary
+- Manager proof:
+  - B token ledger is fresh and row count increased by 4 approved token rows
+  - B token COGS ledger is fresh and has 3 added sale COGS rows
+  - B token shortage proof is fresh with 1 remaining unrelated legacy baseline row
+  - approved protected shortage rows for `AK-OB6V-HIYD` and `T8-6UWL-I3E1` are cleared
+  - B MOT no longer asks Luke for the protected token-shortage decision
+- Remaining proof gap:
+  - B MOT still returns `fail_count=2`, `warn_count=4`
+  - `b_pnl_daily` still fails because the last full B manifest says the B gate skipped P and L
+  - Order Master and Level 1 still need a normal B proof-window rebuild before the downstream finance view is proven
+  - B refund-return bridge remains `warn` with 31 wider refund/return proof warnings
+- Next verifier:
+  - trigger: Luke-approved B proof window that is allowed to run the normal B boundary rebuild
+  - inspect: B MOT rows `b_pnl_daily`, `b_management_ready_for_maintenance`, `b_token_shortages_by_sku`, and the B manifest gate after the proof window
+  - success means P and L is rebuilt through the normal B path, the B manifest gate no longer blocks D001, the approved token shortage rows do not return, and Order Master/Level 1 no longer carry the repaired rows as missing-token placeholders
+  - if it fails, do not patch finance outputs by hand; split the remaining failure into a B gate rebuild task or a true remaining token/order proof task
+
+### B048 Live B Proof Monitor - 2026-06-03T14:34Z
+- Trigger:
+  - Luke delegated routine technical approvals to Codex, but protected business-state changes still need a named boundary
+  - the active normal B supervisor picked up the approved AK/T8 repair and rebuilt live B evidence
+- Current proof:
+  - approved `AK-OB6V-HIYD` and `T8-6UWL-I3E1` shortage rows have cleared from the live missing-token proof
+  - the remaining live B gate block is now one separate `MW-9K5M-VKW8` legacy baseline gap
+  - the MW gap is one order, one missing token, cost basis GBP 13.65, and is labelled by B as `needs_user_decision_baseline_correction_or_exception`
+- Safety boundary:
+  - Codex may keep inspecting evidence and building read-only previews
+  - Codex must not silently add MW stock, clear the B gate, write finance outputs, align SQL/local DB, write Sheets, delete outputs, restart B, or edit maintenance markers from the earlier AK/T8 approval
+- Next verifier:
+  - trigger: a named MW correction or exception decision, or a manager-approved read-only MW repair preview packet
+  - inspect: `out/token_shortages_by_sku.csv`, `out/orders_missing_tokens.csv`, `out/manual_token_corrections_approved.csv`, `out/stock_receipt_summary.csv`, and B MOT rows `b_token_shortages_by_sku`, `b_pnl_daily`, and `b_management_ready_for_maintenance`
+  - success means MW is either corrected through the normal token path with snapshot and manifest proof, or kept as an explicit exception without hiding it from finance and manager MOT
+  - if it fails, leave MW blocking the B gate and do not let placeholder COGS become final ROI/restocking truth
+
+### B049 Legacy Baseline Gap Preview - 2026-06-03T14:42Z
+- Trigger:
+  - Luke asked Codex to proceed from the recommended boundary
+  - B live proof showed the approved AK/T8 repair cleared, leaving a separate MW one-unit legacy baseline gap
+- Code fix applied:
+  - added B049 read-only legacy baseline gap preview
+  - added manager command `--b-legacy-baseline-gap-preview`
+  - tightened B048 protected apply lock safety so it checks both legacy B locks and the newer `out/systems/B/live` B owner locks before any token write
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not write live tokens, orders, Order Master, Level 1, finance, ROI, or restocking outputs
+  - did not delete outputs
+  - did not change prices or queues
+- Isolated proof:
+  - focused B047/B048/B049 tests passed: 7 tests
+  - `py_compile` passed for B048, B049, and manager app
+- Manager proof:
+  - B049 preview status is `decision_ready`
+  - preview has 1 row: `MW-9K5M-VKW8`, order `204-5340430-7253949`, quantity 1
+  - duplicate allocation count is 0
+  - cost basis is GBP 13.65 from existing B token evidence
+  - applied stock receipt clue exists: `SR-20260318-026`
+  - previous manual baseline correction clue exists: `TOKEN_SHORTAGES_20260506_USER_APPROVED_ALL`
+  - preview live write allowed is 0 and ROI/restocking use allowed is 0
+  - active B owner was seen, so live correction must not be applied while B owns the files
+  - read-only B MOT after the preview still returned `fail_count=2`, `warn_count=4`
+- Remaining proof gap:
+  - B is not manager-ready yet because MW is still a live token-shortage gate block
+  - the next step is a protected MW correction or explicit exception, not a hidden finance patch
+- Next verifier:
+  - trigger: named protected MW correction/exception window after B owner is safely at boundary
+  - inspect: `out/systems/B/token_shortage_repair/b_legacy_baseline_gap_preview.csv`, `out/token_shortages_by_sku.csv`, `out/orders_missing_tokens.csv`, and B MOT rows `b_token_shortages_by_sku`, `b_pnl_daily`, and `b_management_ready_for_maintenance`
+  - success means MW no longer blocks the B token gate, P and L rebuilds through the normal B path, and B MOT clears the same rows without using placeholder COGS as final ROI/restocking truth
+  - if it fails, keep MW visible as a protected stock-truth decision and do not clear the gate manually
+
+### B050 Protected MW Legacy Baseline Gap Repair - 2026-06-03T15:21Z
+- Trigger:
+  - Luke approved the one-token MW baseline correction after the B049 preview proved it was decision-ready
+- Protected repair applied:
+  - added B050 protected legacy baseline gap apply
+  - added manager command `--b-legacy-baseline-gap-apply --approve-protected-legacy-baseline-repair`
+  - used B-only maintenance pause request `B050_MW_BASELINE_20260603T1454Z`
+  - waited for B to report `maintenance.ready` for that exact request before writing
+  - snapshot created before writing: `out/systems/B/token_shortage_repair/b050_legacy_baseline_gap_snapshots/20260603_145440Z`
+  - created 1 allocated correction token for `MW-9K5M-VKW8` order `204-5340430-7253949`
+  - removed 1 MW legacy baseline shortage row
+  - removed 1 MW missing-token row
+  - cleared only the B pause marker created for this repair
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not write orders, Order Master, Level 1, ROI, or restocking outputs by hand
+  - did not delete outputs
+  - did not change prices or queues
+- Isolated proof:
+  - focused B047/B048/B049/B050 tests passed: 10 tests
+  - `py_compile` passed for B049, B050, and manager app
+- Live proof:
+  - B resumed after the protected pause
+  - next full B cycle `B_20260603T150937Z` completed after the correction
+  - B007 saw the corrected token state
+  - D001 P and L ran in the normal B path
+  - B gate passed with 0 fail and 0 warn
+  - B MOT returned `fail_count=0`, `warn_count=5`
+  - B MOT work items `MOT_B_B_PNL_DAILY` and `MOT_B_B_MANAGEMENT_READY_FOR_MAINTENANCE` were marked proved
+- Remaining proof gap:
+  - B active failures are cleared
+  - B is still warning-labelled for wider order truth, marketplace coverage, refund-return token bridge, and Sellerboard refund/fee/ROI bridge gaps
+  - Sellerboard bridge values still cannot feed live ROI/restocking as final truth
+- Next verifier:
+  - trigger: next B manager proof packet for warning-labelled order truth and refund/fee/return bridge work
+  - inspect: B MOT rows `b_order_truth_completion`, `b_marketplace_coverage_report`, `b_refund_return_token_bridge`, and `b_sellerboard_refund_fee_roi_bridge`
+  - success means warnings are either API-proved, explicitly exception-labelled, or converted into bounded worker repair packets
+  - if it fails, keep B management in warn state and do not hide bridge-only evidence downstream
+
+### B051 Refund Return Warning Workpack - 2026-06-03T15:31Z
+- Trigger:
+  - continued approved task `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE`
+  - B refund-return bridge still had 31 warning rows after the protected B046, B048, and B050 repairs cleared the hard B failures
+- Code fix applied:
+  - added B051 read-only refund-return warning workpack
+  - added manager command `--b-refund-return-warning-workpack`
+  - added B MOT row `b_refund_return_warning_workpack`
+  - added manager worklist mapping so the old generic bridge warning parks when B051 proves all lanes are safely classified
+  - added tests proving warning lanes are classified and cannot write live data, feed ROI/restocking, or treat Sellerboard as final truth
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - focused B051, B041, and manager MOT tests passed: 119 tests
+  - `py_compile` passed for B051, manager app, and hourly MOT
+- Manager proof:
+  - B051 workpack status is `ok`
+  - 31 refund-return bridge warnings are classified into 5 manager lanes
+  - 15 rows need Amazon return coverage proof
+  - 5 rows need original allocation proof
+  - 1 row is a candidate for protected B008 refund-token reproof
+  - 1 row is waiting for B008 returned-pending trace before B009 can be considered
+  - 9 rows need protected non-sellable disposition review before any live fix
+  - workpack has 0 unclassified lanes
+  - workpack has 0 live-write lanes
+  - workpack has 0 ROI/restocking-use lanes
+  - workpack has 0 Sellerboard-final-truth lanes
+  - B MOT row `b_refund_return_warning_workpack` is `ok`
+  - B MOT worklist item `MOT_B_B_REFUND_RETURN_TOKEN_BRIDGE` is parked with Luke action required set to no
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - `b_refund_return_token_bridge` remains `warn`, not proved, because the 31 underlying rows still need lane-specific proof or protected repair
+  - this packet made the warnings controlled and actionable; it did not correct stock, tokens, refunds, ROI, or restocking
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target the 15-row Amazon return coverage proof lane first
+  - inspect: `out/systems/B/refunds/b_refund_return_warning_workpack.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_refund_return_warning_workpack` and `b_refund_return_token_bridge`
+  - success means the 15 rows either gain Amazon return proof, get an approved non-customer-return exception label, or stay blocked from stock recovery and ROI/restocking
+  - if it fails, keep those rows warning-labelled and do not create reusable tokens or ROI stock recovery from bridge evidence
+
+### B052 Amazon Return Coverage Audit - 2026-06-03T15:49Z
+- Trigger:
+  - continued the B051 next lane for 15 `amazon_return_coverage_review` rows
+  - target was to prove whether the lane was missing Amazon customer-return report coverage or only had weaker stock-adjustment evidence
+- Code fix applied:
+  - added B052 read-only Amazon return coverage audit
+  - added manager command `--b-amazon-return-coverage-audit`
+  - added B MOT row `b_amazon_return_coverage_audit`
+  - updated the B051 lane wording so Amazon return coverage work points to B052
+  - updated the worklist parking note so the generic bridge task records B052 lane proof when present
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+  - did not treat Sellerboard or stock-adjustment-only evidence as final stock truth
+- Isolated proof:
+  - focused B052, B051, and manager MOT tests passed: 119 tests
+  - `py_compile` passed for B052, B051, manager app, and hourly MOT
+- Manager proof:
+  - B052 audit status is `ok`
+  - 15 audit rows were checked
+  - 0 rows have exact Amazon customer-return order/SKU proof
+  - 15 rows have stock-adjustment-only signals
+  - 0 rows are unclassified
+  - 0 rows allow live writes
+  - 0 rows allow ROI/restocking use
+  - 0 rows allow Sellerboard as final truth
+  - B MOT row `b_amazon_return_coverage_audit` is `ok`
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - the 15 rows are now explained but not fixed
+  - they must stay blocked from clean stock recovery because stock movement evidence is not the same as Amazon customer-return order proof
+  - using stock-adjustment-only proof as an exception would be a separate Luke business decision
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target the 5-row original allocation proof lane
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_token_reproof_preview.csv`, and B MOT rows `b_return_token_repair_preview`, `b_refund_token_reproof_preview`, and `b_refund_return_token_bridge`
+  - success means each of the 5 rows either finds the original sale-token allocation, gets a no-token proof label, or remains blocked from stock recovery without creating replacement stock
+  - if it fails, keep the rows warning-labelled and do not create stock or token rows as a shortcut
+
+### B053 Original Allocation Gap Audit - 2026-06-03T15:59Z
+- Trigger:
+  - continued the B051 next lane for 5 `b008_allocation_gap` rows
+  - target was to prove whether the original order existed but allocation was missing, or whether the original order itself was not manager-readable
+- Code fix applied:
+  - added B053 read-only original allocation gap audit
+  - added manager command `--b-original-allocation-gap-audit`
+  - added B MOT row `b_original_allocation_gap_audit`
+  - updated the B051 allocation-lane wording so it points to B053
+  - updated the worklist parking note so the generic bridge task records B053 lane proof when present
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+  - did not create replacement stock or token rows
+- Isolated proof:
+  - focused B053, B052, B051, and manager MOT tests passed: 123 tests
+  - `py_compile` passed for B053, B052, B051, manager app, and hourly MOT
+- Manager proof:
+  - B053 audit status is `ok`
+  - 5 audit rows were checked
+  - all 5 have API refund money rows
+  - all 5 have 0 `orders_all` rows
+  - all 5 have 0 `order_items_all` rows
+  - all 5 have 0 token allocation rows
+  - all 5 are classified as `refund_money_without_original_order_or_allocation_proof`
+  - 0 rows are unclassified
+  - 0 rows allow live writes
+  - 0 rows allow ROI/restocking use
+  - 0 rows allow Sellerboard as final truth
+  - B MOT row `b_original_allocation_gap_audit` is `ok`
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - the 5 rows are now explained but not fixed
+  - they are not ready for B008 token reproof because the original sale order is not visible in the manager-readable B order chain
+  - refund money remains API-proved, but original sale units, original allocation, stock recovery, and recovered COGS remain blocked
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target original-order recovery proof for these 5 refund orders
+  - inspect: `out/systems/B/refunds/b_original_allocation_gap_audit.csv`, `out/orders_all.csv`, `out/order_items_all.csv`, `out/token_allocations_live.csv`, `out/token_ledger_live.csv`, and B MOT rows `b_original_allocation_gap_audit`, `b_refund_token_reproof_preview`, and `b_refund_return_token_bridge`
+  - success means each row either gains original order/order-item/allocation proof, is API-proved as an old pre-window refund with no stock recovery, or stays explicitly blocked from stock recovery without token creation
+  - if it fails, keep the rows warning-labelled and do not repair by creating substitute stock or token rows
+
+### B054 Original Order Recovery Proof - 2026-06-03T16:15Z
+- Trigger:
+  - continued the B053 next lane for 5 refund rows where refund money exists but the original order is not manager-readable
+  - target was to prove whether the original order already exists locally, exists in recovery quarantine, or needs an Amazon API order fetch first
+- Code fix applied:
+  - added B054 read-only original-order recovery proof
+  - added manager command `--b-original-order-recovery-proof`
+  - added B MOT row `b_original_order_recovery_proof`
+  - updated the worklist parking note so the generic bridge task records B054 lane proof when present
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+  - did not promote recovered orders into live B outputs
+- Isolated proof:
+  - focused B051/B052/B053/B054 and manager MOT tests passed: 128 tests
+  - `py_compile` passed for B054, manager app, and hourly MOT
+- Manager proof:
+  - B054 proof status is `ok`
+  - 5 refund rows were checked
+  - all 5 have API refund money rows
+  - all 5 have 0 local raw order rows
+  - all 5 have 0 local compiled order rows
+  - all 5 have 0 recovery quarantine API-proved rows
+  - all 5 are classified as `needs_api_original_order_fetch_to_quarantine`
+  - 0 rows are unclassified
+  - 0 rows allow live writes
+  - 0 rows allow ROI/restocking use
+  - 0 rows allow Sellerboard as final truth
+  - B MOT row `b_original_order_recovery_proof` is `ok`
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - the 5 rows are now controlled, but not repaired
+  - the next safe worker job is an API original-order fetch into quarantine for these exact 5 orders
+  - no token repair, stock recovery, promotion, ROI, or restocking use is allowed until the original order is API-proved and later promoted through an approved protected window
+- Next verifier:
+  - trigger: next approved B refund/order worker packet should fetch these 5 original orders from Amazon API into quarantine only
+  - inspect: `out/systems/B/refunds/b_original_order_recovery_proof.csv`, `out/systems/B/recovery_quarantine/b_order_recovery_quarantine.csv`, and B MOT rows `b_original_order_recovery_proof`, `b_original_allocation_gap_audit`, and `b_refund_return_token_bridge`
+  - success means the 5 rows move from `needs_api_original_order_fetch_to_quarantine` to API-proved quarantine evidence with purchase date, marketplace, SKU, ASIN, order item ID, status, and currency
+  - if it fails, keep the rows warning-labelled and do not create tokens, promote orders, or use refund stock recovery in ROI/restocking
+
+### B055 Original Order Fetch-To-Quarantine Preview - 2026-06-03T16:24Z
+- Trigger:
+  - B054 proved that the 5 refund rows need original orders fetched from Amazon API into quarantine first
+  - target was to build the guarded fetch step and prove the target list before any live API fetch is run
+- Code fix applied:
+  - added B055 guarded original-order fetch-to-quarantine tool
+  - added manager commands:
+    - `--b-original-order-recovery-fetch-preview`
+    - `--b-original-order-recovery-fetch-apply --approve-original-order-quarantine-fetch`
+  - added B MOT row `b_original_order_recovery_fetch`
+  - updated the worklist parking note so the generic bridge task records B055 preview/result proof when present
+- Safety boundary:
+  - preview did not call Amazon
+  - preview did not write recovery quarantine
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+  - did not promote recovered orders into live B outputs
+- Isolated proof:
+  - focused B051/B052/B053/B054/B055 and manager MOT tests passed: 134 tests
+  - `py_compile` passed for B054, B055, manager app, and hourly MOT
+- Manager proof:
+  - B055 preview status is `ok`
+  - source rows: 5
+  - planned API fetch rows: 5
+  - fetched API-proved rows: 0 because this was preview only
+  - API fetch failed rows: 0
+  - duplicate-blocked rows: 0
+  - 0 rows allow live writes
+  - 0 rows allow ROI/restocking use
+  - 0 rows allow Sellerboard as final truth
+  - B MOT row `b_original_order_recovery_fetch` is `ok`
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - the next step is the guarded API fetch-to-quarantine apply
+  - that apply writes only the quarantine proof area and still cannot promote orders, create tokens, write Sheets, align DB, or feed ROI/restocking
+  - after the fetch, B054 and B MOT must be rerun to prove the 5 rows moved to API-proved quarantine
+- Next verifier:
+  - trigger: approved B original-order quarantine fetch boundary using `--b-original-order-recovery-fetch-apply --approve-original-order-quarantine-fetch`
+  - inspect: `out/systems/B/refunds/b_original_order_recovery_fetch_results.csv`, `out/systems/B/recovery_quarantine/b_order_recovery_quarantine.csv`, `out/systems/B/refunds/b_original_order_recovery_proof.csv`, and B MOT rows `b_original_order_recovery_fetch` and `b_original_order_recovery_proof`
+  - success means all 5 target orders are API-proved in quarantine with required order fields and still have `ready_for_live_merge=0`
+  - if it fails, keep the rows warning-labelled and do not promote orders or create token stock as a workaround
+
+### B055 Protected Original Order Fetch Applied - 2026-06-03T16:29Z
+- Trigger:
+  - Luke approved proceeding with the guarded API fetch-to-quarantine boundary
+- Protected fetch applied:
+  - ran B055 with `--b-original-order-recovery-fetch-apply --approve-original-order-quarantine-fetch`
+  - fetched the 5 target original orders from Amazon API into recovery quarantine only
+  - all 5 rows are API-proved in quarantine
+  - all 5 rows keep `ready_for_live_merge=0`
+  - no duplicate blocks
+  - no API failures
+  - no incomplete required-field gaps
+- Safety boundary:
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, prices, queues, ROI, or restocking decisions
+  - did not promote recovered orders into live B outputs
+- Isolated proof:
+  - focused B051/B052/B053/B054/B055 and manager MOT tests passed: 134 tests
+- Manager proof:
+  - B054 now shows 0 rows needing API fetch and 5 rows with API-proved quarantine proof
+  - B055 now shows 5 fetched API-proved rows
+  - B order promotion preview now shows 5 `ready_pending_approval` rows and 0 blocked rows
+  - B MOT returned `fail_count=0`, `warn_count=3`, `status=decision_needed`
+- Remaining proof gap:
+  - the 5 recovered orders are safe in quarantine but not live B truth yet
+  - B now needs a protected promotion decision before writing live order outputs, item outputs, Order Master, Level 1, or related shadow proof
+- Next verifier:
+  - trigger: Luke-approved protected B order promotion apply window
+  - inspect: B order promotion manifest, B promotion preview, `orders_all`, `order_items_all`, `financial_events_level1`, `order_master`, and B MOT rows `b_order_promotion_preview`, `b_order_promotion_live_chain`, and `b_order_truth_completion`
+  - success means the 5 recovered orders are promoted through the normal B chain, duplicate risk remains zero, and B MOT clears the promotion decision rows
+  - if it fails, do not hand-patch live outputs; use the promotion rollback/snapshot path and keep ROI/restocking blocked from the recovered rows
+
+### B Order Promotion Applied - 2026-06-03T16:38Z
+- Trigger:
+  - Luke approved protected promotion after B055 fetched the 5 original orders into quarantine
+- Protected promotion applied:
+  - requested B maintenance handoff with request ID `CODEX_B_ORDER_PROMOTION_20260603T1632Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied protected B order promotion through the existing promotion writer
+  - removed only the matching promotion maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not change prices or queues
+  - did not delete outputs
+  - did not create tokens or stock recovery
+  - did not feed Sellerboard estimates into ROI/restocking
+- Promotion proof:
+  - promotion manifest status is `promoted`
+  - B promotion preview now reports `ok`
+  - all 6 API-proved quarantine orders are already live, including the earlier UAE order and the 5 refund-original orders
+  - the 5 target refund orders each appear once in:
+    - `orders_all`
+    - `order_items_all`
+    - `financial_events_level1`
+    - `order_master`
+  - B lock and supervisor heartbeat resumed after maintenance markers were cleared
+- Isolated proof:
+  - focused B051/B052/B053/B054/B055, order-promotion, and manager MOT tests passed: 142 tests
+- Manager proof:
+  - B MOT returned `fail_count=0`, `warn_count=5`
+  - `b_order_promotion_preview` is `ok`
+  - `b_order_promotion_live_chain` is `ok`
+  - `b_original_order_recovery_proof` is `ok` with 0 remaining fetch targets
+  - `b_original_order_recovery_fetch` is `ok` with 0 remaining fetch targets
+  - `b_original_allocation_gap_audit` now shows 4 rows as `order_seen_allocation_missing`
+- Remaining proof gap:
+  - original-order recovery is complete for these 5 refund rows
+  - one row now has original allocation proof
+  - four rows have the original order and item live, but still lack original sale-token allocation proof
+  - refund stock recovery and ROI/restocking remain blocked for those four rows until allocation proof is repaired or exception-labelled
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target the 4-row original sale-token allocation proof gap
+  - inspect: `out/systems/B/refunds/b_original_allocation_gap_audit.csv`, `out/token_allocations_live.csv`, `out/token_ledger_live.csv`, `out/systems/B/refunds/b_refund_token_reproof_preview.csv`, and B MOT rows `b_original_allocation_gap_audit`, `b_refund_token_reproof_preview`, and `b_refund_return_token_bridge`
+  - success means each of the 4 rows either gains original sale-token allocation proof, is safely labelled no-stock-recovery, or remains blocked without creating substitute stock
+  - if it fails, keep the rows warning-labelled and do not create token stock as a shortcut
+
+### B056 Original Sale Allocation Repair Preview - 2026-06-03T16:53Z
+- Trigger:
+  - after protected order promotion, B053 showed 4 refund rows where the original order is now live but the original sale-token allocation proof is still missing
+- Preview built:
+  - added a read-only B056 preview that classifies the 4 remaining rows without writing tokens, stock, ROI, restocking, Sheets, local DB facts, or order outputs
+  - 3 rows are `protected_legacy_baseline_allocation_candidate`
+  - 1 row is `protected_runtime_adjustment_allocation_candidate`
+  - 0 rows are unclassified
+  - 0 rows are missing token proof inputs
+  - 0 rows are missing cost basis inputs
+- Safety boundary:
+  - preview only
+  - did not run B manually
+  - did not restart B
+  - did not clear locks or maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not correct tokens or create reusable stock
+  - did not feed Sellerboard values, recovered values, or weak stock recovery into ROI/restocking
+- Isolated proof:
+  - B056 plus manager MOT tests passed: 125 tests
+  - focused B051/B052/B053/B054/B055/B056, order-promotion, and manager MOT tests passed: 146 tests
+  - `py_compile` passed for B056, manager app, and hourly MOT
+- Manager proof:
+  - B056 preview status is `ok`
+  - B MOT returned `fail_count=0`, `warn_count=5`
+  - B MOT row `b_original_sale_allocation_repair_preview` is `ok`
+  - B MOT row `b_refund_return_token_bridge` remains warning-labelled because stock recovery is not fully proved yet
+- Remaining proof gap:
+  - the four rows are now packaged, not fixed
+  - applying any allocation correction is a protected stock/token decision
+  - ROI/restocking must continue to ignore those stock-recovery values until a protected repair or approved exception clears the lane
+- Next verifier:
+  - trigger: Luke-approved protected original sale-token allocation correction or explicit no-stock-recovery exception for the 4 rows
+  - inspect: B056 preview, token allocation proof, token ledger proof, B053 allocation audit, B038 refund-return bridge, and B MOT row `b_refund_return_token_bridge`
+  - success means each row either has normal token allocation proof or is explicitly labelled as no-stock-recovery before ROI/restocking can trust it
+  - if it fails, leave the rows warning-labelled and do not create stock recovery as a shortcut
+
+### B057 Original Sale Allocation Repair Applied - 2026-06-03T17:10Z
+- Trigger:
+  - Luke approved the protected original sale-token allocation correction for the four refund rows that had live original orders but missing allocation proof
+- Protected repair applied:
+  - requested a B maintenance handoff with request ID `CODEX_B057_ORIGINAL_SALE_ALLOCATION_20260603T1705Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied the protected B057 original sale allocation repair
+  - removed only the matching B057 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B057 manifest status is `applied`
+  - 4 original sale allocation rows were created
+  - 4 matching sale token rows were allocated
+  - 4 matching token COGS rows were created
+  - 4 stale missing-token shortage rows were removed
+  - 4 stale missing-order rows were removed
+  - 0 rows were blocked
+- Manager proof:
+  - B053 original allocation audit now has 0 active rows
+  - B056 original sale allocation repair preview now has 0 rows
+  - B MOT row `b_original_sale_allocation_repair_apply` is `ok`
+- Remaining proof gap:
+  - this proved the original sale side of the four refund rows
+  - it did not create returned reusable stock
+  - stock reuse still needed the normal B008 then B009 return-token route
+
+### B043 Refund Token Reproof Applied - 2026-06-03T17:15Z
+- Trigger:
+  - after B057 restored original sale allocation proof, the same four refund rows became eligible for the existing B008 returned-pending route
+- Protected repair applied:
+  - requested a B maintenance handoff with request ID `CODEX_B043_REFUND_TOKEN_REPROOF_20260603T1712Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied the protected B043 refund token reproof through the existing B008-style state route
+  - removed only the matching B043 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B043 manifest status is `applied`
+  - 4 eligible rows were applied
+  - 4 token rows were updated to returned-pending proof
+  - 4 refund event rows were updated
+  - 0 rows were blocked
+- Manager proof:
+  - B008 reproof preview now has 0 ready B008 rows
+  - B return-token repair preview moved the four rows into the B009 order-aware lane
+- Remaining proof gap:
+  - B008 returned-pending proof was restored
+  - sellable return stock still needed B009 reuse through the normal return-token route
+
+### B044 Returned Token Reuse Applied - 2026-06-03T17:28Z
+- Trigger:
+  - after B043, the four rows had refund money, Amazon sellable return proof, and returned-pending token proof
+- Protected repair applied:
+  - requested a B maintenance handoff with request ID `CODEX_B044_RETURN_TOKEN_REUSE_20260603T1720Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied the protected B044 returned-token reuse repair through the existing B009-style route
+  - removed only the matching B044 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B044 manifest status is `applied`
+  - 4 eligible rows were applied
+  - 4 token rows were updated
+  - 4 reusable return tokens were created
+  - 4 return-ledger rows were created
+  - 4 stock-event rows were created
+  - 0 rows were blocked
+- Isolated proof:
+  - focused B043/B044/B051/B056/B057 and manager MOT tests passed: 144 tests
+- Manager proof:
+  - B return-token repair preview now has 27 rows and 0 B009 order-aware rows
+  - B refund token reproof preview now has 0 ready B008 rows
+  - B refund-return warning workpack is `ok` with 27 rows, 4 lanes, and 0 unclassified rows
+  - B MOT returned `fail_count=0`, `warn_count=5`
+  - B maintenance marker state returned to clean after the handoff
+- Remaining proof gap:
+  - the four-row B057/B043/B044 repair chain is complete
+  - the wider B refund-return bridge remains warning-labelled with 27 rows
+  - the remaining bridge lanes include Amazon-return coverage proof, protected conflict review, and wider original-order recovery candidates
+  - no remaining warning row is allowed to write live stock, feed ROI/restocking, or treat Sellerboard as final truth
+- Next verifier:
+  - trigger: next approved B refund-return worker packet should target the remaining 27-row bridge lanes without widening into ROI/restocking
+  - inspect: `out/systems/B/refunds/b_refund_return_warning_workpack.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_original_order_recovery_proof.csv`, and B MOT rows `b_refund_return_token_bridge`, `b_refund_return_warning_workpack`, and `b_order_truth_completion`
+  - success means each remaining row either gains direct Amazon/API proof, receives an approved no-stock-recovery/protected exception label, or remains visibly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, merge data, or use bridge evidence as live ROI truth
+
+### B042/B051 Return-Bridge Lane Refinement - 2026-06-03T17:52Z
+- Trigger:
+  - continued the remaining 27-row B refund-return bridge work after the four-row B057/B043/B044 chain cleared
+  - target was to stop the manager workpack from routing rough B008 clues as live B008/B009 repair candidates when deeper proof says they are not clean candidates
+- Code fix applied:
+  - B051 now uses B042 reproof detail as the tiebreaker for B008/B009-looking rows
+  - B051 added manager lanes for:
+    - `b008_token_ledger_gap`
+    - `bridge_mapping_retest`
+    - `protected_original_return_status_conflict`
+  - B042 now separates original returned-token live-status conflicts from clean reusable returned-token proof
+- Safety boundary:
+  - proof mapping only
+  - did not run B manually
+  - did not restart B
+  - did not request or clear maintenance markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change tokens, stock, prices, queues, ROI, or restocking decisions
+- Isolated proof:
+  - py_compile passed for B042 and B051
+  - focused B041/B042/B043/B044/B051/B052/B056/B057 and manager MOT tests passed: 157 tests
+- Manager proof:
+  - B051 workpack is `ok`
+  - B051 now has 27 rows across 5 named lanes:
+    - 15 Amazon return coverage proof rows
+    - 9 protected non-sellable disposition conflict rows
+    - 1 protected original returned-token live-status conflict row
+    - 1 token-ledger proof gap row
+    - 1 protected B008 refund-token marking candidate
+  - B051 has 0 unclassified rows
+  - B051 has 0 live-write rows
+  - B051 has 0 ROI/restocking-use rows
+  - B051 has 0 Sellerboard-final-truth rows
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - B refund-return bridge remains warning-labelled, not complete
+  - none of the remaining 27 rows can affect ROI/restocking or create stock without direct proof or a separate protected approval
+  - the 15 Amazon-coverage rows currently have stock-adjustment evidence but no order-level Amazon customer-return proof
+  - the 10 protected conflict rows need a protected correction or exception decision before live stock state can change
+  - the 1 token-ledger gap needs source proof before B008 can be considered
+  - the 1 B008 candidate is ready only as a protected write preview; it is not applied
+- Next verifier:
+  - trigger: Luke-approved protected B008 repair window for the 1 ready row, or keep it parked if approval is not given
+  - inspect: `out/systems/B/refunds/b_refund_token_reproof_preview.csv`, `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_warning_workpack.csv`, and B MOT rows `b_refund_return_warning_workpack` and `b_refund_return_token_bridge`
+  - success means the one B008 row is marked returned-pending through the guarded B043 path, then B041/B038/B051 and B MOT retest the same row
+  - if approval is not given, keep the row warning-labelled and do not change token state or ROI/restocking use
+
+### B043 One-Row B008 Repair And False-Green Guard - 2026-06-03T18:48Z
+- Trigger:
+  - Luke approved proceeding with the recommended one-row protected B008 refund-token repair
+- Protected repair applied:
+  - requested B maintenance handoff with request ID `CODEX_B043_REFUND_TOKEN_REPROOF_20260603T183505Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied B043 to one eligible row
+  - removed only the matching B043 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B043 manifest status is `applied`
+  - 1 eligible row was applied
+  - 1 token row was updated to returned-pending proof
+  - 1 refund-event row was updated
+  - 0 rows were blocked
+- Proof-reader correction:
+  - B038 no longer treats an old `return_sellable_dup` note as completed stock recovery for the current return
+  - B041 no longer lets a returned-pending token count against both the current return order and an older return order
+  - B042 keeps original returned-token live-status conflicts separate from clean reusable returned-token proof
+- Isolated proof:
+  - py_compile passed for B038, B041, B042, and B051
+  - focused B038/B041/B042/B043/B044/B051/B052/B056/B057 and manager MOT tests passed: 167 tests
+- Manager proof:
+  - B refund-return bridge now has 28 warning rows
+  - B051 workpack is `ok`
+  - B051 now has 28 rows across 6 named lanes:
+    - 15 Amazon return coverage proof rows
+    - 9 protected non-sellable disposition conflict rows
+    - 1 protected original returned-token live-status conflict row
+    - 1 token-ledger proof gap row
+    - 1 bridge-mapping retest row
+    - 1 protected B009 order-aware sellable-return candidate
+  - B051 has 0 unclassified rows
+  - B051 has 0 live-write rows
+  - B051 has 0 ROI/restocking-use rows
+  - B051 has 0 Sellerboard-final-truth rows
+  - B MOT returned `fail_count=0`, `warn_count=5`
+- Remaining proof gap:
+  - B008 is now proved for the one approved row
+  - B009 is not yet applied for the one ready sellable-return row
+  - applying B009 would create reusable returned stock, so it is a new protected write decision
+  - all remaining warning rows stay blocked from ROI/restocking and stock recovery until direct proof or protected approval exists
+- Next verifier:
+  - trigger: Luke-approved protected B009 repair window for the 1 ready row, or keep it parked if approval is not given
+  - inspect: `out/systems/B/refunds/b_return_token_repair_preview.csv`, `out/systems/B/refunds/b_refund_return_warning_workpack.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT row `b_refund_return_token_bridge`
+  - success means the one B009 row creates reusable returned stock through the guarded B044 path, then B041/B038/B051 and B MOT retest the same row
+  - if approval is not given, keep the row warning-labelled and do not create reusable stock or allow ROI/restocking use
+
+### B062 Disposition Swap Applied And Reclassified - 2026-06-03T22:08Z
+- Trigger:
+  - Luke approved proceeding with the manager-recommended protected replacement-token correction for the four B061 replacement-swap-ready rows.
+- Protected repair applied:
+  - requested B maintenance handoff with request ID `CODEX_B062_DISPOSITION_SWAP_20260603T2235Z`
+  - B reached `maintenance.ready` after its current cycle boundary
+  - applied B062 only to the four approved replacement-swap-ready rows
+  - removed only the matching B062 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B062 manifest status is `applied`
+  - 4 eligible rows were applied
+  - 8 token rows were updated
+  - 4 allocation rows were updated
+  - 4 COGS rows were updated
+  - 0 rows were blocked
+  - B062 wrote a rollback snapshot before changing live local token/allocation/COGS proof
+- Proof-reader correction:
+  - B041 now routes live original returned-token stock states into the protected original-return lane instead of the vague proof-mapping lane
+  - the B MOT worklist note now uses the current B051/B062/B061/B045 proof values instead of a fixed older row count
+  - the non-sellable duplicate-token disposition lane now has 0 remaining rows
+  - the remaining issue is original returned-token lifecycle proof, not a clean replacement-swap lane
+- Isolated proof:
+  - py_compile passed for B041, B051, and hourly MOT
+  - focused B041/B045/B051/B058/B060/B061/B062 tests passed: 22 tests
+  - focused B manager MOT tests passed: 11 tests
+  - wider B manager MOT tests passed: 54 tests
+- Manager proof:
+  - B MOT returned `fail_count=0`, `warn_count=6`
+  - B062 swap apply is `ok`
+  - B disposition conflict preview is `ok` with 0 rows
+  - B disposition correction apply preview is `ok` with 0 rows
+  - B refund-return warning workpack is `ok` with 25 rows, 2 lanes, and 0 unclassified rows
+  - B original returned-token conflict preview is `ok` with 10 rows
+- Remaining proof gap:
+  - 15 Amazon return coverage rows still need direct order-level Amazon return proof or an approved exception
+  - 10 original returned-token live-status conflict rows need a separate protected correction/exception packet before any live write
+  - ROI/restocking must continue to ignore these warning rows as clean stock recovery
+- Next verifier:
+  - trigger: next approved B refund-return packet for original returned-token live-status conflicts or Amazon return coverage proof
+  - inspect: `out/systems/B/refunds/b_original_return_status_conflict_preview.csv`, `out/systems/B/refunds/b_refund_return_warning_workpack.csv`, `out/systems/B/refunds/b_refund_return_token_bridge.csv`, and B MOT rows `b_original_return_status_conflict_preview`, `b_refund_return_warning_workpack`, and `b_refund_return_token_bridge`
+  - success means each row either gains direct Amazon/API proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B063 Original Returned-Token Apply Preview - 2026-06-04T06:51Z
+- Trigger:
+  - continued the protected original returned-token conflict review after B062 cleared the non-sellable duplicate-token disposition swap lane
+- Code changed:
+  - added B063 read-only original returned-token apply preview
+  - added B063 CLI command through the manager app
+  - added B063 independent MOT row
+  - added B063 to the B order-truth proof gate
+  - tightened B046 so future live apply blocks when B owner locks exist without matching maintenance-ready proof
+- Proof result:
+  - B045 original-token conflict preview has 10 rows
+  - B063 apply preview has 10 rows
+  - 10 rows are ready for a future protected B046 apply window
+  - 0 rows are blocked by missing proof
+  - 9 rows target `returned_complete`
+  - 1 row targets `unsellable`
+  - 0 live-write rows
+  - 0 ROI/restocking-use rows
+  - 0 Sellerboard-final-truth rows
+- Safety boundary:
+  - no B run or restart
+  - no live token correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B046, B063, manager app, and hourly MOT
+  - focused B045/B046/B063 tests passed: 8 tests
+  - focused B original-token manager MOT tests passed: 5 tests
+  - wider B manager MOT tests passed: 56 tests
+  - read-only B MOT: `fail_count=0`, `warn_count=6`
+- Current stop point:
+  - B063 proves the 10 rows are ready, but code edits and previews do not apply the repair
+  - applying B046 would change live local token status, so it needs a protected Luke decision
+  - decision packet created: `sellerone_manager/tasks/blocked/MOT_B_B_ORIGINAL_RETURN_STATUS_APPLY_DECISION.md`
+- Next verifier:
+  - trigger: Luke-approved protected B046 original returned-token status apply window
+  - inspect: B046 manifest, B046 applied proof, B045 conflict preview, B063 apply preview, B041 repair preview, B038 bridge, B051 warning workpack, and B MOT
+  - success means B046 manifest says `applied`, 10 token rows update, B045/B063 drop to 0 rows, and B MOT keeps remaining bridge gaps warning-labelled
+  - if approval is declined, keep the rows parked and blocked from stock recovery, ROI, and restocking
+
+### B046 Original Returned-Token Status Repair Applied - 2026-06-04T07:00Z
+- Trigger:
+  - Luke approved the protected B046 original returned-token status repair window
+- Protected repair applied:
+  - requested B maintenance handoff with request ID `CODEX_B046_ORIGINAL_RETURN_STATUS_20260604T0655Z`
+  - B reached matching `maintenance.ready` after its current cycle boundary
+  - applied B046 only to the 10 ready original returned-token status rows
+  - removed only the matching B046 maintenance request and ready markers after apply
+- Safety boundary:
+  - did not restart B
+  - did not run a manual B cycle
+  - did not clear unrelated locks or markers
+  - did not write Google Sheets
+  - did not align local DB facts or SQL tables
+  - did not delete outputs except the matching temporary maintenance markers
+  - did not change prices or queues
+  - did not feed Sellerboard values or weak stock recovery into ROI/restocking
+- Repair proof:
+  - B046 manifest status is `applied`
+  - 10 eligible rows were applied
+  - 10 token rows were updated
+  - 0 rows were blocked
+  - 9 rows moved to `returned_complete`
+  - 1 row moved to `unsellable`
+  - B046 wrote a rollback snapshot before changing live local token proof
+- Proof-reader correction:
+  - B038 now keeps return-ledger evidence for sellable returns as reuse proof, but does not call non-sellable return COGS residuals live reusable stock
+  - B041/B051 now route non-sellable return COGS residual evidence into a named protected lane
+- Isolated proof:
+  - py_compile passed for B038, B041, B046, B051, B063, manager app, and hourly MOT
+  - focused B038/B041/B046/B051/B063 tests passed: 28 tests
+  - wider B manager and focused refund-return tests passed: 126 tests
+- Manager proof:
+  - B045 original-token conflict preview is now 0 rows
+  - B063 original-token apply preview is now 0 rows
+  - B051 warning workpack is `ok` with 25 rows, 4 lanes, and 0 unclassified rows
+  - read-only B MOT returned `fail_count=0`, `warn_count=7`
+  - B worker owner proof is single owner
+  - B maintenance marker state is clear after the handoff
+- Remaining proof gap:
+  - 15 Amazon return coverage proof rows
+  - 5 protected disposition conflict rows
+  - 4 protected return COGS residual rows
+  - 1 separate protected original-return/B009 path row
+  - all remaining rows stay blocked from stock recovery, ROI, and restocking until direct proof or protected approval exists
+- Next verifier:
+  - trigger: next approved B refund-return packet for Amazon return coverage proof or protected return COGS residual review
+  - inspect: B038 bridge, B041 repair preview, B051 warning workpack, and B MOT
+  - success means each remaining row either gains direct proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### F061 Seller Central Visible Window Loop Containment - 2026-06-04T08:49Z
+- Trigger:
+  - Luke reported the scanner-owned Amazon/Seller Central browser was repeatedly jumping between a tiny top-left window and full screen after manual login, making the PC unusable.
+- Immediate containment:
+  - `f061_login_mode.requested` was parked with `status=canceled` and reason `user_pc_unusable_visibility_loop_paused`.
+  - `f061_browser_visibility_state.txt` and `f061_manager_mode_state.txt` were set to hidden/stopped-for-usability markers.
+  - The current elevated FPM130 owner and scanner Chromium window refused stop attempts with Windows `Access is denied`, so a 30-minute temporary minimizer guard was started for the scanner Chromium window only.
+- Code changed:
+  - `FPM130_run_live_cycle.py` now treats the explicit PC-usability pause as stronger than stale Seller Central login proof.
+  - The next FPM130 owner reload should choose minimized browser mode when the pause marker is present.
+  - The normal path that keeps Seller Central visible when no pause exists remains intact.
+- Verification:
+  - `python -m py_compile scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py`
+  - focused Seller Central visibility tests passed: 3 tests
+  - full `python -m pytest tests/test_fpm130_live_cycle.py -q` passed: 79 tests
+- Live monitoring target:
+  - first check at 2026-06-04T09:20Z, after the temporary minimizer guard expires
+  - inspect `out/systems/F/price_list_manager/live/f061_window_guard_status.txt`, `f061_browser_visibility_state.txt`, `f061_manager_mode_state.txt`, `live_cycle.lock`, and process/window state for PID `29260` and the scanner Chromium window
+  - success means the PC is no longer being stolen by the scanner window, the visibility state is not being forced back to visible, and the next FPM130 owner reload uses the patched minimized path
+  - if it fails, stop the elevated FPM130 owner from an elevated Task Manager or approve a controlled F owner reload that proves the patched minimized path; do not edit queues, prices, Sheets, Product DB facts, or F output history to hide the issue
+
+### B064 Return COGS Residual Review - 2026-06-04T07:40Z
+- Trigger:
+  - continued from the remaining protected return COGS residual lane after B046 cleared the 10 original returned-token status rows
+- Code changed:
+  - B037 now counts return COGS recovery only from reusable returned tokens, not tokens later blocked as non-sellable
+  - B038 now separates allowed recovered COGS from blocked non-sellable return COGS
+  - B064 adds a read-only residual review so blocked non-sellable COGS remains visible to the manager
+  - B MOT now checks B064 and requires blocked COGS to stay out of live writes, ROI, restocking, and Sellerboard-final truth
+- Proof result:
+  - B037 rebuilt refund bridge and SKU refund-rate proof
+  - B038 bridge now has 21 warning rows, down from 25
+  - B051 warning workpack now has 21 rows, 3 lanes, and 0 unclassified rows
+  - the protected return COGS residual lane has cleared
+  - B064 shows 9 blocked COGS rows, 0 unsafe rows, and 313.21 blocked residual value
+  - read-only B MOT returned 0 FAIL and 6 WARN
+- Safety boundary:
+  - no B run or restart
+  - no live token or return-ledger correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B037, B038, B064, manager app, and hourly MOT
+  - focused B037/B038/B040/B041/B051/B064 and B manager MOT tests passed: 133 tests, 48 deselected
+  - B proof chain rebuilt through B037, B038, B040, B041, B042, B045, B063, B051, B064, and read-only B MOT
+- Remaining proof gap:
+  - 15 Amazon return coverage rows
+  - 5 protected disposition conflict rows
+  - 1 separate protected original-return/B009 path row
+  - all remaining rows stay blocked from stock recovery, ROI, and restocking until direct proof or protected approval exists
+- Next verifier:
+  - trigger: next manager-approved B refund-return packet for Amazon return coverage proof or protected disposition conflict review
+  - inspect: B038 bridge, B041 repair preview, B051 warning workpack, B064 residual review, and read-only B MOT
+  - success means each remaining row either gains direct proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B052 Amazon Coverage And COGS Blocking - 2026-06-04T09:20Z
+- Trigger:
+  - continued from the remaining 15 Amazon return coverage rows after B064 separated blocked COGS from recovered stock money
+- Code changed:
+  - B037 now requires exact Amazon SELLABLE customer-return proof before return COGS can count as recovered stock money
+  - B037 blocks returned-token COGS when Amazon return proof is missing or not sellable
+  - B038 now carries those values as blocked COGS instead of recovered COGS
+  - B064 keeps the blocked COGS residual visible and checks that it is not allowed into live writes, ROI, restocking, or Sellerboard-final truth
+- Proof result:
+  - B052 shows the 15 Amazon coverage rows are inside the pulled customer-return report window
+  - B052 also shows 0 exact Amazon customer-return order/SKU matches for those 15 rows
+  - all 15 are stock-adjustment or token signals only, not order-level customer-return proof
+  - B037 rebuilt 221 refund bridge rows and 660 SKU refund-rate rows
+  - B038 bridge remains warning-labelled with 21 rows
+  - B051 warning workpack now has 21 rows, 3 lanes, and 0 unclassified rows
+  - B064 shows 24 blocked COGS rows, 0 unsafe rows, and 638.91 blocked residual value
+  - read-only B MOT returned 0 FAIL and 5 WARN
+- Safety boundary:
+  - no B run or restart
+  - no live token or return-ledger correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B037, B038, B052, B064, manager app, and hourly MOT
+  - focused B037/B038/B052/B064 tests passed: 20 tests
+  - wider B refund-return and B manager MOT tests passed: 136 tests, 48 deselected
+  - B proof chain rebuilt through B037, B038, B040, B041, B052, B042, B045, B063, B051, B064, and read-only B MOT
+- Remaining proof gap:
+  - 15 Amazon coverage rows still lack exact customer-return order/SKU proof, but their COGS recovery is now blocked
+  - 5 protected disposition conflict rows remain
+  - 1 protected original-return/B009 path row remains
+  - all remaining rows stay blocked from stock recovery, ROI, and restocking until direct proof or protected approval exists
+- Next verifier:
+  - trigger: next manager-approved B refund-return packet for protected disposition conflict review or a business decision on whether stock-adjustment-only evidence can ever become an approved stock-recovery exception
+  - inspect: B052 coverage audit, B038 bridge, B041 repair preview, B051 warning workpack, B064 residual review, and read-only B MOT
+  - success means each remaining row either gains exact Amazon/API proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B061 Protected Disposition Timing Proof - 2026-06-04T09:45Z
+- Trigger:
+  - continued from the 5 protected disposition conflict rows after the stricter Amazon sellable-return proof blocked weak return COGS recovery
+- Code changed:
+  - B061 now adds replacement timing proof to the no-write apply preview
+  - B061 labels whether a candidate replacement token was available before the downstream sale, received after the downstream sale, missing a usable date, or missing entirely
+  - B MOT now checks those timing proof columns and reports late replacement candidates separately
+- Proof result:
+  - B058 conflict preview refreshed: 5 protected non-sellable disposition rows
+  - B059 decision preview refreshed: all 5 require protected review
+  - B060 impact preview refreshed: all 5 were used on downstream shipped order items
+  - B061 apply preview refreshed:
+    - 5 preview rows
+    - 0 replacement-swap-ready rows
+    - 4 candidate replacement tokens received after the downstream sale
+    - 0 unknown-timing rows
+    - 1 no-replacement row
+    - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+  - read-only B MOT returned 0 FAIL and 6 WARN
+- Safety boundary:
+  - no B run or restart
+  - no live token correction
+  - no replacement-token swap
+  - no downstream allocation correction
+  - no COGS correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B061 and hourly MOT
+  - focused B061/B062/B manager MOT tests passed: 155 tests
+  - B061 read-only preview rebuilt
+  - read-only B MOT reran after the preview rebuild
+  - B maintenance markers remain clear
+- Remaining proof gap:
+  - 4 rows need historical replacement-stock proof because the currently visible candidate replacement stock arrived after the sale it would replace
+  - 1 row needs shortage/exception review because no clean replacement token exists
+  - 15 Amazon coverage rows still lack exact customer-return order/SKU proof
+  - all remaining rows stay blocked from stock recovery, ROI, and restocking until direct proof or protected approval exists
+- Next verifier:
+  - trigger: next manager-approved B refund-return packet for historical replacement-stock proof or shortage/exception review
+  - inspect: B061 apply preview, B060 impact preview, B059 decision preview, B058 conflict preview, B051 warning workpack, B038 bridge, B064 residual review, and read-only B MOT
+  - success means a row gains date-valid replacement proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, swap allocations, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B065 Historical Replacement Stock Proof - 2026-06-04T10:32Z
+- Trigger:
+  - completed approved packet `B-HISTORICAL-REPLACEMENT-STOCK` for the 4 B061 date-validation rows.
+- Code changed:
+  - added B065 read-only historical replacement-stock proof
+  - added B065 CLI command through the manager app
+  - added B065 independent MOT row
+  - added B065 to the B order-truth proof gate
+- Proof result:
+  - 4 proof rows were classified
+  - 0 rows have a clean replacement token that is both date-valid and currently available
+  - 4 rows have date-valid same-SKU tokens that existed before the downstream sale but were already used later
+  - 0 rows are still missing date proof
+  - 0 rows are not yet proven
+  - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+- Manager state:
+  - `B-HISTORICAL-REPLACEMENT-STOCK` marked `proved`
+  - B MOT row `b_historical_replacement_stock_proof` is `warn`, meaning proved and parked rather than direct-repair-ready
+  - B order-truth completion remains warning-labelled because this proof does not approve a live token swap
+- Safety boundary:
+  - no B run or restart
+  - no live token correction
+  - no replacement-token swap
+  - no downstream allocation correction
+  - no COGS correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B065, manager app, hourly MOT, and focused test files
+  - focused B065 and manager MOT tests passed: 160 tests
+  - B065 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 7 WARN
+- Remaining proof gap:
+  - the 4 historical rows are classified but not direct-swap-ready because their date-valid tokens have already been consumed by later orders
+  - the separate 1 no-replacement row still needs shortage/exception review
+  - all remaining rows stay blocked from stock recovery, ROI, and restocking until direct proof or protected approval exists
+- Next verifier:
+  - trigger: next manager-approved B packet for the separate no-replacement shortage/exception row or a protected business exception decision
+  - inspect: B061 apply preview, B065 historical replacement proof, B051 warning workpack, B038 bridge, B064 residual review, and read-only B MOT
+  - success means each row is either corrected in an approved protected apply window or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, swap allocations, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B066 No-Replacement Shortage Exception Review - 2026-06-04T10:49Z
+- Trigger:
+  - completed approved packet `B-NO-REPLACEMENT-REVIEW` for the 1 B061 no-replacement row.
+- Code changed:
+  - added B066 read-only no-replacement shortage/exception review
+  - added B066 CLI command through the manager app
+  - added B066 independent MOT row
+  - added B066 to the B order-truth proof gate
+- Proof result:
+  - 1 review row was classified
+  - the row is `true_no_replacement_shortage`
+  - 29 clean same-SKU tokens existed, but all 29 were already used before the downstream sale
+  - 0 replacement mapping-gap rows
+  - 0 missing-date rows
+  - 0 not-yet-proven rows
+  - 0 direct replacement-swap-ready rows
+  - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+- Manager state:
+  - `B-NO-REPLACEMENT-REVIEW` marked `proved`
+  - B MOT row `b_no_replacement_shortage_exception_review` is `warn`, meaning proved and parked rather than live-repair-ready
+  - B order-truth completion remains warning-labelled because this proof does not approve a stock recovery exception
+- Safety boundary:
+  - no B run or restart
+  - no live token creation or correction
+  - no replacement-token swap
+  - no downstream allocation correction
+  - no COGS correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B066, manager app, hourly MOT, and focused test files
+  - focused B066/B065 and manager MOT tests passed: 169 tests
+  - B066 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 8 WARN
+- Remaining proof gap:
+  - the row is now proved as a true shortage, but any live stock recovery exception would be a protected business decision
+  - 15 Amazon coverage rows still lack exact customer-return order/SKU proof
+  - refund/fee/shipping ROI bridge gaps remain warning-labelled and blocked from live ROI/restocking
+- Next verifier:
+  - trigger: next manager-approved B packet for Amazon return coverage or refund/fee/shipping API gap review
+  - inspect: B052 coverage audit, B038 bridge, B041 repair preview, B051 warning workpack, B064 residual review, B066 shortage review, and read-only B MOT
+  - success means each row either gains exact Amazon/API proof, is corrected in an approved protected apply window, or remains explicitly blocked from stock recovery and ROI/restocking
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B052 Amazon Return Coverage Manager Labels - 2026-06-04T11:09Z
+- Trigger:
+  - completed approved packet `B-AMAZON-RETURN-COVERAGE` for the 15 Amazon return coverage rows.
+- Code changed:
+  - B052 now writes a plain manager-facing `manager_coverage_label`
+  - B MOT now requires that label and counts approved labels directly
+  - focused tests now prove the manager labels and safety flags
+- Proof result:
+  - 15 audit rows were classified
+  - 15 rows are labelled `stock_adjustment_only`
+  - 0 rows are labelled `exact_amazon_return_proved`
+  - 0 rows are labelled `token_only`
+  - 0 rows are labelled `nearby_sku_only`
+  - 0 rows are labelled `not_yet_proven`
+  - 0 rows are unclassified
+  - 0 rows are order-level safe for stock recovery
+  - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+- Manager state:
+  - `B-AMAZON-RETURN-COVERAGE` marked `proved`
+  - B MOT row `b_amazon_return_coverage_audit` is `ok`
+  - B refund-return bridge remains warning-labelled because stock-adjustment-only evidence is deliberately not treated as exact Amazon customer-return proof
+- Safety boundary:
+  - no B run or restart
+  - no Amazon live fetch
+  - no token correction
+  - no stock recovery exception
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no live ROI/restocking use
+- Verification:
+  - py_compile passed for B052, hourly MOT, and focused test files
+  - focused B052 and manager MOT tests passed: 164 tests
+  - B052 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 8 WARN
+- Remaining proof gap:
+  - the 15 rows are no longer unclassified, but they remain blocked from stock recovery because they are stock-adjustment-only
+  - refund/fee/shipping ROI bridge gaps remain warning-labelled and blocked from live ROI/restocking
+- Next verifier:
+  - trigger: next manager-approved B packet for refund/fee/shipping API gap review or a protected business exception decision
+  - inspect: B052 coverage audit, B038 bridge, B051 warning workpack, B064 residual review, B066 shortage review, and read-only B MOT
+  - success means weak stock recovery remains blocked unless exact Amazon/API proof appears or Luke approves an explicit protected exception
+  - if it fails, keep the rows warning-labelled and do not create stock, hand-patch outputs, run/restart B, write Sheets, align DB facts, delete outputs, or use bridge evidence as live ROI truth
+
+### B067 Refund Fee Shipping Gap Review - 2026-06-04T11:33Z
+- Trigger:
+  - completed approved packet `B-REFUND-FEE-SHIPPING-GAPS` for refund, fee, shipping, E ROI, and O restock money proof labels.
+- Code changed:
+  - added B067 read-only refund fee shipping gap review
+  - added B067 CLI command through the manager app
+  - added B067 independent MOT row
+  - added B067 to the B order-truth proof gate
+- Proof result:
+  - 11 money-confidence rows were reviewed
+  - 4 rows are labelled `api_proved`
+  - 2 rows are labelled `sellerboard_bridge_estimate`
+  - 5 rows are labelled `not_yet_proven`
+  - 221 API refund rows are visible in the refund bridge
+  - 1 Sellerboard return/refund gap remains bridge-labelled
+  - direct fee detail API rows are 0
+  - E has 161 downstream warning rows
+  - O has 526 downstream warning rows
+  - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+- Manager state:
+  - `B-REFUND-FEE-SHIPPING-GAPS` marked `proved`
+  - B MOT row `b_refund_fee_shipping_gap_review` is `warn`
+  - B order-truth completion remains warning-labelled because fee/shipping and downstream confidence are not fully API-proven
+- Safety boundary:
+  - no B run or restart
+  - no refund, fee, shipping, ROI, or restocking data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+  - no scope widening into E/O live decisions
+- Verification:
+  - py_compile passed for B067, manager app, hourly MOT, and focused test files
+  - focused B067 and manager MOT tests passed: 168 tests
+  - B067 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 9 WARN
+- Remaining proof gap:
+  - API refund money is visible, but the whole money chain is not yet business-ready
+  - commission, FBA fee, and shipping fee still need direct API proof
+  - Sellerboard remains an outside witness only
+  - weak bridge labels remain blocked from live ROI and O restocking
+- Next verifier:
+  - trigger: next manager-approved B packet for fee-detail API proof, shipping fee proof, or downstream E/O confidence cleanup
+  - inspect: B067 gap review, B sellerboard bridge summary, B037 refund bridge, B SKU refund rate, E performance summary, O restock source view, and read-only B MOT
+  - success means every money row is either `api_proved`, still visibly bridge-labelled, or visibly `not_yet_proven`, with no live ROI/restocking use allowed
+  - if it fails, keep weak money rows warning-labelled and do not run/restart B, write Sheets, align DB facts, delete outputs, change prices or queues, or let Sellerboard bridge values drive ROI/restocking
+
+### B Fee Shipping API Proof Design - 2026-06-04T11:52Z
+- Trigger:
+  - completed approved packet `B-FEE-SHIPPING-API` after B067 showed fee/shipping proof remained incomplete.
+- Manager design result:
+  - Level 3 financial events are the best current API-backed source for order commission, FBA fee, and shipping income.
+  - `fee_detail_ledger_api` is not the right main proof source for order-level commission/FBA/shipping because it filters Finances v2024 transaction breakdowns for `ServiceFee`; the current breakdown file contains shipment/refund rows and produces 0 fee-detail rows.
+  - Shipping income and shipping fee/cost must remain separate.
+  - Shipping income is available from Level 3 order lines.
+  - Shipping fee/cost or chargeback needs a read-only Level 3 proof map before any ROI/restocking use.
+- Current evidence:
+  - Level 3 raw financial-event rows: 199,335
+  - Level 3 summary rows: 154,502
+  - Level 3 official rows: 11,757
+  - Order Master rows: 11,503
+  - `fee_detail_ledger_api` rows: 0
+  - Level 3 raw includes commission, FBA fee, shipping charge, shipping tax, shipping chargeback, and refund fee reversal amount types
+- Durable artifact:
+  - `sellerone_manager/blueprints/B_FEE_SHIPPING_API_PROOF_DESIGN.md`
+- Manager state:
+  - `B-FEE-SHIPPING-API` marked `proved`
+  - new approved follow-up packet `B-LEVEL3-FEE-MAP` created
+- Safety boundary:
+  - no B run or restart
+  - no live Amazon API pull
+  - no refund, fee, shipping, ROI, restocking, order, token, allocation, or COGS data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Next verifier:
+  - trigger: approved packet `B-LEVEL3-FEE-MAP`
+  - inspect: Level 3 raw, Level 3 summary, Level 3 official, refunds, order master, B067, E performance summary, O restock source
+  - success means a read-only proof map labels each field as `api_source_available`, `api_source_missing`, `repo_path_unclear`, or `protected_live_pull_required`
+  - if it fails, keep B067 warning parked and do not use fee/shipping values in live ROI/restocking
+
+### B068 Level 3 Fee Shipping Proof Map - 2026-06-04T12:07Z
+- Trigger:
+  - completed approved packet `B-LEVEL3-FEE-MAP` after the design packet showed Level 3 financial events were the best current local API-backed money source.
+- Code changed:
+  - added B068 read-only Level 3 fee/shipping API proof map
+  - added B068 CLI command through the manager app
+  - added B068 independent MOT row
+  - added B068 to the B order-truth proof gate
+  - parked B068 warnings on the Manager Task Board when the proof is classified and safely blocked from live ROI/restocking
+- Proof result:
+  - 6 money fields were reviewed
+  - 4 fields have local API-backed source evidence: commission, FBA fee, customer shipping income, and refund fee reversals
+  - 2 fields remain `repo_path_unclear`: shipping chargeback/cost handling and the old fee-detail ledger route
+  - 0 fields are `api_source_missing`
+  - 0 fields require a protected live pull in this proof map
+  - 0 live-write, ROI/restocking, or Sellerboard-final-truth rows
+- Evidence counts:
+  - Level 3 raw financial-event rows: 199,335
+  - Level 3 official rows: 11,757
+  - Order Master rows: 11,503
+  - fee-detail ledger API rows: 0
+  - Finances v2024 breakdown rows: 164
+- Manager state:
+  - `B-LEVEL3-FEE-MAP` marked `proved`
+  - B MOT row `b_level3_fee_shipping_api_proof_map` is `warn` and parked because 2 source paths remain unclear but blocked from live ROI/restocking
+  - B order-truth completion remains warning-labelled, not failed
+- Safety boundary:
+  - no B run or restart
+  - no live Amazon API pull
+  - no fee, shipping, refund, ROI, restocking, order, token, allocation, or COGS data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Verification:
+  - py_compile passed for B068, manager app, hourly MOT, and focused test files
+  - focused B068 and manager MOT tests passed: 170 tests
+  - B068 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 10 WARN
+- Remaining proof gap:
+  - commission, FBA fee, customer shipping income, and refund fee reversals now have a source map
+  - shipping chargeback/cost still needs a clean official-field decision before ROI/restocking can use it
+  - `fee_detail_ledger_api` remains a diagnostic path, not the main proof source for order commission/FBA/shipping
+- Next verifier:
+  - trigger: next manager-approved packet connecting the B068 Level 3 source map back into B067 money confidence and downstream E/O labels
+  - inspect: B068 proof map, B067 gap review, Level 3 official outputs, Order Master, E performance summary, O restock source view, and read-only B MOT
+  - success means fields with Level 3 source proof become clearly labelled as API-backed in the manager money chain while unclear shipping-cost fields remain blocked
+  - if it fails, keep B067 and B068 warning-labelled and do not run/restart B, pull Amazon live, write Sheets, align DB facts, delete outputs, change prices or queues, or let weak fee/shipping values drive ROI/restocking
+
+### B067 Level 3 Confidence Link - 2026-06-04T12:25Z
+- Trigger:
+  - completed approved packet `B-B067-LEVEL3-LINK` after B068 proved local Level 3 source rows for several fee and shipping fields.
+- Code changed:
+  - B067 now reads the B068 proof map when it exists
+  - B067 upgrades Level 3-proved commission, FBA fee, shipping income, and refund fee reversals to `api_proved`
+  - B067 keeps shipping chargeback/cost mapped to the unclear B068 path and leaves it `not_yet_proven`
+  - B067 still keeps all live ROI, restocking, and Sellerboard-final-truth flags at `0`
+- Proof result:
+  - B067 review rows increased from 11 to 12 because refund fee reversals are now named separately
+  - API-proved rows increased from 4 to 7
+  - Sellerboard bridge estimate rows remain 2
+  - not-yet-proven rows reduced from 5 to 3
+  - 4 B068 fields were connected as API-proved
+  - 1 B068 connected field remains not-yet-proven
+  - 0 unsafe live-use rows
+- Remaining blocked or parked:
+  - Sellerboard return/refund gap remains bridge-labelled
+  - shipping chargeback/cost remains not yet proven for ROI/restocking
+  - live ROI safety gate remains not yet proven
+  - E has 161 downstream warning rows
+  - O has 526 downstream warning rows
+- Manager state:
+  - `B-B067-LEVEL3-LINK` marked `proved`
+  - B MOT row `b_refund_fee_shipping_gap_review` remains `warn` and parked
+  - B MOT row `b_level3_fee_shipping_api_proof_map` remains `warn` and parked
+  - B order-truth completion remains warning-labelled, not failed
+- Safety boundary:
+  - no B run or restart
+  - no live Amazon API pull
+  - no fee, shipping, refund, ROI, restocking, order, token, allocation, or COGS data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Verification:
+  - py_compile passed for B067, B068, manager app, hourly MOT, and focused test files
+  - focused B067, B068, and manager MOT tests passed: 179 tests
+  - B067 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 10 WARN
+- Next verifier:
+  - trigger: next manager-approved packet for B marketplace coverage or downstream E/O money confidence cleanup
+  - inspect: B067 gap review, B068 proof map, E performance summary, O restock source view, marketplace coverage report, and read-only B MOT
+  - success means either the remaining B warnings are parked with bounded jobs or the specific check clears through the same MOT row
+  - if it fails, keep B warnings visible and do not run/restart B, pull Amazon live, write Sheets, align DB facts, delete outputs, change prices or queues, or let weak values drive ROI/restocking
+
+### B Marketplace Coverage Warning Review - 2026-06-04T12:38Z
+- Trigger:
+  - completed approved packet `B-MARKETPLACE-COVERAGE` after the B MOT showed marketplace coverage as warning, not failure.
+- Code changed:
+  - marketplace coverage rows now include a manager-facing coverage label and next step
+  - status-difference rows are labelled `warning_labelled_status_difference`
+  - quiet/no-activity marketplaces are labelled as skipped or unsupported rather than silently treated as proved
+  - B MOT now reports status-difference warning counts separately
+  - B MOT parks marketplace coverage warnings when there are no missing shipped orders, no fail rows, and no shared cursor risk
+- Proof result:
+  - 17 participating marketplaces are visible
+  - 5 marketplaces have local B order history
+  - 4 marketplaces have Sellerboard comparison rows
+  - 0 missing shipped Sellerboard orders
+  - 0 marketplace fail rows
+  - 0 shared cursor risk rows
+  - 3 marketplace warning rows remain, all `warning_labelled_status_difference`
+  - warning rows are UK 34 status differences, Ireland 1 status difference, and Non-Amazon UK 1 status difference
+- Manager state:
+  - `B-MARKETPLACE-COVERAGE` marked `proved`
+  - MOT card `B-MARKETPLACE-COVERAGE-REPORT` is parked
+  - `b_future_marketplace_order_cursors`, `b_marketplace_sellerboard_gaps`, and `b_marketplace_shared_cursor_risk` are all OK/proved
+  - B order-truth completion remains warning-labelled because other B lanes remain parked
+- Safety boundary:
+  - no B run or restart
+  - no live Amazon API pull
+  - no order backfill or promotion
+  - no cursor rewrite
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no ROI/restocking live use
+- Verification:
+  - py_compile passed for marketplace coverage, hourly MOT, and focused test files
+  - focused marketplace coverage and manager MOT tests passed: 179 tests
+  - marketplace coverage proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL and 10 WARN
+- Next verifier:
+  - trigger: next manager-approved packet for remaining B order-truth parked lanes
+  - inspect: B MOT worklist, B refund-return token bridge, B historical/no-replacement stock proof, B067/B068 money proof, and read-only B MOT
+  - success means each remaining B warning is either proved, parked with a clear manager label, or converted into a bounded worker packet
+  - if it fails, keep warnings visible and do not run/restart B, pull Amazon live, rewrite cursors, backfill/promote orders, write Sheets, align DB facts, delete outputs, change prices or queues, or use weak proof in ROI/restocking
+
+### B P&L Daily Freshness Review - 2026-06-04T12:47Z
+- Trigger:
+  - completed approved MOT packet `B-PNL-DAILY` after the B MOT showed `pnl_daily.csv` as warning-stale.
+- Code changed:
+  - B MOT now labels warning-stale P&L as waiting producer refresh proof
+  - B MOT records whether D001 appeared in the inspected B manifest
+  - the Manager Task Board parks warning-only `b_pnl_daily` rows instead of treating them as a fresh repair job
+  - failure/protected-decision paths still remain active and visible
+- Proof result:
+  - `pnl_daily.csv` exists
+  - row count is 54
+  - age is in the manager warning window
+  - latest inspected B manifest does not show D001 as run
+  - this is not a Luke decision and not a MOT-side finance repair
+- Manager state:
+  - `B-PNL-DAILY` marked `parked`
+  - MOT card `b_pnl_daily` is parked as waiting producer refresh proof
+  - B order-truth completion remains warning-labelled because other B lanes remain parked
+- Safety boundary:
+  - no B run or restart
+  - no D001/P&L rebuild
+  - no finance data rewrite
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no refund, fee, shipping, ROI, token, order, price, or queue correction
+- Verification:
+  - py_compile passed for hourly MOT and focused test file
+  - focused manager MOT tests passed: 178 tests
+  - read-only B MOT returned 0 FAIL and 10 WARN
+- Next verifier:
+  - trigger: next normal producer refresh that rebuilds `out/pnl_daily.csv`, or next manager-approved packet for remaining B parked lanes
+  - inspect: `b_pnl_daily` MOT row, `out/pnl_daily.csv`, latest B manifest, and B MOT worklist
+  - success means the same B MOT row clears to OK after producer refresh, or stays parked as waiting producer proof without data repair
+  - if it fails, create a bounded producer-path task; do not run/restart B, run D001, rewrite finance data, write Sheets, align DB facts, delete outputs, change prices or queues, or mask stale P&L downstream
+
+### E B Money Dependency Mapping Refresh - 2026-06-04T13:05Z
+- Trigger:
+  - Luke asked whether E was waiting on B and told Codex to continue.
+- Code changed:
+  - E MOT money dependency now prefers the current B067 refund/fee/shipping gap review when that proof exists.
+  - The old Sellerboard bridge summary remains a fallback only when the B067 proof is absent.
+  - E now reports the newer B states for refund money, Sellerboard return gap, commission, FBA fee, shipping income, and shipping fee.
+- Proof result:
+  - E now sees refund money as API-proved.
+  - E now sees commission as API-proved.
+  - E now sees FBA fee as API-proved.
+  - E now sees shipping income as API-proved.
+  - E still sees Sellerboard return-gap evidence as a bridge estimate.
+  - E saw shipping cost/chargeback as not yet proven at this point; this was superseded by the later B shipping chargeback source proof below.
+  - live ROI safety stays blocked at `0`.
+- Manager state:
+  - `E-B-MONEY-CLEARANCE` remains parked, not solved.
+  - The card is now parked for the true remaining B gaps, not stale commission/FBA labels.
+  - `B-REFUND-FEE-SHIPPING-GAPS` remains parked until the remaining bridge/not-yet-proven rows clear or receive a future approved business rule.
+- Safety boundary:
+  - no B run or restart
+  - no E live run
+  - no live Amazon API pull
+  - no fee, shipping, refund, ROI, restocking, order, token, allocation, or COGS data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Verification:
+  - focused E/B money dependency and refund-return MOT tests passed: 5 tests
+  - full manager MOT test file passed: 179 tests
+  - read-only B MOT returned 0 FAIL and 10 WARN
+  - read-only E MOT returned 0 FAIL and 2 WARN
+- Next verifier:
+  - trigger: next manager-approved packet for B shipping-cost proof or Sellerboard return-gap API proof
+  - inspect: B067 gap review, B068 proof map, E `e_b_money_truth_dependency` row, and read-only B/E MOT
+  - success means B067 has no bridge/not-yet-proven money rows and E `e_b_money_truth_dependency` clears to OK
+  - if it fails, keep E warning-labelled and do not run/restart B, pull Amazon live, write Sheets, align DB facts, delete outputs, change prices or queues, or let weak B money drive ROI/restocking
+
+### B Shipping Chargeback Source Proof - 2026-06-04T13:42Z
+- Trigger:
+  - Luke approved continuing with B shipping-cost proof and Sellerboard return-gap API proof.
+- Code changed:
+  - B068 now labels `shipping_chargeback_or_cost` as `api_source_available` when Level 3 raw has order, SKU, posted-date, amount, and currency proof.
+  - B068 keeps live ROI/restocking use blocked because the official/order-master output does not yet expose a named shipping-cost field.
+  - B068 now labels the old empty `fee_detail_ledger_api` ServiceFee path as `api_source_missing`, not an unclear main proof path.
+  - B067 now reads the refreshed B068 map and labels shipping fee/chargeback as API-proved source evidence.
+  - E MOT now sees shipping fee/chargeback as API-proved through B067.
+  - B MOT board wording now says raw-only/source-missing fields remain blocked from live use until a separate official-output path is proved.
+- Proof result:
+  - B068 proof rows: 6
+  - API source available rows: 5
+  - repo-path unclear rows: 0
+  - API source missing rows: 1, the legacy fee-detail ServiceFee path
+  - shipping chargeback raw source rows: 14,985
+  - B067 API-proved rows increased to 8
+  - B067 not-yet-proven rows reduced to 2
+  - E `e_b_money_truth_dependency` now reports shipping fee as API-proved
+  - live ROI safety remains blocked at `0`
+- Remaining blocked or parked:
+  - Sellerboard return/refund gap remains a bridge estimate
+  - E and O downstream confidence rows still carry bridge/not-yet-proven labels
+  - B has a separate protected P&L/token-shortage decision from the latest B evidence; this was not changed in this packet
+- Safety boundary:
+  - no B run or restart
+  - no E live run
+  - no live Amazon API pull
+  - no fee, shipping, refund, ROI, restocking, order, token, allocation, COGS, or P&L data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Verification:
+  - py_compile passed for B067, B068, and hourly MOT
+  - focused B067, B068, and manager MOT tests passed: 13 tests
+  - full manager MOT test file passed: 180 tests
+  - read-only B MOT returned 0 FAIL, 8 WARN, and 1 protected decision on `b_pnl_daily`
+  - read-only E MOT returned 0 FAIL and 2 WARN
+- Next verifier:
+  - trigger: next manager-approved packet for the remaining Sellerboard return-gap API proof or downstream E/O confidence refresh
+  - inspect: B067 gap review, B068 proof map, E `e_b_money_truth_dependency`, B `b_pnl_daily`, and read-only B/E MOT
+  - success means Sellerboard return-gap is API-proved or remains bridge-labelled by rule, downstream E/O confidence rows refresh, and live ROI safety can clear only from API-backed proof
+  - if it fails, keep E/B warnings visible and do not run/restart B, correct token/P&L data, pull Amazon live, write Sheets, align DB facts, delete outputs, change prices or queues, or let weak B money drive ROI/restocking
+
+### B Sellerboard Return-Gap API Proof - 2026-06-04T13:52Z
+- Trigger:
+  - continued the approved B money-proof cleanup after shipping chargeback source proof.
+- Code changed:
+  - B067 now checks Sellerboard return-gap order IDs against the API-proved B refund bridge.
+  - A Sellerboard return-gap row clears only when the same order is API-proved in `b_refund_pnl_bridge`.
+  - Sellerboard alone still cannot prove refund money or feed live ROI/restocking.
+- Proof result:
+  - Sellerboard return-gap order `026-5660420-4052305` is present in the API-proved refund bridge.
+  - B067 now labels the Sellerboard return/refund gap as API-proved.
+  - B067 API-proved rows increased to 9.
+  - B067 Sellerboard bridge-estimate rows reduced to 1.
+  - B067 not-yet-proven rows remain 2.
+  - Remaining weak rows are downstream confidence rows/live safety, not a missing refund-money source.
+- Remaining blocked or parked:
+  - E performance output still carries bridge-labelled money confidence rows.
+  - O restock source output still carries not-yet-proven blocker rows.
+  - B has a separate protected P&L/token-shortage decision from the latest B evidence; this packet did not touch it.
+- Safety boundary:
+  - no B run or restart
+  - no E/O live run
+  - no live Amazon API pull
+  - no refund, fee, shipping, ROI, restocking, order, token, allocation, COGS, or P&L data correction
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no price or queue change
+  - no Sellerboard values as final live ROI/restocking truth
+- Verification:
+  - B067/B068 focused tests passed: 8 tests
+  - B067 proof rebuilt read-only
+  - read-only B MOT returned 0 FAIL, 8 WARN, and 1 protected decision on `b_pnl_daily`
+  - read-only E MOT returned 0 FAIL and 2 WARN
+- Next verifier:
+  - trigger: manager-approved downstream E/O confidence refresh or protected B P&L/token-shortage decision
+  - inspect: B067 gap review, E `sku_performance_summary`, O `restock_source_view`, B `b_pnl_daily`, and read-only B/E/O MOT
+  - success means E/O stop carrying stale bridge labels after clean B source proof, or stay warning-labelled if their own inputs remain weak
+  - if it fails, keep E/O warnings visible and do not run/restart B, correct token/P&L data, pull Amazon live, write Sheets, align DB facts, delete outputs, change prices or queues, or let weak B money drive ROI/restocking
+
+### B Approved Token Catch-Up - 2026-06-04T14:02Z
+- Trigger:
+  - Luke approved catching up the remaining two-token shortage using the last known COG before the affected sales.
+- Current phase:
+  - protected B-only maintenance pause and apply proof
+- Scope:
+  - SKU `AK-OB6V-HIYD`
+  - two missing sale tokens only
+  - cost basis from the last proved COG before each affected sale
+- Allowed actions:
+  - request a B-only maintenance pause at the next B boundary
+  - apply the existing approved token-shortage repair only after matching B maintenance-ready proof exists
+  - release the B-only pause after the apply result is written
+  - retest with read-only B MOT
+- Forbidden actions:
+  - no B live restart
+  - no Google Sheets write
+  - no local DB alignment
+  - no output deletion
+  - no prices or queues
+  - no ROI/restocking use of the corrected values until manager proof clears
+- Code changed:
+  - B048 now accepts matching B maintenance-ready proof before writing while B owner locks still exist.
+  - B048 still blocks when B is live and matching maintenance proof is absent.
+- Isolated proof:
+  - focused B047/B048 token repair tests passed: 11 tests
+- Monitoring target:
+  - wait for `out/locks/maintenance.ready` containing the matching request id
+  - success means B has finished its current pass and is waiting safely
+  - if the ready marker does not appear within the bounded wait, keep the catch-up parked as `waiting B pause proof`
+- Retest rule:
+  - after apply and release, run read-only B MOT
+  - success means the B P&L/token-shortage manager decision clears or moves to a new named proof gap
+  - if it fails, keep the B manager warning visible and do not hand-edit downstream P&L or ROI outputs
+- Final proof:
+  - B-only maintenance pause proof appeared with request id `B048_TOKEN_CATCHUP_20260604T1402Z`.
+  - B048 applied the approved AK two-token catch-up at 2026-06-04T14:08:48Z.
+  - Created token rows: 2.
+  - Allocated token rows: 2.
+  - Shortage rows removed: 1.
+  - Missing-order rows removed: 2.
+  - Snapshot created before the write.
+  - B-only pause marker was released and B removed its ready marker.
+  - A fresh B manifest appeared after release.
+  - B MOT after the manager daily-P&L cadence correction returned 0 FAIL and 9 WARN.
+  - `b_pnl_daily` is ok.
+  - `b_token_shortages_by_sku` is ok with 0 rows.
+  - `b_management_ready_for_maintenance` is warning-labelled, not blocked.
+- Follow-up:
+  - remaining B warnings stay on the Manager Task Board as parked bridge/proof gaps.
+  - do not use Sellerboard bridge values or weak refund/return stock proof as final ROI/restocking truth.
+
+### B Maintenance Readiness Split And Cursor Refresh - 2026-06-04T14:36Z
+- Trigger:
+  - continued the B manager cleanup after token/P&L proof cleared.
+- Code changed:
+  - B management readiness now separates the two finish lines:
+    - B Management ready for maintenance
+    - B order truth complete
+  - Parked refund/Sellerboard bridge warnings no longer block B Management readiness when there are 0 hard failures, 0 protected decisions, fresh cursor proof, and recovery controls are active.
+  - Real missing-order failures still block B Management readiness.
+- Cursor proof refresh:
+  - ran cursor-only B order recovery scan
+  - skipped missing-order fetch
+  - wrote 12 marketplace cursor proof rows
+  - wrote 0 quarantine rows
+  - no B run, no B restart, no live merge, no Sheet write, no local DB alignment, no output deletion, no price or queue change
+- Proof result:
+  - focused B order recovery/readiness tests passed: 11 tests
+  - read-only B MOT returned 0 FAIL and 8 WARN
+  - `b_future_marketplace_order_cursors` is ok with missing_cursors=0 and stale_cursors=0
+  - `b_management_ready_for_maintenance` is ok with ready_for_maintenance_with_parked_truth_warnings
+  - `b_order_truth_completion` remains warning-labelled
+  - `b_refund_return_token_bridge` remains parked because 21 warning rows are classified into named lanes and blocked from live ROI/restocking
+- Follow-up:
+  - B is manager-ready for maintenance.
+  - B order truth is not fully complete; continue future API/refund/return proof packets without feeding bridge values into live ROI/restocking.
+
+### F RESCAN Quiet-Window Reapply - 2026-06-04T15:52:43Z
+- Task:
+  - `F-RESCAN-PRIORITY-02`
+- Current phase:
+  - controlled F quiet-window reapply
+- Reason:
+  - the future RESCAN rule is fixed, but 223 old live RESCAN rows are still parked with timeout dates.
+  - the first apply ran while the live F owner was still writing and the owner overwrote the screening proof from old memory.
+- Allowed actions:
+  - request the normal F owner to drain and exit at a safe boundary
+  - wait until F is no longer writing the active screening/run-state files
+  - reapply the already-previewed RESCAN recovery with `require-preview-total=223`
+  - run read-only F MOT after the apply
+  - clear the F quiet-window marker and confirm normal F ownership comes back
+  - update the manager-approved packet status from the proof result
+- Forbidden actions:
+  - do not run `F061` manually
+  - do not open a separate browser
+  - do not write Google Sheets
+  - do not change prices
+  - do not change local DB facts
+  - do not delete outputs
+  - do not approve handoff or publishing decisions
+- Monitoring target:
+  - `out/systems/F/price_list_manager/live/live_cycle_status.csv`
+  - `out/systems/F/price_list_manager/live/live_cycle.lock`
+  - `out/systems/F/price_list_manager/test_mode/f061_rescan_recovery_apply_summary.csv`
+  - `out/systems/M/mot/mot_worklist.csv`
+- Success condition:
+  - F drains before the apply.
+  - `FPM123` applies the preview with total `223`.
+  - `f_rescan_priority_proof` reports `ok`.
+  - `rescan_timeout_rows=0`.
+  - normal F owner is restored after the maintenance marker is cleared.
+- Timeout rule:
+  - if F does not reach a safe quiet window inside the bounded monitoring window, leave the task visible as blocked/waiting proof and do not force-kill the worker.
+- If it fails:
+  - keep `F-RESCAN-PRIORITY-02` on the Manager Task Board with the exact failed proof.
+  - do not hand-edit queue or screening files outside the approved recovery script.
+- Final proof:
+  - F drained cleanly at 2026-06-04T15:58:00Z.
+  - `FPM123` reapplied the approved preview at 2026-06-04T15:59:42Z.
+  - Preview rows: 223.
+  - Active rows added: 144.
+  - Screening rows updated: 223.
+  - `f_rescan_priority_proof` is ok with `rescan_timeout_rows=0`.
+  - F owner was restored by the supervisor with PID `26088`.
+  - read-only F MOT returned `status=ok`, `fail_count=0`, `warn_count=0`.
+  - manager task `F-RESCAN-PRIORITY-02` was marked `proved`.
+
+### F Heartbeat Source-Shape And RESCAN Reblock - 2026-06-05T00:37Z
+- Trigger:
+  - F heartbeat found F had changed from calm to blocked.
+- Current live proof:
+  - F owner is alive under `FPM130`.
+  - F owner is blocked before launching a scanner child.
+  - live owner state is `blocked_source_shape_guard`.
+  - active supplier is `dhb`.
+  - sample supplier SKU is `GCT019`.
+  - source-shape reason is `unit_cost_not_positive_numeric`.
+- Manager-only fix completed:
+  - `blocked_source_shape_guard` is now classified as a protected decision, not an unknown owner warning.
+  - stale F061 child heartbeat is not treated as a separate warning when the owner is blocked before a child should be running.
+  - F manager snapshot now reports `needs_user` for this source-shape case.
+- Tests:
+  - `tests/manager/test_hourly_mot.py -k "f_"`: 71 passed.
+  - `tests/test_sellerone_manager_control_plane.py::test_source_shape_guard_live_state_is_classified_as_blocker`: passed.
+- Retest:
+  - read-only F MOT returned `status=decision_needed`, `fail_count=1`, `warn_count=0`.
+- Current protected decisions:
+  - `F-OWNER`: approve a bounded F source-shape recovery preview for the active DHB row, or leave F parked.
+  - `F-RESCAN-PRIORITY-02`: approve a preview-first F rescan recovery packet for the reappeared parked RESCAN rows, or leave them parked.
+- Safety:
+  - no `F061` run
+  - no scanner proof window
+  - no worker restart
+  - no F061 queue edit
+  - no output rewrite
+  - no Google Sheets write
+  - no price or local DB change
+- Follow-up:
+  - F heartbeat must notify Luke because F has new protected decisions.
+  - Email alert sent to `laprice90@gmail.com` for this protected F decision on 2026-06-05T00:37Z heartbeat.
+  - Do not continue F repair until Luke approves the specific preview-only recovery path.
+
+### F DHB Source File Check - 2026-06-05
+- Trigger:
+  - Luke supplied `C:\Users\Luke\Downloads\Trade Price May 2026.xlsx` as possible DHB source evidence for the blocked `GCT019` row.
+- Source proof:
+  - workbook exists and is readable.
+  - sheet `Trade Price` has `GCT019` on row 275.
+  - description is `GC TOOTH MOUSSE VANILLA 35ML`.
+  - barcode is `10386040004367`.
+  - `Trade Price` is blank.
+  - the barcode appears only once in the workbook.
+- Live active proof:
+  - active DHB row `GCT019` has blank `unit_cost`.
+  - active DHB rows `AUR018X` and `WIS124` have valid costs.
+- Meaning:
+  - `GCT019` cannot be scanned for profit/ROI from this file because the cost is genuinely missing.
+  - the safe recovery is not to invent a cost.
+  - the safe recovery is to park/source-block `GCT019` and leave costed DHB rows available to continue.
+- Boundary:
+  - no F061 run
+  - no queue edit
+  - no active row edit
+  - no output rewrite
+  - no Sheet write
+  - no local DB or price change
+- Next protected decision:
+  - approve preview-only F source-shape recovery to show the exact park/source-block action for `GCT019`, or leave F parked.
+
+### F RESCAN Preview Count Change - 2026-06-05T07:07Z
+- Trigger:
+  - F heartbeat found the protected RESCAN decision still open, but preview evidence changed.
+- Current read-only F MOT proof:
+  - `rescan_timeout_rows=180`
+  - `preview_total=180`
+  - `preview_requeue=12`
+  - `preview_exhausted=75`
+  - `preview_source_blocked=2`
+  - active retry rows: 99
+  - retry visible rows: 1
+- Meaning:
+  - the protected decision is still open.
+  - the current preview is narrower than the earlier 223-row preview.
+  - do not use the earlier 223-row proof as the current apply shape.
+- Email:
+  - update alert sent to `laprice90@gmail.com` because the protected F evidence changed materially.
+- Boundary:
+  - no F061 run
+  - no worker restart
+  - no queue edit
+  - no output rewrite
+  - no Google Sheets write
+  - no local DB or price change
+- Next protected decision:
+  - approve preview-only F source-shape and RESCAN recovery from the current proof, or leave F parked.
+
+### B006PFN3BW H Floor Cost Mismatch - 2026-06-05
+- Trigger:
+  - Luke challenged why H is using 4.51 COGS for ASIN `B006PFN3BW` / SKU `A2-T2AC-TW3L` when the Tokens Sheet shows later 4.44 receipt batches.
+- Read-only evidence:
+  - Google Sheet `Amazon Supplier Process`, tab `Tokens`, has `A2-T2AC-TW3L` receipt batches: 120 at 4.51 on 2026-01-05, then 120 at 4.44 on 2026-02-09, 240 at 4.44 on 2026-02-09, 360 at 4.44 on 2026-03-26, and 120 at 4.44 on 2026-04-28.
+  - Local live token ledger also contains stock-adjustment fallback tokens for the same SKU at 4.51: 120 dated 2026-02-10, 120 dated 2026-03-04, 240 dated 2026-03-18, 120 dated 2026-04-02, and 120 dated 2026-04-08.
+  - H latest floor proof is reading local B token truth and choosing 4.51 as next available COGS, producing hard floor 10.75.
+- Root-cause candidate:
+  - `B009_apply_stock_adjustments_to_tokens.py` creates fallback sellable tokens from Amazon stock adjustment receipt events when no returned-pending token is available. Its fallback cost basis comes from the latest existing local ledger cost, not from the matching receipt batch cost in the Tokens Sheet.
+- Safety:
+  - no H run
+  - no B run
+  - no token edit
+  - no Sheet write
+  - no price, queue, local DB alignment, output deletion, or worker restart
+- Next repair lane:
+  - Create a B-owned proof-first task to audit and repair stock-adjustment fallback token cost sourcing for `A2-T2AC-TW3L`.
+  - Success condition: fallback-created stock receipt tokens either carry a proven source cost from the matching receipt/batch evidence or are parked for explicit review; H floor proof then stops using unproven 4.51 fallback tokens as current cost truth.
+  - If repair would require changing existing live token values, stop for Luke approval before applying.

@@ -1,0 +1,2 @@
+observed_utc,run_id,owner_pid,state,active_supplier_id,active_f061_run_id,pending_rows,last_action,last_action_status,chunk_rows,drain_ready,notes
+2026-05-19T12:00:04Z,fpm_live_20260519T115821Z,6584,blocked_source_shape_guard,td_synnex,fpm_td_synnex_20260519T090704Z,43039,source_shape_guard,blocked,25,0,source_shape_guard:td_synnex_supplier_title_numeric_like|count=42915|sample_row_key=750dce41dbe5e95765067f7cea45230f5942138c|sample_supplier_sku=ADDON NETWORKING|sample_supplier_title=61.60

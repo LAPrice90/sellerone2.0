@@ -1,0 +1,10 @@
+requested_utc=2026-06-05T13:43:19Z
+requested_by=operator_ui
+mode=login_recovery
+supplier_id=dhb
+run_id=fpm_dhb_fresh_20260512T145047Z
+status=still_required
+hold_seconds=60
+reason=operator_login_button
+last_observed_utc=2026-06-08T07:55:17Z
+last_status_note=active=1;selected_rows=18;bbp_selected_rows=18;pending_after=17;new_pending_rows=17;bbp_iframe_plugin_blocked_rows=0

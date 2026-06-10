@@ -1,36 +1,44 @@
 check,status,value,notes,alert_first_seen_utc,alert_last_seen_utc,alert_consecutive_runs,alert_age_hours,cycle
-h_health_alert_snooze_config,ok,expired,until=2026-02-14T23:59:00Z;reason=temporary suppression while focusing on H-cycle blocker gate,,,,,H
-orders_all_rows,ok,7972,,,,,,B
-order_items_all_rows,ok,7992,,,,,,shared
+h_health_alert_snooze_config,ok,expired,until=2026-03-30T13:30:00Z;reason=reduce repeated health alert interruptions while user is working,,,,,H
+shared_cycle_failure_ledger_schema,ok,ok,"path C:\Users\Luke\Desktop\SellerOne 2.0\out\cycle_alerts\cycle_failure_events.csv;reason=ok;required=event_id,timestamp_utc,cycle,run_id,final_state,cause_code,cause_detail,step_name,stage,rc,verification_status,manifest_path,health_path,source_path,recovery_action",,,,,shared
+orders_all_rows,ok,12001,,,,,,B
+b_orders_all_freshness,ok,26.05,owner=B;recovery_signal=controlled_restart_gate;path=out\orders_all.csv;warn_after_min=45.0;fail_after_min=180.0;mtime_utc=2026-06-10T04:59:34.114063+00:00,,,,,B
+b_order_master_freshness,ok,28.47,"owner=B;recovery_signal=controlled_restart_gate;path=out\order_master.csv;warn_after_min=60.0;fail_after_min=180.0;mtime_utc=2026-06-10T04:57:09.150305+00:00;maintenance_markers=maintenance.requested,maintenance.ready,maintenance.active;maintenance_expected_staleness=1",,,,,B
+order_items_all_rows,ok,12026,,,,,,shared
 orders_missing_items_window,ok,0,,,,,,B
-order_master_rows,ok,7758,,,,,,B
-order_master_row_drop,ok,0,"prev=7758, current=7758",,,,,B
+order_master_rows,ok,11690,,,,,,B
+order_master_row_drop,ok,0,"prev=11690, current=11690",,,,,B
 order_master_blank_sku,ok,0,,,,,,B
 order_master_blank_date,ok,0,,,,,,B
 order_master_blank_qty,ok,0,,,,,,B
-order_master_date_gap_hours,ok,0.00,l1_token_eligible max 2026-03-17 14:34:37+00:00; master max 2026-03-17 14:34:37+00:00,,,,,B
+order_master_date_gap_hours,ok,0.00,orders_all max 2026-06-10 00:21:06+00:00; master max 2026-06-10 00:21:06+00:00,,,,,B
 order_master_blank_cogs_lvl1plus,ok,0,,,,,,B
-l1_keys_missing_in_master,ok,0,held_back_missing_tokens=11;held_back_missing_tokens_dynamic=11,,,,,B
+order_master_placeholder_cogs_rows,warn,4,repeat_sku_count=1;repeat_row_count=3;sample=AK-OB6V-HIYD:3,2026-06-06T05:25:36.707583+00:00,2026-06-10T05:25:37.393362+00:00,15,96.00,B
+order_master_missing_token_no_placeholder_rows,ok,0,,,,,,B
+l1_keys_missing_in_master,ok,0,observed_missing_fee_keys=1;observed_missing_token_keys=4,,,,,B
 order_master_orphans_count,ok,0,,,,,,B
-l3_orphans_count,ok,0,scope_start=2025-11-01; missing_dates=0; ignored_orders=634,,,,,B
+l3_orphans_count,ok,4,scope_start=2025-11-01; missing_dates=4; ignored_orders=630,,,,,B
 level2_duplicate_keys,ok,0,,,,,,shared
-tokens_total,ok,11110,,,,,,shared
-tokens_available,ok,2665,,,,,,shared
-tokens_allocated,ok,8355,,,,,,shared
-tokens_stock_receipt_missing_order_key,ok,0,stock_receipt_rows=1595,,,,,shared
-token_cogs_rows,ok,9053,,,,,,B
-inventory_rows,ok,337,,,,,,shared
-token_shortages_by_sku,ok,0,,,,,,B
-b_cycle_log_exists,ok,yes,mtime 2026-03-17T15:09:48.483011+00:00; path=out\systems\B\live\B_cycle.log,,,,,B
-b_cycle_recent_fail_lines,ok,0,latest_cycle=2026-03-17T15:03:23Z; raw_fail_count=0; recovered_count=0; unresolved_count=0; ignored_non_actionable=0; path=out\systems\B\live\B_cycle.log,,,,,B
-b_listing_offer_collection,ok,130,status=info;timestamp_utc=2026-03-17T15:07:11Z;notes=system_exit_nonfatal code=130;classified_nonfatal_130=1,,,,,B
+tokens_total,ok,17977,,,,,,shared
+tokens_available,ok,4221,,,,,,shared
+tokens_allocated,ok,13275,,,,,,shared
+tokens_stock_receipt_missing_order_key,ok,0,stock_receipt_rows=5331,,,,,shared
+token_cogs_rows,ok,13674,,,,,,B
+inventory_rows,ok,336,,,,,,shared
+a_inventory_stale_token_gap,ok,0,"stale_hours=24.0;scope_rows=301;stale_scope_rows=279;available_gap_rows=0;total_gap_rows=0;stale_scope_sample=02-7AZG-O0CV,03-7TNF-U2A1,06-6WC0-UGFH,0B-IC3D-6S96,0H-5V53-GPG4;unresolved_sample=",,,,,A
+token_shortages_by_sku,fail,3,"classes=runtime_adjustment_pending:1,true_live_shortage:2",2026-06-06T05:25:36.707583+00:00,2026-06-10T05:25:37.393362+00:00,15,96.00,B
+token_allocated_on_canceled_orders,ok,0,units=0,,,,,B
+b_cycle_log_exists,ok,yes,mtime 2026-06-10T05:25:36.517543+00:00; path=out\systems\B\live\B_cycle.log,,,,,B
+b_cycle_recent_fail_lines,ok,0,"latest_cycle=2026-06-10T04:59:18Z; raw_fail_count=0; recovered_count=0; unresolved_count=0; ignored_non_actionable=0; maintenance_context=1; maintenance_marker_lines=281; maintenance_markers_active=maintenance.requested,maintenance.ready,maintenance.active; path=out\systems\B\live\B_cycle.log",,,,,B
+b_listing_offer_collection,ok,0,status=skip;timestamp_utc=2026-06-10T05:01:15Z;notes=interval_not_due age_sec=445,,,,,B
 b_sheet_sync_external_health,ok,0,window_hours=6.0;path=out\b_sheet_sync_status.csv;latest_step=B007_allocate_tokens_live;latest_status=ok;latest_severity=ok,,,,,B
 b_token_source_single_truth,ok,0,"window_hours=6.0;path=out\b_sheet_sync_status.csv;unsafe_mode=local_fallback|sheet_sync_skipped_local_newer;unsafe_status=degraded_local|hard_fail;latest_step_modes=B007_allocate_tokens_live:local_master:ok,B030_sync_token_allocations_from_sheet:local_master:ok",,,,,B
 a_fees_failed_rows_today,ok,0,path=out\fees_failed.csv;total_rows=0,,,,,A
-a_stock_receipts_collection_health,ok,0,path=out\manifests\A\2026-03-17\20260317T111601Z.json;run_id=20260317T111601Z;end_time=2026-03-17T11:33:13Z;age_hours=3.62;final_state=completed;recorded_step_count=13;configured_step_count=13;health_status=current;current_cycle_evidence=1;step_status=completed;step_notes=elapsed=10.7s;fresh_outputs=1,,,,,A
+a_stock_receipts_collection_health,ok,0,path=out\manifests\A\2026-06-09\20260609T185208Z.json;run_id=20260609T185208Z;end_time=2026-06-09T19:16:13Z;age_hours=10.16;final_state=completed;recorded_step_count=11;configured_step_count=11;health_status=current;current_cycle_evidence=1;step_status=skipped;step_notes=skipped because A_ENABLE_STOCK_RECEIPTS_SHEET=0,,,,,A
 b_schema_orders_missing_items_window,ok,ok,,,,,,B
+b_schema_allocated_tokens_on_canceled_orders,ok,ok,,,,,,B
 b_schema_unknown_fee_countries,ok,ok,,,,,,B
-fee_rules_unknown_countries,ok,0,,,,,,shared
+fee_rules_unknown_countries,warn,1,CN,2026-06-08T22:21:59.271884+00:00,2026-06-10T05:25:37.393362+00:00,10,31.06,shared
 c_schema_financial_events_shipments,ok,ok,,,,,,C
 c_schema_financial_events_inbound_summary,ok,ok,,,,,,C
 c_schema_inventory_ledger_raw,ok,ok,,,,,,C
@@ -65,8 +73,21 @@ e_schema_performance_summary,ok,ok,,,,,,E
 e_schema_study_report,ok,ok,,,,,,E
 e_schema_run_log,ok,ok,,,,,,E
 e_schema_decision_log,ok,ok,,,,,,E
-h_e_inputs_fresh,ok,0,asof_date=2026-03-17; max_age_days=1,,,,,H
-h_e_outputs_latest_asof,ok,0,"run_log_path=out\systems\E\live\e_run_log.jsonl; chosen_run_id=20260317T105928968816Z; chosen_output_asof=2026-03-17; today_utc=2026-03-17; expected_any=2026-03-16,2026-03-17",,,,,H
+e_schema_sales_truth_sku_30d,ok,ok,,,,,,E
+e_schema_sales_truth_reconciliation,ok,ok,,,,,,E
+e_schema_sku_daily_sales_truth,ok,ok,,,,,,E
+e_sales_truth_selling_rows_revenue_zero,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_zero_profit_with_revenue,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_missing_cogs_equals_units,ok,0,path=out\sku_roi_snapshot.csv;selling_rows=39,,,,,E
+e_sales_truth_reconciliation_mismatch_rows,ok,0,path=out\sales_truth_reconciliation_latest.csv;total_rows=39;mismatch_rows=0;mismatch_share=0.0000;revenue_delta_abs_sum=0.00;profit_delta_abs_sum=0.00;fail_share=0.80,,,,,E
+e_sales_truth_performance_units_align_roi,ok,0,path=out\sku_performance_summary.csv;roi_row_count=39;mismatch_rows=0,,,,,E
+e_sales_truth_daily_state_explicit,ok,0,path=out\sku_daily_sales_truth_latest.csv;rows=246;invalid_source_rows=0;blank_source_rows=0;provisional_bad_confidence_rows=0;finalized_bad_confidence_rows=0,,,,,E
+e_sales_truth_daily_confidence_state_alignment,ok,0,path=out\sku_daily_sales_truth_latest.csv;rows=246;invalid_source_rows=0;blank_source_rows=0;provisional_bad_confidence_rows=0;finalized_bad_confidence_rows=0,,,,,E
+e_study_report_fresh_vs_summary,ok,0,summary=out\sku_performance_summary.csv;study=out\e_study_report.csv;summary_mtime_utc=2026-06-10T05:20:37.265996+00:00;study_mtime_utc=2026-06-10T05:20:38.172076+00:00;lag_seconds=0,,,,,E
+e_study_report_truth_alignment,ok,0,summary=out\sku_performance_summary.csv;study=out\e_study_report.csv;roi_row_count=39;mismatch_rows=0;sample=,,,,,E
+o_net_fee_bridge_health,ok,no_action_ready,"source=out\systems\O\live\restock_source_view.csv;recommendations=out\systems\O\live\restock_recommendations_live.csv;coverage=out\systems\O\live\reorder_input_coverage_report.csv;source_rows=608;recommendation_rows=608;coverage_rows=608;coverage_action_ready_rows=0;buy_recommendation_rows=0;action_skus=0;max_age_hours=48.00;missing_sku_rows=0;missing_action_source_rows=0;missing_action_recommendation_rows=0;missing_net_field_rows=0;bad_status_rows=0;stale_age_rows=0;fee_drag_rows=161;equal_net_gross_roi_rows=0;roi_compare_missing_rows=0;roi_compare_not_applicable_rows=120;read_states=source:ok,recommendations:ok,coverage:ok;read_notes=path=out\systems\O\live\restock_source_view.csv;rows=608|path=out\systems\O\live\restock_recommendations_live.csv;rows=608|path=out\systems\O\live\reorder_input_coverage_report.csv;rows=608;sample=",,,,,O
+h_e_inputs_fresh,ok,0,asof_date=2026-06-10; max_age_days=1,,,,,H
+h_e_outputs_latest_asof,ok,0,"run_log_path=out\systems\E\live\e_run_log.jsonl; chosen_run_id=20260610T052026260164Z; chosen_output_asof=2026-06-10; today_utc=2026-06-10; expected_any=2026-06-09,2026-06-10",,,,,H
 z_schema_health_status,ok,ok,,,,,,Z
 f_schema_training_set,ok,ok,,,,,,F
 h_schema_lab_cohort,ok,ok,,,,,,H
@@ -84,6 +105,25 @@ h_schema_worker_probe_response_log,ok,ok,,,,,,H
 h_schema_executioner_action_log,ok,ok,,,,,,H
 h_schema_seller_profiles,ok,ok,,,,,,H
 h_schema_seller_soi,ok,ok,,,,,,H
+h_schema_ceiling_events,ok,ok,,,,,,H
+h_ceiling_events_required_fields_non_blank,fail,3,blank_required=true_binding_ceiling_gbp:3,2026-05-27T05:30:03.603580+00:00,2026-06-10T05:25:37.393362+00:00,24,335.93,H
+h_schema_strategy_outcome_log,ok,ok,,,,,,H
+h_strategy_outcome_log_required_fields_non_blank,ok,0,,,,,,H
+h_schema_strategy_outcome_daily,ok,ok,,,,,,H
+h_strategy_outcome_daily_required_fields_non_blank,ok,0,,,,,,H
+h_ceiling_effective_floor_integrity,ok,0,path=out\h_ceiling_events.csv;scope_run_id=20260610T051107Z;scoped_rows=8;checked_rows=8;total_rows=94787;samples=none,,,,,H
+h_strategy_outcome_daily_count_integrity,ok,0,checked_rows=488;samples=none,,,,,H
+h_strategy_no_write_failed_streak_multi_seller_ladder_cap,ok,0,scenario=multi_seller_ladder_cap;warn_threshold=5;sample_case_ids=,,,,,H
+h_strategy_no_write_failed_streak_single_rival_reset,ok,0,scenario=single_rival_reset;warn_threshold=5;sample_case_ids=,,,,,H
+h_strategy_no_write_failed_streak_suppression_reactivation,ok,0,scenario=suppression_reactivation;warn_threshold=5;sample_case_ids=,,,,,H
+h_strategy_sample_size_multi_seller_ladder_cap,warn,8,scenario=multi_seller_ladder_cap;asof_date=2026-06-10;sample_min_rows=150;provisional_sample_flag=1;chosen_tactic=REGAIN_LADDER_CAP,2026-04-18T05:06:13.272345+00:00,2026-06-10T05:25:37.393362+00:00,58,1272.32,H
+h_strategy_expired_share_multi_seller_ladder_cap,ok,75.00,scenario=multi_seller_ladder_cap;asof_date=2026-06-10;expired_rows=6;terminal_rows=7;warn_threshold_pct=70.00,,,,,H
+h_strategy_sample_size_single_rival_reset,warn,0,scenario=single_rival_reset;asof_date=2026-06-10;sample_min_rows=30;provisional_sample_flag=1;chosen_tactic=,2026-04-17T05:04:38.511598+00:00,2026-06-10T05:25:37.393362+00:00,59,1296.35,H
+h_strategy_expired_share_single_rival_reset,ok,0.00,scenario=single_rival_reset;asof_date=2026-06-10;expired_rows=0;terminal_rows=0;warn_threshold_pct=70.00,,,,,H
+h_strategy_sample_size_suppression_reactivation,warn,7,scenario=suppression_reactivation;asof_date=2026-06-10;sample_min_rows=20;provisional_sample_flag=1;chosen_tactic=SUPPRESSION_REACTIVATION,2026-06-10T05:25:37.393362+00:00,2026-06-10T05:25:37.393362+00:00,1,0.00,H
+h_strategy_expired_share_suppression_reactivation,ok,0.00,scenario=suppression_reactivation;asof_date=2026-06-10;expired_rows=0;terminal_rows=4;warn_threshold_pct=70.00,,,,,H
+h_suppression_cases_required_fields_non_blank,ok,0,,,,,,H
+h_suppression_reactivation_required_fields_non_blank,ok,0,,,,,,H
 h_seller_soi_active_coverage,ok,0,all_active_skus_have_soi,,,,,H
 h_worker_probe_event_idempotent,ok,0,key=probe_event_id,,,,,H
 h_worker_probe_event_numeric_valid,ok,0,"rules=target_in_floor_ceiling,move_within_max,cooldown>=1,state_enum,probe_enum,valid_timestamps",,,,,H
@@ -104,49 +144,57 @@ h_schema_api_run_log,ok,ok,,,,,,H
 h_api_recent_fail_runs,ok,0,window_hours=24.0,,,,,H
 h_schema_api_rate_state,ok,ok,,,,,,H
 h_spapi_lock_present,ok,0,,,,,,H
-h_cycle_stale_lock,ok,0,"searched=out\systems\H\live\H_pricing_cycle.lock,out\H_pricing_cycle.lock",,,,,H
+h_cycle_stale_lock,ok,0,active=out\systems\H\live\H_pricing_cycle.lock|pid=7180;out\H_pricing_cycle.lock|pid=7180,,,,,H
 e_cycle_stale_lock,ok,0,"searched=out\systems\E\live\E_cycle.lock,out\E_cycle.lock",,,,,E
+h_cycle_log_freshness,ok,13.09,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\systems\H\live\H_cycle.log;warn_after_min=20.0;fail_after_min=60.0;mtime_utc=2026-06-10T05:12:31.795697+00:00,,,,,H
+h_listing_offer_snapshot_latest_freshness,ok,13.14,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\listing_offer_snapshot_latest.csv;warn_after_min=20.0;fail_after_min=60.0;mtime_utc=2026-06-10T05:12:29.231993+00:00,,,,,H
+h_phase1_runtime_floor_snapshot_latest_freshness,ok,17.53,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\phase1_runtime_floor_snapshot_latest.csv;warn_after_min=30.0;fail_after_min=90.0;mtime_utc=2026-06-10T05:08:05.847564+00:00,,,,,H
+h_ceiling_events_current,ok,5.05,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\h_ceiling_events.csv;warn_after_min=20.0;fail_after_min=60.0;mtime_utc=2026-06-10T05:20:34.652556+00:00,,,,,H
+h_strategy_outcome_log_current,ok,0.15,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\h_strategy_outcome_log.csv;warn_after_min=20.0;fail_after_min=60.0;mtime_utc=2026-06-10T05:25:28.310532+00:00,,,,,H
+h_strategy_outcome_daily_current,ok,0.00,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\h_strategy_outcome_daily.csv;warn_after_min=1440.0;fail_after_min=2880.0;mtime_utc=2026-06-10T05:25:42.821273+00:00,,,,,H
+h_terminal_marker_freshness,ok,15.04,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;path=out\systems\H\live\H_cycle_last_terminal_info.txt;warn_after_min=30.0;fail_after_min=90.0;mtime_utc=2026-06-10T05:10:35.214546+00:00,,,,,H
+h_publish_marker_freshness,ok,15.06,owner=H;recovery_signal=run_H_cycle.bat_guarded_owner;publish_path=out\systems\H\live\H_cycle_last_publish_info.txt;terminal_path=out\systems\H\live\H_cycle_last_terminal_info.txt;warn_after_min=30.0;fail_after_min=90.0;publish_status=ok;terminal_state=finalized;source=publish_marker;publish_age_min=15.06;terminal_age_min=15.04,,,,,H
 h_schema_listing_offer_snapshot,ok,ok,,,,,,H
-h_market_context_fill_nonzero,ok,0,buy_box_channel=51; lowest_fba_price=56; lowest_fbm_price=50; offer_count_fba=56; offer_count_fbm=50,,,,,H
+h_market_context_fill_nonzero,ok,0,buy_box_channel=38; lowest_fba_price=39; lowest_fbm_price=37; offer_count_fba=39; offer_count_fbm=37,,,,,H
 h_schema_listing_offer_seller_snapshot,ok,ok,,,,,,H
-h_seller_snapshot_landed_non_null_training,ok,0,snapshot empty; expected_empty_reason=no_seller_rows_for_active_lab_skus,,,,,H
-h_seller_snapshot_landed_ge_listing,ok,0,snapshot empty; expected_empty_reason=no_seller_rows_for_active_lab_skus,,,,,H
-h_seller_snapshot_shipping_non_negative,ok,0,snapshot empty; expected_empty_reason=no_seller_rows_for_active_lab_skus,,,,,H
+h_seller_snapshot_landed_non_null_training,ok,0,training_rows=53,,,,,H
+h_seller_snapshot_landed_ge_listing,ok,0,comparable_rows=53,,,,,H
+h_seller_snapshot_shipping_non_negative,ok,0,shipping_rows=53,,,,,H
 h_market_snapshot_exists,ok,yes,path out\hos_daily_market_snapshot_latest.csv,,,,,H
-h_market_snapshot_rows_10,ok,57,expected_at_least=10,,,,,H
+h_market_snapshot_rows_10,ok,65,expected_at_least=10,,,,,H
 h_market_snapshot_required_columns,ok,0,,,,,,H
 h_market_snapshot_no_null_core_fields,ok,0,buy_box_price_used_gross=0; offer_count_fba=0; offer_count_fbm=0,,,,,H
 h_market_snapshot_delivery_parity_binary,ok,0,"allowed_values=0,1",,,,,H
-h_market_snapshot_econ_anchors_filled,ok,0,training_rows=10; break_even_exvat_gbp=0; break_even_gross_gbp=0; token_cost_exvat_gbp=0; min_price_gross_10pct=0; max_price_gross_current=0,,,,,H
-h_market_report_html_exists,ok,yes,path out\reports\hos_daily\hos_daily_report_2026-03-16.html,,,,,H
-h_market_report_pdf_exists,ok,yes,path out\reports\hos_daily\hos_daily_report_2026-03-16.pdf,,,,,H
-h_market_report_price_charts_count,ok,57,expected_at_least=57,,,,,H
-h_market_report_seller_mix_charts_count,ok,57,expected_at_least=57,,,,,H
+h_market_snapshot_econ_anchors_filled,ok,0,training_rows=9; break_even_exvat_gbp=0; break_even_gross_gbp=0; token_cost_exvat_gbp=0; min_price_gross_10pct=0; max_price_gross_current=0,,,,,H
+h_market_report_html_exists,ok,yes,path out\reports\hos_daily\hos_daily_report_2026-04-28.html,,,,,H
+h_market_report_pdf_exists,ok,yes,path out\reports\hos_daily\hos_daily_report_2026-04-28.pdf,,,,,H
+h_market_report_price_charts_count,ok,65,expected_at_least=65,,,,,H
+h_market_report_seller_mix_charts_count,ok,65,expected_at_least=65,,,,,H
 h_schema_inventory_history,ok,ok,,,,,,H
 h_schema_inbound_history,ok,ok,,,,,,H
 h_schema_refund_adjustment_history,ok,ok,,,,,,H
 h_schema_inventory_snapshot,ok,ok,,,,,,H
 h_schema_inbound_snapshot,ok,ok,,,,,,H
 h_schema_refund_adjustment_snapshot,ok,ok,,,,,,H
-h_listing_offer_history_idempotent_today,ok,0,asof_date=2026-03-17,,,,,H
-h_listing_offer_seller_history_idempotent_today,ok,0,no rows for 2026-03-17; expected_empty_reason=no_seller_rows_for_active_lab_skus,,,,,H
-h_inventory_history_idempotent_today,ok,0,asof_date=2026-03-17,,,,,H
-h_inbound_history_idempotent_today,ok,0,asof_date=2026-03-17,,,,,H
-h_refund_adjustment_history_idempotent_today,ok,0,asof_date=2026-03-17,,,,,H
-a_daily_intel_prerequisite_freshness,ok,0,date=2026-03-17; required=59; non_parked=59; dropped=374; covered=59; stock_source=out\inventory_snapshot_latest.csv; scope_mtime_utc=2026-03-17T15:08:52Z; daily_mtime_utc=2026-03-17T15:09:03.925857+00:00; stock_source_mtime_utc=2026-03-17T11:24:32Z,,,,,A
-a_daily_intel_coverage_non_parked,ok,0,date=2026-03-17; required=59; dropped=374; non_parked=59; covered=59; stock_source=out\inventory_snapshot_latest.csv;missing_sample=,,,,,A
-a_daily_intel_compliance_nonempty_non_parked,ok,0,date=2026-03-17; required=59; dropped=374; non_parked=59; missing_rows=0; blank_compliance=0; reason_coded=0; stock_source=out\inventory_snapshot_latest.csv,,,,,A
-h_ceiling_rule_bbp_missing_trial,ok,skipped_parked,sku=L1-54EX-56YC;date=2026-03-17;reason=PARK_OUT_OF_STOCK,,,,,H
-h_ceiling_rule_cpt_missing_trial,ok,skipped_parked,sku=L1-54EX-56YC;date=2026-03-17;reason=PARK_OUT_OF_STOCK,,,,,H
-h_ceiling_rule_inputs_missing_trial,ok,skipped_parked,sku=L1-54EX-56YC;date=2026-03-17;reason=PARK_OUT_OF_STOCK,,,,,H
-h_scope_non_parked_matches_targets,ok,0,processed=0; non_parked_scope=59; skipped_parked=3; invalid_processed_sample=; state_path=out/systems/H/live/h_pricing_cycle_state.json,,,,,H
-h_parked_sku_write_attempts,warn,34,date=2026-03-17; parked_skus=547; parked_rows_today=34; attempt_statuses=APPLIED; park_reasons=PARK_OUT_OF_STOCK; event_time_proof_available=0; severity_basis=out_of_stock_only_no_event_time_proof,2026-03-17T12:28:50.277761+00:00,2026-03-17T15:10:16.428256+00:00,4,2.69,H
-h_no_cpt_calls_in_h_cycle,ok,0,date=2026-03-17; endpoint=products_pricing_post_competitive_summary_batch; sample=,,,,,H
+h_listing_offer_history_idempotent_today,ok,0,asof_date=2026-06-10,,,,,H
+h_listing_offer_seller_history_idempotent_today,ok,0,asof_date=2026-06-10,,,,,H
+h_inventory_history_idempotent_today,ok,0,asof_date=2026-06-10,,,,,H
+h_inbound_history_idempotent_today,ok,0,asof_date=2026-06-10,,,,,H
+h_refund_adjustment_history_idempotent_today,ok,0,asof_date=2026-06-10,,,,,H
+a_daily_intel_prerequisite_freshness,ok,0,date=2026-06-10; required=157; non_parked=157; dropped=374; covered=157; stock_source=out\inventory_snapshot_latest.csv; scope_mtime_utc=2026-06-10T05:19:23Z; daily_mtime_utc=2026-06-10T05:20:25.384282+00:00; stock_source_mtime_utc=2026-06-10T05:09:58Z; daily_mtime_source=daily_intel_latest,,,,,A
+a_daily_intel_coverage_non_parked,ok,0,date=2026-06-10; required=157; dropped=374; non_parked=157; covered=157; stock_source=out\inventory_snapshot_latest.csv;missing_sample=,,,,,A
+a_daily_intel_compliance_nonempty_non_parked,ok,0,date=2026-06-10; required=157; dropped=374; non_parked=157; missing_rows=0; blank_compliance=0; reason_coded=0; stock_source=out\inventory_snapshot_latest.csv,,,,,A
+h_ceiling_rule_bbp_missing_trial,ok,0,sku=L1-54EX-56YC;date=2026-06-10;source=MIN_BBP_CPTX1_2,,,,,H
+h_ceiling_rule_cpt_missing_trial,ok,0,sku=L1-54EX-56YC;date=2026-06-10;source=MIN_BBP_CPTX1_2,,,,,H
+h_ceiling_rule_inputs_missing_trial,ok,0,sku=L1-54EX-56YC;date=2026-06-10;source=MIN_BBP_CPTX1_2,,,,,H
+h_scope_non_parked_matches_targets,ok,0,processed=50; non_parked_scope=157; skipped_parked=0; invalid_processed_sample=; state_path=out/systems/H/live/h_pricing_cycle_state.json,,,,,H
+h_parked_sku_write_attempts,ok,0,date=2026-06-10; parked_skus=457; parked_rows_today=0; attempt_statuses=; park_reasons=; event_time_proof_available=0; severity_basis=strict,,,,,H
+h_no_cpt_calls_in_h_cycle,ok,0,date=2026-06-10; endpoint=products_pricing_post_competitive_summary_batch; sample=,,,,,H
 h_floor_vat_policy_config,ok,ok,vat_registered=1;recover_input_vat_on_cogs=1;recover_input_vat_on_fees=1;formula_version=vat_registered_exvat_basis_v1;note=Official H floor policy: remove output VAT from sale first; use ex-VAT COGS and fees for floor math.,,,,,H
-h_floor_phase1_cogs_basis_drift,ok,0,date=2026-03-17;latest_asof=2026-03-17T15:07:13Z;rows_in_run=59;compared=58;missing_expected=1;expected_source=trace_latest_asof;sample=,,,,,H
-h_floor_legacy_cogs_basis_drift,ok,0,date=2026-03-17;rows_today=0;compared=0;sample=,,,,,H
-h_floor_no_order_inputs,ok,0,date=2026-03-17;rows_today=5802;sample=,,,,,H
-h_floor_referral_band_integrity,ok,0,date=2026-03-17;rows_today=5802;sample=,,,,,H
-h_floor_referral_source_coverage,ok,0,date=2026-03-17;rows_today=5802;rows_non_parked=5723;rows_parked=79;missing_rate_pct=0.00;warn_rate_pct=5.00;fail_rate_pct=20.00;sample=,,,,,H
-h_floor_referral_source_coverage_parked_observability,ok,0,date=2026-03-17;rows_parked=79;observability_only=1;sample=,,,,,H
-h_floor_formula_consistency,ok,0,date=2026-03-17;rows_today=5802;comparable=5802;sample=,,,,,H
+h_floor_phase1_cogs_basis_drift,ok,0,date=2026-06-10;latest_asof=2026-06-10T05:12:34Z;rows_in_run=158;compared=157;missing_expected=1;expected_source=trace_latest_asof;sample=,,,,,H
+h_floor_legacy_cogs_basis_drift,ok,0,date=2026-06-10;rows_today=0;compared=0;sample=,,,,,H
+h_floor_no_order_inputs,ok,0,date=2026-06-10;rows_today=1264;sample=,,,,,H
+h_floor_referral_band_integrity,ok,0,date=2026-06-10;rows_today=1264;sample=,,,,,H
+h_floor_referral_source_coverage,warn,112,"date=2026-06-10;rows_today=1264;rows_non_parked=1264;rows_parked=0;missing_rate_pct=8.86;warn_rate_pct=5.00;fail_rate_pct=20.00;sample=02-7AZG-O0CV,1U-1W76-M840,EA-FZ2V-D7II,A9-2Y9G-M2K7,M5-71MK-T0DL",2026-04-28T16:28:24.311030+00:00,2026-06-10T05:25:37.393362+00:00,53,1020.95,H
+h_floor_referral_source_coverage_parked_observability,ok,0,date=2026-06-10;rows_parked=0;observability_only=1;sample=,,,,,H
+h_floor_formula_consistency,ok,0,date=2026-06-10;rows_today=1264;comparable=1264;sample=,,,,,H

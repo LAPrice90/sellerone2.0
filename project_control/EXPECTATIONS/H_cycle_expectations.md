@@ -12,6 +12,7 @@ The H cycle is the live repricing runtime. It collects market signals, applies r
 | Publish updates | Publish markers and runtime status outputs are written | In Progress | Publish and finalizer markers exist |
 | Runtime lock safety | Lock ownership and overlap protections are active | In Progress | Lock, heartbeat, and ownership checks are implemented |
 | Boundary truth handling | H to A016 boundary outcomes are captured safely | In Progress | Boundary artifacts exist, stabilization still needed |
+| 10-run reliability window | Last 10 completed H runs are classified from outside proof as clean, warning, or failed | In Progress | `h_reliability_window` keeps latest-run readiness separate from longer stability |
 | Health reporting | H health and runtime status artifacts are produced | In Progress | H health checklist and runtime status files are present |
 | Storage self-cleaning | H staged rollback folders are capped and reported through central housekeeping | In Progress | `out/systems/H/staged/*` keeps the newest 5 snapshots by registry policy; cleanup must run only at a safe H boundary |
 

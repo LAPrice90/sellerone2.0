@@ -11510,8 +11510,18 @@ def _run_once(*, cfg: dict, read_only: bool, run_id: str, now_utc: datetime) -> 
     )
     if not scan_state_ok:
         raise RuntimeError(f"scan_state_write_required_failed:{scan_state_reason}")
+    _progress(
+        "post_scan_state_artifact_writes_start",
+        run_id=run_id,
+        processed_count=str(len(run_rows)),
+    )
     _write_json(H_REENTRY_STATE_PATH, {"skus": reentry_state_by_sku})
     _write_json(H_INBOUND_ACTIVATION_STATE_PATH, {"skus": inbound_state_by_sku})
+    _progress(
+        "post_scan_state_artifact_writes_done",
+        run_id=run_id,
+        processed_count=str(len(run_rows)),
+    )
 
     next_due_sleep_seconds = 0
     next_due_sku = ""
@@ -11521,7 +11531,17 @@ def _run_once(*, cfg: dict, read_only: bool, run_id: str, now_utc: datetime) -> 
     # Keep strategy outcome resolution current every cycle, not only cooldown-only runs.
     # Use an end-of-cycle timestamp so long cycles can close outcomes that matured during processing.
     strategy_outcome_tick_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _progress(
+        "post_scan_state_outcome_close_start",
+        run_id=run_id,
+        observation_ts_utc=strategy_outcome_tick_ts,
+    )
     phase1_main_loop.close_pending_strategy_outcomes_tick(
+        observation_ts_utc=strategy_outcome_tick_ts,
+    )
+    _progress(
+        "post_scan_state_outcome_close_done",
+        run_id=run_id,
         observation_ts_utc=strategy_outcome_tick_ts,
     )
 

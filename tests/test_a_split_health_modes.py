@@ -2,10 +2,16 @@
 import unittest
 from pathlib import Path
 from unittest import mock
+import sys
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from scripts import run_A_all as a_cycle
+from scripts.flows.A import A020_run_daily_finance as a020
 
 
 class ASplitHealthModeTests(unittest.TestCase):
@@ -16,6 +22,48 @@ class ASplitHealthModeTests(unittest.TestCase):
             "out/inventory_snapshot_latest.csv",
             a_cycle.STEP_ARTIFACTS["A003_run_inventory_to_sheet.py"],
         )
+
+    def test_a001_local_refresh_is_not_skipped_by_legacy_sheet_output_flag(self) -> None:
+        self.assertIn("A001_run_listings_to_sheet.py", a_cycle.RUN_ORDER)
+        self.assertNotIn("A001_run_listings_to_sheet.py", a_cycle.LEGACY_SHEET_OUTPUT_STEPS)
+        self.assertIn("A001_run_listings_to_sheet.py", a_cycle.LOCAL_REFRESH_WITH_LEGACY_SHEETS_DISABLED)
+        self.assertIn(
+            "out/merchant_listings_latest.csv",
+            a_cycle.STEP_ARTIFACTS["A001_run_listings_to_sheet.py"],
+        )
+
+    def test_a002_and_a004_refresh_locally_when_legacy_sheets_are_disabled(self) -> None:
+        self.assertIn("A002_run_catalog_items_to_sheet.py", a_cycle.RUN_ORDER)
+        self.assertIn("A004_run_fees_to_sheet.py", a_cycle.RUN_ORDER)
+        self.assertNotIn("A002_run_catalog_items_to_sheet.py", a_cycle.LEGACY_SHEET_OUTPUT_STEPS)
+        self.assertNotIn("A004_run_fees_to_sheet.py", a_cycle.LEGACY_SHEET_OUTPUT_STEPS)
+        self.assertIn("A002_run_catalog_items_to_sheet.py", a_cycle.LOCAL_REFRESH_WITH_LEGACY_SHEETS_DISABLED)
+        self.assertIn("A004_run_fees_to_sheet.py", a_cycle.LOCAL_REFRESH_WITH_LEGACY_SHEETS_DISABLED)
+
+    def test_sheet_only_product_db_steps_are_not_in_normal_a_run_order(self) -> None:
+        self.assertNotIn("dedupe_product_db.py", a_cycle.RUN_ORDER)
+        self.assertNotIn("sync_product_db_to_main_sheet.py", a_cycle.RUN_ORDER)
+        self.assertIn("dedupe_product_db.py", a_cycle.LEGACY_SHEET_ONLY_PRODUCT_DB_STEPS)
+        self.assertIn("sync_product_db_to_main_sheet.py", a_cycle.LEGACY_SHEET_ONLY_PRODUCT_DB_STEPS)
+
+    def test_stock_receipts_sheet_is_enabled_by_default(self) -> None:
+        self.assertTrue(a_cycle.A_ENABLE_STOCK_RECEIPTS_SHEET)
+
+    def test_legacy_sheet_steps_are_disabled_by_default(self) -> None:
+        self.assertTrue(a_cycle.A_SKIP_LEGACY_SHEET_OUTPUT_STEPS)
+
+    def test_a020_daily_finance_defaults_to_no_sheet_writes(self) -> None:
+        env = a020.apply_no_sheet_defaults({})
+        self.assertEqual(env["FIN_L3_SKIP_SHEETS"], "1")
+        self.assertEqual(env["STOCK_EVENTS_WRITE_SHEETS"], "0")
+        self.assertEqual(env["TOKEN_EVENTS_WRITE_SHEETS"], "0")
+        self.assertEqual(env["TOKEN_PROOF_PACK_WRITE_SHEETS"], "0")
+        self.assertEqual(env["VAT_REPORT_WRITE_SHEETS"], "0")
+        self.assertEqual(env["PNL_WRITE_SHEETS"], "0")
+
+    def test_a020_daily_finance_does_not_override_explicit_env(self) -> None:
+        env = a020.apply_no_sheet_defaults({"STOCK_EVENTS_WRITE_SHEETS": "1"})
+        self.assertEqual(env["STOCK_EVENTS_WRITE_SHEETS"], "1")
 
     def test_a003_and_a016_retry_stale_producer_outputs_once(self) -> None:
         stale = {"verification_status": "failed_stale_outputs"}

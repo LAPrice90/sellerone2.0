@@ -1,0 +1,1 @@
+state=alive_no_progress|reason=process_alive_seconds=2.6;scanner_progress_seconds=3506.3|manager_pids=25952|child_pids=26292|launched_pid=0|progress_state=no_row_progress|scanner_progress_age_seconds=3506.3|scanner_progress_utc=2026-06-08T06:47:34Z|stale_seconds=900.0|updated_utc=2026-06-08T07:46:00Z

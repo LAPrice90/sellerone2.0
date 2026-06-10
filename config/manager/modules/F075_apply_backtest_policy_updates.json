@@ -1,0 +1,69 @@
+{
+  "id": "F075_apply_backtest_policy_updates",
+  "display_name": "F075 Backtest Policy Updates",
+  "flow": "F",
+  "purpose": "Register backtest policy update handling so the manager can inspect requested policy-change evidence without applying policy changes.",
+  "owner_entrypoint": "scripts/flows/F/F075_apply_backtest_policy_updates.py",
+  "worker_entrypoint": "scripts/flows/F/F075_apply_backtest_policy_updates.py",
+  "health_sources": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_policy_update_events",
+      "path": "out/systems/F/inbox/feeder_backtest_policy_update_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "policy_update_events_are_read_only_manager_evidence",
+    "policy_apply_requires_separate_approved_packet"
+  ],
+  "needs_user_signals": [
+    "manual_policy_change_requested",
+    "policy_update_event_visible",
+    "invalid_policy_ordering"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "apply_backtest_policy_update",
+    "change_backtest_policy",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read policy and update-event proof but must not apply policy changes or change prices."
+}

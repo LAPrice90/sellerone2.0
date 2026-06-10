@@ -1,0 +1,2 @@
+po_id,po_line_id,seller_sku,asin,ordered_qty,ordered_unit_cost_gbp,supplier_pack_size,moq,receipt_status,received_qty,remaining_open_qty,expected_arrival_utc,backorder_flag,source_event_id,source_decision_action,cost_mode,recommendation_basis,source_recommendation_asof_utc
+PO-DRAFT-20260404-001,PO-DRAFT-20260404-001-L001,XE-YPAI-HX9F,B086ZD7MG6,15,8.0625,1,1,not_received,0,15,,,phase2-evt-approve-test,approve_test_restock,test,test_cost_snapshot,2026-04-03T13:58:44Z

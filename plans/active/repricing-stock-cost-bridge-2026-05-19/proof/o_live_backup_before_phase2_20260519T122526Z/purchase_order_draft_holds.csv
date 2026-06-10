@@ -1,0 +1,2 @@
+hold_utc,event_id,seller_sku,asin,decision_action,final_decision_status,hold_reason,hold_note,confirmed_qty,confirmed_unit_cost,supplier_code,supplier_name,cost_mode,recommendation_basis,source_reference,recommendation_asof_utc
+2026-04-04T13:58:53Z,phase2-evt-approve-full,L3-ZQ8U-A7LQ,B004I2N5AS,approve_full_restock,wait,final_status_not_buyable,approval action was recalculated to non-buyable final status,60,14.1132,2046517,TD Synnex,test,test_cost_snapshot,phase2_ticket_sample,2026-04-03T13:58:44Z

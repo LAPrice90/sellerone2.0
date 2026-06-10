@@ -116,3 +116,67 @@ def test_resolve_unified_truth_clamps_suppression_temp_ceiling_to_hard_floor() -
 
     assert truth["true_binding_ceiling_gbp"] == "7.31"
     assert truth["true_binding_ceiling_type"] == "SUPPRESSION_TEMP_CLAMPED"
+
+
+def test_resolve_unified_truth_applied_floor_write_uses_floor_as_binding_ceiling() -> None:
+    truth = resolve_unified_truth(
+        suppression_active_flag="0",
+        parked_flag="0",
+        write_capable=True,
+        execution_state="LIQUIDATE_TO_FLOOR",
+        execution_write_status="APPLIED",
+        execution_reason_codes_json=(
+            '["DAILY_INTEL_DEGRADED_FLOOR_SEEK","CANNOT_COMPETE_FLOOR_SEEK_STEP",'
+            '"FINAL_CEILING_UNAVAILABLE","CEILING_RULE_INPUTS_MISSING","PHASE_LIVE_WRITE_ALLOWED"]'
+        ),
+        execution_final_ceiling_landed_gbp="",
+        execution_binding_ceiling_type="",
+        suppression_buy_box_state="NORMAL",
+        suppression_strategy_state="",
+        suppression_write_status="",
+        suppression_ceiling_landed_temp="",
+        execution_old_price_gbp="5.46",
+        execution_new_price_gbp="5.26",
+        execution_hard_floor_gbp="5.26",
+        observed_our_price_gbp="5.26",
+        trace_candidate_price_gbp="5.26",
+        trace_floor_total_gbp="5.26",
+        execution_event_ts_utc="2026-06-02T08:51:54Z",
+        trace_asof_utc="2026-06-02T08:57:26Z",
+    )
+
+    assert truth["unified_writer_outcome"] == "APPLIED"
+    assert truth["write_attempted_flag"] == "1"
+    assert truth["write_applied_flag"] == "1"
+    assert truth["truth_status"] == "WRITE_APPLIED"
+    assert truth["true_binding_ceiling_gbp"] == "5.26"
+    assert truth["true_binding_ceiling_type"] == "PHASE_FLOOR"
+
+
+def test_resolve_unified_truth_applied_non_floor_write_keeps_missing_ceiling_visible() -> None:
+    truth = resolve_unified_truth(
+        suppression_active_flag="0",
+        parked_flag="0",
+        write_capable=True,
+        execution_state="REGAIN",
+        execution_write_status="APPLIED",
+        execution_reason_codes_json='["FINAL_CEILING_UNAVAILABLE","PHASE_LIVE_WRITE_ALLOWED"]',
+        execution_final_ceiling_landed_gbp="",
+        execution_binding_ceiling_type="",
+        suppression_buy_box_state="NORMAL",
+        suppression_strategy_state="",
+        suppression_write_status="",
+        suppression_ceiling_landed_temp="",
+        execution_old_price_gbp="10.00",
+        execution_new_price_gbp="9.50",
+        execution_hard_floor_gbp="5.00",
+        observed_our_price_gbp="9.50",
+        trace_candidate_price_gbp="9.50",
+        trace_floor_total_gbp="5.00",
+        execution_event_ts_utc="2026-06-02T08:51:54Z",
+        trace_asof_utc="2026-06-02T08:57:26Z",
+    )
+
+    assert truth["truth_status"] == "WRITE_APPLIED"
+    assert truth["true_binding_ceiling_gbp"] == ""
+    assert truth["true_binding_ceiling_type"] == ""

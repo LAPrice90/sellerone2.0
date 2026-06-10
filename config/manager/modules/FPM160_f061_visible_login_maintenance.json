@@ -1,0 +1,86 @@
+{
+  "id": "FPM160_f061_visible_login_maintenance",
+  "display_name": "FPM160 F061 Visible Login Maintenance",
+  "flow": "F",
+  "purpose": "Register the visible-login maintenance tool so the manager can inspect request and launch evidence without opening a separate browser or changing worker ownership.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM160_f061_visible_login_maintenance.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM160_f061_visible_login_maintenance.py",
+  "health_sources": [
+    {
+      "name": "f061_login_mode_request",
+      "path": "out/systems/F/price_list_manager/live/f061_login_mode.requested",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "visible_login_launch_status",
+      "path": "out/systems/F/diagnostics/fpm160_visible_login_launch_status.json",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "visible_login_request",
+      "path": "out/systems/F/price_list_manager/live/f061_visible_login.requested",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "browser_visibility_state",
+      "path": "out/systems/F/price_list_manager/live/f061_browser_visibility_state.txt",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "global_maintenance_request",
+      "path": "out/locks/maintenance.requested",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "outputs": [
+    {
+      "name": "visible_login_request",
+      "path": "out/systems/F/price_list_manager/live/f061_visible_login.requested",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "visible_login_launch_status",
+      "path": "out/systems/F/diagnostics/fpm160_visible_login_launch_status.json",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "visible_login_request_is_decision_evidence_only",
+    "separate_browser_open_requires_explicit_approval"
+  ],
+  "needs_user_signals": [
+    "visible_login_request_active",
+    "script_owned_login_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "open_browser",
+    "open_separate_chrome_login",
+    "kill_process",
+    "clear_maintenance_request",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. FPM160 may be inspected but MOT must not open a separate Chrome login window; normal BBP login must stay on the script-owned F061 browser path unless Luke explicitly approves otherwise."
+}

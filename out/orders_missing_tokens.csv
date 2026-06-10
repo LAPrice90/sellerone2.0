@@ -1,3 +1,5 @@
-Order ID,SKU,Date,lvl,Quantity Ordered,currency_code
-204-6652219-1322752,GK-YI4S-C158,2026-02-16T12:50:17Z,1,1,
-S02-6203744-6940028,QM-QAGK-D2UQ,2026-02-16T10:41:57Z,1,1,
+Order ID,SKU,Date,lvl,Quantity Ordered,currency_code,placeholder_applied_flag,placeholder_cost_per_unit,placeholder_total_cogs,placeholder_basis_source,placeholder_basis_date,missing_token_reason_class,receipt_state_class,token_shortage_units
+202-4369858-9101137,AK-OB6V-HIYD,2026-06-05T08:18:50Z,2,1,GBP,1,1.21,1.21,token_cogs_ledger_last_actual,2026-06-05,missing_token_placeholder_applied,placeholder_applied_shortage_open,3
+205-0782892-4979546,AK-OB6V-HIYD,2026-06-05T16:10:20Z,2,1,GBP,1,1.21,1.21,token_cogs_ledger_last_actual,2026-06-05,missing_token_placeholder_applied,placeholder_applied_shortage_open,3
+203-0584515-2942710,AK-OB6V-HIYD,2026-06-05T20:31:26Z,2,1,GBP,1,1.21,1.21,token_cogs_ledger_last_actual,2026-06-05,missing_token_placeholder_applied,placeholder_applied_shortage_open,3
+206-9357251-5581147,SE-UITZ-7CPY,2026-06-06T06:08:48Z,1,1,GBP,1,3.41,3.41,token_cogs_ledger_last_actual,2026-04-27,missing_token_placeholder_applied,placeholder_applied_shortage_open,1

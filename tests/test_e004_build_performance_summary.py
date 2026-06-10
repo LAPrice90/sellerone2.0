@@ -32,6 +32,7 @@ def _patch_paths(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setattr(e004, "OUT_SUMMARY", out / "sku_performance_summary.csv")
     monkeypatch.setattr(e004, "TOKEN_COGS", out / "token_cogs_ledger.csv")
     monkeypatch.setattr(e004, "REFUND_HISTORY", out / "refund_adjustment_history.csv")
+    monkeypatch.setattr(e004, "REFUND_RATE_PROOF", out / "systems" / "B" / "refunds" / "b_sku_refund_rate.csv")
     monkeypatch.setattr(e004, "FIN_L3", out / "financial_events_level3_official.csv")
     monkeypatch.setattr(e004, "LISTING_HISTORY", out / "listing_offer_history.csv")
     return out
@@ -166,3 +167,69 @@ def test_e004_sql_primary_writes_summary_table_and_csv_export(monkeypatch, tmp_p
         connection.close()
 
     assert rows == [("SKU-A", "roi")]
+
+
+def test_e004_uses_b_refund_rate_proof_for_expected_refund_drag(monkeypatch, tmp_path: Path) -> None:
+    out = _patch_paths(monkeypatch, tmp_path)
+    _write_csv(
+        out / "sku_sales_velocity.csv",
+        [{"sku": "SKU-A", "window_days": "30", "units_sold": "10", "velocity_30d": "1", "asof_date": "2026-05-20"}],
+        ["sku", "window_days", "units_sold", "velocity_30d", "asof_date"],
+    )
+    _write_csv(
+        out / "sku_roi_snapshot.csv",
+        [{"sku": "SKU-A", "units_sold": "10", "profit_exvat_gbp": "30", "asof_date": "2026-05-20"}],
+        ["sku", "units_sold", "profit_exvat_gbp", "asof_date"],
+    )
+    _write_csv(out / "sku_restock_signals.csv", [{"sku": "SKU-A"}], ["sku"])
+    _write_csv(
+        out / "systems" / "B" / "refunds" / "b_sku_refund_rate.csv",
+        [
+            {
+                "sku": "SKU-A",
+                "window_days": "30",
+                "sales_units": "10",
+                "refund_units": "1",
+                "refund_unit_rate": "0.1",
+                "expected_refund_cost_per_unit_gbp": "0.7",
+                "basis": "sale_cohort",
+                "sample_confidence": "medium",
+                "proof_state": "api_proved_or_not_applicable",
+            },
+            {
+                "sku": "SKU-A",
+                "window_days": "90",
+                "sales_units": "30",
+                "refund_units": "3",
+                "refund_unit_rate": "0.1",
+                "expected_refund_cost_per_unit_gbp": "0.6",
+                "basis": "sale_cohort",
+                "sample_confidence": "high",
+                "proof_state": "api_proved_or_not_applicable",
+            },
+        ],
+        [
+            "sku",
+            "window_days",
+            "sales_units",
+            "refund_units",
+            "refund_unit_rate",
+            "expected_refund_cost_per_unit_gbp",
+            "basis",
+            "sample_confidence",
+            "proof_state",
+        ],
+    )
+
+    e004.main()
+
+    df = pd.read_csv(out / "sku_performance_summary.csv")
+    row = df.loc[df["sku"] == "SKU-A"].iloc[0]
+    assert row["expected_refund_cost_per_unit_gbp"] == pytest.approx(0.6)
+    assert row["refund_unit_rate_30d"] == pytest.approx(0.1)
+    assert row["refund_unit_rate_90d"] == pytest.approx(0.1)
+    assert row["refund_units_30d"] == pytest.approx(1.0)
+    assert row["sales_units_30d"] == pytest.approx(10.0)
+    assert row["refund_cost_basis"] == "sale_cohort_90d"
+    assert row["refund_proof_state"] == "api_proved_or_not_applicable"
+    assert row["refund_sample_confidence"] == "high"

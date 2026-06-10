@@ -139,6 +139,57 @@ class AMaintenanceHandoffTests(unittest.TestCase):
         self.assertFalse(bool(result.get("interrupted", True)))
         self.assertEqual(str(a_cycle.ROOT), str(popen_mock.call_args.kwargs.get("cwd")))
 
+    def test_write_maintenance_handoff_proof_records_cleanup_and_history(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            old_request = a_cycle.MAINTENANCE_REQUEST_PATH
+            old_ready = a_cycle.MAINTENANCE_READY_PATH
+            old_active = a_cycle.MAINTENANCE_ACTIVE_PATH
+            old_latest = a_cycle.A_MAINTENANCE_HANDOFF_LATEST_PATH
+            old_history = a_cycle.A_MAINTENANCE_HANDOFF_HISTORY_PATH
+            try:
+                a_cycle.MAINTENANCE_REQUEST_PATH = root / "maintenance.requested"
+                a_cycle.MAINTENANCE_READY_PATH = root / "maintenance.ready"
+                a_cycle.MAINTENANCE_ACTIVE_PATH = root / "maintenance.active"
+                a_cycle.A_MAINTENANCE_HANDOFF_LATEST_PATH = root / "out" / "systems" / "A" / "live" / "a_maintenance_handoff_latest.json"
+                a_cycle.A_MAINTENANCE_HANDOFF_HISTORY_PATH = root / "out" / "systems" / "A" / "history" / "a_maintenance_handoff_history.jsonl"
+
+                a_cycle.MAINTENANCE_READY_PATH.write_text(
+                    "B_READY|pid=123|ts=2026-05-27T07:00:00Z|request_id=REQ_A\n",
+                    encoding="utf-8",
+                )
+                a_cycle.MAINTENANCE_ACTIVE_PATH.write_text(
+                    "active_by=A|pid=456|ts=2026-05-27T07:01:00Z|request_id=REQ_A\n",
+                    encoding="utf-8",
+                )
+                ready_evidence = a_cycle._marker_evidence(a_cycle.MAINTENANCE_READY_PATH)
+                active_evidence = a_cycle._marker_evidence(a_cycle.MAINTENANCE_ACTIVE_PATH)
+                a_cycle.MAINTENANCE_READY_PATH.unlink()
+                a_cycle.MAINTENANCE_ACTIVE_PATH.unlink()
+
+                payload = a_cycle._write_a_maintenance_handoff_proof(
+                    request_id="REQ_A",
+                    handoff_mode="b_ready",
+                    b_ready_evidence=ready_evidence,
+                    b_status_at_handoff={"running": False},
+                    a_active_evidence=active_evidence,
+                    final_run_id="A_TEST",
+                    final_state="completed",
+                    final_exit_code=0,
+                    manifest_path="out/manifests/A/test.json",
+                )
+
+                self.assertEqual(payload["proof_status"], "ok")
+                self.assertTrue(a_cycle.A_MAINTENANCE_HANDOFF_LATEST_PATH.exists())
+                self.assertTrue(a_cycle.A_MAINTENANCE_HANDOFF_HISTORY_PATH.exists())
+                self.assertIn("REQ_A", a_cycle.A_MAINTENANCE_HANDOFF_HISTORY_PATH.read_text(encoding="utf-8"))
+            finally:
+                a_cycle.MAINTENANCE_REQUEST_PATH = old_request
+                a_cycle.MAINTENANCE_READY_PATH = old_ready
+                a_cycle.MAINTENANCE_ACTIVE_PATH = old_active
+                a_cycle.A_MAINTENANCE_HANDOFF_LATEST_PATH = old_latest
+                a_cycle.A_MAINTENANCE_HANDOFF_HISTORY_PATH = old_history
+
 
 if __name__ == "__main__":
     unittest.main()

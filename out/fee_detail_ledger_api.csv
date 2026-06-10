@@ -1,2 +1,1 @@
 date,posted_date,transaction_id,fee_type,amount_total,amount_base,amount_vat,currency,non_gbp_api_only,inbound_shipment_id
-2026-02-17,2026-02-17T15:13:02Z,AlQKa5AiXoNrzMdu3k1kpXAyN9bqtPmUmk2UG0M3Tc4,FBAPostInboundTransportation,-5.33,-4.441666666666667,-0.8883333333333328,GBP,False,

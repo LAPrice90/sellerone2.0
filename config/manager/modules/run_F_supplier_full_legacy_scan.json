@@ -1,0 +1,56 @@
+{
+  "id": "run_F_supplier_full_legacy_scan",
+  "display_name": "Run F Supplier Full Legacy Scan",
+  "flow": "F",
+  "purpose": "Classify the supplier full legacy scan runner so the manager can see it as legacy scanner machinery without running it.",
+  "owner_entrypoint": "run_F_supplier_full_legacy_scan.bat",
+  "worker_entrypoint": "run_F_supplier_full_legacy_scan.bat",
+  "health_sources": [
+    {
+      "name": "legacy_scanner_outputs",
+      "path": "out/systems/F/live",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "legacy_scanner_outputs",
+      "path": "out/systems/F/live",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "legacy_scanner_outputs",
+      "path": "out/systems/F/live",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "legacy_full_scan_runner_is_not_manager_proof"
+  ],
+  "needs_user_signals": [
+    "legacy_scan_requested"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "run_legacy_scan",
+    "align_local_db"
+  ],
+  "manager_notes": "Legacy runner classification only. MOT must not run this full legacy scan."
+}

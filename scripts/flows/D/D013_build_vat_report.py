@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
+from scripts.core.safe_file_writes import safe_to_csv
 try:
     import gspread
     from gspread.exceptions import APIError
@@ -35,6 +36,7 @@ SHEET_ID = os.environ.get("PNL_SHEET_ID", "1aT26UYnTBP6-oNz0RIWVCRbuuN1RmP4_VwHE
 TAB_DAILY = os.environ.get("VAT_REPORT_DAILY_TAB", "VAT_Report_Daily")
 TAB_MONTHLY = os.environ.get("VAT_REPORT_MONTHLY_TAB", "VAT_Report_Monthly")
 SETTLEMENT_PATH_ENV = os.environ.get("VAT_SETTLEMENT_PATH", "")
+VAT_REPORT_WRITE_SHEETS = os.environ.get("VAT_REPORT_WRITE_SHEETS", "1").strip() == "1"
 
 SHEETS_MAX_RETRIES = 5
 SHEETS_BACKOFF = 2.0
@@ -263,7 +265,7 @@ def main() -> None:
 
     daily = pd.DataFrame(rows, columns=["Parameter/Date"] + all_dates + ["Total"])
     OUT_DAILY.parent.mkdir(parents=True, exist_ok=True)
-    daily.to_csv(OUT_DAILY, index=False)
+    safe_to_csv(daily, OUT_DAILY, index=False)
 
     # Monthly rollup
     month_cols = sorted({d[:7] for d in all_dates})
@@ -281,19 +283,20 @@ def main() -> None:
         out_row["Total"] = round(total, 2)
         month_rows.append(out_row)
     monthly = pd.DataFrame(month_rows, columns=["Line Item"] + month_cols + ["Total"])
-    monthly.to_csv(OUT_MONTHLY, index=False)
+    safe_to_csv(monthly, OUT_MONTHLY, index=False)
 
-    try:
-        if gspread is None:
-            raise RuntimeError("gspread not available")
-        client = gspread.service_account(filename=str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json"))
-        sheet = client.open_by_key(SHEET_ID)
-        _write_tab_with_retry(sheet, TAB_DAILY, daily)
-        _write_tab_with_retry(sheet, TAB_MONTHLY, monthly)
-    except Exception as exc:
-        print({"status": "warning", "alert": "sheets_error", "error": str(exc)})
+    if VAT_REPORT_WRITE_SHEETS:
+        try:
+            if gspread is None:
+                raise RuntimeError("gspread not available")
+            client = gspread.service_account(filename=str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json"))
+            sheet = client.open_by_key(SHEET_ID)
+            _write_tab_with_retry(sheet, TAB_DAILY, daily)
+            _write_tab_with_retry(sheet, TAB_MONTHLY, monthly)
+        except Exception as exc:
+            print({"status": "warning", "alert": "sheets_error", "error": str(exc)})
 
-    print({"status": "success", "daily": str(OUT_DAILY), "monthly": str(OUT_MONTHLY)})
+    print({"status": "success", "daily": str(OUT_DAILY), "monthly": str(OUT_MONTHLY), "write_sheets": VAT_REPORT_WRITE_SHEETS})
 
 
 if __name__ == "__main__":

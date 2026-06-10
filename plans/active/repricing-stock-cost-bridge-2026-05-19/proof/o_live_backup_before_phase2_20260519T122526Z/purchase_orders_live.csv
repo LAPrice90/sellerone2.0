@@ -1,0 +1,2 @@
+po_id,created_utc,supplier_code,supplier_name,po_status,currency,total_lines,total_units,total_value_gbp,approved_from_decision_batch,expected_arrival_utc,po_notes,po_build_note
+PO-DRAFT-20260404-001,2026-04-04T13:58:53Z,CUR120,DHB,draft,GBP,1,15,120.9375,phase2-evt-approve-test,,,contains_test_mode_costs

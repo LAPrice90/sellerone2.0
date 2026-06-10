@@ -1,0 +1,76 @@
+{
+  "id": "F050_build_feeder_po_handoff",
+  "display_name": "F050 Feeder PO Handoff",
+  "flow": "F",
+  "purpose": "Register approved-only feeder PO handoff proof so the manager can inspect ready and held rows without creating purchase actions.",
+  "owner_entrypoint": "scripts/flows/F/F050_build_feeder_po_handoff.py",
+  "worker_entrypoint": "scripts/flows/F/F050_build_feeder_po_handoff.py",
+  "health_sources": [
+    {
+      "name": "feeder_po_handoff_health",
+      "path": "out/systems/F/live/feeder_po_handoff_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_approval_queue_live",
+      "path": "out/systems/F/live/feeder_approval_queue_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_approval_decisions_log",
+      "path": "out/systems/F/history/feeder_approval_decisions_log.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_po_handoff_ready_live",
+      "path": "out/systems/F/live/feeder_po_handoff_ready_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_po_handoff_holds",
+      "path": "out/systems/F/live/feeder_po_handoff_holds.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "feeder_po_handoff_health_warn_after_43200_minutes",
+    "handoff_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "po_handoff_approval_required",
+    "missing_decision_lineage",
+    "no_approved_handoff_rows"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_po_handoff",
+    "approve_candidate_rows",
+    "write_purchase_handoff",
+    "create_purchase_order",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read PO handoff proof but must not create purchase actions, approve candidates, or move rows."
+}

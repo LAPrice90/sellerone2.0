@@ -1,0 +1,6 @@
+{
+  "operator_timezone": "Europe/London",
+  "operator_time_label": "UK time",
+  "raw_log_timezone": "UTC",
+  "chat_time_policy": "Use UK local time for Luke-facing summaries. Keep raw machine evidence in UTC, and include UTC only when referencing exact log timestamps."
+}

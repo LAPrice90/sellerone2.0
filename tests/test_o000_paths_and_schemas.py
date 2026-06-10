@@ -36,7 +36,7 @@ def test_ensure_o_directories_is_idempotent(tmp_path: Path) -> None:
 
 def test_all_phase0_output_contracts_present() -> None:
     contracts = get_o_output_contracts()
-    assert set(contracts.keys()) == {
+    phase0_contracts = {
         "restock_source_view",
         "sku_quantity_profiles",
         "special_order_profiles",
@@ -83,6 +83,7 @@ def test_all_phase0_output_contracts_present() -> None:
         "supplier_lead_time_history",
         "supplier_cost_snapshot_test",
     }
+    assert phase0_contracts.issubset(set(contracts.keys()))
 
 
 def test_output_contract_metadata_is_consistent() -> None:

@@ -168,6 +168,7 @@ class HWorkerLifecycleContractTests(unittest.TestCase):
                 )
 
                 self.assertEqual(bb_map["ASIN1"]["buy_box_price"], "9.99")
+                self.assertEqual(bb_map["SKU1"]["buy_box_price"], "9.99")
                 self.assertEqual(offer_rows[0]["seller_id"], "S1")
                 self.assertEqual(detail_meta["ASIN1"]["detail_status"], h_cycle.DETAIL_STATUS_OK)
                 self.assertIn(

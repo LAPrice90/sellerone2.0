@@ -1,0 +1,74 @@
+{
+  "id": "F010_build_feeder_candidate_intake",
+  "display_name": "F010 Feeder Candidate Intake",
+  "flow": "F",
+  "purpose": "Register feeder candidate intake so the manager can inspect accepted and held candidate rows without rebuilding feeder intake.",
+  "owner_entrypoint": "scripts/flows/F/F010_build_feeder_candidate_intake.py",
+  "worker_entrypoint": "scripts/flows/F/F010_build_feeder_candidate_intake.py",
+  "health_sources": [
+    {
+      "name": "feeder_intake_health",
+      "path": "out/systems/F/live/feeder_intake_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_discovery_handoff",
+      "path": "out/systems/F/inbox/supplier_discovery_handoff.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_candidate_intake_holds",
+      "path": "out/systems/F/live/feeder_candidate_intake_holds.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_candidate_intake_live",
+      "path": "out/systems/F/live/feeder_candidate_intake_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_candidate_intake_holds",
+      "path": "out/systems/F/live/feeder_candidate_intake_holds.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "feeder_intake_health_warn_after_43200_minutes",
+    "intake_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "source_contract_failed",
+    "all_rows_held",
+    "candidate_handoff_needs_real_review"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_feeder_intake",
+    "approve_candidate_rows",
+    "write_purchase_handoff",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may inspect intake and hold proof but must not rebuild intake rows or approve feeder candidates."
+}

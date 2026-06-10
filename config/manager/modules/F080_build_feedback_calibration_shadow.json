@@ -1,0 +1,69 @@
+{
+  "id": "F080_build_feedback_calibration_shadow",
+  "display_name": "F080 Feedback Calibration Shadow",
+  "flow": "F",
+  "purpose": "Register feedback calibration shadow proof so the manager can inspect shadow-only calibration evidence without applying it to live decisions.",
+  "owner_entrypoint": "scripts/flows/F/F080_build_feedback_calibration_shadow.py",
+  "worker_entrypoint": "scripts/flows/F/F080_build_feedback_calibration_shadow.py",
+  "health_sources": [
+    {
+      "name": "feeder_feedback_calibration_live",
+      "path": "out/systems/F/live/feeder_feedback_calibration_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "hf_learning_factor_impacts_latest",
+      "path": "out/analysis_reports/hf_learning_factor_impacts_latest.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_approval_queue_live",
+      "path": "out/systems/F/live/feeder_approval_queue_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_feedback_calibration_live",
+      "path": "out/systems/F/live/feeder_feedback_calibration_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "feedback_calibration_shadow_warn_after_43200_minutes",
+    "shadow_output_must_not_apply_to_live_decisions"
+  ],
+  "needs_user_signals": [
+    "calibration_apply_requested",
+    "source_hash_mismatch",
+    "rescrape_trigger_visible"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "apply_feedback_calibration",
+    "run_rescrape",
+    "change_live_decisions",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. Shadow calibration proof can be read, but live decision changes and rescrapes remain protected."
+}

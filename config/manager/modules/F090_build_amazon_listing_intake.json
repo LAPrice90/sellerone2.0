@@ -1,0 +1,73 @@
+{
+  "id": "F090_build_amazon_listing_intake",
+  "display_name": "F090 Amazon Listing Intake Builder",
+  "flow": "F",
+  "purpose": "Classify the Amazon listing intake builder as a downstream bridge script so the manager can inspect draft intake proof without publishing listings or changing product facts.",
+  "owner_entrypoint": "scripts/flows/F/F090_build_amazon_listing_intake.py",
+  "worker_entrypoint": "scripts/flows/F/F090_build_amazon_listing_intake.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_intake_health",
+      "path": "out/systems/F/live/amazon_listing_intake_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_review_events",
+      "path": "out/systems/F/inbox/feeder_review_events.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "amazon_listing_intake_live",
+      "path": "out/systems/F/live/amazon_listing_intake_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "amazon_listing_intake_live",
+      "path": "out/systems/F/live/amazon_listing_intake_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "amazon_listing_stage_holds",
+      "path": "out/systems/F/live/amazon_listing_stage_holds.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "listing_intake_is_draft_only",
+    "publish_or_product_fact_changes_need_separate_approval"
+  ],
+  "needs_user_signals": [
+    "listing_publish_requested",
+    "product_fact_alignment_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "publish_listing",
+    "reserve_sku",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Bridge classification only. MOT may read draft listing intake proof but must not publish listings, reserve SKUs, change Product DB facts, or align local data."
+}

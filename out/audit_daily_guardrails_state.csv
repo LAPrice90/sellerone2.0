@@ -1,2 +1,3 @@
 check,status,first_seen_utc,last_seen_utc,consecutive_runs
-fee_vat_missing_rows_gbp,FAIL,2026-02-06T16:07:42.153823+00:00,2026-02-18T07:06:23.936505+00:00,17
+unmapped_fees_count,FAIL,2026-02-19T13:49:01.811944+00:00,2026-06-10T05:24:14.456972+00:00,158
+fee_vat_missing_rows_gbp,FAIL,2026-02-06T16:07:42.153823+00:00,2026-06-10T05:24:14.456972+00:00,175

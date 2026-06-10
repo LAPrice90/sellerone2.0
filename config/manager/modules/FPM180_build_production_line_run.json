@@ -1,0 +1,73 @@
+{
+  "id": "FPM180_build_production_line_run",
+  "display_name": "FPM180 Production Line Run Builder",
+  "flow": "F",
+  "purpose": "Register the production-line run builder so the manager can inspect stage health and pipeline proof without running scanner stages.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM180_build_production_line_run.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM180_build_production_line_run.py",
+  "health_sources": [
+    {
+      "name": "production_line_health",
+      "path": "out/systems/F/price_list_manager/live/production_line_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "production_line_pipeline_runs",
+      "path": "out/systems/F/price_list_manager/pipeline_runs",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "review_handoff_manifest",
+      "path": "out/systems/F/price_list_manager/live/review_handoff_manifest.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "production_line_health",
+      "path": "out/systems/F/price_list_manager/live/production_line_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "pipeline_run_status",
+      "path": "out/systems/F/price_list_manager/pipeline_runs",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "production_line_health_warn_after_10080_minutes",
+    "stage_handoffs_must_balance_before_manager_ready"
+  ],
+  "needs_user_signals": [
+    "production_line_stage_failure",
+    "live_scanner_proof_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "run_scanner_stage",
+    "build_production_line_run",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may inspect production-line health but must not run stages, change routing, or trigger scanner work."
+}

@@ -1,0 +1,76 @@
+{
+  "id": "F098_build_brand_approval_queue",
+  "display_name": "F098 Brand Approval Queue",
+  "flow": "F",
+  "purpose": "Register brand approval queue proof so the manager can inspect restricted-brand decisions without approving brands or listings.",
+  "owner_entrypoint": "scripts/flows/F/F098_build_brand_approval_queue.py",
+  "worker_entrypoint": "scripts/flows/F/F098_build_brand_approval_queue.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_health",
+      "path": "out/systems/F/health/amazon_listing_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "amazon_listing_restrictions_live",
+      "path": "out/systems/F/live/amazon_listing_restrictions_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_readback_events",
+      "path": "out/systems/F/history/amazon_listing_readback_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "brand_approval_queue_live",
+      "path": "out/systems/F/live/brand_approval_queue_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "brand_approval_decision_events",
+      "path": "out/systems/F/history/brand_approval_decision_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "brand_approval_queue_warn_after_43200_minutes",
+    "brand_approval_requires_real_operator_decision"
+  ],
+  "needs_user_signals": [
+    "brand_approval_required",
+    "operator_brand_decision_required",
+    "restricted_listing_visible"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "approve_brand",
+    "approve_listing",
+    "call_amazon_api",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read brand approval queue proof, but brand/listing approval is a protected operator decision."
+}

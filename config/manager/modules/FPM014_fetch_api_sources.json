@@ -1,0 +1,66 @@
+{
+  "id": "FPM014_fetch_api_sources",
+  "display_name": "FPM014 API Source Intake",
+  "flow": "F",
+  "purpose": "Register API source intake so the manager can inspect existing API-source status without calling supplier APIs or downloading files.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM014_fetch_api_sources.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM014_fetch_api_sources.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "supplier_registry",
+      "path": "config/feeder/price_list_manager/suppliers.csv",
+      "required": false,
+      "max_age_minutes": 100000
+    }
+  ],
+  "outputs": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "api_source_status_warn_after_10080_minutes",
+    "mot_must_not_call_supplier_api"
+  ],
+  "needs_user_signals": [
+    "api_source_failed",
+    "api_credentials_missing"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "call_supplier_api",
+    "download_price_file",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may read API source status but must not call supplier APIs, download files, or run F061."
+}

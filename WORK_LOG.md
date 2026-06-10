@@ -19,6 +19,623 @@ State:
 Next:
 - Add first real log entry after approved code change
 ---
+
+## 2026-04-23 11:45:09 +01:00 - Approved H repricer Google Sheets publish freshness fix
+
+User approval:
+- Approved
+
+Scope:
+- Investigated why the H repricer Google Sheets view had not updated for 96.26 minutes.
+- Fixed the runtime cause of stale `PRICING_DASHBOARD` publishing.
+- No Google Sheets manual edits.
+- No local DB alignment changes.
+
+Root cause:
+- H was running, but the pilot batch was uncapped.
+- `config/pilot_sku.yaml` had `max_skus_per_run: 0`, meaning H tried to process the full due universe in one pilot run.
+- Recent runs attempted `137` SKUs inside the `900s` parent pilot timeout and failed before reaching the main dashboard publish step.
+- Example pre-fix evidence:
+- Run `20260423T100117Z` used `due_count=137`, `max_skus_per_run=0`.
+- It failed at `idx=71/137` with `max_runtime elapsed_seconds=900.02`.
+- `publish_status=not_started`, so the Google Sheet dashboard marker stayed stale.
+
+Fix:
+- Changed `config/pilot_sku.yaml` to `max_skus_per_run: 50`.
+- This uses the existing H110 batch-control path so H publishes between batches rather than waiting for the whole due universe.
+
+Files:
+- `config/pilot_sku.yaml`
+- `plans/active/h-floor-recovery-proof-2026-04-22/CODING_PLAN.md`
+- `WORK_LOG.md`
+
+State:
+- code fix applied
+- isolated verification not required for config-only cap
+- live loop verification confirmed
+
+Evidence:
+- Post-fix run `20260423T102218Z` used `due_count=50`, `max_skus_per_run=50`.
+- Post-fix run processed `50` rows.
+- `out/systems/H/live/H_run_state.json`: `state=finalized`, `publish_status=ok`, `utc=2026-04-23T10:37:37Z`.
+- `out/systems/H/live/H_worker_lifecycle.json`: `state=succeeded`, `terminal_outcome=succeeded`, `expected_outputs_ok=1`.
+- `out/systems/H/live/h_pricing_cycle_state.json`: `phase1_observation_publish_status=ok`, `phase1_observation_publish_run_id=20260423T102218Z`, `phase1_observation_publish_rows=52`, `phase1_publish_completed=1`.
+- H scheduler remained enabled and the H owner process chain remained running after proof.
+
+Carryover:
+- None
+
+Next:
+- None
+
+---
+
+## 2026-04-23 10:49:50 +01:00 - Ticket: Supplier label mapping for feeder review UI
+
+Summary:
+- Kept the active supplier runtime ID as `stocklist_supplier` but fixed the UI label so the feeder review header shows the supplier name.
+
+Changes made:
+- File: `out/systems/O/live/supplier_profiles.csv`
+  - Added profile mapping row:
+    - `supplier_code=stocklist_supplier`
+    - `supplier_name=Entertainment Trading`
+    - `profile_notes=website=https://www.et-group.com|legacy_supplier_id=stocklist_supplier`
+- File: `scripts/flows/O/O400_operator_ui.py`
+  - Added supplier profile lookup from `out/systems/O/live/supplier_profiles.csv`.
+  - Updated feeder review summary display logic to prefer `active_supplier_label` (resolved supplier name) over raw `active_supplier_id`.
+
+Proof:
+- `load_feeder_review_summary(Path('.'))` now returns:
+  - `active_supplier_id=stocklist_supplier`
+  - `active_supplier_label=Entertainment Trading`
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py` passed.
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Carryover:
+- None
+
+Next:
+- None
+
+---
+
+## 2026-04-23 10:43:18 +01:00 - Ticket: Add new supplier profile (Entertainment Trading)
+
+Summary:
+- Added a new supplier profile entry for Entertainment Trading in the live O supplier profile database.
+
+Change made:
+- File: `out/systems/O/live/supplier_profiles.csv`
+- Inserted row:
+  - `supplier_code=ET_GROUP`
+  - `supplier_name=Entertainment Trading`
+  - `moq_default=1`
+  - `can_backorder=false`
+  - `shipping_charge_rule=standard`
+  - `free_shipping_threshold=` (blank)
+  - `lead_time_profile_type=unknown`
+  - `order_friction_level=medium`
+  - `bulk_discount_available=` (blank)
+  - `profile_notes=website=https://www.et-group.com`
+
+Proof:
+- Verified row exists in `out/systems/O/live/supplier_profiles.csv` with expected values.
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Carryover:
+- None
+
+Next:
+- None
+
+---
+
+## 2026-04-23 10:42:35 +01:00 - Ticket: Add Entertainment Trading supplier profile
+
+Summary:
+- Added new supplier profile row for Entertainment Trading with website note.
+- Created `supplier_profiles.csv` in O live path because it was missing in this workspace.
+
+Files:
+- out/systems/O/live/supplier_profiles.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `out/systems/O/live/supplier_profiles.csv` now contains:
+  - `supplier_code=ET_GROUP`
+  - `supplier_name=Entertainment Trading`
+  - `profile_notes=website=https://www.et-group.com`
+
+Carryover:
+- None
+
+Next:
+- If needed, map this supplier profile to any existing supplier-code aliases used in upstream ingest.
+
+---
+
+## 2026-04-23 10:40:41 +01:00 - Ticket: O UI hover summary readability polish
+
+Summary:
+- Replaced raw code-like hover line formatting (`key=value`, underscores) with human-readable labels and values.
+- Kept the same upstream data truth while changing only display formatting for signal hover cards.
+- Added key label mapping and value cleanup for better operator readability.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+
+Carryover:
+- None
+
+Next:
+- Validate hover copy tone and adjust specific labels if needed.
+
+---
+
+## 2026-04-23 10:39:13 +01:00 - Ticket: O UI score display simplification
+
+Summary:
+- Updated New Product Review score display to show raw score value only (for example `4`) instead of `4/5`.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+
+Carryover:
+- None
+
+Next:
+- Validate live UI score column readability after refresh.
+
+---
+
+## 2026-04-23 10:38:36 +01:00 - Ticket: F019 original score terminology cleanup
+
+Summary:
+- Replaced `og_score` and `og_result` labels in F019-generated row summaries with `original_score` and `original_result`.
+- Rebuilt latest pass and near-miss review packs so hover details reflect the updated terminology immediately.
+
+Files:
+- scripts/one_off/F019_build_live_price_file_near_miss_pack.py
+- out/analysis_reports/f_live_price_file_pass_review_latest.csv
+- out/analysis_reports/f_live_price_file_near_miss_review_latest.csv
+- out/analysis_reports/f_live_price_file_review_summary_latest.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/one_off/F019_build_live_price_file_near_miss_pack.py` passed
+- `pytest tests/test_f019_build_live_price_file_near_miss_pack.py -q` passed (`1 passed`)
+- `python scripts/one_off/F019_build_live_price_file_near_miss_pack.py` passed and regenerated latest review pack files
+
+Carryover:
+- None
+
+Next:
+- Validate updated hover wording in UI after refresh.
+
+---
+
+## 2026-04-23 10:37:34 +01:00 - Ticket: O UI modern hover panels for review signals
+
+Summary:
+- Replaced browser default signal tooltips (`title` popups) with styled in-app hover cards for `?` and `!`.
+- Added modern tooltip visuals: rounded panel, dark gradient surface, soft shadow, clear heading, and stacked fact lines.
+- Kept signal symbols compact in-row while making hover details readable and consistent.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+
+Carryover:
+- None
+
+Next:
+- Validate hover panel position and width on your display and tune if required.
+
+---
+
+## 2026-04-23 10:32:27 +01:00 - Ticket: O UI page selector visibility fix
+
+Summary:
+- Replaced narrow-column page selector with a full-width horizontal page control so page navigation is always visible.
+- Preserved query-param page persistence behavior (`?page=`) and session route state.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+
+Carryover:
+- None
+
+Next:
+- Validate live browser navigation visibility and spacing on your screen size.
+
+---
+
+## 2026-04-23 10:31:26 +01:00 - Ticket: O UI row readability and copy affordance refinement
+
+Summary:
+- Removed score suffix marker (`P`/`F`) so score shows only as `x/5`.
+- Updated New Product Review row typography balance so non-title data is larger and easier to read.
+- Changed Product title rendering from single-line truncate to two-line clamp.
+- Narrowed Product column and widened Note column for better operator workflow.
+- Switched SKU/ASIN cells to reorder-style click-to-copy controls.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+
+Carryover:
+- None
+
+Next:
+- Validate the visual balance in live UI and apply final spacing polish only if needed.
+
+---
+
+## 2026-04-23 10:27:42 +01:00 - Ticket: O UI sticky page routing and feeder review draft persistence
+
+Summary:
+- Replaced tab-only navigation reset behavior with persistent page routing using a `Page` selector plus URL query param (`?page=`).
+- New Product Review now autosaves unsent row inputs (`decision`, `note`, `done`) to O live state and restores them on refresh.
+- Added source-backed hover summary flow previously completed, and kept compact row UI behavior intact.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- scripts/flows/O/_schemas.py
+- tests/test_o_ui_operator_view.py
+- tests/test_f019_build_live_price_file_near_miss_pack.py
+- scripts/one_off/F019_build_live_price_file_near_miss_pack.py
+- out/analysis_reports/f_live_price_file_pass_review_latest.csv
+- out/analysis_reports/f_live_price_file_near_miss_review_latest.csv
+- out/analysis_reports/f_live_price_file_review_summary_latest.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- `python -m py_compile scripts/flows/O/O400_operator_ui.py scripts/flows/O/_schemas.py tests/test_o_ui_operator_view.py` passed
+- `pytest tests/test_o_ui_operator_view.py -q` passed (`33 passed`)
+- `python scripts/one_off/F019_build_live_price_file_near_miss_pack.py` passed and refreshed latest review pack outputs
+
+Carryover:
+- None
+
+Next:
+- Validate operator UX in live browser session and tune compact row spacing if required.
+
+---
+## 2026-04-22 16:16:27+01:00 - O/F feeder review UI user-flow improvements
+
+Summary:
+- Improved New Product Review usability before live pilot by adding correction paths and clearer progress context.
+- Added sent-decision visibility and reopen controls for the current filter scope.
+- Added lane-level undo for the last sent window in the current browser session.
+- Improved operator feedback with current-view and current-window metrics.
+- Improved launcher failure behavior with a friendly message and pause.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- tests/test_o_ui_operator_view.py
+- run_O_operator_ui.bat
+- plans/active/o-f-feeder-review-ui-v1/CODING_PLAN.md
+- plans/active/o-f-feeder-review-ui-v1/PLAN_STATUS.md
+- plans/active/o-f-feeder-review-ui-v1/EXECUTION_BATCH_004.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Sent decisions now visible and reopenable in-page:
+  - "Recent sent decisions in this view" panel
+  - per-row `Reopen` action
+- Undo path added:
+  - `Undo Last Send` for current lane in current session
+- Progress context added:
+  - rows in view
+  - undecided
+  - already reviewed
+  - current window
+  - pass/fail/remaining selection counts for current 10 rows
+- Launcher usability:
+  - `run_O_operator_ui.bat` now prints a clear error hint and pauses on failure
+- Verification:
+  - `python -m py_compile scripts/flows/O/O400_operator_ui.py tests/test_o_ui_operator_view.py`
+  - `pytest tests/test_o_ui_operator_view.py -q`
+  - result: `32 passed`
+  - live check:
+    - passes `10` visible / `266` undecided
+    - near misses `10` visible / `3056` undecided
+
+Carryover:
+- None
+
+Next:
+- Run first live review window in UI and confirm send, reopen, and undo behavior against `out/systems/F/inbox/feeder_review_events.csv`.
+
+---
+## 2026-04-22 16:07:46+01:00 - O/F feeder review UI hardening pass
+
+Summary:
+- Hardened the temporary feeder review tab to improve decision correctness and operator flow stability.
+- Fixed review-state matching so decisions only apply to the same supplier run and review lane.
+- Fixed next-10 selection to be deterministic by priority.
+- Reduced write overhead by switching feeder review submission to one append write per batch.
+- Scoped the batch-complete checkbox state to the current lane and filters.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- tests/test_o_ui_operator_view.py
+- plans/active/o-f-feeder-review-ui-v1/CODING_PLAN.md
+- plans/active/o-f-feeder-review-ui-v1/PLAN_STATUS.md
+- plans/active/o-f-feeder-review-ui-v1/EXECUTION_BATCH_003.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Composite identity matching now uses:
+  - `active_supplier_id`
+  - `active_run_id`
+  - `review_pack_type`
+  - `candidate_id`
+- Next-10 ordering now sorts undecided rows by numeric `review_priority_score` descending.
+- Feeder review submit now appends all reviewed rows in one write call.
+- Done-checkbox key now varies by lane, supplier, batch, and search scope.
+- Verification:
+  - `python -m py_compile scripts/flows/O/O400_operator_ui.py scripts/flows/F/_schemas.py tests/test_o_ui_operator_view.py`
+  - `pytest tests/test_o_ui_operator_view.py -q`
+  - result: `29 passed`
+
+Carryover:
+- None
+
+Next:
+- Run first live review batch from `New Product Review` and confirm events land in `out/systems/F/inbox/feeder_review_events.csv`.
+
+---
+## 2026-04-22 16:01:28+01:00 - O/F feeder review UI v1 implementation
+
+Summary:
+- Implemented a temporary `New Product Review` tab inside the existing operator UI.
+- Added a separate feeder review inbox so UI review decisions do not mix with restock events or feeder approval history.
+- Added a clickable launcher batch file for the operator UI.
+- Enforced a 10-listing review window with a batch-complete checkbox before send.
+
+Files:
+- scripts/flows/O/O400_operator_ui.py
+- scripts/flows/F/_schemas.py
+- tests/test_o_ui_operator_view.py
+- run_O_operator_ui.bat
+- plans/active/o-f-feeder-review-ui-v1/CODING_PLAN.md
+- plans/active/o-f-feeder-review-ui-v1/PLAN_STATUS.md
+- plans/active/o-f-feeder-review-ui-v1/EXECUTION_BATCH_002.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- New launcher:
+  - `run_O_operator_ui.bat`
+- New operator tab:
+  - `New Product Review`
+- New feeder review inbox:
+  - `out/systems/F/inbox/feeder_review_events.csv`
+- Live window proof:
+  - pass view shows `10` visible rows from `266` undecided
+  - near-miss view shows `10` visible rows from `3056` undecided
+- Verification:
+  - `python -m py_compile scripts/flows/O/O400_operator_ui.py scripts/flows/F/_schemas.py tests/test_o_ui_operator_view.py`
+  - `pytest tests/test_o_ui_operator_view.py -q`
+  - result: `26 passed`
+
+Carryover:
+- None
+
+Next:
+- Run the first live review batch from the new UI and confirm feeder review events land as expected.
+
+---
+[2026-04-21 20:54 UTC] Ticket: BEF Phase 17 rank-window source recovery and readiness rerun
+Layer: B-E-F sales feedback loop commercial readiness
+Scope: Recover sold-universe rank-window coverage from existing full-capture evidence, rerun commercial readiness outputs, and refresh active plan artifacts.
+
+Change:
+- Updated `F013_build_live_test_readiness_pack.py` to derive rank windows from `f_full_capture_manifest_*.csv` raw JSON (`chart_raw_bsr_daily_series` / `chart_bsr_daily_series`) when backtest rank fields are missing.
+- Added and passed fallback coverage tests in `test_f013_build_live_test_readiness_pack.py`.
+- Updated `F014_build_live_test_data_sufficiency_gate.py` to count rank-window sufficiency from both backtest input and full-capture manifests.
+- Added and passed rank-window fallback sufficiency tests in `test_f014_build_live_test_data_sufficiency_gate.py`.
+- Reran live builders and refreshed Batch 013 plan/status artifacts with new proof metrics.
+
+Files:
+- scripts/one_off/F013_build_live_test_readiness_pack.py
+- scripts/one_off/F014_build_live_test_data_sufficiency_gate.py
+- tests/test_f013_build_live_test_readiness_pack.py
+- tests/test_f014_build_live_test_data_sufficiency_gate.py
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_013.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Batch compile checks:
+  - `python -m py_compile scripts/one_off/F013_build_live_test_readiness_pack.py scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF003_build_sales_feedback_examples.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f013_build_live_test_readiness_pack.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+  - `python -m py_compile scripts/one_off/F014_build_live_test_data_sufficiency_gate.py tests/test_f014_build_live_test_data_sufficiency_gate.py` -> pass
+- Batch tests:
+  - `pytest tests/test_f013_build_live_test_readiness_pack.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `19 passed`
+  - `pytest tests/test_f014_build_live_test_data_sufficiency_gate.py -q` -> `3 passed`
+- Runtime proof:
+  - `python scripts/one_off/F013_build_live_test_readiness_pack.py` (`2026-04-21T20:49:30Z`) -> pass
+    - `commercial_judged_rows=57`
+    - `live_test_ready_rows=2`
+    - `rank_gap_rows=0`
+    - `rows_using_full_capture_rank_window=57`
+    - `rows_missing_rank_window=0`
+  - `python scripts/one_off/F014_build_live_test_data_sufficiency_gate.py` (`2026-04-21T20:51:57Z`) -> pass
+    - `rank_window_state=ready_now`
+    - `sold_asin_bsr_overlap_full_capture_rows=57`
+  - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` (`2026-04-21T20:49:37Z`) -> pass
+    - `guard_status=ready`
+    - `next_action=expand_identity_bridge_resolution`
+
+Carryover:
+- None
+
+Next:
+- Start bounded shadow live testing on `ready_for_live_test` rows from `f_live_test_readiness_pack_latest.csv` while continuing identity-bridge expansion in parallel.
+
+---
+[2026-04-21 15:50 UTC] Ticket: B-E-F Batch 012 sold decision replay bridge completion
+Layer: B-E-F sales feedback loop v1 Phase 16 (sold-universe decision replay and commercial bridge)
+Scope: Implement replay-first sold decision coverage recovery, wire accuracy pack precedence, add guard replay-coverage routing, and prove runtime thresholds.
+
+Change:
+- Added sold decision replay bridge builder `BEF006_build_sold_decision_replay_bridge.py`.
+- Updated `F011_build_sales_history_accuracy_pack.py` to consume replay bridge first, then summary, then alignment fallback.
+- Added sold commercial carry fields and summary metrics:
+  - `rows_with_demand_bucket`
+  - `rows_with_recommended_test_qty`
+  - `rows_with_recommendation_status`
+  - `sold_decision_replay_coverage_rows`
+  - explicit `bucket::missing_model_decision`
+- Updated `BEF004_run_sales_feedback_guarded_once.py` to read sold replay coverage from accuracy summary and route low coverage to replay-expansion action.
+- Added and updated targeted tests for BEF006, F011, and BEF004.
+- Updated active plan artifacts for Batch 012 completion:
+  - `plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_012.md`
+  - `plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md`
+  - `plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md`
+
+Files:
+- scripts/one_off/BEF006_build_sold_decision_replay_bridge.py
+- scripts/one_off/F011_build_sales_history_accuracy_pack.py
+- scripts/one_off/BEF004_run_sales_feedback_guarded_once.py
+- tests/test_bef006_build_sold_decision_replay_bridge.py
+- tests/test_f011_build_sales_history_accuracy_pack.py
+- tests/test_bef004_run_sales_feedback_guarded_once.py
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_012.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Compile:
+  - `python -m py_compile scripts/one_off/BEF006_build_sold_decision_replay_bridge.py scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef006_build_sold_decision_replay_bridge.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py`
+  - result: pass
+- Tests:
+  - `pytest tests/test_bef006_build_sold_decision_replay_bridge.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py -q`
+  - result: `16 passed`
+- Runtime:
+  - `python scripts/one_off/BEF006_build_sold_decision_replay_bridge.py` -> pass
+    - `sold_rows_total=57`
+    - `sold_decision_replay_coverage_rows=57`
+    - `sold_rows_with_full_model_evidence=57`
+    - `rows_with_demand_bucket=57`
+    - `rows_with_recommended_test_qty=57`
+    - `rows_with_recommendation_status=57`
+  - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` -> pass
+    - `sold_rows_with_model_side_evidence=57`
+    - `sold_rows_missing_model_side_evidence=0`
+    - `decision_judged_rows=57`
+    - `bucket::missing_model_decision=0`
+  - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` -> pass
+    - `guard_status=ready`
+    - `readiness_label=ready_with_warnings`
+    - `next_action=expand_identity_bridge_resolution`
+
+Carryover:
+- None
+
+Next:
+- Execute `plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_013.md` to build commercial decision bands and live-test readiness outputs.
+
+---
 [2026-02-10 13:29 UTC]
 Layer: H Cycle / Head of Sales
 Scope: Implement approved Phase 2 minimum price rule (10% ROI floor) and run proof
@@ -210,6 +827,37 @@ State:
 
 Next:
 - None
+
+## 2026-03-30 07:10:11 UTC - Temp trial activated live for 6V-EEC1-2S9Z
+- Implemented a live H decision override for a config-backed temp trial undercut.
+- Added `config/h_temp_trial_rules.csv` and enabled SKU `6V-EEC1-2S9Z` with `undercut_gbp=0.05`.
+- Wired `scripts/phase1/phase1_main_loop.py` to apply `competitor - undercut` with floor and ceiling clamps when a temp trial rule is enabled.
+- Added focused tests for temp-trial target logic and clamp behavior.
+
+Files
+- scripts/phase1/phase1_main_loop.py
+- config/h_temp_trial_rules.csv
+- tests/test_phase1_temp_trial_override.py
+
+Proof
+- Focused tests passed:
+- `python -m pytest -q tests/test_phase1_temp_trial_override.py tests/test_h151_temp_trial_cyn20_6v.py`
+- Result: `8 passed`
+- Live runtime evidence for SKU activation:
+- `out/systems/H/live/h110_sku_lifecycle_log.csv` contains run `20260330T064935Z_07` for `6V-EEC1-2S9Z` with:
+- `write_status=APPLIED`
+- reason codes include `TEMP_TRIAL_ACTIVE` and `TEMP_TRIAL_UNDERCUT_GBP_0P05`
+
+Verification status: code fix applied; isolated verification passed; live loop verification confirmed for SKU 6V-EEC1-2S9Z temp-trial reason + applied write
+Changed at: 2026-03-30T06:50:10Z
+Latest health snapshot at: 2026-03-29T10:16:40Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Clear H split-shadow freshness FAIL pair (`h_phase1_runtime_floor_snapshot_latest_freshness`, `h_publish_marker_freshness`) once the current publish stage completes and fresh markers are emitted.
 ---
 [2026-02-09 16:19 UTC]
 Layer: Setup
@@ -227,6 +875,452 @@ State:
 - Canonical log remains `WORK_LOG.md`.
 - Historical entries preserved unchanged.
 - New work should use the fresh section template below.
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-04-13 12:06 UTC] Ticket: F backtest Batch 008 planning and user-alignment task lock
+Layer: Repo planning and backtest continuation
+Scope: Define the next durable F backtest batch for guided sample review, historical result refresh under policy changes, and dual-mode validation for future scans.
+
+Change:
+- Added `EXECUTION_BATCH_008.md` to the active F backtest plan folder.
+- Updated the active F backtest plan and status files to reflect the next continuation stage.
+- Added `USER_ALIGNMENT_NOTES.md` as the durable place to record agreed sample-review outcomes with the user.
+- Locked the next stage around four concrete needs:
+  - representative scenario review with the user
+  - durable expectation-alignment notes
+  - truthful historical refresh after policy changes
+  - proof for both `screening` and `data_collection` modes
+
+Files:
+- plans/active/f-cycle-backtest-v1/PLAN.md
+- plans/active/f-cycle-backtest-v1/PLAN_STATUS.md
+- plans/active/f-cycle-backtest-v1/EXECUTION_BATCH_008.md
+- plans/active/f-cycle-backtest-v1/USER_ALIGNMENT_NOTES.md
+- WORK_LOG.md
+
+State:
+- plan update applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Health snapshot checked before close:
+  - `out/system_health_checklist.csv` latest reviewed rows contained no active `warn` or `fail`
+- Plan folder proof:
+  - `plans/active/f-cycle-backtest-v1/EXECUTION_BATCH_008.md` now defines the next continuation batch
+  - `plans/active/f-cycle-backtest-v1/USER_ALIGNMENT_NOTES.md` now exists as the durable user-review record
+  - `plans/active/f-cycle-backtest-v1/PLAN_STATUS.md` now points to Batch 008 as the current continuation point
+- Latest F evidence noted into plan status:
+  - raw F evidence refreshed on 2026-04-13
+  - backtest snapshot remains the 2026-04-11 proof set and is called out as older than Monday raw evidence
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-08 06:26 UTC] Ticket: Shure catalog lookup rescue for EAN/title fallback
+Layer: F legacy scanner
+Scope: Fix missed Shure rows by resolving 13-digit EAN/GTIN barcodes and retrying title-based catalog lookup when barcode is blank.
+
+Change:
+- Updated the copied legacy Amazon catalog lookup to try EAN/GTIN/UPC identifiers before giving up.
+- Added a title-based catalog search fallback for rows with no barcode.
+- Updated the local runner to pass supplier title and brand into the lookup path.
+- Added focused tests for EAN preference and title fallback.
+
+Files:
+- scripts/flows/F/legacy_scanner_2_1/amazonCatalogCall.py
+- scripts/flows/F/F061_run_legacy_first_checks_local.py
+- tests/test_f061_run_legacy_first_checks_local.py
+- tests/test_legacy_amazon_catalog_call.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- `python -m pytest tests/test_f061_run_legacy_first_checks_local.py tests/test_legacy_amazon_catalog_call.py -q`
+- Result: `3 passed`
+- `python -m compileall scripts/flows/F/F061_run_legacy_first_checks_local.py scripts/flows/F/legacy_scanner_2_1/amazonCatalogCall.py tests/test_f061_run_legacy_first_checks_local.py tests/test_legacy_amazon_catalog_call.py`
+
+Carryover:
+- Live Shure run needs the next scheduled cycle check before we can call the new lookup behavior proven on real data.
+
+Next:
+- Verify the next scheduled A015 health snapshot against the updated Shure lookup path.
+---
+[2026-04-07 12:31 UTC] Ticket: H seller-detail cadence policy and protected retry lane plan
+Layer: H planning and policy design
+Scope: Produce formal blueprint for Phase 6 policy execution without code changes.
+
+Change:
+- Created formal planning blueprint:
+  - `project_control/H_SELLER_DETAIL_CADENCE_POLICY_BLUEPRINT_2026-04-07.md`
+- Blueprint defines:
+  - bucket-to-policy contract
+  - protected retry lane design
+  - fairness and lane-cap controls
+  - operator action contract
+  - implementation test and runtime proof requirements
+- Baseline in blueprint anchored to latest live measurement artifacts:
+  - summary, alerts, and operator review outputs in `out/systems/H/live/`
+
+Files:
+- project_control/H_SELLER_DETAIL_CADENCE_POLICY_BLUEPRINT_2026-04-07.md
+- WORK_LOG.md
+
+State:
+- planning blueprint created
+- no runtime code changed
+- no live behavior changed
+
+Evidence:
+- Baseline snapshot used in blueprint:
+  - `out/systems/H/live/h_seller_detail_measurement_summary_latest.csv`
+  - `out/systems/H/live/h_seller_detail_measurement_alerts_latest.csv`
+  - `out/systems/H/live/h_seller_detail_operator_review_latest.csv`
+- Latest measured run referenced:
+  - `run_id=20260407T121633Z`
+
+Carryover:
+- None
+
+Next:
+- Optional implementation ticket: `H seller-detail cadence policy and protected retry lane implementation (Phase 6A-6E)`
+---
+[2026-04-07 09:43 UTC] Ticket: H seller-detail retry recovery implementation slice (retry contract + truth + gate pass-through)
+Layer: H cycle runtime and observability
+Scope: Implement retry queue enforcement semantics and truth alignment so H can distinguish local retry misses from confirmed Amazon missing detail, while avoiding false `SUPP_BLOCKED` for read-only seller-detail holds.
+
+Change:
+- Extended H retry queue contract in `run_H_pricing_cycle.py` with additive fields for attempt counters, skip counters, resolution status, force-attempt flag, exhausted flag, and operator reason.
+- Implemented retry resolution statuses: `PENDING_RETRY`, `RECOVERED`, `AMAZON_EMPTY_CONFIRMED`, `API_ERROR_CONFIRMED`, `RETRY_EXHAUSTED`.
+- Implemented retry-priority selection with budget support (`H_ITEM_OFFERS_RETRY_BUDGET`) and fair ordering (force-attempt first, never-attempted first, then oldest attempt).
+- Added resolution metadata pass-through into `listing_offer_snapshot_latest.csv` rows and kept legacy fields (`seller_detail_status`, `retry_next_run_flag`) for compatibility.
+- Added seller-detail resolution pass-through into phase1 H cycle interface and outputs (`phase1_main_loop.py`, `H110_run_phase1_h_pilot.py`) with explicit reason code tagging.
+- Updated suppression truth so `READ_ONLY_NO_WRITE` is non-attempt and seller-detail gated suppression cases map to `SUPP_GATED_DETAIL` instead of `SUPP_BLOCKED`.
+- Updated H130 observation formatting to include `SUPP_GATED_DETAIL`.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- scripts/phase1/phase1_main_loop.py
+- scripts/flows/H/H110_run_phase1_h_pilot.py
+- scripts/h/h_suppression_truth.py
+- scripts/flows/H/H130_build_phase1_observation_sheet.py
+- tests/test_h_item_offers_retry_queue.py
+- tests/test_h_suppression_truth.py
+- tests/test_phase1_main_loop.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- New key proof test added and passing:
+  - `test_repeat_attempt_distinguishes_local_skip_vs_amazon_missing_detail`
+  - Path A confirms local scheduling miss can recover to `RECOVERED`.
+  - Path B confirms repeated selected+attempted empties become `AMAZON_EMPTY_CONFIRMED`.
+- Test command and result:
+  - `python -m pytest -q tests/test_h_item_offers_retry_queue.py tests/test_h_suppression_truth.py tests/test_get_pricing_detail_meta.py tests/test_phase1_main_loop.py -k "seller_detail or retry or suppression or detail_meta"`
+  - Result: 11 passed, 21 deselected
+- Additional gate regression check:
+  - `python -m pytest -q tests/test_h_split_health_gate.py`
+  - Result: 10 passed
+- Compile sanity:
+  - `python -m py_compile scripts/cycles/run_H_pricing_cycle.py scripts/phase1/phase1_main_loop.py scripts/flows/H/H110_run_phase1_h_pilot.py scripts/h/h_suppression_truth.py scripts/flows/H/H130_build_phase1_observation_sheet.py tests/test_h_item_offers_retry_queue.py`
+  - Result: success
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-07T09:43:20Z
+Latest health snapshot at: 2026-04-07T05:04:02Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Verify runtime movement on next H cycles: `DETAIL_SKIPPED_ROTATION` backlog down, `SELLER_DETAIL_HOLD` down, and read-only seller-detail suppression cases moved from `SUPP_BLOCKED` to `SUPP_GATED_DETAIL`.
+---
+## 2026-04-07 09:20:03 UTC - Ticket: H seller-detail retry recovery blueprint
+Layer: H cycle planning
+Scope: Define the root-cause recovery plan for repeated seller-detail misses so H can prove whether data is recoverable with repeat attempts or genuinely missing from Amazon.
+
+Change:
+- Created a full phased blueprint for seller-detail retry recovery, observability, queue enforcement, terminal truth, and proof.
+- Added a plain-English operator summary and an explicit expectation paragraph for what the user should see when the fix is working.
+- Defined the required repeat-attempt proof test to distinguish local retry/rotation failure from true repeated Amazon empty-detail responses.
+
+Files:
+- project_control/H_SELLER_DETAIL_RETRY_RECOVERY_BLUEPRINT_2026-04-07.md
+- WORK_LOG.md
+
+State:
+- blueprint created
+- implementation not started
+- live loop behavior unchanged
+
+Evidence:
+- Current artifact truth from `out/listing_offer_snapshot_latest.csv` still shows retry without recovery:
+  - `DETAIL_SKIPPED_ROTATION` with `retry_next_run_flag=1`: 50
+  - `DETAIL_EMPTY_RESPONSE` with `retry_next_run_flag=1`: 2
+  - `DETAIL_OK` with `retry_next_run_flag=0`: 13
+- Current H runtime truth from `out/phase1_runtime_floor_snapshot_latest.csv` still shows seller-detail gating pressure:
+  - `SELLER_DETAIL_HOLD`: 52
+  - `SUPP_BLOCKED`: 8
+- Blueprint includes the required proof split:
+  - repeat local attempts eventually recover detail when the problem is our retry/selection path
+  - repeated forced attempts still return empty detail when the problem is upstream at Amazon
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-07T09:20:03Z
+Latest health snapshot at: 2026-04-06T05:05:41Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Implement Phase 1 observability and retry-attempt accounting from the blueprint before changing pricing behavior.
+---
+[2026-04-07 09:14 UTC] Ticket: Housekeeping phase-2 execution - apply-safe guard and action ledger
+Layer: H observability housekeeping safety
+Scope: Execute the next cleanup step by enforcing apply-time H safety blocking, adding action-ledger proof output, and validating behavior with tests plus dry-run/apply runs.
+
+Change:
+- Updated `scripts/tools/log_housekeeping.py`:
+  - added global apply guard `_apply_guard` (`h_run_unfinalized` or unknown state blocks all live apply actions)
+  - added `--apply-safe` CLI alias for guarded apply execution
+  - added action ledger writer `housekeeping_actions.<run_id>.csv` and `housekeeping_actions.latest.csv`
+  - extended summary payload/text with `apply_allowed`, `apply_block_reason`, and action ledger path
+  - retained existing class restrictions so only allowed L4/L6 rules are eligible when apply is allowed
+- Updated `tests/test_log_housekeeping.py`:
+  - adjusted apply tests for new function signature/context
+  - added test for global apply blocking when H run is unfinalized
+  - added test for action ledger output paths/content
+- Executed dry-run and apply-safe proofs.
+
+Files:
+- scripts/tools/log_housekeeping.py
+- tests/test_log_housekeeping.py
+- out/housekeeping/housekeeping_actions.latest.csv
+- out/housekeeping/housekeeping_report.latest.csv
+- out/housekeeping/housekeeping_summary.latest.json
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- Tests passed:
+  - `pytest -q tests/test_log_housekeeping.py`
+  - result: `6 passed in 0.16s`
+- Dry-run proof:
+  - `python scripts/tools/log_housekeeping.py --registry project_control/log_housekeeping_registry.json`
+  - summary reported `mode=dry_run`, `apply_allowed=False`, `apply_block_reason=h_run_unfinalized`
+- Apply-safe proof:
+  - `python scripts/tools/log_housekeeping.py --registry project_control/log_housekeeping_registry.json --apply-safe`
+  - summary reported:
+    - `mode=apply`
+    - `apply_allowed=False`
+    - `apply_block_reason=h_run_unfinalized`
+    - `action_skipped=325`
+  - action ledger grouped results:
+    - `skipped, apply_blocked:h_run_unfinalized = 325`
+- Protected/non-gate checks in latest report remained correct:
+  - `out/cycle_alerts/checklist_H.csv` -> `keep` / `protected_policy`
+  - `out/cycle_alerts/checklist_H_split.csv` -> `keep` / `non_cleanup_class`
+  - `out/health_status_H.csv` -> `keep` / `non_cleanup_class`
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-07T09:14:13Z
+Latest health snapshot at: 2026-04-07T05:04:02Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-07 08:55 UTC] Ticket: H stale-observability housekeeping execution (phase 1)
+Layer: H observability and housekeeping safety
+Scope: Execute phase-1 housekeeping controls so stale H observability files are explicitly classified as non-gate evidence, with tests and dry-run proof before any live cleanup.
+
+Change:
+- Updated `project_control/log_housekeeping_registry.json` with explicit rule `h_non_gate_observability` for:
+  - `out/cycle_alerts/checklist_H_split.csv`
+  - `out/health_status_H.csv`
+- Added focused test coverage in `tests/test_log_housekeeping.py` for:
+  - registry rule presence
+  - non-gate classification as `keep/non_cleanup_class`
+  - safety behavior that skips L5 apply actions
+  - allowed L4 delete behavior
+- Executed housekeeping dry-run proof using:
+  - `python scripts/tools/log_housekeeping.py --registry project_control/log_housekeeping_registry.json`
+
+Files:
+- project_control/log_housekeeping_registry.json
+- tests/test_log_housekeeping.py
+- out/housekeeping/housekeeping_report.latest.csv
+- out/housekeeping/housekeeping_summary.latest.json
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- Tests passed:
+  - `pytest -q tests/test_log_housekeeping.py`
+  - result: `4 passed in 0.09s`
+- Dry-run proof artifacts written:
+  - `out/housekeeping/housekeeping_report.latest.csv`
+  - `out/housekeeping/housekeeping_summary.latest.json`
+- Dry-run summary:
+  - `mode=dry_run`
+  - `total_items=183574`
+  - `decision_blocked_by_safety=160077`
+  - `decision_keep=3455`
+  - `decision_would_delete=325`
+  - `h_run_unfinalized=true`
+- Target rows in report confirm new non-gate classification:
+  - `out/cycle_alerts/checklist_H_split.csv` -> class `L5`, rule `h_non_gate_observability`, decision `keep`, reason `non_cleanup_class`
+  - `out/health_status_H.csv` -> class `L5`, rule `h_non_gate_observability`, decision `keep`, reason `non_cleanup_class`
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-07T08:55:11Z
+Latest health snapshot at: 2026-04-07T05:04:02Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-07 08:18 UTC] Ticket: Morning MOT follow-up - H gate truth and B manifest artifact alignment
+Layer: B/H runtime observability
+Scope: Remove false morning MOT noise by pointing H MOT checks at the real H gate file and aligning B/H step artifact metadata with the files the live loops actually use.
+
+Change:
+- Updated `project_control/MORNING_MOT_CHECKLIST.md` so morning MOT uses H flow-owned gate truth `out/cycle_alerts/checklist_H.csv` instead of stale observability-only H split files.
+- Updated `scripts/cycles/run_B_cycle.py` step artifact metadata so B001 now reports `out/orders_all.csv` and `out/order_items_all.csv`, and B002 now reports `out/orders_pending_raw.csv` and `out/order_items_pending_raw.csv`.
+- Updated `scripts/cycles/run_H_pricing_cycle.py` step artifact metadata so `resolve_h_split_gate` reports `out/cycle_alerts/checklist_H.csv`.
+- Added targeted contract assertions in `tests/test_flow_health_gate.py`.
+
+Files:
+- project_control/MORNING_MOT_CHECKLIST.md
+- scripts/cycles/run_B_cycle.py
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_flow_health_gate.py
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- Morning MOT source audit showed the real mismatch: `out/cycle_alerts/checklist_H.csv` was current at `2026-04-07T05:04:02Z` while `out/cycle_alerts/checklist_H_split.csv` and `out/health_status_H.csv` were stale at `2026-04-01T15:05:32Z`, with live H runtime still current at `2026-04-07T08:18:37Z`.
+- Current runtime evidence remained healthy during the ticket: `out/systems/B/live/B_cycle.lock` heartbeat `2026-04-07T08:18:35Z`; `out/systems/H/live/H_runtime_status.json` heartbeat `2026-04-07T08:18:37Z`.
+- Contract proof after patch:
+  - `B001=['out/orders_all.csv', 'out/order_items_all.csv']`
+  - `B002=['out/orders_pending_raw.csv', 'out/order_items_pending_raw.csv']`
+  - `H_GATE_STEP=['out/cycle_alerts/checklist_H.csv']`
+- Targeted tests passed: `pytest tests/test_flow_health_gate.py -q` -> `7 passed in 2.41s`.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-07T08:18:56Z
+Latest health snapshot at: 2026-04-07T05:04:02Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+## 2026-04-06 19:13:44 UTC
+Ticket: H ceiling contract recovery blueprint
+Layer: H / A repricer planning
+Scope: Create a formal project-control blueprint for the upstream ceiling-contract repair so the current H fallback patch can be replaced by a proper A-to-H ceiling design.
+
+Change:
+- Added `project_control/H_CEILING_CONTRACT_RECOVERY_BLUEPRINT_2026-04-06.md`.
+- The blueprint ties the live defect on SKU `LV-425G-BY4X` to the current A/H contract, the v10 masterplan rules, the implementation phases, the required tests, and the proof sequence.
+- The blueprint explicitly separates:
+  - floor protection
+  - compliance/protection ceiling
+  - upward opportunity ceiling
+- The blueprint also defines the required health and observability work so repeated missing ceiling contracts become visible upstream.
+
+Files:
+- project_control/H_CEILING_CONTRACT_RECOVERY_BLUEPRINT_2026-04-06.md
+- WORK_LOG.md
+
+State:
+- planning blueprint created
+- implementation not started
+- runtime proof pending future implementation
+
+Evidence:
+- Blueprint created in project-control lane per repricer planning governance rules.
+- Blueprint references live contract, target masterplan, current defect chain, implementation files, tests, and proof requirements.
+
+Carryover:
+- None
+
+Next:
+- Use the new blueprint as the implementation contract for the upstream ceiling repair ticket.
+---
+## 2026-04-06 17:52:47 UTC
+Ticket: H repricer floor-stick fix for ASIN 9188805646
+Layer: H runtime repricing
+Scope: Fix root-cause logic that held SKU `LV-425G-BY4X` at floor when live rival pricing existed but A-intel ceiling inputs were missing.
+
+Change:
+- Updated `scripts/phase1/phase1_main_loop.py` so `RAISE_FIND_LOSS` can derive a temporary ceiling from the live rival price when `ceiling_inputs_missing_flag=1` and the existing ceiling is blank or pinned at current price.
+- Limited that exception to the live-rival fallback path and allowed the upward step to proceed even when CPT risk is `UNKNOWN`, while keeping the existing conservative hold for the normal non-fallback path.
+- Added regression coverage in `tests/test_phase1_main_loop.py`.
+
+Files:
+- scripts/phase1/phase1_main_loop.py
+- tests/test_phase1_main_loop.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- Root-cause confirmation from live artifacts for SKU `LV-425G-BY4X`: daily intel had `ceiling_inputs_missing_flag=1`, `ceiling_rule_value_gbp` blank, `cpt_risk_band=UNKNOWN`, while live offer history still showed us at `23.87` with next FBM at `26.28`.
+- Focused tests passed:
+  - `python -m pytest tests\\test_phase1_main_loop.py -k "rival_fallback or cpt_unknown_uses_conservative_non_raise" -q`
+  - Result: 2 passed.
+- Full-file validation:
+  - `python -m pytest tests\\test_phase1_main_loop.py -q`
+  - Result: 23 passed, 2 failed.
+  - Remaining failures were in unknown-outcome / observability tests, not the `RAISE_FIND_LOSS` fallback path fixed in this ticket.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-06T17:51:51Z
+Latest health snapshot at: 2026-04-06T05:05:41Z
+Next verifier: next scheduled cycle A015
 
 Carryover:
 - None
@@ -4952,4 +6046,2491 @@ Next verifier: next scheduled cycle A015
 
 Carryover:
 - None
+---
+
+---
+[2026-03-17 18:36 UTC]
+Layer: Governance / Reliability Tolerance
+Scope: Lock tolerance policy and standardize non-blocking WARN exception format
+
+Change:
+- Confirmed reliability tolerance policy as active governance baseline.
+- Recorded that planning/optimisation may proceed when scoped hard-block conditions are clear.
+- Standardized non-blocking WARN exception register format in control docs.
+- Registered current accepted WARN h_parked_sku_write_attempts as non-blocking with owner/review trigger.
+
+Files:
+- WORK_LOG.md
+- project_control/CURRENT_STATE.md
+- project_control/TASK_QUEUE.md
+
+State:
+- Planning gate now uses hard-block vs soft-block policy.
+- Known non-blocking WARNs no longer force reliability-first loop by default.
+- Reliability work is resumed on hard-block conditions.
+
+Carryover:
+- None
+
+Next:
+- Keep exception register reviewed weekly and reclassify to blocking if behavior changes.
+
+---
+[2026-03-19 13:03 UTC]
+Ticket: H split-health shadow cleanup - stale checklist fallback to live artifact freshness
+
+Scope
+- Keep H publish reliability closed and untouched.
+- Fix non-blocking shadow FAIL drift at source when split/primary checklist evidence is stale.
+
+Change
+- Updated H split gate logic to compute shadow freshness directly from live H artifacts when checklist age exceeds `H_CHECKLIST_MAX_AGE_SECONDS` and inline A015 is disabled.
+- Added live-artifact checks for:
+  - `out/systems/H/live/H_cycle.log`
+  - `out/listing_offer_snapshot_latest.csv`
+  - `out/phase1_runtime_floor_snapshot_latest.csv`
+  - `out/systems/H/live/H_cycle_last_publish_info.txt`
+- Shadow gate source now records `live_artifact_freshness_shadow` in this stale-checklist condition.
+
+Files
+- scripts/cycles/run_H_pricing_cycle.py
+
+Proof
+- `python -m py_compile scripts/cycles/run_H_pricing_cycle.py` passed.
+- Direct gate probe returned:
+  - source=`live_artifact_freshness_shadow`
+  - fail=0
+  - warn=0
+- Live freshness probe returned:
+  - h_cycle_log_freshness=ok
+  - h_listing_offer_snapshot_latest_freshness=ok
+  - h_phase1_runtime_floor_snapshot_latest_freshness=ok
+  - h_publish_marker_freshness=ok
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-19T13:00:55Z
+Latest health snapshot at: 2026-03-19T06:18:11Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+---
+[2026-03-20 13:38 UTC]
+Ticket: Log housekeeping rollout and readiness gate (PROMPT 006-009)
+
+Scope
+- Implement policy-backed housekeeping without touching H runtime stability logic.
+- Expand registry coverage for major H-live unknown families.
+- Validate controlled operational readiness in fail-closed mode.
+
+Change
+- Added central registry for L1-L6 classes and retention/safety rules.
+- Added housekeeping tool with dry-run default and report outputs under `out/housekeeping/`.
+- Restricted live cleanup path to explicit `--apply` and safe subset only.
+- Expanded registry coverage for high-volume H-live families:
+  - H_home_time_monitor_diagnostic.*.json
+  - phase1_pilot_step.complete/result/checkpoint (including .json.tmp variants)
+  - H_core_parent_exit_capture.monitor_start.*.txt
+  - H_core_parent_exit_capture.*.json
+  - snapshot_refresh_worker.contract.*.json
+  - H_launcher_gate_trace.*.log
+- Kept expanded H-live families conservative with live_cleanup_allowed=0.
+
+Files
+- scripts/tools/log_housekeeping.py
+- project_control/log_housekeeping_registry.json
+- project_control/DECISIONS.md
+- project_control/CURRENT_STATE.md
+
+Proof
+- Dry-run output generated successfully:
+  - out/housekeeping/housekeeping_report.latest.csv
+  - out/housekeeping/housekeeping_summary.latest.json
+- Before/after unknown_unclassified:
+  - before=9896
+  - after=366
+- Destructive candidates remain constrained:
+  - would_delete=68
+  - class scope=L4 global_tmp_debug_files only
+  - protected class leaks (L1/L2/L3/L5)=0
+- Safety posture in latest summary:
+  - mode=dry_run
+  - blocked_by_safety=18249
+  - blocker reason dominated by h_run_unfinalized
+
+Readiness decision
+- READY with caveat: dry-run default, live use only for current approved safe subset.
+- Unknown/unclassified remains non-actionable by policy.
+
+Verification status: Validated by dry-run artifacts
+Changed at: 2026-03-20T13:34:00Z
+Latest health snapshot at: 2026-03-20T06:18:59Z
+Next verifier: periodic housekeeping review
+
+Carryover:
+- None
+
+Next:
+- Periodic review only.
+
+## 2026-03-28 10:47:47 UTC - H stale pilot reconciliation fix
+- Fixed the H stale-owner reconcile path in `scripts/cycles/run_H_pricing_cycle.py` so a dead owner with a real successful pilot completion now recovers to `pilot_done` instead of being forced to `failed`.
+- Kept the fail-closed path for dead-owner stale runs without success evidence.
+- Added recovery for the rare case where the run had already been marked `failed` but the pilot success marker and result later proved the completion was valid.
+
+Files
+- scripts/cycles/run_H_pricing_cycle.py
+
+Proof
+- `python -m py_compile scripts/cycles/run_H_pricing_cycle.py`
+- Synthetic reconcile validation:
+  - success evidence -> `pilot_done`
+  - no evidence -> `failed`
+  - prior false `failed` with success evidence -> `pilot_done`
+
+Verification status: Validated by targeted synthetic branch test
+Changed at: 2026-03-28T10:47:47Z
+Latest health snapshot at: 2026-03-28T06:39:47Z
+Next verifier: next scheduled H cycle
+
+Carryover:
+- None
+
+Next:
+- Let the live H runtime pick up the patched reconcile path on its next restart or cycle handoff.
+
+## 2026-03-28 14:08:30 UTC - A004 fee eligibility alignment for H referral-band coverage
+- Fixed A004 eligibility gating in `scripts/flows/A/A004_run_fees_to_sheet.py` so inactive-listing SKUs can still refresh fee bands when they are non-parked in `out/phase1_sku_scope.csv` (or stock-positive fallback), aligning A004 with A015/H non-parked coverage scope.
+- Kept existing dropped/discontinued stock-positive behavior unchanged.
+
+Files
+- scripts/flows/A/A004_run_fees_to_sheet.py
+
+Proof
+- `python -m py_compile scripts/flows/A/A004_run_fees_to_sheet.py`
+- `python scripts/flows/A/A004_run_fees_to_sheet.py`
+  - processed eligible rows: 86
+  - updated rows: 86
+  - errors: 0
+- Post-run data evidence for previously missing SKUs:
+  - `2X-8XI7-C9T5` now has `referral_fee_10=5.0`, `referral_fee_100=15.0`
+  - `8W-I703-VOFQ` now has `referral_fee_10=7.0`, `referral_fee_100=7.0`
+- H floor resolver proof (band 100) now resolves referral source from API bands for both target SKUs with no referral-band-missing reason.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-28T14:00:02Z
+Latest health snapshot at: 2026-03-28T12:42:59Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Confirm `h_floor_referral_source_coverage` on the next scheduled A015 run reflects the post-A004 rows and clears back below WARN threshold.
+
+## 2026-03-28 15:57:00 UTC - Scope policy fix for stocked inactive SKUs
+- Updated scope policy in `scripts/phase1/phase1_sku_scope.py` so `inactive` is no longer a repricing blocker when `in_stock_flag=1`.
+- This aligns with the operating rule that stocked SKUs should receive pricing treatment, while still preserving parked behavior for out-of-stock rows.
+- Kept live-write authority unchanged: `write_effective` still requires `write_enabled=1`.
+
+Files
+- scripts/phase1/phase1_sku_scope.py
+
+Proof
+- `python -m py_compile scripts/phase1/phase1_sku_scope.py`
+- `python scripts/phase1/phase1_sku_scope.py`
+  - `phase1_scope_rows=608`
+  - `phase1_scope_non_parked=75`
+  - `phase1_scope_parked=533`
+- Scope impact evidence:
+  - `ACTIVE_WRITE` increased `37 -> 42`
+  - `ACTIVE_READONLY` decreased `38 -> 33`
+  - `reason_code=inactive` in non-parked read-only rows reduced `19 -> 0`
+- Target SKU evidence:
+  - `0G-JB6S-PN34`, `AX-NKNU-29C1`, `D8-1A3E-I37F`, `Q1-00D7-5IQF`, `XH-0LAE-FQO5` now resolve as `eligible` with `write_effective=1`
+  - `2X-8XI7-C9T5` and `8W-I703-VOFQ` remain `ACTIVE_READONLY` by switch policy (`write_enabled=0`), not by false inactive blocking
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-28T15:56:09Z
+Latest health snapshot at: 2026-03-28T12:42:59Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Validate next H cycles continue processing stocked inactive SKUs without inactive blocking, then confirm with fresh A015 health evidence.
+
+## 2026-03-28 17:38:40 UTC - H read-only remediation via switch authority + isolated proof
+- Enabled live-write authority for every currently eligible non-parked SKU by updating `config/h_sku_switches.csv`.
+- Changed the two existing switch-disabled SKUs (`6V-EEC1-2S9Z`, `L1-54EX-56YC`) to `write_enabled=1`.
+- Added 31 missing eligible SKUs to `config/h_sku_switches.csv` with `observe_enabled=1`, `write_enabled=1`, `manual_disable=0`.
+
+Files
+- config/h_sku_switches.csv
+
+Proof
+- Scope rebuild with updated switches:
+  - `python scripts/phase1/phase1_sku_scope.py`
+  - Stale live process cache was bypassed with a fresh generated scope (`out/phase1_sku_scope.test.csv`) showing:
+    - `ACTIVE_WRITE=75`
+    - `ACTIVE_READONLY=0`
+- Controlled isolated H validation:
+  - `pause` succeeded (scheduler disabled, controlled mode active, stale locks reconciled).
+  - `run-success` produced run `20260328T172645Z`.
+  - Terminal artifacts confirm success:
+    - `out/systems/H/live/H_run_state.json` -> `state=finalized`, `publish_status=ok`, `run_id=20260328T172645Z`
+    - `out/systems/H/live/H_worker_lifecycle.json` -> `state=succeeded`, `terminal_outcome=succeeded`
+    - `out/systems/H/live/H_cycle.log` shows publish commit and finalize for `20260328T172645Z`
+  - Canonical scope after isolated run:
+    - `ACTIVE_WRITE=75`
+    - `ACTIVE_READONLY=0`
+  - Processed SKU set in isolated run includes previously read-only SKUs (example in log line for run `20260328T172645Z`: `2X-8XI7-C9T5`, `8W-I703-VOFQ`, `6V-EEC1-2S9Z`, `L1-54EX-56YC`, `VL-48KZ-J3F2`).
+- Scheduler ownership restored:
+  - `resume` succeeded.
+  - Status confirms task `AMZ H Cycle` is `Running` and `Enabled` with active owner chain.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-28T17:38:40Z
+Latest health snapshot at: 2026-03-28T12:42:59Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Re-check `h_floor_referral_source_coverage` after next scheduled A015 snapshot (current WARN snapshot predates this remediation).
+
+## 2026-03-29 08:12:51 UTC - AGENTS standard update for runtime proof and status wording
+- Added a new mandatory instruction block to `AGENTS.md` to standardize how Codex reports live runtime work.
+- Required status separation is now explicit:
+  - `code fix applied`
+  - `isolated verification passed`
+  - `live loop verification pending` / `confirmed`
+- Added a default proof sequence for scheduler-owned systems so future chats must prove:
+  - terminal success artifacts
+  - ownership restore after isolated testing
+  - full upstream/downstream handoff when that is the ticket
+- Added wording rules so Codex must say `not yet proven` when runtime proof is incomplete and must treat stale health snapshots as stale, not confirmation.
+
+Files
+- AGENTS.md
+
+Proof
+- Updated instruction file now includes `### 16) Runtime proof and status language (mandatory)`.
+- Existing reliability section was renumbered from `### 16)` to `### 17)` to keep numbering consistent.
+
+Verification status: Not applicable - instruction-only repo standard update
+Changed at: 2026-03-29T08:12:51Z
+Latest health snapshot at: 2026-03-28T12:42:59Z
+Next verifier: not required
+
+Carryover:
+- None
+
+Next:
+- Re-check `h_floor_referral_source_coverage` after the next scheduled A015 snapshot and only sign out once that remaining WARN is either cleared or explicitly accepted.
+
+## 2026-03-30 05:45:45 UTC - H151 temp trial one-off for CYN20 6V undercut
+- Added a new one-off tool for SKU `6V-EEC1-2S9Z` named `temp trial`.
+- Tool logic sets target to `competitor - 0.05 GBP` and clamps to floor/ceiling when needed.
+- Tool writes decision artifacts to `out/analysis_reports` as timestamped files plus `latest` JSON/CSV pointers.
+- Added focused tests for normal undercut, floor clamp, ceiling clamp, and competitor-missing blocked behavior.
+
+Files
+- scripts/one_off/H151_temp_trial_cyn20_6v.py
+- tests/test_h151_temp_trial_cyn20_6v.py
+
+Proof
+- `python -m pytest -q tests/test_h151_temp_trial_cyn20_6v.py` returned `4 passed`.
+- `python scripts/one_off/H151_temp_trial_cyn20_6v.py --sku 6V-EEC1-2S9Z` returned:
+- `temp_trial_status=READY`
+- `temp_trial_current_gbp=7.10`
+- `temp_trial_competitor_gbp=7.10`
+- `temp_trial_final_target_gbp=7.05`
+- `temp_trial_reason_codes=UNDERCUT_APPLIED`
+- Latest artifacts written:
+- `out/analysis_reports/temp_trial_6v_cyn20_latest.json`
+- `out/analysis_reports/temp_trial_6v_cyn20_latest.csv`
+
+Verification status: Verified (one-off tests plus direct execution)
+Changed at: 2026-03-30T05:45:45Z
+Latest health snapshot at: 2026-03-29T10:16:40Z
+Next verifier: not required for one-off script
+
+Carryover:
+- None
+
+Next:
+- None
+
+[2026-03-30 11:31 UTC]
+Layer: A Cycle
+Scope: Reduce maintenance wait noise and false timeout risk during A->B handoff
+
+Change:
+- Increased default maintenance-ready timeout from 120s to 300s in A runner.
+- Increased default maintenance poll interval from 2s to 5s in A runner.
+- Added wait-log throttling (default every 10s) during maintenance boundary wait.
+- Added stale maintenance.requested marker cleanup when prior owner PID is dead.
+- Added matching default env values to un_A_all.bat so operator runs inherit safer cadence.
+
+Files:
+- scripts/cycles/run_A_all.py
+- run_A_all.bat
+- WORK_LOG.md
+
+State:
+- Validation run: python -m py_compile scripts/cycles/run_A_all.py passed.
+- No ad-hoc A cycle executed by Codex (per verification policy).
+- A split health snapshot currently shows FAIL=3, WARN=0 at 2026-03-30T09:18:36Z (stale vs this code change).
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-30T11:30:48Z
+Latest health snapshot at: 2026-03-30T09:18:36Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Run one A cycle via un_A_all.bat and confirm maintenance wait cadence + refreshed A split checklist timestamp.
+---
+
+[2026-03-30 11:31 UTC]
+Layer: A Cycle
+Scope: Correction note for prior log entry formatting
+
+Change:
+- Corrected text rendering of un_A_all.bat references in the immediately previous entry.
+- No code or runtime behavior changed in this correction.
+
+Files:
+- WORK_LOG.md
+
+State:
+- Prior entry remains intact for append-only audit.
+- Correct literal references are un_A_all.bat in both File list narrative and Next step.
+
+Next:
+- None
+---
+
+[2026-03-30 11:32 UTC]
+Layer: A Cycle
+Scope: Second correction note for prior log formatting
+
+Change:
+- Confirmed the intended file name is run_A_all.bat (plain text, no markup).
+- No code changes and no runtime changes were made in this correction.
+
+Files:
+- WORK_LOG.md
+
+State:
+- Previous entries remain unchanged for append-only audit.
+- This line supersedes malformed text where the leading r was not rendered.
+
+Next:
+- None
+---
+
+['+$ts+']
+Layer: A Cycle
+Scope: Codex-owned fix-test-repeat takeover for A run stabilization (local-first mode)
+
+Change:
+- Took over execution loop directly in terminal using production entrypoint run_A_all.bat.
+- Stabilized A maintenance handoff behavior and reduced wait-loop noise from frequent polling.
+- Aligned script entrypoint defaults so python scripts/run_A_all.py and run_A_all.bat share the same safe runtime defaults.
+- Disabled legacy sheet-owned A steps by default for this mode, including stock receipts sheet and Product_DB dedupe/sync steps.
+- Corrected A010 output verification contract to match real outputs and avoid stale false-fail on product_db_preview.
+- Converted A005, B003, B008, B009, and B012 to local-first behavior so sheet dependency is optional and non-blocking when disabled.
+- Fixed manifest final-state logic so full recorded traversal with exit_code=0 is marked completed (skipped-by-config steps no longer mislabeled interrupted).
+
+Files:
+- scripts/run_A_all.py
+- run_A_all.bat
+- scripts/cycles/run_A_all.py
+- scripts/flows/B/B010_apply_researching_delta.py
+- scripts/flows/A/A005_run_inventory_adjustments_report.py
+- scripts/flows/B/B003_run_financial_events_level3.py
+- scripts/flows/B/B008_apply_refunds_to_tokens.py
+- scripts/flows/B/B009_apply_stock_adjustments_to_tokens.py
+- scripts/flows/B/B012_build_token_events_append.py
+- WORK_LOG.md
+
+State:
+- Production verification command: run_A_all.bat
+- Verified run manifest: out/manifests/A/2026-03-30/20260330T124412Z.json
+- Manifest truth: final_state=completed, recorded_step_count=13, configured_step_count=13, health_summary.status=current
+- A split checklist after run: out/cycle_alerts/checklist_A_split.csv with FAIL=0, WARN=0
+- Global checklist after run: out/system_health_checklist.csv with FAIL=2, WARN=4
+- Remaining global FAIL keys: h_cycle_log_freshness, h_publish_marker_freshness
+- Remaining global WARN keys: b_order_master_freshness, b_cycle_recent_fail_lines, h_listing_offer_snapshot_latest_freshness, h_phase1_runtime_floor_snapshot_latest_freshness
+
+Verification status: code fix applied; isolated verification passed; live loop verification pending
+Changed at: 2026-03-30T12:49:25Z
+Latest health snapshot at: 2026-03-30T12:48:40Z
+Next verifier: next scheduler-owned A cycle
+
+Carryover:
+- None
+
+Next:
+- Monitor one scheduler-owned A cycle and confirm the same A split result (FAIL=0, WARN=0) under scheduler ownership.
+---
+
+[2026-03-30 12:50 UTC]
+Layer: A Cycle
+Scope: Correction note for malformed WORK_LOG header token
+
+Change:
+- Previous entry header token was malformed as ['+2026-03-30 12:50 UTC+'] due shell string quoting.
+- Confirmed intended timestamp for that entry is 2026-03-30 12:49 UTC.
+- No code or runtime behavior changed in this correction.
+
+Files:
+- WORK_LOG.md
+
+State:
+- Append-only policy preserved.
+- This correction supersedes the malformed header token in the immediately previous entry.
+
+Next:
+- None
+---
+
+[2026-03-30 12:50 UTC]
+Layer: A Cycle
+Scope: Second correction note for prior header-token text
+
+Change:
+- Confirmed the malformed token text should be read literally as a shell interpolation artifact.
+- Canonical intended timestamp for the affected entry is 2026-03-30 12:49 UTC.
+- No code or runtime behavior changed in this correction.
+
+Files:
+- WORK_LOG.md
+
+State:
+- Append-only policy preserved.
+- This entry supersedes malformed token rendering in the previous correction line.
+
+Next:
+- None
+---
+
+[2026-03-30 20:44 UTC]
+Layer: A-B Handover Reliability
+Scope: Hardening maintenance handshake and B recovery ownership after A cycle
+
+Change:
+- Hardened A maintenance handshake with request-id correlation, stale-ready rejection, and b_not_running debounce window.
+- Added post-A B recovery verification gate (heartbeat/lock health) with scheduler-owned single recovery trigger when B is not healthy.
+- Added safe defaults in A launchers for new handover/recovery controls.
+- Hardened B maintenance path to echo request_id in ready marker and use safe path-exists checks to avoid maintenance-path handle errors.
+- Added B supervisor single-owner lock guard in run_B_cycle.bat to reduce duplicate supervisor instances.
+- Added unit tests covering request-id matching and timeout/not-running handoff decisions.
+
+Files:
+- scripts/cycles/run_A_all.py
+- scripts/cycles/run_B_cycle.py
+- scripts/run_A_all.py
+- run_A_all.bat
+- run_B_cycle.bat
+- tests/test_a_maintenance_handoff.py
+
+State:
+- Syntax verification passed for patched Python modules.
+- Unit tests passed: tests/test_a_maintenance_handoff.py (4 tests, OK).
+- Live-loop proof not yet complete for this patch set.
+- Current health snapshot predates these code changes and is stale for confirmation.
+
+Verification status: Pending next cycle check
+Changed at: 2026-03-30T20:43:14Z
+Latest health snapshot at: 2026-03-30T20:27:03Z
+Next verifier: next scheduled cycle A015 plus one explicit A->B handover proof run
+
+Carryover:
+- Validate one full A run and confirm B boundary-ready -> A complete -> B healthy resume chain in live logs/manifests.
+
+Next:
+- None
+---
+[2026-03-30 21:47 UTC] Ticket: B supervisor ghost-ownership hardening after repeated A->B handoff failures
+- Approved change implemented to replace fragile batch-owned B restart loop with a Python-owned supervisor in `scripts/cycles/run_B_supervisor.py`.
+- `run_B_cycle.bat` now delegates to the Python supervisor instead of holding its own loop/lock state.
+- Added durable `out/systems/B/live/B_supervisor.lock` and `out/systems/B/live/B_supervisor.log` so scheduler ownership and worker restart state are visible.
+- Hardened `scripts/cycles/run_A_all.py` recovery path so if Task Scheduler says `AMZ Orders` is running but B is unhealthy, A forces a scheduler restart instead of treating ghost ownership as success.
+- Root cause found: Windows could keep stale `cmd.exe` ownership alive while the actual `run_B_cycle.py` worker had died, so A's post-run recovery could no-op against a fake running state.
+- Isolated proof: `py_compile` passed for patched files; `python -m unittest tests.test_b_supervisor -v` passed 2/2.
+- Live proof so far: stale B scheduler instance ended, orphan B cmd removed, fresh scheduler-owned chain now visible as `cmd.exe -> run_B_supervisor.py -> run_B_cycle.py`, with fresh `B_supervisor.lock` and `B_cycle.lock` heartbeats.
+- Verification status remains pending for the full A->B handoff chain until the next explicit A run completes and B is observed to resume afterward.
+- Carryover: verify one live A completion followed by B resume under the new supervisor path.
+
+---
+
+[2026-03-30 23:10 UTC]
+Layer: A-B Handover Reliability
+Scope: Home-time proof run - two consecutive A cycles with verified B resume
+
+Change:
+- No new code patch in this pass; used current hardened A/B runtime and executed two full A cycles back-to-back.
+- A run 20260330T225516Z completed and reported B recovery healthy after A.
+- A run 20260330T230344Z completed and reported B recovery healthy after A.
+- Verified B resumed after each maintenance clear in B live log and continued with new B steps.
+
+Files:
+- out/manifests/A/2026-03-30/20260330T225516Z.json
+- out/manifests/A/2026-03-30/20260330T230344Z.json
+- out/tmp_a_proof_run1_20260330T225136Z.log
+- out/tmp_a_proof_run2_20260330T225928Z.log
+- out/systems/B/live/B_cycle.log
+- out/systems/B/live/B_cycle.lock
+
+State:
+- code fix applied: yes (from earlier ticket changes in A/B handoff + B supervisor ownership)
+- isolated verification passed: yes (	ests/test_a_maintenance_handoff.py, 	ests/test_b_supervisor.py)
+- live loop verification confirmed: yes (2 consecutive A->B handovers proven)
+- B owner truth at proof end: lock heartbeat present (B|pid=25028|heartbeat=2026-03-30T23:08:27Z)
+- Non-blocking alert still present: _cycle_recent_fail_lines=1 (transient B004 retry exhaustion while level1 file was still updating)
+
+Verification status: Confirmed in live loop
+Changed at: 2026-03-30T20:43:14Z
+Latest health snapshot at: 2026-03-30T23:07:28Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Optional hardening: reduce transient _cycle_recent_fail_lines warnings by preventing B004 retries while level1 is actively mutating.
+
+Next:
+- None
+
+---
+
+[2026-03-30 23:10 UTC]
+Layer: A-B Handover Reliability
+Scope: Correction note for previous WORK_LOG formatting artifacts
+
+Change:
+- Corrected text rendering artifacts in the immediately previous entry where backtick escapes in PowerShell introduced control characters.
+- Canonical intended text is:
+  - isolated verification passed: yes (tests/test_a_maintenance_handoff.py, tests/test_b_supervisor.py)
+  - Non-blocking alert still present: b_cycle_recent_fail_lines=1
+  - Carryover option references b_cycle_recent_fail_lines hardening.
+- No code or runtime behavior changed in this correction.
+
+Files:
+- WORK_LOG.md
+
+State:
+- Append-only policy preserved.
+- This correction supersedes malformed control-character tokens in the immediately previous entry.
+
+Next:
+- None
+
+---
+
+[2026-04-02 07:55 UTC] Ticket: Controlled restart 02:10 observer-only skip fix (explicit escalation)
+Layer: Restart Control
+Scope: Ensure scheduled controlled-restart task passes explicit escalation so 02:10 run is not observer-only.
+
+Change:
+- Patched `run_controlled_restart_controller.bat` to set `H_RESTART_ESCALATION_MODE=1` by default when undefined.
+- Patched `run_controlled_restart_controller.bat` to append `--escalation-mode` when `H_RESTART_ESCALATION_MODE=1`.
+- Root cause addressed at launch/config boundary: controller required explicit escalation but launcher did not provide it, so restart runs entered observer-only mode and skipped active actions.
+
+Files:
+- run_controlled_restart_controller.bat
+- out/locks/restart_control/restart_controller.latest.json
+- out/locks/restart_control/restart_controller.latest.txt
+- out/locks/restart_control/restart_controller.log.jsonl
+
+State:
+- code fix applied: yes
+- isolated verification passed: yes (safe controller invocation with reboot and drain disabled)
+- live loop verification pending: yes (next real scheduled 02:10 run)
+- isolated proof evidence: run_id=20260402T075222.369800Z.pid28524, escalation_mode=true, requested_escalation_override=true, active_actions_permitted=true, reboot_attempted=false
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-02T07:52:22Z
+Latest health snapshot at: 2026-04-02T05:04:58Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Verify next real 02:10 local controlled restart run shows escalation_only role (not observer_only) and records non-skipped active decision path.
+
+Next:
+- None
+
+---
+
+[2026-04-03 08:00 UTC] Ticket: H Google Sheets publish incident closure sign-off
+Layer: H Cycle Runtime Truth
+Scope: Final workbook sign-off after approved root-cause fix and live production proof.
+
+Change:
+- Signed off the approved H runtime fix for missing bool parser in core owner flow (`_to_bool`) that previously caused post-pilot `NameError` and blocked publish.
+- Confirmed live production chain for run_id `20260403T071831Z`: snapshot_done -> pilot_done -> publish_started -> publish_done -> finalized.
+- Confirmed same-run publish proof marker match for `20260403T071831Z` in publish marker artifacts.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_h_split_health_gate.py
+- out/systems/H/live/H_cycle.log
+- out/systems/H/live/H_cycle_last_publish_run_id.txt
+- out/systems/H/live/H_cycle_last_publish_info.txt
+- out/system_health_checklist.csv
+- out/cycle_alerts/checklist_H.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+- checklist snapshot refresh pending
+
+Evidence:
+- Live finalized proof run: `20260403T071831Z` (H cycle log shows `publish_done` and `finalized` for same run).
+- Publish proof check line confirms marker for same run_id: `publish_marker_run_id=20260403T071831Z`.
+- Latest publish marker now: `20260403T074955Z` (`out/systems/H/live/H_cycle_last_publish_run_id.txt`).
+- Health snapshots remain older than fix window and are treated as stale checklist evidence until next scheduled refresh:
+  - `out/system_health_checklist.csv` last write: `2026-04-03T05:03:53Z`
+  - `out/cycle_alerts/checklist_H.csv` last write: `2026-04-03T05:03:53Z`
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T07:14:00Z
+Latest health snapshot at: 2026-04-03T05:03:53Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- Confirm next scheduled health snapshot refreshes checklist files post-fix; if FAIL persists, validate checklist input path and marker source selection.
+
+Next:
+- None
+
+---
+
+[2026-04-03 13:09 UTC] Ticket: H/B stale FAIL deblock + hidden background recovery proof
+Layer: H and B Runtime Recovery
+Scope: Remove stale blocking freshness FAILs from active context, harden recovery owner proof, and keep launcher consoles hidden.
+
+Change:
+- Reconciled stale checklist freshness blockers so active H/global checklist rows now reflect live health instead of old FAIL carryover.
+- Hardened H owner truth in recovery proof so core lock ownership counts as healthy owner even when launcher lock is absent.
+- Kept launcher sleep output suppressed and hidden-detach launchers in place for H/B/monitor background operation.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- scripts/one_off/HB_safe_recover_background.py
+- tests/test_h_split_health_gate.py
+- tests/test_hb_safe_recover_background.py
+- run_H_cycle.bat
+- run_B_cycle.bat
+- run_home_time_monitor_supervisor.bat
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Checklist deblock: out/cycle_alerts/checklist_H.csv FAIL=0 WARN=0 and out/system_health_checklist.csv FAIL=0 WARN=0.
+- Recovery proof: out/locks/recovery/HB_safe_recover_background.20260403T130614Z.json has status ok, proof_confirmed=true, H_owner_running_after=true, B_owner_running_after=true, visible monitor console 0.
+- Hidden runtime ownership: run_H/run_B/monitor cmd launcher processes have MainWindowHandle=0 and no visible timeout console windows found.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T13:06:14Z
+Latest health snapshot at: 2026-04-03T13:06:14Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+
+---
+
+[2026-04-03 13:26 UTC] Ticket: H130 today-units source fix for live order placements
+Layer: H Observation Sheet
+Scope: Correct Today Units on H Google Sheet so same-day placed orders appear before order_master catches up.
+
+Change:
+- Switched H130 Today Units sourcing away from order_master-only truth.
+- Added live same-day order join using out/orders_all.csv plus out/order_items_all.csv.
+- Kept 30-day sales and per-day velocity on order_master so finance-backed history stays unchanged.
+- Republished H130 sheet after fix.
+
+Files:
+- scripts/flows/H/H130_build_phase1_observation_sheet.py
+- tests/test_h130_ops_status.py
+- out/analysis_reports/phase1_observation_combined_2026-04-03.csv
+- out/analysis_reports/phase1_observation_view_2026-04-03.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Before fix, sku 6V-EEC1-2S9Z showed sales_units_today=0.0 in out/analysis_reports/phase1_observation_combined_2026-04-03.csv while order_master had no 2026-04-03 rows for that SKU.
+- Live orders proof showed 4 same-day pending orders for sku 6V-EEC1-2S9Z in orders_all/order_items_all with purchase timestamps 2026-04-03T09:35:09Z, 10:50:02Z, 11:55:03Z, 12:58:18Z.
+- After fix, out/analysis_reports/phase1_observation_combined_2026-04-03.csv shows sales_units_today=4.0 and out/analysis_reports/phase1_observation_view_2026-04-03.csv shows Today Units=4.0 for sku 6V-EEC1-2S9Z.
+- Manual publish completed successfully for sheet id 18flepYvH11078sOfEu9sBUmeF4KAl8T_iDKhxDZNPaY tab 2026-04-03.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T13:26:00Z
+Latest health snapshot at: 2026-04-03T13:26:00Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+
+[2026-04-03 13:45 UTC] Ticket: B token allocation truth fix for 6V-EEC1-2S9Z missing COGS
+Layer: B Token Allocation and Order Master
+Scope: Find the real source of missing COGS for same-day 6V-EEC1-2S9Z orders and fix the pipeline so token-backed COGS and order_master promotion are correct.
+
+Change:
+- Hardened B007 so token_ledger rows are reconciled against explicit token allocations before choosing available tokens.
+- Prevented B007 from reusing token_ids that are already present in token_allocations_live.csv even if the ledger still says available.
+- Corrected B025 source selection so explicit token_allocations_live truth wins over token_ledger fallback whenever both exist.
+- Let the live B cycle rebuild token_cogs_ledger and order_master after the code changes.
+
+Files:
+- scripts/flows/B/B007_allocate_tokens_live.py
+- scripts/flows/B/B025_build_token_cogs_ledger.py
+- tests/test_b007_allocate_tokens_live.py
+- tests/test_b025_build_token_cogs_ledger.py
+- out/token_cogs_ledger.csv
+- out/order_master.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Root source bug 1: token_ledger_live.csv had many rows marked available while those same token_ids already existed in token_allocations_live.csv, so B007 could silently choose already-allocated token_ids.
+- Root source bug 2: B025_build_token_cogs_ledger.py claimed allocations were primary truth but actually chose whichever source had more rows, which let stale ledger rows override explicit allocations and inflate COGS.
+- After the B007 fix, the four orders received explicit token allocations in out/systems/B/live/token_allocations_live.csv using token_ids SR-20260316-001-0053 to SR-20260316-001-0056.
+- After the B025 fix and next live B cycle, out/token_cogs_ledger.csv shows exactly 4 rows for those orders, each with token_cost 2.22 and cogs_total 2.66.
+- After the next B004 run, out/order_master.csv shows all four orders with COGS_Total=-2.66, COGS_ExVAT=-2.22, COGS_VAT=-0.44 and Margin_ExVAT=1.07.
+- out/orders_missing_tokens.csv now contains 0 rows for those four order IDs.
+- Latest B scoped health snapshot remained FAIL=0 WARN=0 in out/cycle_alerts/checklist_B.csv.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T13:45:00Z
+Latest health snapshot at: 2026-04-03T13:42:14Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+
+[2026-04-03 14:59 UTC] Ticket: B004 alignment audit for Order_Master vs Level_1/Level_2
+Layer: B Order Master integrity
+Scope: Audit alignment between Level_1, Level_2, and Order_Master; identify potential issues; patch level selection so Order_Master truth does not mislabel empty Level_2 rows.
+
+Change:
+- Audited live key alignment and classified all deltas between financial_events_level1, financial_events_level2, and order_master.
+- Added Level 2 viability gate in B004 to block promotion when L2 is effectively empty (L1 qty > 0, L2 qty <= 0, no L2 financial payload).
+- Added incremental re-evaluation so existing lvl=2 rows are forced back through selection logic when their L2 row is non-viable.
+- Added targeted tests for the new L2 viability gate.
+
+Files:
+- scripts/flows/B/B004_build_order_master.py
+- tests/test_b004_level_gate.py
+- out/order_master.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Pre-fix audit found 4 rows labelled lvl=2 while their L2 rows were empty/qty=0 and payload was coming from L1 fallback:
+  - 204-5473246-3082763 / L3-ZQ8U-A7LQ
+  - 408-0036689-3441978 / R4-0AXZ-ZZ9D
+  - 202-8019874-5733104 / NN-TSZ1-X2RD
+  - 203-9164611-3103558 / 6V-EEC1-2S9Z
+- After fix and live B cycle, these 4 rows are now lvl=1 in out/order_master.csv and still retain correct L1 quantities/prices.
+- Current alignment classification is coherent:
+  - L2 not in OM: 37 (32 qty_zero_or_negative, 5 held_back_missing_token_cogs)
+  - L1 not in OM: 6 (all held_back_missing_token_cogs)
+  - OM lvl counts: lvl3=7834, lvl2=725, lvl1=99
+- B scoped checklist remains healthy: out/cycle_alerts/checklist_B.csv has FAIL=0 WARN=0.
+- Tests passed: pytest -q tests/test_b004_level_gate.py -> 3 passed.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T14:59:00Z
+Latest health snapshot at: 2026-04-03T13:56:11Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- Optional: add deterministic duplicate-key resolution for Level_3 input (current behavior is last-row-wins when duplicate Order ID + SKU appears in L3).
+
+[2026-04-03 15:15 UTC] Ticket: B004 deterministic duplicate-key handling for Level_3 inputs
+Layer: B Order Master integrity
+Scope: Remove non-deterministic last-row-wins behavior when Level_3 contains duplicate Order ID + SKU rows, and prove B cycle remains healthy.
+
+Change:
+- Added deterministic duplicate-key selection in B004 input indexing so duplicate L2/L3 keys are collapsed by row quality (positive qty, richer monetary payload, newer date, stable fingerprint tie-break).
+- Added runtime warning telemetry for collapsed duplicate groups and rows (`source_duplicate_keys_collapsed`).
+- Added regression tests for duplicate-key selection behavior.
+
+Files:
+- scripts/flows/B/B004_build_order_master.py
+- tests/test_b004_level_gate.py
+- out/order_master.csv
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Source audit via patched selector confirms current duplicate surface: L3 rows=8728, unique_keys=8720, duplicate_groups=8, duplicate_rows=8.
+- One-shot B004 execution after L1 stability window completed successfully and emitted duplicate telemetry: `source_duplicate_keys_collapsed source=l3 duplicate_groups=8 duplicate_rows=8`.
+- Same run completed with success artifact write: `status=success rows=8660 snapshot=out\\order_master.csv`.
+- B live cycle health recovered to clean state: `health_snapshot ... fail=0 warn=0` in out/systems/B/live/B_cycle.log and `b_cycle_recent_fail_lines=ok` in out/cycle_alerts/checklist_B.csv.
+- Tests passed: `pytest -q tests/test_b004_level_gate.py` -> 5 passed.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-03T14:10:54Z
+Latest health snapshot at: 2026-04-03T14:11:56Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-05 08:12 UTC] Ticket: Morning MOT follow-up - manifest terminal truth and H gate source alignment
+Layer: B/E/H runtime observability
+Scope: Fix stale-or-misleading morning MOT evidence by making manifest terminal state explicit for B and E, and by sourcing H ops status from flow-owned H gate truth.
+
+Change:
+- Updated B manifest flush path to pass explicit final_state per cycle result (`completed` when cycle rc=0, otherwise `failed`).
+- Updated E manifest finalize path to map run status to explicit final_state (`success` -> `completed`, non-success -> `failed`).
+- Updated H130 ops status/alerts checklist source for H to use `flow_gate_checklist_path("H")` (flow-owned `checklist_H.csv`) while keeping existing metric names stable.
+
+Files:
+- scripts/cycles/run_B_cycle.py
+- scripts/cycles/run_E_cycle.py
+- scripts/flows/H/H130_build_phase1_observation_sheet.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification pending
+
+Evidence:
+- Root-cause confirmation from morning MOT: H split artifact timestamp stale while live H runtime and H gate checklist were current.
+- Code references:
+  - `scripts/cycles/run_B_cycle.py` now sets `manifest_final_state` and passes it into `_manifest_flush`.
+  - `scripts/cycles/run_E_cycle.py` now computes `manifest_final_state` from run `status` and passes it to `finalize_manifest`.
+  - `scripts/flows/H/H130_build_phase1_observation_sheet.py` now resolves H checklist path via `flow_gate_checklist_path("H")`.
+- Targeted tests passed:
+  - `PYTHONPATH=.;scripts pytest -q tests/test_h130_ops_status.py tests/test_flow_health_gate.py tests/test_b_split_health_modes.py tests/test_b_cycle_signal_policy.py tests/test_e_split_health_gate.py`
+  - Result: 19 passed.
+
+Verification status: Pending next cycle check
+Changed at: 2026-04-05T08:12:09Z
+Latest health snapshot at: 2026-04-05T08:09:32Z
+Next verifier: next scheduled cycle A015
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-07 11:07 UTC] Ticket: H seller-detail resolution visibility and runtime proof contract
+Layer: H snapshot + suppression observability
+Scope: Propagate seller-detail resolution fields into seller snapshot outputs and add explicit runtime proof artifact/counts for pending/recovered/gated/blocked states.
+
+Change:
+- Added seller-detail resolution columns to `listing_offer_seller_snapshot_*` outputs by enriching seller rows from listing snapshot detail metadata.
+- Added runtime proof artifact writer at `out/systems/H/live/h_seller_detail_resolution_proof_latest.csv` with one-row counts:
+  - `pending_retry_count`
+  - `recovered_count`
+  - `supp_gated_detail_count`
+  - `supp_blocked_count`
+- Added explicit H cycle log marker: `phase1 seller_detail_resolution_proof ...` during runtime floor snapshot stage.
+- Added targeted tests for seller snapshot enrichment and proof-count builder logic.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_h_item_offers_retry_queue.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Tests passed: `python -m pytest -q tests/test_h_item_offers_retry_queue.py tests/test_h_suppression_truth.py -k "seller_detail or retry or proof or suppression"` -> 7 passed.
+- Compile check passed: `python -m py_compile scripts/cycles/run_H_pricing_cycle.py`.
+- Live run proof marker present:
+  - `phase1 seller_detail_resolution_proof pending_retry=50 recovered=15 supp_gated_detail=5 supp_blocked=2`
+  - run_id `20260407T105459Z` in `out/systems/H/live/H_cycle.log`.
+- Proof artifact written:
+  - `out/systems/H/live/h_seller_detail_resolution_proof_latest.csv` row `2026-04-07T10:54:59Z,20260407T105459Z,65,89,50,15,5,2`.
+- Seller snapshot header now includes resolution fields:
+  - `listing_offer_seller_snapshot_latest.csv` includes `seller_detail_resolution_status` and `retry_next_run_flag`.
+- Runtime terminal/publish truth for proof run:
+  - `publish_commit_end run_id=20260407T105459Z`
+  - `h_batch_state_transition ... from=published to=finalized`
+  - `run_completed_marker written run_id=20260407T105459Z`
+  - `H_last_finalized_run_id.txt` and `H_cycle_last_publish_run_id.txt` both `20260407T105459Z`.
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-07 11:20 UTC] Ticket: H seller-detail home-time measurement plan
+Layer: H planning and observability
+Scope: Define the next implementation step after retry-logic and visibility fixes so home-time mode can measure recoverable vs likely Amazon-missing seller-detail cases with explicit proof expectations.
+
+Change:
+- Created a dedicated home-time measurement plan for the next H phase.
+- Defined new target artifacts for recovery history and summary counts.
+- Defined per-SKU classification contract, thresholds, proof sequence, and live-loop expectations for Codex.
+- Aligned the plan with roadmap and H expectations so the next ticket is measurement-first, not strategy drift.
+
+Files:
+- project_control/H_SELLER_DETAIL_HOME_TIME_MEASUREMENT_PLAN_2026-04-07.md
+- WORK_LOG.md
+
+State:
+- plan created
+- no runtime code changed
+- no live behavior changed
+
+Evidence:
+- Current roadmap and H expectation docs reviewed before planning:
+  - `project_control/ROADMAP_SYSTEM_MAP.md`
+  - `project_control/EXPECTATIONS/H_cycle_expectations.md`
+- Existing seller-detail recovery blueprint reviewed:
+  - `project_control/H_SELLER_DETAIL_RETRY_RECOVERY_BLUEPRINT_2026-04-07.md`
+- Plan anchored to latest proven live evidence already established in this chat:
+  - seller-detail proof artifact live
+  - latest proven runtime evidence showed pending/recovered/gated/blocked counts from H live proof output.
+
+Carryover:
+- None
+
+Next:
+- Execute Phase 5A/5B from `project_control/H_SELLER_DETAIL_HOME_TIME_MEASUREMENT_PLAN_2026-04-07.md` in home-time mode with focused tests and live proof.
+---
+[2026-04-07 11:45 UTC] Ticket: H seller-detail home-time measurement execution (Phase 5A/5B)
+Layer: H measurement and observability
+Scope: Implement rolling recovery history + summary artifacts with aging and classification, then prove in live home-time loop.
+
+Change:
+- Implemented seller-detail measurement artifacts in H runtime:
+  - `out/systems/H/live/h_seller_detail_recovery_history_latest.csv`
+  - `out/systems/H/live/h_seller_detail_measurement_summary_latest.csv`
+- Added recovery history builder with per-SKU fields:
+  - status, resolution, retry/skip/error counters, truth status, aging fields, classification
+- Added classification contract in code:
+  - `PENDING_RETRY`
+  - `RECOVERED`
+  - `LIKELY_AMAZON_MISSING`
+  - `LIKELY_LOCAL_SELECTION_DELAY`
+  - `RETRY_EXHAUSTED`
+  - `NOT_APPLICABLE`
+- Added threshold-driven classification logic via env-backed settings.
+- Added summary builder with required counts:
+  - pending/recovered/amazon-missing-likely/retry-exhausted/supp-gated/supp-blocked/newly-recovered/stale-pending
+- Extended runtime floor snapshot stage to emit both new artifacts and log `phase1 seller_detail_measurement_summary ...`.
+- Added focused tests for measurement output, classification, aging, and summary reconciliation.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_h_item_offers_retry_queue.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Tests passed:
+  - `python -m pytest -q tests/test_h_item_offers_retry_queue.py tests/test_h_suppression_truth.py -k "seller_detail or retry or proof or suppression or measurement"`
+  - Result: `9 passed`
+- Compile check passed:
+  - `python -m py_compile scripts/cycles/run_H_pricing_cycle.py`
+- Safe reload executed through restart drain marker flow; ownership restored.
+- Post-change live marker present:
+  - `phase1 seller_detail_measurement_summary pending_retry=5 recovered=14 amazon_missing_likely=2 retry_exhausted=45 newly_recovered=0 stale_pending=0`
+- New artifact writes confirmed:
+  - `out/systems/H/live/h_seller_detail_recovery_history_latest.csv` (written at 2026-04-07T11:40:50Z)
+  - `out/systems/H/live/h_seller_detail_measurement_summary_latest.csv` (written at 2026-04-07T11:40:50Z)
+- Runtime terminal truth for proof run `20260407T112940Z`:
+  - `publish_commit_end run_id=20260407T112940Z`
+  - `h_batch_state_transition run_id=20260407T112940Z from=published to=finalized`
+  - `run_completed_marker written run_id=20260407T112940Z`
+  - `publish_proof_check current=20260407T112940Z`
+  - `H_last_finalized_run_id.txt` and `H_cycle_last_publish_run_id.txt` both `20260407T112940Z`
+- Post-proof ownership truth:
+  - next run observed: `H_runtime_status.json run_id=20260407T114307Z`
+
+Carryover:
+- None
+
+Next:
+- Optional Phase 5C: add H-scoped alert conditions for backlog growth and exhaustion trend based on the new summary artifact.
+---
+[2026-04-07 12:17 UTC] Ticket: H seller-detail alerting and exhausted-bucket review (Phase 5C)
+Layer: H measurement and observability
+Scope: Add H-scoped seller-detail alert outputs, operator review buckets, per-run summary archive, and prove them live in home-time mode.
+
+Change:
+- Extended H seller-detail measurement runtime with new local artifacts:
+  - `out/systems/H/live/h_seller_detail_measurement_alerts_latest.csv`
+  - `out/systems/H/live/h_seller_detail_operator_review_latest.csv`
+  - `out/systems/H/live/history/h_seller_detail_measurement_summary_<run_id>.csv`
+- Added alert logic for:
+  - pending retry growth vs previous run
+  - retry exhausted growth vs previous run
+  - likely Amazon-missing pressure
+  - stale pending pressure
+- Added operator review bucketing for current-run stuck SKUs:
+  - `LIKELY_AMAZON_UPSTREAM`
+  - `LIKELY_LOCAL_SELECTION_CADENCE`
+  - `RETRY_EXHAUSTED_OPERATOR_REVIEW`
+  - `GENUINE_PRICING_OR_SUPPRESSION_BLOCKER`
+- Added sort/rank output so operators can inspect the worst current cases first.
+- Kept pricing behavior unchanged; this phase only adds truthful measurement and review outputs.
+- Added focused tests for:
+  - schema/contract columns
+  - alert trend evaluation
+  - operator review bucketing
+  - idempotent same-run rebuild behavior
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_h_item_offers_retry_queue.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Tests passed:
+  - `python -m pytest -q tests/test_h_item_offers_retry_queue.py tests/test_h_suppression_truth.py -k "seller_detail or retry or proof or suppression or measurement or review or alert"`
+  - Result: `13 passed`
+- Compile check passed:
+  - `python -m py_compile scripts/cycles/run_H_pricing_cycle.py`
+- Safe reload executed through H restart drain token and boundary wait:
+  - `maintenance.requested` token written with controlled restart marker
+  - `out/systems/H/live/H_restart_drain.ready` reached at `2026-04-07T12:02:36Z`
+  - request cleared and launcher resumed
+- Post-change live marker present on proof run `20260407T120506Z`:
+  - `phase1 seller_detail_alerts warn_count=0 review_rows=52 amazon_bucket=1 local_selection_bucket=48 retry_exhausted_bucket=1 genuine_blocker_bucket=2`
+- New artifact writes confirmed for proof run:
+  - `out/systems/H/live/h_seller_detail_measurement_alerts_latest.csv` at `2026-04-07T12:14:32Z`
+  - `out/systems/H/live/h_seller_detail_operator_review_latest.csv` at `2026-04-07T12:14:32Z`
+  - `out/systems/H/live/h_seller_detail_measurement_summary_latest.csv` at `2026-04-07T12:14:32Z`
+  - `out/systems/H/live/history/h_seller_detail_measurement_summary_20260407T120506Z.csv` at `2026-04-07T12:14:32Z`
+- Runtime summary row for proof run:
+  - `2026-04-07T12:05:06Z,20260407T120506Z,65,1,14,1,49,4,3,14,0`
+- Runtime terminal truth for proof run `20260407T120506Z`:
+  - `publish_commit_end run_id=20260407T120506Z`
+  - `h_batch_state_transition run_id=20260407T120506Z from=published to=finalized`
+  - `run_completed_marker written run_id=20260407T120506Z`
+  - `publish_proof_check current=20260407T120506Z`
+  - `H_last_finalized_run_id.txt` and `H_cycle_last_publish_run_id.txt` both `20260407T120506Z`
+- Post-proof ownership truth:
+  - next run observed in `H_runtime_status.json` as `run_id=20260407T121633Z`
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-07 13:51 UTC] Ticket: H seller-detail protected retry lane execution (Phase 6)
+Layer: H retry selection and cadence recovery
+Scope: Implement protected retry lane selection to prioritize likely local-cadence misses before likely Amazon-upstream misses, with fairness and cap controls, then prove in live home-time loop.
+
+Change:
+- Implemented protected retry lane planner in H cycle retry selection:
+  - local-cadence candidate detection
+  - likely Amazon-upstream candidate detection
+  - fairness deferral for recently attempted local-cadence candidates
+  - cap controls using lane budget and max-share limits
+- Added env-backed controls:
+  - `H_ITEM_OFFERS_LOCAL_SELECTION_DELAY_SKIP_THRESHOLD`
+  - `H_ITEM_OFFERS_AMAZON_MISSING_CONFIRM_THRESHOLD`
+  - `H_ITEM_OFFERS_PROTECTED_LANE_BUDGET`
+  - `H_ITEM_OFFERS_PROTECTED_LANE_MAX_SHARE`
+  - `H_ITEM_OFFERS_PROTECTED_LANE_FAIRNESS_WINDOW_MINUTES`
+- Wired snapshot refresh logging to publish protected-lane counters per run:
+  - `protected_candidates`
+  - `protected_selected`
+  - `protected_cap`
+  - `fairness_deferred`
+  - `amazon_upstream_candidates`
+- Added focused tests for protected-lane prioritization, share cap, and fairness deferral.
+
+Files:
+- scripts/cycles/run_H_pricing_cycle.py
+- tests/test_h_item_offers_retry_queue.py
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Tests passed:
+  - `python -m pytest -q tests/test_h_item_offers_retry_queue.py tests/test_h_suppression_truth.py -k "seller_detail or retry or proof or suppression or measurement or review or alert or protected"`
+  - Result: `16 passed`
+- Compile check passed:
+  - `python -m py_compile scripts/cycles/run_H_pricing_cycle.py`
+- Post-change protected-lane counters confirmed in live H cycle log:
+  - `2026-04-07T13:13:08Z snapshot_refresh retry_priority ... protected_candidates=0 protected_selected=0 protected_cap=0 fairness_deferred=0 amazon_upstream_candidates=0`
+- Runtime terminal truth for proof run `20260407T134341Z`:
+  - `publish_commit_end run_id=20260407T134341Z`
+  - `h_batch_state_transition run_id=20260407T134341Z from=published to=finalized`
+  - `run_completed_marker written run_id=20260407T134341Z`
+  - `out/systems/H/live/H_cycle_last_terminal_info.txt` shows `state=finalized` and `publish_status=ok`
+  - `out/systems/H/live/H_cycle_last_publish_run_id.txt` and `out/systems/H/live/H_last_finalized_run_id.txt` both `20260407T134341Z`
+- Post-proof ownership truth:
+  - next run observed: `2026-04-07T13:50:48Z h_batch_state_transition run_id=20260407T135048Z from=finalized to=started`
+  - `out/systems/H/live/H_runtime_status.json` shows running owner process with `run_id=20260407T135048Z`
+
+Carryover:
+- None
+
+Next:
+- None
+---
+---
+[2026-04-11 10:45 UTC] Ticket: AI planning system two-lane workflow scaffolding
+Layer: Repo planning and Codex handoff
+Scope: Add repo-native build lane and debug lane scaffolding so AI sessions create durable plan workspaces, use the correct lane, and keep proof in repo files.
+
+Change:
+- Added repo guidebook for the AI delivery system with one operating system and two lanes:
+  - build lane for new features and extensions
+  - debug lane for incidents, stale data, integration faults, and contract violations
+- Added `CODEX.md` as the short Codex handoff file and configured repo-local Codex fallback discovery in `.codex/config.toml`.
+- Added `plans/` workspace structure with starter templates for:
+  - project brief
+  - incident brief
+  - plan
+  - plan status
+  - execution batch
+  - debug batch
+  - execution reply
+  - data contracts
+  - runbook
+- Added one-off scaffold helper `scripts/one_off/P001_create_plan_workspace.py` to create a full plan workspace automatically.
+- Updated `scripts/ONE_OFF_SCRIPTS.md` to register the scaffold helper.
+
+Files:
+- project_control/AI_DELIVERY_SYSTEM_GUIDE.md
+- CODEX.md
+- .codex/config.toml
+- plans/README.md
+- plans/active/.gitkeep
+- plans/archive/.gitkeep
+- plans/templates/PROJECT_BRIEF_TEMPLATE.md
+- plans/templates/INCIDENT_BRIEF_TEMPLATE.md
+- plans/templates/PLAN_TEMPLATE.md
+- plans/templates/PLAN_STATUS_TEMPLATE.md
+- plans/templates/EXECUTION_BATCH_TEMPLATE.md
+- plans/templates/DEBUG_BATCH_TEMPLATE.md
+- plans/templates/EXECUTION_REPLY_TEMPLATE.md
+- plans/templates/DATA_CONTRACTS_TEMPLATE.md
+- plans/templates/RUNBOOK_TEMPLATE.md
+- scripts/one_off/P001_create_plan_workspace.py
+- scripts/ONE_OFF_SCRIPTS.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Health snapshot checked before close:
+  - `out/system_health_checklist.csv` latest reviewed rows contained no active `warn` or `fail`
+  - `out/cycle_alerts/checklist_all.csv` latest reviewed rows contained no active `warn` or `fail`
+- Scaffold verification passed:
+  - `python scripts/one_off/P001_create_plan_workspace.py --slug "AI Workflow Pilot"`
+  - `python scripts/one_off/P001_create_plan_workspace.py --slug "verify plan"`
+  - `python scripts/one_off/P001_create_plan_workspace.py --slug "debug lane check"`
+- Result checks:
+  - build-lane scaffold created expected files successfully
+  - debug-lane scaffold created `INCIDENT_BRIEF.md` and `DEBUG_BATCH_001.md`
+  - final scaffold output reported `files_created=9`
+- Cleanup completed:
+  - temporary verification plan folders removed after proof
+
+Carryover:
+- None
+
+Next:
+- None
+---
+[2026-04-16 11:24 UTC] Ticket: AI planning system monitored validation and coding-plan persistence
+Layer: Repo planning and Codex execution workflow
+Scope: Tighten the middle of the repo workflow so multi-phase work uses a durable coding plan, runtime monitoring is Codex-owned in bounded proof windows, and active plans do not stall in a generic wait state.
+
+Change:
+- Added mandatory monitoring-ownership and phase-persistence rules to `AGENTS.md`.
+- Updated `AI_PROCESS_USER_GUIDE.md`, `CODEX.md`, and `plans/README.md` so the standard flow is now:
+  - brief
+  - plan
+  - coding plan
+  - batch
+  - isolated proof
+  - monitored validation
+  - reply or parked checkpoint
+- Added `plans/templates/CODING_PLAN_TEMPLATE.md`.
+- Expanded plan templates so status, execution, and reply files carry monitoring cadence, thresholds, and timeout rules.
+- Updated `scripts/one_off/P001_create_plan_workspace.py` so new plan workspaces scaffold `CODING_PLAN.md` automatically.
+- Added `plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md` and linked the active F plan to coding-plan control.
+- Updated active H plan files so runtime proof is described as `monitored validation in progress` or `pending next H proof window`, not `monitor and wait`.
+
+Files:
+- AGENTS.md
+- AI_PROCESS_USER_GUIDE.md
+- CODEX.md
+- plans/README.md
+- plans/templates/CODING_PLAN_TEMPLATE.md
+- plans/templates/PLAN_STATUS_TEMPLATE.md
+- plans/templates/EXECUTION_BATCH_TEMPLATE.md
+- plans/templates/EXECUTION_REPLY_TEMPLATE.md
+- scripts/one_off/P001_create_plan_workspace.py
+- plans/active/f-cycle-sales-history-truth-v2/PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- plans/active/h-repricer-strategy-alignment-v1/PLAN.md
+- plans/active/h-repricer-strategy-alignment-v1/PLAN_STATUS.md
+- plans/active/h-repricer-strategy-alignment-v1/CODING_PLAN.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable to this workflow change
+
+Evidence:
+- Existing health snapshot reviewed before close:
+  - `out/system_health_checklist.csv` currently shows two active warns:
+    - `h_suppression_cases_required_fields_non_blank`
+    - `h_suppression_reactivation_required_fields_non_blank`
+  - these warns were not changed by this ticket
+- Scaffold verification passed:
+  - `python scripts/one_off/P001_create_plan_workspace.py --slug temp-coding-plan-proof`
+  - result reported `files_created=10`
+  - created workspace included `CODING_PLAN.md`
+- Cleanup completed:
+  - temporary verification plan folder removed after proof
+- Active-plan wording check passed:
+  - H active plan files now use monitored-validation and park wording instead of `monitor and wait`
+  - F active plan now has a durable `CODING_PLAN.md`
+
+Carryover:
+- None
+
+Next:
+- Use the upgraded scaffold and coding-plan flow on the next new multi-phase ticket
+---
+[2026-04-16 11:31 UTC] Ticket: Passive monitoring notification suppression
+Layer: Repo planning and Codex monitoring behavior
+Scope: Stop Codex from interrupting the user during routine monitored-validation intervals by making passive monitoring silent unless a real decision or milestone is reached.
+
+Change:
+- Added passive-monitoring and user-interruption control rules to `AGENTS.md`.
+- Defined that monitored validation is silent by default once the user approves the monitoring block.
+- Limited user-facing interruptions to:
+  - phase completion
+  - next approved coding phase auto-start
+  - new or worse alert severity
+  - contradiction to the current root-cause theory
+  - monitoring timeout that blocks automatic continuation
+  - approval-required next action
+- Updated `AI_PROCESS_USER_GUIDE.md` and `CODEX.md` so passive monitoring is part of the standard operating flow.
+- Expanded plan templates to carry notification mode and interruption thresholds.
+- Updated active H and F coding-plan artifacts so monitoring is explicitly passive rather than conversational.
+
+Files:
+- AGENTS.md
+- AI_PROCESS_USER_GUIDE.md
+- CODEX.md
+- plans/templates/PLAN_STATUS_TEMPLATE.md
+- plans/templates/EXECUTION_BATCH_TEMPLATE.md
+- plans/templates/EXECUTION_REPLY_TEMPLATE.md
+- plans/templates/CODING_PLAN_TEMPLATE.md
+- plans/active/h-repricer-strategy-alignment-v1/CODING_PLAN.md
+- plans/active/h-repricer-strategy-alignment-v1/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- WORK_LOG.md
+
+State:
+- process rule fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Existing health snapshot reviewed before close:
+  - `out/system_health_checklist.csv` still shows active WARN rows:
+    - `h_suppression_cases_required_fields_non_blank`
+    - `h_suppression_reactivation_required_fields_non_blank`
+  - these WARNs were not changed by this ticket
+- Rule and template consistency check passed via repo search:
+  - passive-monitoring notification controls now appear in `AGENTS.md`, `CODEX.md`, plan templates, and active H plan files
+- No routine monitoring-interval chat output is required by the updated repo rules unless the interruption threshold is met
+
+Carryover:
+- None
+
+Next:
+- Apply the passive-monitoring threshold on the next runtime-owned monitored-validation ticket so interval checks stay silent unless a real decision point is reached
+---
+[2026-04-16 11:52 UTC] Ticket: O restock pack-aware mock quantity path
+Layer: O flow planning and operator restock path
+Scope: Complete Batch 001 of the mock-data-first restock task by adding a small pack-aware quantity profile through O source view and the operator reorder submit path, without changing Product_DB authority or using real SKU onboarding.
+
+Change:
+- Added pack-aware mock quantity fields to the O restock source contract.
+- Built quantity-profile derivation in `O001_build_restock_source_view.py` so mock rows can carry:
+  - supplier SKU
+  - barcode
+  - order quantity mode
+  - sell-pack quantity
+  - supplier case quantity
+  - step size
+  - repack or bundle flags
+  - plain-English quantity label
+- Updated `O400_operator_ui.py` so the reorder board:
+  - shows quantity meaning in the `Qtys` column
+  - prefills operator quantity in packs or bundles when the mock profile says it should
+  - converts the operator-entered pack count back to raw units only when writing the decision event
+- Added focused tests for:
+  - source-view pack profile fields
+  - reorder input pack display
+  - submit-time raw-unit conversion
+- Updated the active plan artifacts and execution reply for the restock task.
+
+Files:
+- scripts/flows/O/_schemas.py
+- scripts/flows/O/O001_build_restock_source_view.py
+- scripts/flows/O/O400_operator_ui.py
+- tests/test_o001_restock_source_view.py
+- tests/test_o_ui_operator_view.py
+- plans/active/o-restock-pack-and-db-through-use-v1/CODING_PLAN.md
+- plans/active/o-restock-pack-and-db-through-use-v1/PLAN_STATUS.md
+- plans/active/o-restock-pack-and-db-through-use-v1/EXECUTION_BATCH_001.md
+- plans/active/o-restock-pack-and-db-through-use-v1/EXECUTION_BATCH_001_REPLY.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable to this workflow change
+
+Evidence:
+- Targeted proof passed:
+  - `pytest tests/test_o000_paths_and_schemas.py tests/test_o001_restock_source_view.py tests/test_o_ui_operator_view.py`
+  - result: `32 passed in 4.66s`
+- Latest health snapshot reviewed before close:
+  - `out/system_health_checklist.csv` file time: `2026-04-16 11:48 UTC`
+  - active WARN rows:
+    - `h_strategy_no_write_failed_streak_single_rival_reset`
+    - `h_strategy_sample_size_single_rival_reset`
+  - active FAIL rows: none
+- No sheet writes were made.
+- No Product_DB authority change was made.
+- No live-loop ownership or scheduler behavior was changed.
+
+Carryover:
+- None
+
+Next:
+- Batch 002 should add pack-aware blocker reporting and a slow operator walkthrough using the fake SKU set before any approved real-SKU onboarding
+---
+[ UTC] Ticket: Forced proof windows instead of next-cycle waiting
+Layer: Agent governance, plan templates, and runtime proof workflow
+Scope: Remove vague next-scheduled-cycle waiting as the default for single-run sign-off, add a safe forced-proof planner, and update the active H plan to use boundary-safe proof windows.
+
+Change:
+- Added mandatory forced-proof-window rules to AGENTS.md so Codex must prefer a safe owned proof path over vague next-cycle waiting for narrow sign-off and runtime validation.
+- Updated CODEX.md, AI_PROCESS_USER_GUIDE.md, and project_control/OPERATING_SYSTEM.md so the execution workflow now calls for forced proof at flow boundaries before passive waiting.
+- Added project_control/FORCED_PROOF_WINDOWS.md as the process guide for A, B, E, and H safe proof windows, including the no-mid-cycle-check rule.
+- Added scripts/one_off/P002_plan_forced_proof_window.py as a read-only helper that inspects locks and markers, reports the safe boundary, and prints the proof command sequence for A, B, E, or H.
+- Added focused tests in 	ests/test_p002_plan_forced_proof_window.py.
+- Updated plan templates so new coding plans, runbooks, and batch files must record the forced proof window and the fallback blocker.
+- Updated the active H repricer plan artifacts to replace 
+ext scheduled A015 sign-off wording with the H forced proof window.
+
+Files:
+- AGENTS.md
+- CODEX.md
+- AI_PROCESS_USER_GUIDE.md
+- project_control/OPERATING_SYSTEM.md
+- project_control/FORCED_PROOF_WINDOWS.md
+- scripts/ONE_OFF_SCRIPTS.md
+- scripts/one_off/P002_plan_forced_proof_window.py
+- tests/test_p002_plan_forced_proof_window.py
+- plans/templates/CODING_PLAN_TEMPLATE.md
+- plans/templates/RUNBOOK_TEMPLATE.md
+- plans/templates/EXECUTION_BATCH_TEMPLATE.md
+- plans/templates/DEBUG_BATCH_TEMPLATE.md
+- plans/templates/PLAN_STATUS_TEMPLATE.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/PLAN.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/CODING_PLAN.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/PLAN_STATUS.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/RUNBOOK.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/DEBUG_BATCH_001.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/EXECUTION_BATCH_001.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/EXECUTION_BATCH_001_REPLY.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/SIGN_OFF_REVIEW_2026-04-17.md
+
+State:
+- process rule fix applied
+- isolated verification passed
+- live loop verification not applicable to this governance ticket
+
+Evidence:
+- Focused helper tests passed:
+  - python -m pytest tests/test_p002_plan_forced_proof_window.py -q -p no:cacheprovider
+  - result: 6 passed in 0.70s
+- Compile check passed:
+  - python -m py_compile scripts/one_off/P002_plan_forced_proof_window.py tests/test_p002_plan_forced_proof_window.py
+- Live helper output verified on current repo state:
+  - python scripts/one_off/P002_plan_forced_proof_window.py --flow h --format json
+  - current result: proof_window_status=pause_required, can_proceed_without_next_cycle=true
+- No A, B, E, or H proof cycle was run by this ticket; this ticket changed the process and the proof planner only.
+- Current health snapshot remains stale and still shows active alert rows:
+  - latest out/system_health_checklist.csv mtime: 2026-04-17T05:04:49Z
+  - FAIL: h_ceiling_effective_floor_integrity
+  - WARN: h_strategy_expired_share_multi_seller_ladder_cap
+  - WARN: h_strategy_sample_size_single_rival_reset
+  - WARN: h_spapi_lock_present
+
+Carryover:
+- None
+
+Next:
+- On the next runtime-owned ticket, use python scripts/one_off/P002_plan_forced_proof_window.py --flow <a|b|e|h> before sign-off so proof runs at a safe boundary instead of waiting for the next scheduled cycle
+---
+[2026-04-17 08:48 UTC] Ticket: Forced proof windows instead of next-cycle waiting (corrective clean entry)
+Layer: Agent governance, plan templates, and runtime proof workflow
+Scope: Remove vague next-scheduled-cycle waiting as the default for single-run sign-off, add a safe forced-proof planner, and update the active H plan to use boundary-safe proof windows.
+
+Change:
+- Added mandatory forced-proof-window rules to AGENTS.md so Codex must prefer a safe owned proof path over vague next-cycle waiting for narrow sign-off and runtime validation.
+- Updated CODEX.md, AI_PROCESS_USER_GUIDE.md, and project_control/OPERATING_SYSTEM.md so the execution workflow now calls for forced proof at flow boundaries before passive waiting.
+- Added project_control/FORCED_PROOF_WINDOWS.md as the process guide for A, B, E, and H safe proof windows, including the no-mid-cycle-check rule.
+- Added scripts/one_off/P002_plan_forced_proof_window.py as a read-only helper that inspects locks and markers, reports the safe boundary, and prints the proof command sequence for A, B, E, or H.
+- Added focused tests in tests/test_p002_plan_forced_proof_window.py.
+- Updated plan templates so new coding plans, runbooks, and batch files must record the forced proof window and the fallback blocker.
+- Updated the active H repricer plan artifacts to replace next-scheduled-A015 sign-off wording with the H forced proof window.
+
+Files:
+- AGENTS.md
+- CODEX.md
+- AI_PROCESS_USER_GUIDE.md
+- project_control/OPERATING_SYSTEM.md
+- project_control/FORCED_PROOF_WINDOWS.md
+- scripts/ONE_OFF_SCRIPTS.md
+- scripts/one_off/P002_plan_forced_proof_window.py
+- tests/test_p002_plan_forced_proof_window.py
+- plans/templates/CODING_PLAN_TEMPLATE.md
+- plans/templates/RUNBOOK_TEMPLATE.md
+- plans/templates/EXECUTION_BATCH_TEMPLATE.md
+- plans/templates/DEBUG_BATCH_TEMPLATE.md
+- plans/templates/PLAN_STATUS_TEMPLATE.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/PLAN.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/CODING_PLAN.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/PLAN_STATUS.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/RUNBOOK.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/DEBUG_BATCH_001.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/EXECUTION_BATCH_001.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/EXECUTION_BATCH_001_REPLY.md
+- plans/active/h-repricer-ceiling-floor-conversion-v2/SIGN_OFF_REVIEW_2026-04-17.md
+
+State:
+- process rule fix applied
+- isolated verification passed
+- live loop verification not applicable to this governance ticket
+
+Evidence:
+- Focused helper tests passed:
+  - python -m pytest tests/test_p002_plan_forced_proof_window.py -q -p no:cacheprovider
+  - result: 6 passed in 0.70s
+- Compile check passed:
+  - python -m py_compile scripts/one_off/P002_plan_forced_proof_window.py tests/test_p002_plan_forced_proof_window.py
+- Live helper output verified on current repo state:
+  - python scripts/one_off/P002_plan_forced_proof_window.py --flow h --format json
+  - current result: proof_window_status=pause_required, can_proceed_without_next_cycle=true
+- No A, B, E, or H proof cycle was run by this ticket; this ticket changed the process and the proof planner only.
+- Current health snapshot remains stale and still shows active alert rows:
+  - latest out/system_health_checklist.csv mtime: 2026-04-17T05:04:49Z
+  - FAIL: h_ceiling_effective_floor_integrity
+  - WARN: h_strategy_expired_share_multi_seller_ladder_cap
+  - WARN: h_strategy_sample_size_single_rival_reset
+  - WARN: h_spapi_lock_present
+
+Carryover:
+- None
+
+Next:
+- On the next runtime-owned ticket, use python scripts/one_off/P002_plan_forced_proof_window.py --flow <a|b|e|h> before sign-off so proof runs at a safe boundary instead of waiting for the next scheduled cycle
+---
+[2026-04-17 16:41 UTC] Ticket: Morning MOT owns routine alerts and quiet autofix flow
+Layer: Agent governance and morning operations process
+Scope: Replace the current all-conversation alert behavior with morning-MOT-owned health review, quiet autofix for clear blockers, and milestone-only user interruption.
+
+Change:
+- Replaced the old AGENTS rule that forced every FAIL and WARN into every conversation.
+- Made the morning MOT the main operator-facing alert sweep and triage window.
+- Added quiet-fix rules so Codex can sort issues into fix now, monitor in MOT only, stale evidence only, or needs user decision.
+- Added quiet morning-MOT execution rules so Codex fixes clear blockers, tests them, and proves them without routine checkpoint prompts.
+- Kept hard boundaries in place: no sheet changes without approval, no local DB alignment changes without approval, no overlapping loop runs, and no scope widening.
+- Updated the A-script approval rule so an explicit morning-MOT fix-execution request can include the narrow proof run it needs.
+- Updated the morning MOT checklist with quiet-mode behavior, autofix packaging rules, and a new quiet-fix preset prompt.
+- Updated the short operator guides so Codex now treats routine alerts as morning-MOT digest material instead of repeating them in unrelated replies.
+
+Files:
+- AGENTS.md
+- project_control/MORNING_MOT_CHECKLIST.md
+- AI_PROCESS_USER_GUIDE.md
+- CODEX.md
+- project_control/OPERATING_SYSTEM.md
+
+State:
+- process rule fix applied
+- consistency review passed
+- live loop verification not applicable to this governance ticket
+
+Evidence:
+- Rule and guide consistency checked with repo search across:
+  - AGENTS.md
+  - project_control/MORNING_MOT_CHECKLIST.md
+  - AI_PROCESS_USER_GUIDE.md
+  - CODEX.md
+  - project_control/OPERATING_SYSTEM.md
+- New documented behavior now includes:
+  - morning MOT owns routine alert review
+  - quiet fix mode for clear blockers
+  - milestone-only interruption for morning fix execution
+  - morning-MOT fix execution may include the narrow A proof run it needs
+- No runtime loop, scheduler, sheet, or DB change was made by this ticket.
+
+Carryover:
+- None
+
+Next:
+- Use the new preset prompt: Run the morning MOT in quiet fix mode. Sort the issues, fix the clear blockers, test them, prove them, and only interrupt me if you need a real decision.
+---
+[2026-04-17 22:12 UTC] Ticket: E sales-truth closeout v2 and overnight runtime readiness
+Layer: E flow operator truth, publish contract, health gates, and overnight runtime check
+Scope: Finish the operator-facing sales-truth closeout, prove the real E cycle order, confirm E flow health, and verify overnight background owners are live before sign-out.
+
+Change:
+- Repaired the E study report so it now rebuilds from the corrected performance summary truth.
+- Added study-report fields for truth units, velocity units, unit source, and latest daily truth state.
+- Extended the E publish contract to include the study report, sales-truth reconciliation, and daily sales-truth outputs.
+- Added A015 guards for stale study-report output and study-report truth misalignment.
+- Fixed A015 script bootstrap so it can run correctly when called as a subprocess from the E cycle.
+- Added focused tests for E005, E010, and the new A015 guards.
+- Ran the real E cycle order with publish disabled and confirmed fresh E health with zero fail and zero warn.
+- Verified the overnight runtime owners after the change and confirmed the live B and H loops remained active.
+
+Files:
+- scripts/flows/E/E005_build_study_report.py
+- scripts/flows/E/E010_publish_e_outputs.py
+- scripts/flows/A/A015_build_system_health_check.py
+- tests/test_e005_build_study_report.py
+- tests/test_e010_publish_e_outputs.py
+- tests/test_a015_health_check_runtime.py
+- plans/active/e-sales-truth-closeout-v2/REVIEW_FINDINGS.md
+- plans/active/e-sales-truth-closeout-v2/PLAN.md
+- plans/active/e-sales-truth-closeout-v2/CODING_PLAN.md
+- plans/active/e-sales-truth-closeout-v2/FINAL_PASS_CRITERIA.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed for the E flow
+- overnight runtime owners confirmed live for B and H
+
+Evidence:
+- Scoped E closeout tests passed:
+  - python -m pytest tests/test_e002_build_roi_snapshot.py tests/test_e004_build_performance_summary.py tests/test_e005_build_study_report.py tests/test_e006_build_sales_truth_reconciliation.py tests/test_e007_build_sku_daily_sales_truth.py tests/test_e010_publish_e_outputs.py tests/test_e_split_health_gate.py -q
+  - result: 19 passed
+- Targeted A015 tests passed:
+  - python -m pytest tests/test_a015_health_check_runtime.py -k "a015_script_help_bootstraps_imports or study_report_fresh or study_report_truth_alignment or daily_sales_truth or performance_units_alignment" -q
+  - result: 6 passed
+- Real E cycle proof passed:
+  - python scripts/cycles/run_E_cycle.py with E_ENFORCE_CADENCE=0 and E_WRITE_SHEETS=0
+  - latest successful run_id: 20260417T220919386933Z
+  - tasks_run included E001, E002, E003, E004, E005, E006, E007, and A015 profile=e
+- Fresh E health confirmed:
+  - out/cycle_alerts/checklist_E_split.csv mtime: 2026-04-17T22:09:38Z
+  - fail_count=0
+  - warn_count=0
+- Operator report freshness confirmed:
+  - out/sku_performance_summary.csv mtime: 2026-04-17T22:09:24Z
+  - out/e_study_report.csv mtime: 2026-04-17T22:09:25Z
+- Sample proof confirmed:
+  - 0G-JB6S-PN34 study report now matches performance summary economics
+  - A2-T2AC-TW3L study report now shows latest_daily_truth_date=2026-04-17, latest_daily_truth_state=provisional_order_master, latest_daily_truth_units=6, latest_daily_truth_profit_gbp=4.98
+- Overnight owner check confirmed:
+  - B loop live lock: out/systems/B/live/B_cycle.lock pid=20836 heartbeat=2026-04-17T22:11:30Z
+  - H loop live lock: out/systems/H/live/H_pricing_cycle.lock pid=19200 heartbeat=2026-04-17T22:11:30Z
+  - No active maintenance markers present
+  - No H kill marker present
+  - Home-time supervisor still running via run_home_time_monitor_supervisor.bat
+- Global snapshot remains stale and is not proof for this ticket:
+  - latest out/system_health_checklist.csv mtime: 2026-04-17T05:04:49Z
+  - stale FAIL: h_ceiling_effective_floor_integrity
+  - stale WARN: h_strategy_expired_share_multi_seller_ladder_cap
+  - stale WARN: h_strategy_sample_size_single_rival_reset
+  - stale WARN: h_spapi_lock_present
+
+Carryover:
+- None
+
+Next:
+- Treat the stale global H-side alerts as a separate runtime ticket; the E closeout and overnight E/B/H readiness work is complete.
+---
+[2026-04-18 10:53 UTC] Ticket: H/F data cleanup sign-off and follow-on strategy planning
+Layer: H/F sign-off, research, and next-ticket execution planning
+Scope: Sign off the H/F cleanup ticket using current proof, then create the next researched plan for overlap recovery, tactic sample growth, and shadow strategy optimisation.
+
+Change:
+- Confirmed the cleanup pass criteria remain satisfied from current runtime and H/F artifacts.
+- Wrote the sign-off pack for `plans/active/h-f-data-cleanup-2026-04-18`.
+- Created a new active plan: `plans/active/h-f-overlap-sample-strategy-v1`.
+- Added the new plan pack:
+  - project brief
+  - research report
+  - blueprint
+  - coding plan
+  - data contracts
+  - runbook
+  - Batch 001 execution pack
+- Did not change runtime code, loops, sheets, or DB.
+
+Files:
+- plans/active/h-f-data-cleanup-2026-04-18/PLAN_STATUS.md
+- plans/active/h-f-data-cleanup-2026-04-18/CODING_PLAN.md
+- plans/active/h-f-data-cleanup-2026-04-18/SIGNOFF_2026-04-18.md
+- plans/active/h-f-overlap-sample-strategy-v1/PROJECT_BRIEF.md
+- plans/active/h-f-overlap-sample-strategy-v1/RESEARCH_REPORT_2026-04-18.md
+- plans/active/h-f-overlap-sample-strategy-v1/PLAN.md
+- plans/active/h-f-overlap-sample-strategy-v1/CODING_PLAN.md
+- plans/active/h-f-overlap-sample-strategy-v1/PLAN_STATUS.md
+- plans/active/h-f-overlap-sample-strategy-v1/DATA_CONTRACTS.md
+- plans/active/h-f-overlap-sample-strategy-v1/RUNBOOK.md
+- plans/active/h-f-overlap-sample-strategy-v1/EXECUTION_BATCH_001.md
+- plans/active/h-f-overlap-sample-strategy-v1/EXECUTION_BATCH_001_REPLY.md
+- WORK_LOG.md
+
+State:
+- cleanup ticket signed off
+- next H/F optimisation ticket planned and ready for Batch 001
+- no runtime code fix applied in this ticket
+- no live loop verification required for the new plan pack
+
+Evidence:
+- Cleanup sign-off baseline:
+  - latest H ceiling slice `run_id=20260418T102258Z` with `0` ceiling-below-floor rows
+  - H daily impossible rows = `0`
+  - H live sample truth exposed with stale marker in `out/h_pricing_cycle_state.json`
+  - H/F health = `fail=0`, `warn=0`
+- Next-plan starting facts:
+  - `identity_rows_asin_in_h_scope=0` out of `6979` ASIN-bearing rows
+  - alignment rows = `95` with `65` `missing_expected_baseline`
+  - tactic sample counts:
+    - `multi_seller_ladder_cap=87/150`
+    - `single_rival_reset=5/30`
+    - `suppression_reactivation=62/20`
+
+Carryover:
+- None
+
+Next:
+- Start Batch 001 of `plans/active/h-f-overlap-sample-strategy-v1`: build the overlap expansion pack and summary without touching H runtime.
+
+---
+[2026-04-18 19:27 UTC] Ticket: Archive finished plans and prepare next hometime handoff
+Layer: Planning administration and next-ticket handoff
+Scope: Archive finished active plans with signed-off proof, update live references that would break after archive, and create a hometime-mode prompt for the next execution-ready plan.
+
+Change:
+- Archived `h-f-data-cleanup-2026-04-18` from `plans/active/` to `plans/archive/2026/`.
+- Archived `e-sales-truth-closeout-v2` from `plans/active/` to `plans/archive/2026/`.
+- Added `ARCHIVE_NOTE.md` to both archived plan folders so the close reason and carry-forward state are explicit.
+- Updated the overlap strategy project brief to point to the archived cleanup plan path instead of the old active path.
+- Added `plans/active/h-f-overlap-sample-strategy-v1/HOMETIME_PROMPT.md` as the handoff prompt for the next Codex chat.
+- Cleaned internal archive references so moved plan docs point at their archive locations.
+
+Files:
+- plans/archive/2026/h-f-data-cleanup-2026-04-18/ARCHIVE_NOTE.md
+- plans/archive/2026/h-f-data-cleanup-2026-04-18/CODING_PLAN.md
+- plans/archive/2026/e-sales-truth-closeout-v2/ARCHIVE_NOTE.md
+- plans/archive/2026/e-sales-truth-closeout-v2/CODING_PLAN.md
+- plans/active/h-f-overlap-sample-strategy-v1/PROJECT_BRIEF.md
+- plans/active/h-f-overlap-sample-strategy-v1/HOMETIME_PROMPT.md
+- WORK_LOG.md
+
+State:
+- finished cleanup and E closeout plans are no longer in `plans/active/`
+- next execution-ready active plan remains `h-f-overlap-sample-strategy-v1`
+- hometime handoff prompt is ready for a new Codex ticket
+- no runtime code, loops, Sheets, or DB ownership were changed in this ticket
+
+Evidence:
+- Cleanup archive basis:
+  - `plans/archive/2026/h-f-data-cleanup-2026-04-18/PLAN_STATUS.md` records `PASS - data clean enough to sign off today`
+  - same status file records `sign-off pack completed: yes`
+- E closeout archive basis:
+  - `plans/archive/2026/e-sales-truth-closeout-v2/CODING_PLAN.md` records `Status: Complete for the E flow`
+  - same coding plan records fresh E health with `fail count: 0` and `warn count: 0`
+  - `plans/archive/2026/e-sales-truth-closeout-v2/FINAL_PASS_CRITERIA.md` states all closeout gates are met
+- Next-ticket handoff:
+  - `plans/active/h-f-overlap-sample-strategy-v1/HOMETIME_PROMPT.md` exists and defines the hometime execution order, proof standard, and archive rule
+
+Carryover:
+- None
+
+Next:
+- Open a new chat and use `plans/active/h-f-overlap-sample-strategy-v1/HOMETIME_PROMPT.md` to execute the overlap strategy plan in hometime mode.
+
+---
+[2026-04-18 20:16 UTC] Ticket: Verify overlap archive correctness and plan the next hometime task
+Layer: Archive verification and next execution handoff
+Scope: Check whether the overlap archive and prior handoff were done correctly, repair any broken archive-state references, record the missing canonical log entry gap, and prepare the next active task as a hometime-mode package.
+
+Change:
+- Verified that `h-f-overlap-sample-strategy-v1` has already been executed and archived with sign-off proof under `plans/archive/2026/`.
+- Confirmed the archive was not fully clean because:
+  - several archived docs still pointed at the old active path
+  - the overlap archive completion was not reflected in `WORK_LOG.md`
+- Repaired stale archive references in the cleanup archive note and overlap archive docs.
+- Added `plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md` as the next hometime execution package.
+- Updated `plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md` to point at the new hometime package.
+
+Files:
+- plans/archive/2026/h-f-data-cleanup-2026-04-18/ARCHIVE_NOTE.md
+- plans/archive/2026/h-f-overlap-sample-strategy-v1/PROJECT_BRIEF.md
+- plans/archive/2026/h-f-overlap-sample-strategy-v1/EXECUTION_BATCH_001.md
+- plans/archive/2026/h-f-overlap-sample-strategy-v1/EXECUTION_BATCH_001_REPLY.md
+- plans/archive/2026/h-f-overlap-sample-strategy-v1/HOMETIME_PROMPT.md
+- plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- Overlap archive is now internally consistent and evidence-backed.
+- The previous statement that `h-f-overlap-sample-strategy-v1` remained active was stale; it is already archived.
+- The true next active root-cause task is F Phase 2B inside `f-cycle-sales-history-truth-v2`.
+- No runtime code, loops, Sheets, or DB ownership were changed in this ticket.
+
+Evidence:
+- Overlap archive proof:
+  - `plans/archive/2026/h-f-overlap-sample-strategy-v1/PLAN_STATUS.md` records `archive-ready for Phases 1 to 4`
+  - `plans/archive/2026/h-f-overlap-sample-strategy-v1/SIGNOFF_2026-04-18.md` records `PASS - archive ready for Phases 1 to 4`
+  - required outputs exist:
+    - `out/analysis_reports/hf_scope_expansion_candidates_latest.csv`
+    - `out/analysis_reports/hf_scope_expansion_summary_latest.csv`
+    - `out/analysis_reports/hf_strategy_scorecard_latest.csv`
+    - `out/reports/hf_strategy_review_pack_latest.csv`
+    - `out/analysis_reports/hf_strategy_experiment_queue_latest.csv`
+  - deterministic proof file exists:
+    - `plans/archive/2026/h-f-overlap-sample-strategy-v1/FULL_PACK_CLEAN_RUN_PROOF.csv`
+- Next-task rationale:
+  - overlap sign-off shows `outside_h_scope_with_capture_path=6979`
+  - overlap sign-off shows every experiment queue row remains `risk_gate_status=fail`
+  - this keeps live H work out of scope and points next work to F-side capture recovery
+- Next hometime package:
+  - `plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md` now defines the bounded Phase 2B recovery window, proof chain, restore proof, and park condition
+
+Carryover:
+- None
+
+Next:
+- Open a new chat and use `plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md` to execute F Batch 002 in hometime mode.
+[2026-04-19 05:43 UTC] Ticket: F Phase 2B hometime live subset recovery and queue restore
+Layer: F flow scrape coverage recovery, rebuild proof, and overnight ownership restore
+Scope: Execute Batch 002 Phase 2B end to end in hometime mode with overlap-safe subset run, rebuild outputs, capture before or after evidence, and restore the stocklist supplier overnight path.
+
+Change:
+- Detected and paused an overlapping F owner run on stocklist_supplier before subset apply.
+- Built the mixed live-ASIN validation pack for completed-month, zero-history, and missing-basis cases.
+- Built and applied the targeted subset queue from missing completed or replay basis rows.
+- Ran a bounded targeted F061 rescrape recovery window on the subset queue.
+- Rebuilt F070 to F074, then rebuilt F004 and F005.
+- Restored the full supplier queue from canonical_current using F062.
+- Resumed overnight ownership with un_F_supplier_full_legacy_scan.bat stocklist_supplier.
+- Updated Phase 2B plan and proof artifacts with factual runtime evidence.
+
+Files:
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_002.md
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_002_REPLY.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live subset recovery proof completed
+- full queue restored and overnight runner ownership confirmed for stocklist_supplier
+
+Evidence:
+- Overlap safety proof:
+  - active overlap detected on stocklist_supplier (un_F_shure_full_legacy_scan.bat + F061 --loop)
+  - overlap processes paused before subset apply (pids 25872, 22032)
+- Validation pack proof:
+  - python scripts/one_off/F006_build_live_asin_validation_pack.py --completed-count 4 --zero-history-count 2 --missing-basis-count 6
+  - output rows: 12 (	rusted_completed_month=4, explicit_zero_history=2, missing_completed_month_basis=6)
+- Subset proof:
+  - python scripts/one_off/F007_prepare_targeted_rescrape_subset.py --supplier-id stocklist_supplier --queue-source auto --apply --output-dir out/analysis_reports
+  - selected subset rows: 2248
+  - supplier active rows: 32872 -> 2248
+- Targeted run proof:
+  - python scripts/flows/F/F061_run_legacy_first_checks_local.py --supplier-id stocklist_supplier --max-rows 25 --scrape-mode legacy_module --price-source native_comp_summary --pricing-min-interval-seconds 32 --legacy-scanner-root c:\Users\Luke\Desktop\SellerOne 2.0\scripts\flows\F\legacy_scanner_2_1
+  - processed rows: 25
+  - scrape success rows: 24
+  - subset pending rows after run: 2223
+- Rebuild proof:
+  - F070: rows 1
+  - F071: rows 2359 (eady=2155, manual_review=204)
+  - F072: rows 771255
+  - F073: rows 2359 (ail=1886, pass=269, manual_review=204)
+  - F074: status counts ok=15, warn=1
+  - F004: rows 18, mismatch rows 2
+  - F005: rows 28681, trusted rows 2264, predicted rows 6792
+- Coverage remeasurement proof:
+  - required historical baseline reference: evidence 1581, completed-month 330, missing-with-ASIN 1251
+  - live window baseline: evidence 4598, completed-month 2241, replay-basis 2354, missing-with-ASIN 2244
+  - after run and rebuild: evidence 4598, completed-month 2264 (+23), replay-basis 2379 (+25), missing-with-ASIN 2219 (-25)
+- Health and queue restore proof:
+  - _backtest_demand_basis_integrity = ok
+  - _backtest_manual_review_share = ok ( .086477)
+  - _backtest_health_staleness = warn (stale_sources:input_view|replay_daily|summary)
+  - restore command: python scripts/flows/F/F062_reset_supplier_test_mode.py --supplier-id stocklist_supplier --no-clear-review-live
+  - restored supplier active rows: 42663
+  - overnight owner active: un_F_supplier_full_legacy_scan.bat stocklist_supplier with child F061 --supplier-id stocklist_supplier --loop
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket for the Phase 3 gate decision using the fresh Phase 2B coverage and health evidence.
+
+---
+[2026-04-19 05:51 UTC] Ticket: F Phase 3 execution planning from fresh Phase 2B proof
+Layer: F flow execution planning
+Scope: Turn the fresh Phase 2B recovery proof into the next execution-ready task package for price-qualified demand hardening.
+
+Change:
+- Created `EXECUTION_BATCH_003.md` for the next F task.
+- Expanded `CODING_PLAN.md` with a concrete Phase 3 section:
+  - goal
+  - allowed files
+  - isolated verification
+  - monitored validation
+  - success threshold
+  - park condition
+- Updated `PLAN_STATUS.md` so Batch 003 is marked ready and the next execution package is explicit.
+- Refreshed `HOMETIME_PROMPT.md` so the next Codex handoff now points at Batch 003 instead of the completed Batch 002 package.
+
+Files:
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_003.md
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md
+- WORK_LOG.md
+
+State:
+- Batch 002 remains complete and proven.
+- Batch 003 is now the next execution-ready task.
+- Phase 3 will harden the price-qualified demand contract before any seasonality or recent-performance work starts.
+- No runtime code or live proof was executed in this planning ticket.
+
+Evidence:
+- Phase 2B carry-forward facts used for the plan:
+  - completed-month rows: `2264`
+  - missing full-chart rows with ASIN: `2219`
+  - `f_backtest_demand_basis_integrity = ok`
+  - `f_backtest_manual_review_share = ok (0.086477)`
+  - `f_backtest_health_staleness = warn`
+- Root-cause decision for Batch 003:
+  - scrape coverage improved enough to move forward
+  - the next blocker is qualification-contract clarity, not another immediate routing-only pass
+
+Carryover:
+- None
+
+Next:
+- Execute `plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_003.md` in hometime mode.
+
+---
+[2026-04-19 05:44 UTC] Ticket: F Phase 2B hometime live subset recovery and queue restore - correction entry
+Layer: F flow scrape coverage recovery, rebuild proof, and overnight ownership restore
+Scope: Append-only correction entry that supersedes the previous malformed log text for this same ticket.
+
+Change:
+- This entry supersedes the immediately previous malformed WORK_LOG entry for the same ticket.
+- Completed Phase 2B execution in hometime mode using overlap-safe subset recovery.
+- Paused overlapping owner run, applied targeted subset, ran bounded recovery, rebuilt F outputs, restored full queue, and resumed overnight owner path.
+- Updated active plan artifacts with factual proof status.
+
+Files:
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_002.md
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_002_REPLY.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live subset recovery proof completed
+- full queue restored and overnight runner ownership confirmed for stocklist_supplier
+
+Evidence:
+- Overlap safety:
+  - overlap owner detected on stocklist_supplier and paused before subset apply (pids 25872, 22032)
+- Validation pack:
+  - F006 run produced 12 rows (trusted_completed_month=4, explicit_zero_history=2, missing_completed_month_basis=6)
+- Targeted subset:
+  - F007 apply selected 2248 rows
+  - supplier active rows changed 32872 to 2248 for recovery window
+- Targeted recovery run:
+  - F061 bounded run processed 25 rows, scrape success rows 24, subset pending rows after run 2223
+- Rebuild chain:
+  - F070 rows 1
+  - F071 rows 2359 (ready=2155, manual_review=204)
+  - F072 rows 771255
+  - F073 rows 2359 (fail=1886, pass=269, manual_review=204)
+  - F074 status counts ok=15, warn=1
+  - F004 rows 18 with mismatch_rows=2
+  - F005 rows 28681 with trusted_rows=2264 and predicted_rows=6792
+- Coverage remeasurement:
+  - required historical baseline reference: evidence=1581, completed_month=330, missing_with_asin=1251
+  - live window baseline: evidence=4598, completed_month=2241, replay_basis=2354, missing_with_asin=2244
+  - after run and rebuild: evidence=4598, completed_month=2264 (+23), replay_basis=2379 (+25), missing_with_asin=2219 (-25)
+- Health and restore:
+  - f_backtest_demand_basis_integrity=ok
+  - f_backtest_manual_review_share=ok (0.086477)
+  - f_backtest_health_staleness=warn (stale_sources:input_view|replay_daily|summary)
+  - F062 restore returned supplier active rows to 42663
+  - overnight owner resumed as run_F_supplier_full_legacy_scan.bat stocklist_supplier with child F061 loop process
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket for the Phase 3 gate decision using the fresh Phase 2B coverage and health evidence.
+
+---
+[2026-04-22 13:42 UTC] Ticket: B-E-F Batch 016 implementation for pass-gate decomposition
+Layer: commercial pass-structure execution
+Scope: implement the next pass-check phases by emitting blocker reasons, false-red recovery lanes, and an expanded pass panel on top of refreshed sold truth.
+
+Change:
+- Added `F017_build_pass_gate_review_pack.py` to build pass-gate decomposition, false-red recovery lanes, and the expanded pass review panel.
+- Added `test_f017_build_pass_gate_review_pack.py` for blocker and recovery classification coverage.
+- Updated the active batch docs and plan status with Batch 016 execution proof.
+
+Files:
+- scripts/one_off/F017_build_pass_gate_review_pack.py
+- tests/test_f017_build_pass_gate_review_pack.py
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_016.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Verification:
+  - `python -m py_compile scripts/one_off/F017_build_pass_gate_review_pack.py tests/test_f017_build_pass_gate_review_pack.py` -> pass
+  - `pytest tests/test_f017_build_pass_gate_review_pack.py -q` -> pass (`1`)
+- Runtime:
+  - `python scripts/one_off/F017_build_pass_gate_review_pack.py` -> pass at `2026-04-22T13:41:57Z`
+- Review pack truth:
+  - `rows_total=58`
+  - `profitable_reject_rows=12`
+  - `false_red_candidate_rows=6`
+  - `promote_to_test_buy_rows=2`
+  - `promote_to_watch_rows=4`
+  - `review_only_profitable_reject_rows=6`
+  - `tier_a_rows=3`
+  - `tier_b_rows=7`
+  - `tier_c_rows=6`
+  - `tier_d_rows=42`
+- Promoted rows:
+  - `promote_to_test_buy`: `B06WW79DX5`, `B006PFN3BW`
+  - `promote_to_watch`: `B002QGAF8S`, `B07CN7NRF7`, `B07L6H9GZ2`, `B086ZD7MG6`
+- Review-only profitable rejects:
+  - `B000PSB13C`, `B0042SI594`, `B00AOES9GE`, `B07QQDMJ6M`, `B08KFFY86W`, `B093FQYQJH`
+- Expanded panel:
+  - `expanded_panel_rows_total=18`
+  - `current_test_buy=1`
+  - `current_watch=3`
+  - `profitable_reject_gbp20_plus=12`
+  - `near_floor_review=2`
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket to decide whether promoted Tier A and Tier B rows should be accepted into the live-test lane or kept as review-only.
+
+---
+[2026-04-22 13:34 UTC] Ticket: B-E-F Batch 016 pass-structure rerun and next-phase pass checks
+Layer: commercial pass-structure planning
+Scope: rerun the current pass structure on refreshed truth and create the next staged pass-check phases.
+
+Change:
+- Reran `F011`, `F013`, and `F016` on the current local truth.
+- Added `EXECUTION_BATCH_016.md` to define the next pass-check phases.
+- Updated the active coding plan and status files to reflect the refreshed pass structure and the next staged pass-gate work.
+
+Files:
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_016.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix not applicable
+- isolated verification not applicable
+- live loop verification confirmed for the rerun outputs
+
+Evidence:
+- Rerun commands:
+  - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` -> pass at `2026-04-22T13:33:05Z`
+  - `python scripts/one_off/F013_build_live_test_readiness_pack.py` -> pass at `2026-04-22T13:33:06Z`
+  - `python scripts/one_off/F016_build_stocked_sku_vetting_report.py` -> pass at `2026-04-22T13:33:09Z`
+- Refreshed pass structure:
+  - `rows_total=58`
+  - `current_test_buy_rows=1`
+  - `current_watch_rows=3`
+  - `current_reject_rows=54`
+  - `current_ready_for_live_test_rows=1`
+- Refreshed commercial scoring:
+  - `false_green_rows=0`
+  - `false_red_rows=12`
+  - `starter_qty_too_high_rows=3`
+  - `starter_qty_too_low_rows=12`
+- Pass lanes:
+  - `test_buy`: `OPER::9188805646`
+  - `watch`: `OPER::B001ET78RY`, `OPER::B005F5TRBI`, `OPER::B0CS3VF4GK`
+- Strong-profit rejects remain material:
+  - `12` rows with `actual_profit_30d_gbp >= 20` are still `reject`
+  - common blocker pattern is inherited `recommendation_status=reject` and `starter_order_band=hold`
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket for Batch 016 implementation: pass-gate decomposition, false-red recovery lane, expanded pass panel, and staged shadow-live checks.
+
+---
+[2026-04-22 10:02 UTC] Ticket: B-E-F Batch 015 task creation for Sellerboard order-alignment investigation
+Layer: sales-truth root-cause planning
+Scope: create the formal next task and prompt for a separate conversation to investigate missing-order alignment to Sellerboard before rechecking pass data.
+
+Change:
+- Added `EXECUTION_BATCH_015.md` to define the Sellerboard order-alignment investigation.
+- Updated the active coding plan with Phase 19 planning scope and success threshold.
+- Updated plan status to show order alignment as the next queued batch and a real blocker for decision trust.
+
+Files:
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_015.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix not applicable
+- isolated verification not applicable
+- live loop verification not applicable
+
+Evidence:
+- Root-cause proof case:
+  - `B07L6H9GZ2` Sellerboard order items show `20` units for `2026-03-23` to `2026-04-21`
+  - `f_stocked_sku_vetting_report_latest.csv` shows `4`
+  - `sku_daily_sales_truth_latest.csv` shows `4`
+- Sellerboard reference files recorded in task:
+  - `reference/DRJ_Hardware_Dashboard_Order_Items_23_03_2026-21_04_2026_(2026_04_22_10_05_26_439).csv`
+  - `reference/DRJ_Hardware_Dashboard_Products_23_03_2026-21_04_2026_(2026_04_22_09_41_46_840).csv`
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket using the Batch 015 prompt and investigate order alignment to Sellerboard before trusting refreshed pass/watch/reject outputs.
+
+---
+[2026-04-22 07:52 UTC] Ticket: B-E-F Batch 014 stocked-SKU vetting report
+Layer: sold-truth commercial reporting
+Scope: build a reusable report that shows current stocked-SKU test decisions, a reconstructed 30-days-ago screening view, and the realized next-30-day outcome.
+
+Change:
+- Added `F016_build_stocked_sku_vetting_report.py` to generate a stocked-SKU report from live sold-truth commercial outputs.
+- Added `test_f016_build_stocked_sku_vetting_report.py` for current-vs-prior-window report coverage.
+- Updated the active B-E-F plan artifacts with Batch 014 execution proof and the new reporting phase.
+- Generated the live stocked-SKU report, summary CSV, and markdown report.
+
+Files:
+- scripts/one_off/F016_build_stocked_sku_vetting_report.py
+- tests/test_f016_build_stocked_sku_vetting_report.py
+- plans/active/b-e-f-sales-feedback-loop-v1/EXECUTION_BATCH_014.md
+- plans/active/b-e-f-sales-feedback-loop-v1/CODING_PLAN.md
+- plans/active/b-e-f-sales-feedback-loop-v1/PLAN_STATUS.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Verification:
+  - `python -m py_compile scripts/one_off/F016_build_stocked_sku_vetting_report.py tests/test_f016_build_stocked_sku_vetting_report.py` -> pass
+  - `pytest tests/test_f016_build_stocked_sku_vetting_report.py -q` -> pass (`1`)
+- Runtime:
+  - `python scripts/one_off/F016_build_stocked_sku_vetting_report.py` -> pass at `2026-04-22T07:51:47Z`
+- Report outputs:
+  - `f_stocked_sku_vetting_report_latest.csv` -> `57` rows
+  - `f_stocked_sku_vetting_summary_latest.csv` -> `14` metrics
+  - `f_stocked_sku_vetting_report_latest.md` -> exists
+- Current decision split:
+  - `current_test_buy_rows=2`
+  - `current_watch_rows=1`
+  - `current_reject_rows=54`
+  - `current_ready_for_live_test_rows=2`
+- Current live-test rows:
+  - `OPER::9188805646` -> `test_buy`
+  - `OPER::B0CS3VF4GK` -> `test_buy`
+  - `OPER::B001ET78RY` -> `watch`
+- Reconstructed 30-days-ago split:
+  - `prior_test_buy_rows=0`
+  - `prior_watch_rows=0`
+  - `prior_reject_rows=57`
+  - `prior_nonzero_units_rows=0`
+  - `prior_nonzero_profit_rows=0`
+  - `prior_missed_winner_rows=10`
+  - `prior_avoided_loser_rows=47`
+- Prior-window limit:
+  - `actual_units_60d == actual_units_30d` for all `57` operational-baseline rows
+  - `actual_profit_60d_gbp == actual_profit_30d_gbp` for all `57` operational-baseline rows
+
+Carryover:
+- None
+
+Next:
+- Start a new ticket to widen the stocked sold-history sample if stronger 30-days-ago learning is required beyond the current 30-day-heavy sold set.
+
+---
+[2026-04-19 12:44 UTC] Ticket: F Batch 003 closeout and Batch 004 execution-ready package
+Layer: F flow qualification proof closure, owner-state confirmation, and next-batch execution packaging
+Scope: Append-only closeout for Batch 003 completion artifacts plus Batch 004 ready package and handoff updates.
+
+Change:
+- Added missing Batch 003 reply artifact with factual proof bundle.
+- Prepared Batch 004 execution package and moved Phase 4 status to execution-ready.
+- Refreshed plan/coding/hometime docs so next hometime run executes Batch 004 directly.
+- Rechecked and confirmed owner chain on stocklist_supplier with runner cmd + F061 loop child active.
+
+Files:
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_003_REPLY.md
+- plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_004.md
+- plans/active/f-cycle-sales-history-truth-v2/CODING_PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN_STATUS.md
+- plans/active/f-cycle-sales-history-truth-v2/PLAN.md
+- plans/active/f-cycle-sales-history-truth-v2/HOMETIME_PROMPT.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- controlled proof completed (Batch 003 remains complete)
+- Batch 004 execution package ready (not started)
+
+Evidence:
+- Owner-state check:
+  - cmd owner active: `run_F_supplier_full_legacy_scan.bat stocklist_supplier`
+  - child active: `F061_run_legacy_first_checks_local.py --supplier-id stocklist_supplier --max-rows 5 --loop`
+- Readiness verification tests:
+  - `pytest tests/test_f061_run_legacy_first_checks_local.py tests/test_f071_build_backtest_input_view.py tests/test_f072_run_backtest_replay.py tests/test_f073_build_backtest_summary.py tests/test_f074_build_backtest_health.py tests/test_f005_build_sales_history_validation_audit.py`
+  - result: `66 passed`
+
+Carryover:
+- None
+
+Next:
+- Execute `plans/active/f-cycle-sales-history-truth-v2/EXECUTION_BATCH_004.md` in hometime mode.
+
+---
+[2026-04-22 14:16 UTC] Ticket: F feeder commercial test launch planning package
+Layer: F feeder live supplier-wave launch planning
+Scope: Create a new active plan folder for the next major phase covering live price-file completion, pass and near-miss review, controlled test orders, and monitored learning.
+
+Change:
+- Created a new active plan folder for the commercial new-product launch path.
+- Locked the operating rule that this phase is a conservative test-buy selector, not an exact forecast project.
+- Recorded current live `stocklist_supplier` evidence, including screening counts and stale launch-surface risks.
+- Broke the phase into controlled batches from launch-baseline freeze through pass review, release shortlist, PO handoff, and post-launch monitoring.
+
+Files:
+- plans/active/f-feeder-commercial-test-launch-v1/PROJECT_BRIEF.md
+- plans/active/f-feeder-commercial-test-launch-v1/PLAN.md
+- plans/active/f-feeder-commercial-test-launch-v1/CODING_PLAN.md
+- plans/active/f-feeder-commercial-test-launch-v1/PLAN_STATUS.md
+- plans/active/f-feeder-commercial-test-launch-v1/RUNBOOK.md
+- plans/active/f-feeder-commercial-test-launch-v1/EXECUTION_BATCH_001.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Active supplier queue:
+  - `current_supplier_id=stocklist_supplier`
+  - `current_run_id=stocklist_supplier_rescrape_subset_20260421T103451Z`
+  - `updated_at_utc=2026-04-21T10:34:51Z`
+- Supplier-list health:
+  - raw rows: `42717`
+  - canonical rows: `42663`
+- Screening row-state:
+  - total rows: `42856`
+  - pending: `32869`
+  - timeout: `9721`
+  - pass: `266`
+- Explicit pass surface:
+  - `feeder_legacy_first_checks_live.csv` -> `266` rows
+- Scrape evidence:
+  - `feeder_legacy_scrape_evidence_live.csv` -> `4397` rows
+  - `PASS=266`
+  - `RESCAN=162`
+  - `FAIL=3969`
+- Stale launch-surface risk:
+  - `feeder_candidate_recommendations_live.csv` -> `9552` rows dated `2026-04-07`
+  - `feeder_approval_queue_live.csv` -> `9552` rows dated `2026-04-07`
+  - sample rows point to `shure_cosmetics`, not `stocklist_supplier`
+- Ownership check:
+  - no active `F061_run_legacy_first_checks_local.py` worker observed at planning time
+
+Carryover:
+- None
+
+Next:
+- Execute `plans/active/f-feeder-commercial-test-launch-v1/EXECUTION_BATCH_001.md` to freeze the active supplier wave and rebuild the launch baseline from current screening truth.
+
+---
+[2026-04-22 14:34 UTC] Ticket: F feeder commercial test launch Batch 001 execution
+Layer: F feeder active supplier-wave baseline and launch-surface safety
+Scope: Execute Batch 001 by implementing and running the launch-baseline builder for the active `stocklist_supplier` wave.
+
+Change:
+- Implemented `F018_build_live_price_file_launch_pack.py` to freeze active supplier-wave counts and launch-readiness status from current screening truth.
+- Added robust input handling so `raw_current.csv` can be read even when supplier files are XLSX payloads with a `.csv` suffix.
+- Added focused test coverage for supplier filtering, completed/pending counts, and stale derived-surface flags.
+- Executed runtime baseline build and wrote latest launch baseline and summary artifacts.
+- Updated active plan docs to mark Batch 001 complete and move to Batch 002 readiness.
+
+Files:
+- scripts/one_off/F018_build_live_price_file_launch_pack.py
+- tests/test_f018_build_live_price_file_launch_pack.py
+- plans/active/f-feeder-commercial-test-launch-v1/EXECUTION_BATCH_001.md
+- plans/active/f-feeder-commercial-test-launch-v1/PLAN_STATUS.md
+- plans/active/f-feeder-commercial-test-launch-v1/CODING_PLAN.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Verification:
+  - `python -m py_compile scripts/one_off/F018_build_live_price_file_launch_pack.py tests/test_f018_build_live_price_file_launch_pack.py` -> pass
+  - `pytest tests/test_f018_build_live_price_file_launch_pack.py -q` -> `1 passed`
+- Runtime:
+  - `python scripts/one_off/F018_build_live_price_file_launch_pack.py` -> pass at `2026-04-22T14:32:38Z`
+- Launch baseline output:
+  - `out/analysis_reports/f_live_price_file_launch_baseline_latest.csv`
+  - `out/analysis_reports/f_live_price_file_launch_summary_latest.csv`
+- Key runtime metrics:
+  - `active_supplier_id=stocklist_supplier`
+  - `active_run_id=stocklist_supplier_rescrape_subset_20260421T103451Z`
+  - `raw_rows=42717`
+  - `canonical_rows=42663`
+  - `row_state_rows_active_supplier=42856`
+  - `row_state_completed_rows=9987`
+  - `row_state_pending_rows=32869`
+  - `row_state_pass_rows=266`
+  - `row_state_timeout_rows=9721`
+  - `row_state_rescan_rows=170`
+  - `scrape_rows=4397`
+  - `scrape_pass_rows=266`
+  - `scrape_rescan_rows=162`
+  - `scrape_fail_rows=3969`
+  - `recommendations_rows=9552`
+  - `recommendations_active_supplier_rows=0`
+  - `approval_rows=9552`
+  - `approval_active_supplier_rows=0`
+  - `derived_launch_surface_safe_flag=false`
+  - `launch_readiness_state=ready_for_pass_review_with_stale_derived_surfaces`
+
+Carryover:
+- None
+
+Next:
+- Execute Batch 002 to build pass and near-miss review packs from active row-state truth while excluding stale recommendation and approval surfaces from launch decisioning.
+
+---
+[2026-04-22 14:44 UTC] Ticket: F feeder commercial test launch Batch 002 execution
+Layer: F feeder pass-review and near-miss review surfaces
+Scope: Execute Batch 002 by building reviewable pass and near-miss packs from active `stocklist_supplier` row-state truth.
+
+Change:
+- Implemented `F019_build_live_price_file_near_miss_pack.py` to convert the active supplier-wave baseline into:
+  - pass review rows
+  - reviewable near-miss rows
+  - hard reject summary buckets
+- Joined current row-state truth with first-check, scrape-evidence, and backtest-summary surfaces where available.
+- Added conservative sales-band and starter-quantity logic for the review surface.
+- Added focused test coverage for pass, near-miss, and hard-reject separation.
+- Executed the runtime builder and wrote latest review-pack outputs.
+- Advanced the active plan to Phase 3 / Batch 003 ready.
+
+Files:
+- scripts/one_off/F019_build_live_price_file_near_miss_pack.py
+- tests/test_f019_build_live_price_file_near_miss_pack.py
+- plans/active/f-feeder-commercial-test-launch-v1/EXECUTION_BATCH_002.md
+- plans/active/f-feeder-commercial-test-launch-v1/PLAN_STATUS.md
+- plans/active/f-feeder-commercial-test-launch-v1/CODING_PLAN.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification confirmed
+
+Evidence:
+- Verification:
+  - `python -m py_compile scripts/one_off/F019_build_live_price_file_near_miss_pack.py tests/test_f019_build_live_price_file_near_miss_pack.py` -> pass
+  - `pytest tests/test_f019_build_live_price_file_near_miss_pack.py -q` -> `1 passed`
+- Runtime:
+  - `python scripts/one_off/F019_build_live_price_file_near_miss_pack.py` -> pass at `2026-04-22T14:43:41Z`
+- Review outputs:
+  - `out/analysis_reports/f_live_price_file_pass_review_latest.csv`
+  - `out/analysis_reports/f_live_price_file_near_miss_review_latest.csv`
+  - `out/analysis_reports/f_live_price_file_review_summary_latest.csv`
+- Key runtime metrics:
+  - `pass_review_rows=266`
+  - `near_miss_review_rows=3056`
+  - `near_miss_evidence_gap_rows=2153`
+  - `near_miss_commercial_rows=903`
+  - `hard_reject_rows=6665`
+  - `pass_review_batches=14`
+  - `near_miss_review_batches=153`
+  - `hard_reject::OVER50K=3423`
+  - `hard_reject::ROIFAIL=1936`
+  - `hard_reject::NOASIN=1149`
+  - `hard_reject::FAIL=152`
+  - `hard_reject::HAZMATFAIL=5`
+
+Carryover:
+- None
+
+Next:
+- Start Batch 003 operator review from `pass_batch_001`, then move into the top near-miss batches only after the clear passes are judged.
+
+---
+[2026-04-22 14:44 UTC] Ticket: O/F feeder review UI design package
+Layer: O operator UI design with F feeder review event boundary
+Scope: Create a planning-only task for a temporary feeder review page inside the operator UI, with pass/fail review, notes, and send-back for analysis.
+
+Change:
+- Created a new active design task for a temporary feeder review page in the current operator UI.
+- Locked the page placement, operator flow, commercial field set, and append-only event-boundary design.
+- Defined a dedicated feeder review event inbox rather than reusing O restock events or writing directly into F approval history.
+- Defined the ASIN link behavior using left-padded 10-character Amazon DP URLs.
+
+Files:
+- plans/active/o-f-feeder-review-ui-v1/PROJECT_BRIEF.md
+- plans/active/o-f-feeder-review-ui-v1/PLAN.md
+- plans/active/o-f-feeder-review-ui-v1/UI_DESIGN.md
+- plans/active/o-f-feeder-review-ui-v1/CODING_PLAN.md
+- plans/active/o-f-feeder-review-ui-v1/PLAN_STATUS.md
+- plans/active/o-f-feeder-review-ui-v1/RUNBOOK.md
+- plans/active/o-f-feeder-review-ui-v1/EXECUTION_BATCH_001.md
+- WORK_LOG.md
+
+State:
+- code fix applied
+- isolated verification passed
+- live loop verification not applicable
+
+Evidence:
+- Existing UI owner path confirmed:
+  - `scripts/flows/O/O400_operator_ui.py`
+- Existing F review pack inputs confirmed:
+  - `out/analysis_reports/f_live_price_file_pass_review_latest.csv`
+  - `out/analysis_reports/f_live_price_file_near_miss_review_latest.csv`
+  - `out/analysis_reports/f_live_price_file_review_summary_latest.csv`
+- Existing append-only UI event pattern confirmed:
+  - `out/systems/O/inbox/restock_decision_events.csv`
+- Existing F decision lineage confirmed:
+  - `out/systems/F/history/feeder_approval_decisions_log.csv`
+- Design decision:
+  - new feeder review UI must use its own append-only intake path:
+    - `out/systems/F/inbox/feeder_review_events.csv`
+
+Carryover:
+- None
+
+Next:
+- If approved, implement the temporary `New Product Review` tab in `O400_operator_ui.py` and the feeder review event inbox path.
+
 ---

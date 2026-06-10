@@ -1,0 +1,29 @@
+{
+  "policy_id": "end_of_day_quiet_autonomy_20260527",
+  "status": "active",
+  "mode": "quiet_autonomy",
+  "controlled_technical_pause_resume_allowed": true,
+  "controlled_technical_pause_requires_controller": true,
+  "business_decisions_delegated": false,
+  "allowed_plain_english": [
+    "manager MOT refreshes",
+    "safe code repairs from approved task packets",
+    "read-only proof checks",
+    "H/O controlled pause proof only if the H maintenance controller install proof already exists"
+  ],
+  "parked_plain_english": [
+    "H/O pause-based proof when the H maintenance controller is not installed",
+    "business decisions on uncertain F or O rows",
+    "broad H autonomy until the H independent manager/MOT layer exists"
+  ],
+  "still_blocked_plain_english": [
+    "price changes",
+    "queue edits",
+    "Google Sheets writes",
+    "Product DB or local DB alignment",
+    "output deletion",
+    "publishing",
+    "approving uncertain F or O business rows",
+    "hiding bad data downstream"
+  ]
+}

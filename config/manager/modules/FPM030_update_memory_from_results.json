@@ -1,0 +1,58 @@
+{
+  "id": "FPM030_update_memory_from_results",
+  "display_name": "FPM030 Update Memory From Results",
+  "flow": "F",
+  "purpose": "Register test-mode memory updates so the manager can inspect barcode memory status without rewriting memory from scan results.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM030_update_memory_from_results.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM030_update_memory_from_results.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "placeholder_scanner_results",
+      "path": "out/systems/F/price_list_manager/test_mode/placeholder_scanner_results.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "barcode_scan_memory",
+      "path": "out/systems/F/price_list_manager/test_mode/barcode_scan_memory.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "barcode_scan_memory_warn_after_10080_minutes",
+    "memory_update_is_worker_action"
+  ],
+  "needs_user_signals": [
+    "memory_update_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "update_scan_memory",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may inspect memory evidence but must not rewrite barcode memory or scan results."
+}

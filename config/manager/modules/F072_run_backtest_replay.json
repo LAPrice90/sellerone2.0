@@ -1,0 +1,75 @@
+{
+  "id": "F072_run_backtest_replay",
+  "display_name": "F072 Backtest Replay",
+  "flow": "F",
+  "purpose": "Register F backtest replay proof so the manager can inspect replay rows without rerunning backtests or changing policy.",
+  "owner_entrypoint": "scripts/flows/F/F072_run_backtest_replay.py",
+  "worker_entrypoint": "scripts/flows/F/F072_run_backtest_replay.py",
+  "health_sources": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_input_view_live",
+      "path": "out/systems/F/live/feeder_backtest_input_view_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_legacy_chart_daily_raw_live",
+      "path": "out/systems/F/live/feeder_legacy_chart_daily_raw_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_backtest_replay_daily_live",
+      "path": "out/systems/F/live/feeder_backtest_replay_daily_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "backtest_replay_warn_after_43200_minutes",
+    "backtest_replay_is_not_price_change_permission"
+  ],
+  "needs_user_signals": [
+    "backtest_replay_missing",
+    "backtest_policy_missing",
+    "manual_backtest_review_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "run_backtest_replay",
+    "change_backtest_policy",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may inspect replay proof but must not rerun backtests, alter policy, change pricing, or align product facts."
+}

@@ -1,0 +1,117 @@
+{
+  "id": "F_price_list_manager",
+  "display_name": "F Price List Manager",
+  "flow": "F",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM130_run_live_cycle.py",
+  "worker_entrypoint": "scripts/flows/F/F061_run_legacy_first_checks_local.py",
+  "health_sources": [
+    {
+      "name": "live_cycle_health",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_health.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "cycle_summary",
+      "path": "out/cycle_alerts/summary.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "due_check_register",
+      "path": "project_control/DUE_CHECK_REGISTER.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "runtime_owner_contract",
+      "path": "config/runtime_owner_contract.json",
+      "required": true,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "script_inventory",
+      "path": "project_control/SCRIPT_INVENTORY.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "live_cycle_status",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_status.csv",
+      "required": true,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "storage_drift_report",
+      "path": "out/systems/F/price_list_manager/live/storage_drift_report.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "status_dashboard",
+      "path": "out/systems/F/price_list_manager/test_mode/status_dashboard.csv",
+      "required": true,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "email_price_list_source_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "active_run",
+      "path": "out/systems/F/inbox/supplier_price_list_active_run.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "run_state",
+      "path": "out/systems/F/inbox/supplier_price_list_run_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "email_price_list_import_batches",
+      "path": "out/systems/F/price_list_manager/test_mode/price_list_batches.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "live_cycle_status_warn_after_180_minutes",
+    "status_dashboard_warn_after_10080_minutes",
+    "cycle_summary_warn_after_1440_minutes"
+  ],
+  "needs_user_signals": [
+    "manual_file_needed",
+    "login_mode_requested",
+    "captcha",
+    "supplier_credentials_missing",
+    "gmail_oauth_missing"
+  ],
+  "safe_actions": [
+    "read_status",
+    "write_manager_report",
+    "write_manager_snapshot",
+    "read_email_source_proof"
+  ],
+  "forbidden_actions": [
+    "run_worker",
+    "restart_worker",
+    "edit_f061_live_queue",
+    "download_gmail_attachment",
+    "delete_gmail_message",
+    "delete_local_price_file",
+    "write_google_sheets",
+    "align_local_db",
+    "run_A_cycle",
+    "run_B_cycle",
+    "run_E_cycle",
+    "run_H_cycle"
+  ]
+}

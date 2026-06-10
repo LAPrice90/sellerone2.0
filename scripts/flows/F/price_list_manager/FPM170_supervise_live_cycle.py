@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import subprocess
 import sys
@@ -24,6 +25,7 @@ MANAGER_SCRIPT = "scripts\\flows\\F\\price_list_manager\\FPM130_run_live_cycle.p
 CHILD_SCRIPT = "scripts\\flows\\F\\F061_run_legacy_first_checks_local.py"
 SUPERVISOR_STATE_NAME = "fpm_live_supervisor_state.txt"
 SUPERVISOR_LOG_NAME = "fpm_live_supervisor.log"
+LIVE_EVENTS_NAME = "live_cycle_events.csv"
 
 
 def _utc_now_iso() -> str:
@@ -162,6 +164,35 @@ def _file_age_seconds(path: Path, *, now: datetime | None = None) -> float | Non
         return None
 
 
+def _latest_scanner_progress(live_dir: Path, *, now: datetime | None = None) -> tuple[float | None, str]:
+    path = live_dir / LIVE_EVENTS_NAME
+    if not path.exists():
+        return None, ""
+    current = now or datetime.now(timezone.utc)
+    latest: datetime | None = None
+    latest_raw = ""
+    try:
+        with path.open(newline="", encoding="utf-8", errors="replace") as fh:
+            for row in csv.DictReader(fh):
+                if normalize_text(row.get("event_type", "")).lower() != "scanner_chunk":
+                    continue
+                status = normalize_text(row.get("status", "")).lower()
+                if status and status != "success":
+                    continue
+                raw = normalize_text(row.get("event_utc", "") or row.get("observed_utc", ""))
+                parsed = _parse_utc(raw)
+                if parsed is None:
+                    continue
+                if latest is None or parsed > latest:
+                    latest = parsed
+                    latest_raw = raw
+    except (OSError, csv.Error):
+        return None, ""
+    if latest is None:
+        return None, ""
+    return max((current - latest).total_seconds(), 0.0), latest_raw
+
+
 def _powershell_process_ids(pattern: str, *, root: Path) -> list[int]:
     if os.name != "nt":
         return []
@@ -207,6 +238,7 @@ def _supervisor_decision(
     manager_state: dict[str, str],
     child_state: dict[str, str],
     child_stdout_age_seconds: float | None,
+    scanner_progress_age_seconds: float | None = None,
     stale_seconds: float,
     now: datetime | None = None,
 ) -> tuple[str, str]:
@@ -226,7 +258,24 @@ def _supervisor_decision(
         return "restart_manager", "no_live_heartbeat_files"
     if freshest > stale_seconds:
         return "restart_manager", f"stale_live_state_seconds={freshest:.1f}"
-    return "ok", f"freshest_live_state_seconds={freshest:.1f}"
+    if scanner_progress_age_seconds is None:
+        return "alive_no_progress", f"process_alive_seconds={freshest:.1f};scanner_progress=missing"
+    if scanner_progress_age_seconds > stale_seconds:
+        return (
+            "alive_no_progress",
+            f"process_alive_seconds={freshest:.1f};scanner_progress_seconds={scanner_progress_age_seconds:.1f}",
+        )
+    return "ok", f"process_alive_seconds={freshest:.1f};scanner_progress_seconds={scanner_progress_age_seconds:.1f}"
+
+
+def _scanner_progress_state(decision: str, scanner_progress_age_seconds: float | None) -> str:
+    if decision == "restart_manager":
+        return "process_missing_or_stale"
+    if scanner_progress_age_seconds is None:
+        return "progress_missing"
+    if decision == "alive_no_progress":
+        return "no_row_progress"
+    return "scanner_progressing"
 
 
 def _terminate_pids(root: Path, pids: list[int]) -> None:
@@ -314,6 +363,7 @@ def supervise_once(
         manager_state = {**manager_state, "updated_utc": lock_heartbeat}
     child_state = _child_status_state(live_dir)
     stdout_age = _file_age_seconds(live_dir / "f061_child_stdout.log", now=now)
+    scanner_progress_age, scanner_progress_utc = _latest_scanner_progress(live_dir, now=now)
     pause_reason = _pause_request_reason(root_path, live_dir)
     if pause_reason and not manager_pids:
         decision, reason = "paused", pause_reason
@@ -323,6 +373,7 @@ def supervise_once(
             manager_state=manager_state,
             child_state=child_state,
             child_stdout_age_seconds=stdout_age,
+            scanner_progress_age_seconds=scanner_progress_age,
             stale_seconds=stale_seconds,
             now=now,
         )
@@ -343,9 +394,13 @@ def supervise_once(
         _append_log(live_dir, f"action=restart_manager reason={reason} launched_pid={launched_pid}")
 
     observed = _utc_now_iso()
+    progress_state = _scanner_progress_state(decision, scanner_progress_age)
+    progress_age_text = "" if scanner_progress_age is None else f"{scanner_progress_age:.1f}"
     state_line = (
         f"state={decision}|reason={reason}|manager_pids={','.join(str(pid) for pid in manager_pids)}|"
         f"child_pids={','.join(str(pid) for pid in child_pids)}|launched_pid={launched_pid}|"
+        f"progress_state={progress_state}|scanner_progress_age_seconds={progress_age_text}|"
+        f"scanner_progress_utc={scanner_progress_utc}|"
         f"stale_seconds={float(stale_seconds):.1f}|updated_utc={observed}\n"
     )
     _write_text(live_dir / SUPERVISOR_STATE_NAME, state_line)
@@ -355,6 +410,8 @@ def supervise_once(
         "manager_pids": manager_pids,
         "child_pids": child_pids,
         "launched_pid": launched_pid,
+        "progress_state": progress_state,
+        "scanner_progress_age_seconds": scanner_progress_age,
         "state_path": str(live_dir / SUPERVISOR_STATE_NAME),
     }
 

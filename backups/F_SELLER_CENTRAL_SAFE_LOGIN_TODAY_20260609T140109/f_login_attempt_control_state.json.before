@@ -1,0 +1,9 @@
+{
+  "attempt_mode_env": "0",
+  "auto_login_enabled": "0",
+  "cooldown_until_utc": "",
+  "mode": "normal_scan_only",
+  "reason": "attempt_mode_not_enabled",
+  "source": "seller_central_login_recovery_gate",
+  "updated_utc": "2026-06-09T10:21:54Z"
+}

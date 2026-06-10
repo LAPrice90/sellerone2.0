@@ -54,6 +54,24 @@ def test_f020_passes_when_review_event_file_has_required_columns_and_valid_value
                 "review_note": "looks good",
                 "actor": "tester",
                 "source_reference": "unit_test",
+            },
+            {
+                "event_utc": "2026-04-23T10:05:00Z",
+                "event_id": "evt-2",
+                "active_supplier_id": "stocklist_supplier",
+                "active_run_id": "run-1",
+                "review_pack_type": "near_misses",
+                "review_batch_id": "near_miss_batch_001",
+                "candidate_id": "cand-2",
+                "supplier_sku": "SKU-2",
+                "asin_raw": "B000000002",
+                "asin_padded": "B000000002",
+                "amazon_dp_url": "https://www.amazon.co.uk/dp/B000000002",
+                "review_decision": "rescan",
+                "review_reason_code": "",
+                "review_note": "needs fresh scanner evidence",
+                "actor": "tester",
+                "source_reference": "unit_test",
             }
         ],
     )
@@ -61,7 +79,7 @@ def test_f020_passes_when_review_event_file_has_required_columns_and_valid_value
     report = assert_review_event_contract(root=tmp_path)
 
     assert report["status"] == "pass"
-    assert report["row_count"] == 1
+    assert report["row_count"] == 2
     assert report["missing_columns"] == []
     assert report["invalid_review_reason_code_rows"] == 0
 

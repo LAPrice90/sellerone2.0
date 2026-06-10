@@ -89,6 +89,7 @@ RUN_ORDER = [
     "B025_build_token_cogs_ledger.py",
     "B004_build_order_master.py",
     "B006_build_fx_ledgers.py",
+    "B037_build_refund_pnl_bridge.py",
     "B011_recover_l3_orphans.py",
 ]
 
@@ -127,6 +128,7 @@ STEP_TIMEOUT_SECONDS = {
     "B007_allocate_tokens_live.py": max(float(os.environ.get("B_STEP_TIMEOUT_B007_SECONDS", "900") or "900"), 0.0),
     "B011_recover_l3_orphans.py": max(float(os.environ.get("B_STEP_TIMEOUT_B011_SECONDS", "900") or "900"), 0.0),
     "B025_build_token_cogs_ledger.py": max(float(os.environ.get("B_STEP_TIMEOUT_B025_SECONDS", "900") or "900"), 0.0),
+    "B037_build_refund_pnl_bridge.py": max(float(os.environ.get("B_STEP_TIMEOUT_B037_SECONDS", "300") or "300"), 0.0),
     "B030_sync_token_allocations_from_sheet.py": max(
         float(os.environ.get("B_STEP_TIMEOUT_B030_SECONDS", "900") or "900"), 0.0
     ),
@@ -257,6 +259,10 @@ STEP_ARTIFACTS = {
     "B025_build_token_cogs_ledger.py": ["out/token_cogs_ledger.csv"],
     "B004_build_order_master.py": ["out/order_master.csv"],
     "B006_build_fx_ledgers.py": ["out/order_ledger_fx.csv", "out/financial_ledger_fx.csv", "out/fx_rates_daily.csv"],
+    "B037_build_refund_pnl_bridge.py": [
+        "out/systems/B/refunds/b_refund_pnl_bridge.csv",
+        "out/systems/B/refunds/b_sku_refund_rate.csv",
+    ],
     "B011_recover_l3_orphans.py": ["out/l3_orphans.csv", "out/orphan_order_items_recovered.csv"],
     "A015_build_system_health_check.py": ["out/cycle_alerts/checklist_B.csv"],
     "run_api_collection.py:listing_offer": [

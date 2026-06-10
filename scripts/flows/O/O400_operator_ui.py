@@ -20,10 +20,73 @@ if str(BOOT_ROOT) not in sys.path:
 
 import pandas as pd
 
+from scripts.flows.F.login_controller import (
+    LoginControllerRequestPaths,
+    write_login_controller_request,
+)
+
+try:
+    import streamlit as st_cache
+except Exception:
+    st_cache = None
+
+
+def _streamlit_cache_data(**kwargs):
+    def _decorator(func):
+        if st_cache is None:
+            return func
+        runtime = getattr(st_cache, "runtime", None)
+        runtime_exists = getattr(runtime, "exists", None)
+        if not callable(runtime_exists) or not runtime_exists():
+            return func
+        return st_cache.cache_data(**kwargs)(func)
+
+    return _decorator
+
 try:
     from scripts.flows.O.O410_product_database_ui import render_product_database_ui
     from scripts.flows.O.O420_product_database_edit_ui import render_product_database_edit_ui
     from scripts.flows.O.O450_repricing_tracker_ui import render_repricing_tracker_ui
+    from scripts.flows.O.O001_build_restock_source_view import build_restock_source_view
+    from scripts.flows.O.O002_build_restock_recommendations import build_restock_recommendations
+    from scripts.flows.O.O020_build_reorder_input_coverage_report import build_reorder_input_coverage_report
+    from scripts.flows.O.O021_build_restock_profit_checks import build_restock_profit_checks
+    from scripts.flows.O.O460_build_restock_session_view import build_restock_session_view
+    from scripts.flows.O.O022_build_inbound_fba_cost_proof import build_inbound_fba_cost_proof
+    from scripts.flows.O.O023_build_profit_input_blocker_breakdown import build_profit_input_blocker_breakdown
+    from scripts.flows.O.O024_build_inbound_fba_source_options import build_inbound_fba_source_options
+    from scripts.flows.O.O025_build_token_cost_trust_gate import build_token_cost_trust_gate
+    from scripts.flows.O.O462_restock_session_draft_decisions import submit_restock_session_draft_decision
+    from scripts.flows.O.O464_build_restock_supplier_batch_drafts import build_restock_supplier_batch_drafts
+    from scripts.flows.O.O466_restock_supplier_proof_events import (
+        latest_restock_session_supplier_proof_events,
+        submit_restock_session_supplier_proof_event,
+    )
+    from scripts.flows.O.O468_restock_pack_moq_proof_events import (
+        latest_restock_session_pack_moq_proof_events,
+        submit_restock_session_pack_moq_proof_event,
+    )
+    from scripts.flows.O.O470_build_purchase_approval_preview import build_purchase_approval_preview
+    from scripts.flows.O.O472_build_purchase_approval_guardrails import (
+        build_purchase_approval_guardrails,
+        submit_purchase_approval_decision_event,
+    )
+    from scripts.flows.O.O474_build_po_draft_readiness_preview import build_po_draft_readiness_preview
+    from scripts.flows.O.O476_build_po_line_design_preview import build_po_line_design_preview
+    from scripts.flows.O.O478_build_po_draft_packet_review import build_po_draft_packet_review
+    from scripts.flows.O.O480_build_po_draft_hold_review import build_po_draft_hold_review
+    from scripts.flows.O.O482_build_po_draft_file_shape_preview import build_po_draft_file_shape_preview
+    from scripts.flows.O.O484_build_po_preview_construction_summary import build_po_preview_construction_summary
+    from scripts.flows.O.O486_build_po_draft_review_controls import (
+        build_po_draft_review_controls,
+        submit_po_draft_review_control_event,
+    )
+    from scripts.flows.O.O488_build_po_draft_export_preview import build_po_draft_export_preview
+    from scripts.flows.O.O490_build_po_draft_export_gate import (
+        build_po_draft_export_gate,
+        submit_po_draft_export_gate_event,
+    )
+    from scripts.flows.O.O492_build_supplier_file_presence_probe import build_supplier_file_presence_probe
     from scripts.flows.O._contract_io import (
         append_o_contract_row,
         empty_o_contract_df,
@@ -62,6 +125,46 @@ except ModuleNotFoundError:
     from flows.O.O410_product_database_ui import render_product_database_ui
     from flows.O.O420_product_database_edit_ui import render_product_database_edit_ui
     from flows.O.O450_repricing_tracker_ui import render_repricing_tracker_ui
+    from flows.O.O001_build_restock_source_view import build_restock_source_view
+    from flows.O.O002_build_restock_recommendations import build_restock_recommendations
+    from flows.O.O020_build_reorder_input_coverage_report import build_reorder_input_coverage_report
+    from flows.O.O021_build_restock_profit_checks import build_restock_profit_checks
+    from flows.O.O460_build_restock_session_view import build_restock_session_view
+    from flows.O.O022_build_inbound_fba_cost_proof import build_inbound_fba_cost_proof
+    from flows.O.O023_build_profit_input_blocker_breakdown import build_profit_input_blocker_breakdown
+    from flows.O.O024_build_inbound_fba_source_options import build_inbound_fba_source_options
+    from flows.O.O025_build_token_cost_trust_gate import build_token_cost_trust_gate
+    from flows.O.O462_restock_session_draft_decisions import submit_restock_session_draft_decision
+    from flows.O.O464_build_restock_supplier_batch_drafts import build_restock_supplier_batch_drafts
+    from flows.O.O466_restock_supplier_proof_events import (
+        latest_restock_session_supplier_proof_events,
+        submit_restock_session_supplier_proof_event,
+    )
+    from flows.O.O468_restock_pack_moq_proof_events import (
+        latest_restock_session_pack_moq_proof_events,
+        submit_restock_session_pack_moq_proof_event,
+    )
+    from flows.O.O470_build_purchase_approval_preview import build_purchase_approval_preview
+    from flows.O.O472_build_purchase_approval_guardrails import (
+        build_purchase_approval_guardrails,
+        submit_purchase_approval_decision_event,
+    )
+    from flows.O.O474_build_po_draft_readiness_preview import build_po_draft_readiness_preview
+    from flows.O.O476_build_po_line_design_preview import build_po_line_design_preview
+    from flows.O.O478_build_po_draft_packet_review import build_po_draft_packet_review
+    from flows.O.O480_build_po_draft_hold_review import build_po_draft_hold_review
+    from flows.O.O482_build_po_draft_file_shape_preview import build_po_draft_file_shape_preview
+    from flows.O.O484_build_po_preview_construction_summary import build_po_preview_construction_summary
+    from flows.O.O486_build_po_draft_review_controls import (
+        build_po_draft_review_controls,
+        submit_po_draft_review_control_event,
+    )
+    from flows.O.O488_build_po_draft_export_preview import build_po_draft_export_preview
+    from flows.O.O490_build_po_draft_export_gate import (
+        build_po_draft_export_gate,
+        submit_po_draft_export_gate_event,
+    )
+    from flows.O.O492_build_supplier_file_presence_probe import build_supplier_file_presence_probe
     from flows.O._contract_io import (
         append_o_contract_row,
         empty_o_contract_df,
@@ -367,26 +470,162 @@ AI_PRODUCT_CHECK_GATE_STATUS_ORDER = [
     "ai_cleared",
 ]
 OPERATOR_PAGE_OPTIONS = [
-    ("Reorder", "reorder"),
-    ("Price List Queue", "price_list_queue"),
+    ("Today", "today"),
+    ("Restock Session", "restock_session"),
+    ("Reorder Workbench", "reorder"),
+    ("Products", "product_db"),
     ("New Product Review", "new_product_review"),
-    ("Product Listing Profile Review", "product_listing_profile_review"),
-    ("Brand Approval Queue", "brand_approval_queue"),
-    ("Product DB", "product_db"),
-    ("Product DB Edit", "product_db_edit"),
-    ("Repricer Tracker", "repricer_tracker"),
-    ("Decision Log", "decision_log"),
-    ("PO Drafts", "po_drafts"),
+    ("Orders and P&L", "po_drafts"),
     ("Receiving", "receiving"),
     ("Send to Amazon", "send_to_amazon"),
+    ("Product DB Edit", "product_db_edit"),
+    ("Listing Profile Review", "product_listing_profile_review"),
+    ("Brand Approval Queue", "brand_approval_queue"),
+    ("Price List Queue", "price_list_queue"),
+    ("Repricer Tracker", "repricer_tracker"),
+    ("Decision Log", "decision_log"),
 ]
+OPERATOR_NAV_LABELS = {
+    "restock_session": "Restocking",
+    "new_product_review": "Supplier Intake",
+    "reorder": "Old Reorder Workbench",
+}
+OPERATOR_NAV_SECTIONS = [
+    (
+        "Business work",
+        "Luke's normal working path.",
+        (
+            "today",
+            "restock_session",
+            "product_db",
+            "new_product_review",
+            "po_drafts",
+            "receiving",
+            "send_to_amazon",
+        ),
+    ),
+    (
+        "Proof / Admin",
+        "Maintenance and proof views only.",
+        (
+            "product_db_edit",
+            "product_listing_profile_review",
+            "brand_approval_queue",
+            "price_list_queue",
+            "repricer_tracker",
+            "decision_log",
+            "reorder",
+        ),
+    ),
+]
+OPERATOR_PAGE_DESCRIPTIONS = {
+    "today": "Read-only daily starting point.",
+    "restock_session": "Manual restocking proof and blocker review.",
+    "reorder": "Old dense supplier table. Use only when you need the legacy controls.",
+    "product_db": "Product truth and freshness view.",
+    "new_product_review": "Check scanner-found supplier products. No buying or listing happens here.",
+    "po_drafts": "Local draft order review.",
+    "receiving": "Record stock that has arrived.",
+    "send_to_amazon": "Record stock ready for Amazon handoff.",
+    "product_db_edit": "Manual Product DB edits.",
+    "product_listing_profile_review": "Listing setup proof.",
+    "brand_approval_queue": "Brand approval proof and decisions.",
+    "price_list_queue": "Scanner queue and login/admin proof.",
+    "repricer_tracker": "Repricing proof tracker.",
+    "decision_log": "Raw local decision event log.",
+}
 OPERATOR_HIDDEN_PAGE_REDIRECTS = {
     "ai_product_check_gate": "new_product_review",
 }
+TODAY_OPERATOR_DATASET_NAMES = (
+    "restock_session_review_live",
+    "product_db_operator_view",
+    "purchase_order_draft_holds",
+    "receiving_event_holds",
+    "send_to_amazon_handoff_holds",
+    "purchase_orders_live",
+    "purchase_order_lines_live",
+    "restock_source_view",
+    "ordered_stock_state",
+    "legacy_purchase_list_bridge",
+    "restock_review_queue",
+    "restock_recommendations_live",
+    "restock_profit_checks_live",
+)
+TODAY_OPERATOR_F_DATASET_NAMES = (
+    "brand_approval_queue_live",
+    "amazon_listing_drafts_live",
+)
+RESTOCK_SESSION_DATASET_NAMES = (
+    "restock_session_review_live",
+    "restock_session_supplier_summary_live",
+    "restock_session_reason_codes",
+    "restock_session_health",
+    "restock_inbound_fba_cost_proof_live",
+    "restock_profit_input_blocker_breakdown_live",
+    "restock_profit_input_blocker_breakdown_health",
+    "restock_inbound_fba_source_options_live",
+    "restock_inbound_fba_source_options_health",
+    "restock_token_cost_trust_gate_live",
+    "restock_token_cost_trust_gate_health",
+    "restock_session_draft_decision_events",
+    "restock_session_supplier_proof_events",
+    "restock_session_pack_moq_proof_events",
+    "restock_session_supplier_batch_lines_live",
+    "restock_session_supplier_batch_summary_live",
+    "restock_session_supplier_batch_health",
+    "restock_supplier_file_source_index_live",
+    "restock_supplier_file_source_index_health",
+    "restock_supplier_file_presence_probe_live",
+    "restock_supplier_file_presence_probe_health",
+    "restock_purchase_approval_preview_lines_live",
+    "restock_purchase_approval_preview_summary_live",
+    "restock_purchase_approval_preview_health",
+    "restock_purchase_approval_decision_events",
+    "restock_purchase_approval_guardrails_live",
+    "restock_purchase_approval_guardrails_health",
+    "restock_po_draft_readiness_preview_lines_live",
+    "restock_po_draft_readiness_preview_summary_live",
+    "restock_po_draft_readiness_preview_health",
+    "restock_po_line_design_preview_lines_live",
+    "restock_po_line_design_preview_summary_live",
+    "restock_po_line_design_preview_health",
+    "restock_po_draft_packet_review_lines_live",
+    "restock_po_draft_packet_review_summary_live",
+    "restock_po_draft_packet_review_health",
+    "restock_po_draft_hold_review_lines_live",
+    "restock_po_draft_hold_review_summary_live",
+    "restock_po_draft_hold_review_health",
+    "restock_po_draft_file_shape_preview_lines_live",
+    "restock_po_draft_file_shape_preview_summary_live",
+    "restock_po_draft_file_shape_preview_health",
+    "restock_po_preview_construction_summary_live",
+    "restock_po_preview_construction_summary_health",
+    "restock_po_draft_review_control_events",
+    "restock_po_draft_review_controls_live",
+    "restock_po_draft_review_controls_health",
+    "restock_po_draft_export_preview_lines_live",
+    "restock_po_draft_export_preview_summary_live",
+    "restock_po_draft_export_preview_health",
+    "restock_po_draft_export_gate_events",
+    "restock_po_draft_export_gate_live",
+    "restock_po_draft_export_gate_health",
+    "purchase_orders_live",
+    "purchase_order_lines_live",
+    "receiving_events",
+    "receiving_event_holds",
+    "send_to_amazon_queue",
+    "send_to_amazon_handoff_log",
+)
 FEEDER_REVIEW_LANE_SPECS = {
     "Passes": {"lane_id": "passes", "pack_type": "passes", "lane_filter": "passes"},
     "Manual review": {"lane_id": "manual_review", "pack_type": "near_misses", "lane_filter": "manual_review"},
     "Near misses": {"lane_id": "near_misses", "pack_type": "near_misses", "lane_filter": "near_misses"},
+}
+FEEDER_REVIEW_LANE_DISPLAY = {
+    "Passes": "Best finds",
+    "Manual review": "Needs Luke's judgement",
+    "Near misses": "Close calls",
 }
 FEEDER_REVIEW_MANUAL_ACTION_COLUMNS = (
     "identity_recommended_action",
@@ -397,7 +636,14 @@ FEEDER_REVIEW_MANUAL_ACTION_COLUMNS = (
     "seller_history_recommended_action",
 )
 SUPPLIER_PROFILES_PATH = "out/systems/O/live/supplier_profiles.csv"
-FEEDER_REVIEW_DECISIONS = ("pass", "fail")
+FEEDER_REVIEW_DECISIONS = ("pass", "fail", "rescan")
+FEEDER_REVIEW_DECISION_DISPLAY = {
+    "": "Choose",
+    "pass": "Keep for listing check",
+    "fail": "Reject",
+    "rescan": "Needs re-scan",
+}
+FEEDER_REVIEW_DECISION_OPTIONS = list(FEEDER_REVIEW_DECISION_DISPLAY.values())
 FEEDER_REVIEW_REASON_OPTIONS = (
     ("", "Select reason"),
     ("wrong_product", "Wrong product"),
@@ -501,12 +747,107 @@ PRICE_LIST_QUEUE_HEADER_LABELS = [
     "Pause",
     "Priority",
 ]
+RESTOCK_SESSION_DISPLAY_COLUMNS = [
+    "seller_sku",
+    "asin",
+    "title",
+    "source_class",
+    "supplier_sku",
+    "barcode",
+    "old_suggested_qty",
+    "current_supplier_cost_gbp",
+    "current_amazon_price_gbp",
+    "expected_profit_per_unit_gbp",
+    "expected_roi_pct",
+    "supplier_match_state",
+    "supplier_stock_state",
+    "supplier_cost_proof_state",
+    "market_price_proof_state",
+    "fee_proof_state",
+    "refund_proof_state",
+    "inbound_cost_proof_state",
+    "profit_input_confidence",
+    "pack_moq_proof_state",
+    "supplier_order_viability_state",
+    "operator_decision_state",
+    "order_qty_draft",
+    "latest_draft_decision_code",
+    "latest_draft_note",
+    "snooze_until_utc",
+    "action_block_reason",
+]
+RESTOCK_WORKBENCH_COLUMNS = [
+    "supplier_name",
+    "seller_sku",
+    "asin",
+    "title",
+    "available_now",
+    "ordered_open",
+    "velocity_30d",
+    "old_suggested_qty",
+    "order_qty_draft",
+    "display_qtys_label",
+    "current_supplier_cost_gbp",
+    "current_amazon_price_gbp",
+    "expected_profit_per_unit_gbp",
+    "expected_roi_pct",
+    "refund_sample_confidence",
+    "fee_proof_state",
+    "net_fee_model_status",
+    "inbound_cost_proof_state",
+    "profit_input_confidence",
+    "supplier_match_state",
+    "supplier_stock_state",
+    "supplier_cost_proof_state",
+    "pack_moq_proof_state",
+    "supplier_order_viability_state",
+    "row_status",
+    "action_block_reason",
+    "latest_draft_decision_code",
+    "latest_draft_note",
+]
+RESTOCK_WORKBENCH_COLUMN_LABELS = {
+    "supplier_name": "Supplier",
+    "seller_sku": "SKU",
+    "asin": "ASIN",
+    "title": "Product",
+    "available_now": "Stock",
+    "ordered_open": "Already Ordered",
+    "velocity_30d": "30d Velocity",
+    "old_suggested_qty": "Suggested Qty",
+    "order_qty_draft": "Luke Draft Qty",
+    "display_qtys_label": "Pack/Case",
+    "current_supplier_cost_gbp": "Buy Cost",
+    "current_amazon_price_gbp": "Amazon Price",
+    "expected_profit_per_unit_gbp": "Profit/Unit",
+    "expected_roi_pct": "ROI",
+    "refund_sample_confidence": "Refund Confidence",
+    "fee_proof_state": "Fee Confidence",
+    "net_fee_model_status": "Net Fee Model",
+    "inbound_cost_proof_state": "Inbound/FBA Cost",
+    "profit_input_confidence": "Profit Input Confidence",
+    "supplier_match_state": "Supplier Match",
+    "supplier_stock_state": "Supplier Stock",
+    "supplier_cost_proof_state": "Supplier Cost Proof",
+    "pack_moq_proof_state": "Pack/MOQ Proof",
+    "supplier_order_viability_state": "Order Viability",
+    "row_status": "State",
+    "action_block_reason": "Blocker",
+    "latest_draft_decision_code": "Luke Decision",
+    "latest_draft_note": "Decision Note",
+}
 FEEDER_REVIEW_IDENTITY_COLUMNS = (
     "active_supplier_id",
     "active_run_id",
     "review_pack_type",
     "candidate_id",
 )
+FEEDER_REVIEW_PRODUCT_IDENTITY_COLUMNS = (
+    "active_supplier_id",
+    "review_pack_type",
+    "asin_padded",
+)
+FEEDER_REVIEW_HANDOFF_GROUP_ID_PREFIX = "handoff_group|"
 REORDER_DRAFT_FIELDS = (
     "send",
     "snze",
@@ -524,6 +865,30 @@ def _utc_now_iso() -> str:
 
 def _normalize_text(value: object) -> str:
     return str(value or "").strip()
+
+
+def _feeder_review_lane_display_label(lane_label: object) -> str:
+    clean = _normalize_text(lane_label)
+    return FEEDER_REVIEW_LANE_DISPLAY.get(clean, clean or "Products to check")
+
+
+def _operator_sidebar_button_label(label: object, *, active: bool = False) -> str:
+    clean = _normalize_text(label)
+    if active:
+        return f"Selected - {clean}"
+    return clean
+
+
+def _normalize_feeder_review_decision(value: object) -> str:
+    token = _normalize_text(value).lower().replace("_", " ").replace("-", " ")
+    token = " ".join(token.split())
+    if token in {"pass", "keep", "keep for listing check", "looks good", "approve", "yes"}:
+        return "pass"
+    if token in {"fail", "reject", "no", "drop", "do not use", "not suitable"}:
+        return "fail"
+    if token in {"rescan", "re scan", "needs re scan", "needs rescan", "retry", "scan again", "recheck", "re check"}:
+        return "rescan"
+    return ""
 
 
 def _normalize_feeder_review_reason_code(value: object) -> str:
@@ -553,8 +918,29 @@ def _empty_contract_df(contract_name: str) -> pd.DataFrame:
     return empty_o_contract_df(contract_name)
 
 
+def _file_cache_fingerprint(path: Path) -> tuple[str, int, int]:
+    try:
+        stat = path.stat()
+    except OSError:
+        return str(path), 0, 0
+    return str(path), int(stat.st_mtime_ns), int(stat.st_size)
+
+
+@_streamlit_cache_data(show_spinner=False, max_entries=160)
+def _read_contract_df_cached(
+    root_text: str,
+    contract_name: str,
+    path_text: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> pd.DataFrame:
+    return read_o_contract_df(Path(root_text), contract_name)
+
+
 def _read_contract_df(root: Path, contract_name: str) -> pd.DataFrame:
-    return read_o_contract_df(root, contract_name)
+    path = root / get_o_output_contract(contract_name).rel_path
+    path_text, mtime_ns, size_bytes = _file_cache_fingerprint(path)
+    return _read_contract_df_cached(str(root), contract_name, path_text, mtime_ns, size_bytes)
 
 
 def _merge_backtest_columns(rec_df: pd.DataFrame, source_df: pd.DataFrame) -> pd.DataFrame:
@@ -602,8 +988,21 @@ def _f_contract_columns(contract_name: str) -> list[str]:
     return f_contract_columns(contract_name)
 
 
+@_streamlit_cache_data(show_spinner=False, max_entries=80)
+def _read_f_contract_df_cached(
+    root_text: str,
+    contract_name: str,
+    path_text: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> pd.DataFrame:
+    return read_f_contract_df(Path(root_text), contract_name)
+
+
 def _read_f_contract_df(root: Path, contract_name: str) -> pd.DataFrame:
-    return read_f_contract_df(root, contract_name)
+    path = root / get_f_output_contract(contract_name).rel_path
+    path_text, mtime_ns, size_bytes = _file_cache_fingerprint(path)
+    return _read_f_contract_df_cached(str(root), contract_name, path_text, mtime_ns, size_bytes)
 
 
 def _append_f_contract_row(root: Path, contract_name: str, row: Dict[str, str]) -> dict[str, str]:
@@ -1065,6 +1464,75 @@ def _humanize_commercial_note(raw_text: object) -> str:
     return original_text
 
 
+def _humanize_intake_evidence_summary(raw_text: object, *, fallback: str = "") -> str:
+    original_text = _normalize_text(raw_text)
+    tokens = _split_review_tokens(raw_text)
+    if not tokens:
+        return fallback or original_text
+
+    values: dict[str, str] = {}
+    plain_tokens: list[str] = []
+    for token in tokens:
+        if "=" not in token:
+            plain_tokens.append(token)
+            continue
+        key, value = token.split("=", 1)
+        normalized_key = _normalize_text(key).lower()
+        normalized_value = _normalize_text(value)
+        if normalized_value.lower() in {"", "blank", "none", "n/a", "na", "null", "unknown"}:
+            continue
+        values[normalized_key] = normalized_value
+
+    sentences: list[str] = []
+    status = _normalize_text(values.get("screen_status") or values.get("original_result") or values.get("original_test_result"))
+    if status.lower() == "pass":
+        sentences.append("Passed the scanner checks.")
+    elif status:
+        sentences.append(f"Scanner result: {status}.")
+
+    score = values.get("original_score") or values.get("score")
+    if score:
+        sentences.append(f"Scanner score: {_format_review_number(score)}.")
+
+    rank = values.get("rank") or values.get("main_rank")
+    if rank:
+        sentences.append(f"Amazon rank: #{_format_review_number(rank, decimals_when_needed=0)}.")
+
+    units_likely = values.get("units_likely_30d") or values.get("expected_units_next_30d")
+    if units_likely:
+        sentences.append(f"Likely 30 day sales: {_format_review_number(units_likely)}.")
+
+    units_band = values.get("units_band_30d")
+    if units_band and ".." in units_band:
+        low, high = units_band.split("..", 1)
+        sentences.append(
+            f"Sales range: {_format_review_number(low)} to {_format_review_number(high)} units."
+        )
+
+    profit_likely = values.get("profit_likely_gbp") or values.get("expected_profit_next_30d_gbp")
+    if profit_likely:
+        sentences.append(f"Likely 30 day profit: {_format_review_currency_gbp(profit_likely)}.")
+
+    unit_profit = values.get("unit_profit") or values.get("profit_per_unit_30d_gbp")
+    if unit_profit:
+        unit_profit = unit_profit.replace("GBP", "").strip()
+        sentences.append(f"Profit per unit: {_format_review_currency_gbp(unit_profit)}.")
+
+    confidence = values.get("decision_confidence") or values.get("ai_match_confidence")
+    if confidence:
+        sentences.append(f"Confidence: {confidence.replace('_', ' ')}.")
+
+    stability = values.get("stability_state")
+    if stability:
+        sentences.append(f"Demand stability: {stability.replace('_', ' ')}.")
+
+    if sentences:
+        return " ".join(sentences[:5])
+    if plain_tokens:
+        return _humanize_commercial_note("|".join(plain_tokens)) or " ".join(plain_tokens)
+    return fallback or original_text
+
+
 def _evidence_value(raw_text: object, key: str) -> str:
     text = _normalize_text(raw_text)
     if text == "":
@@ -1316,6 +1784,22 @@ def _is_feeder_review_handoff_snapshot(snapshot: object) -> bool:
     return _normalize_text(snapshot).startswith(FEEDER_REVIEW_HANDOFF_ID_PREFIX)
 
 
+def _feeder_review_handoff_group_snapshot_id(supplier_id: object) -> str:
+    supplier = _normalize_text(supplier_id)
+    return f"{FEEDER_REVIEW_HANDOFF_GROUP_ID_PREFIX}{supplier}"
+
+
+def _is_feeder_review_handoff_group_snapshot(snapshot: object) -> bool:
+    return _normalize_text(snapshot).startswith(FEEDER_REVIEW_HANDOFF_GROUP_ID_PREFIX)
+
+
+def _parse_feeder_review_handoff_group_snapshot(snapshot: object) -> str:
+    raw = _normalize_text(snapshot)
+    if not raw.startswith(FEEDER_REVIEW_HANDOFF_GROUP_ID_PREFIX):
+        return ""
+    return raw[len(FEEDER_REVIEW_HANDOFF_GROUP_ID_PREFIX) :].strip()
+
+
 def _parse_feeder_review_handoff_snapshot(snapshot: object) -> tuple[str, str]:
     raw = _normalize_text(snapshot)
     if not raw.startswith(FEEDER_REVIEW_HANDOFF_ID_PREFIX):
@@ -1467,6 +1951,32 @@ def _list_feeder_review_handoff_manifests(root_path: Path) -> list[dict[str, str
             continue
         row["_snapshot_id"] = _feeder_review_handoff_snapshot_id(supplier_id, run_id)
         manifests.append(row)
+    return manifests
+
+
+def _feeder_review_handoff_manifest_sort_date(manifest: dict[str, str]) -> str:
+    return (
+        _normalize_text(manifest.get("completed_at_utc", ""))
+        or _normalize_text(manifest.get("source_seen_at_utc", ""))
+        or _normalize_text(manifest.get("built_at_utc", ""))
+    )
+
+
+def _list_feeder_review_handoff_group_manifests(root_path: Path, supplier_id: str) -> list[dict[str, str]]:
+    supplier = _normalize_text(supplier_id)
+    if not supplier:
+        return []
+    manifests = [
+        manifest
+        for manifest in _list_feeder_review_handoff_manifests(root_path)
+        if _normalize_text(manifest.get("supplier_id", "")) == supplier
+    ]
+    manifests.sort(
+        key=lambda row: (
+            _feeder_review_handoff_manifest_sort_date(row),
+            _normalize_text(row.get("run_id", "")),
+        )
+    )
     return manifests
 
 
@@ -1963,20 +2473,27 @@ def _feeder_review_pack_supplier_name(label: str) -> str:
     return text or "Supplier"
 
 
-def _feeder_review_pack_work_phrase(lane_label: str, count: int) -> str:
+def _feeder_review_pack_work_phrase(lane_label: str, count: int, *, unique: bool = False) -> str:
     lane = _normalize_text(lane_label).lower()
     if lane == "passes":
-        return f"{count} {'pass' if count == 1 else 'passes'} to review"
+        uniqueness = "unique " if unique else ""
+        return f"{count} {uniqueness}scanner {'find' if count == 1 else 'finds'} waiting"
     if lane == "manual review":
-        return f"{count} manual review"
+        return f"{count} judgement {'check' if count == 1 else 'checks'} waiting"
     if lane == "near misses":
-        return f"{count} {'near miss' if count == 1 else 'near misses'} to review"
-    return f"{count} rows to review"
+        return f"{count} close {'call' if count == 1 else 'calls'} waiting"
+    return f"{count} {'product' if count == 1 else 'products'} waiting"
 
 
-def _feeder_review_pack_label_for_lane(label: str, lane_label: str, counts: dict[str, int]) -> str:
+def _feeder_review_pack_label_for_lane(
+    label: str,
+    lane_label: str,
+    counts: dict[str, int],
+    *,
+    unique: bool = False,
+) -> str:
     count = int(counts.get("undecided_rows", 0))
-    return f"{_feeder_review_pack_supplier_name(label)} - {_feeder_review_pack_work_phrase(lane_label, count)}"
+    return f"{_feeder_review_pack_supplier_name(label)} - {_feeder_review_pack_work_phrase(lane_label, count, unique=unique)}"
 
 
 def _feeder_review_lane_todo_counts(
@@ -2064,29 +2581,68 @@ def list_feeder_review_pack_options(
     def _skip_for_lane(counts: dict[str, int]) -> bool:
         return bool(normalized_pack_type and not include_history and int(counts.get("undecided_rows", 0)) <= 0)
 
-    for manifest in _list_feeder_review_handoff_manifests(root_path):
-        snapshot = _normalize_text(manifest.get("_snapshot_id", ""))
-        if not snapshot or snapshot in seen_snapshots:
-            continue
-        summary = load_feeder_review_summary(root=root_path, review_pack_snapshot=snapshot)
-        lane_counts = _counts_for_snapshot(snapshot)
-        if _skip_for_lane(lane_counts):
-            continue
-        pack_key = _feeder_review_price_file_key(summary)
-        active_run_key = (
-            _normalize_text(summary.get("active_supplier_id", "")),
-            _normalize_text(summary.get("active_run_id", "")),
-        )
-        seen_snapshots.add(snapshot)
-        seen_pack_keys.add(pack_key)
-        seen_active_runs.add(active_run_key)
-        options.append(
-            {
-                "id": snapshot,
-                "label": _option_label(_feeder_review_handoff_label(manifest, summary), lane_counts),
-                "_sort_key": "|".join(_feeder_review_pack_sort_key(summary, snapshot)),
-            }
-        )
+    handoff_manifests = _list_feeder_review_handoff_manifests(root_path)
+    if normalized_pack_type and not include_history:
+        grouped_handoffs: dict[str, list[dict[str, str]]] = {}
+        for manifest in handoff_manifests:
+            supplier_id = _normalize_text(manifest.get("supplier_id", ""))
+            if supplier_id:
+                grouped_handoffs.setdefault(supplier_id, []).append(manifest)
+        for supplier_id, manifests in grouped_handoffs.items():
+            snapshot = _feeder_review_handoff_group_snapshot_id(supplier_id)
+            if snapshot in seen_snapshots:
+                continue
+            summary = load_feeder_review_summary(root=root_path, review_pack_snapshot=snapshot)
+            lane_counts = _counts_for_snapshot(snapshot)
+            if _skip_for_lane(lane_counts):
+                continue
+            supplier_label = _normalize_text(summary.get("active_supplier_label", "")) or supplier_id
+            seen_snapshots.add(snapshot)
+            for manifest in manifests:
+                seen_snapshots.add(_normalize_text(manifest.get("_snapshot_id", "")))
+                seen_active_runs.add(
+                    (
+                        _normalize_text(manifest.get("supplier_id", "")),
+                        _normalize_text(manifest.get("run_id", "")),
+                    )
+                )
+            seen_pack_keys.add(_feeder_review_price_file_key(summary))
+            options.append(
+                {
+                    "id": snapshot,
+                    "label": _feeder_review_pack_label_for_lane(
+                        supplier_label,
+                        normalized_lane_label,
+                        lane_counts,
+                        unique=True,
+                    ),
+                    "_sort_key": "|".join(_feeder_review_pack_sort_key(summary, snapshot)),
+                }
+            )
+    else:
+        for manifest in handoff_manifests:
+            snapshot = _normalize_text(manifest.get("_snapshot_id", ""))
+            if not snapshot or snapshot in seen_snapshots:
+                continue
+            summary = load_feeder_review_summary(root=root_path, review_pack_snapshot=snapshot)
+            lane_counts = _counts_for_snapshot(snapshot)
+            if _skip_for_lane(lane_counts):
+                continue
+            pack_key = _feeder_review_price_file_key(summary)
+            active_run_key = (
+                _normalize_text(summary.get("active_supplier_id", "")),
+                _normalize_text(summary.get("active_run_id", "")),
+            )
+            seen_snapshots.add(snapshot)
+            seen_pack_keys.add(pack_key)
+            seen_active_runs.add(active_run_key)
+            options.append(
+                {
+                    "id": snapshot,
+                    "label": _option_label(_feeder_review_handoff_label(manifest, summary), lane_counts),
+                    "_sort_key": "|".join(_feeder_review_pack_sort_key(summary, snapshot)),
+                }
+            )
 
     latest_summary = load_feeder_review_summary(root=root_path, review_pack_snapshot="latest")
     if latest_summary:
@@ -2196,6 +2752,25 @@ def list_feeder_review_pack_options(
 def load_feeder_review_summary(root: Path | None = None, review_pack_snapshot: str = "latest") -> dict[str, str]:
     root_path = Path(root) if root is not None else get_o_path_contract().root
     snapshot = _normalize_text(review_pack_snapshot) or "latest"
+    if _is_feeder_review_handoff_group_snapshot(snapshot):
+        supplier_id = _parse_feeder_review_handoff_group_snapshot(snapshot)
+        manifests = _list_feeder_review_handoff_group_manifests(root_path, supplier_id)
+        if not manifests:
+            return {}
+        latest_manifest = manifests[-1]
+        supplier_label = (
+            _normalize_text(latest_manifest.get("supplier_name", ""))
+            or _normalize_text(_supplier_display_map(root_path).get(supplier_id, ""))
+            or supplier_id
+        )
+        return {
+            "active_supplier_id": supplier_id,
+            "active_run_id": "multiple_handoffs",
+            "active_supplier_label": supplier_label,
+            "observed_utc": _feeder_review_handoff_manifest_sort_date(latest_manifest),
+            "completed_at_utc": _normalize_text(latest_manifest.get("completed_at_utc", "")),
+            "review_snapshot_id": snapshot,
+        }
     summary_path = _feeder_review_summary_path(root_path, review_pack_snapshot)
     summary_df = read_review_summary_dataframe(
         summary_path,
@@ -2353,6 +2928,71 @@ def _merge_feeder_review_ai_queue_commercial_fields(
     return out
 
 
+def _dedupe_feeder_review_source_by_product(source_df: pd.DataFrame) -> pd.DataFrame:
+    if source_df.empty:
+        return source_df
+    work = source_df.copy()
+    for column in ("active_supplier_id", "review_pack_type", "asin_padded", "active_run_id", "candidate_id"):
+        if column not in work.columns:
+            work[column] = ""
+        work[column] = work[column].map(_normalize_text)
+    work["_product_dedupe_key"] = work["asin_padded"].map(_normalize_text)
+    missing_asin = work["_product_dedupe_key"].eq("")
+    if missing_asin.any():
+        work.loc[missing_asin, "_product_dedupe_key"] = (
+            "candidate|"
+            + work.loc[missing_asin, "active_run_id"].map(_normalize_text)
+            + "|"
+            + work.loc[missing_asin, "candidate_id"].map(_normalize_text)
+        )
+    if "_handoff_group_sort_date" not in work.columns:
+        work["_handoff_group_sort_date"] = ""
+    if "_handoff_group_source_row" not in work.columns:
+        work["_handoff_group_source_row"] = ""
+    work["_handoff_group_sort_date"] = work["_handoff_group_sort_date"].map(_normalize_text)
+    work["_handoff_group_source_row"] = pd.to_numeric(work["_handoff_group_source_row"], errors="coerce")
+    work = work.sort_values(
+        by=["_handoff_group_sort_date", "_handoff_group_source_row"],
+        ascending=[False, True],
+        kind="stable",
+    )
+    work = work.drop_duplicates(
+        subset=["active_supplier_id", "review_pack_type", "_product_dedupe_key"],
+        keep="first",
+    )
+    return work.drop(
+        columns=["_product_dedupe_key", "_handoff_group_sort_date", "_handoff_group_source_row"],
+        errors="ignore",
+    ).reset_index(drop=True)
+
+
+def _load_feeder_review_handoff_group_source_df(
+    pack_type: str,
+    *,
+    root_path: Path,
+    supplier_id: str,
+) -> pd.DataFrame:
+    manifests = _list_feeder_review_handoff_group_manifests(root_path, supplier_id)
+    if not manifests:
+        return pd.DataFrame()
+    parts: list[pd.DataFrame] = []
+    for manifest in manifests:
+        snapshot_id = _normalize_text(manifest.get("_snapshot_id", ""))
+        if not snapshot_id:
+            continue
+        part = load_feeder_review_source_df(pack_type, root=root_path, review_pack_snapshot=snapshot_id)
+        if part.empty:
+            continue
+        part = part.copy()
+        part["_handoff_group_sort_date"] = _feeder_review_handoff_manifest_sort_date(manifest)
+        part["_handoff_group_source_row"] = range(len(part.index))
+        parts.append(part)
+    if not parts:
+        return pd.DataFrame()
+    combined = pd.concat(parts, ignore_index=True)
+    return _dedupe_feeder_review_source_by_product(combined)
+
+
 def load_feeder_review_source_df(
     pack_type: str,
     *,
@@ -2360,10 +3000,14 @@ def load_feeder_review_source_df(
     review_pack_snapshot: str = "latest",
 ) -> pd.DataFrame:
     root_path = Path(root) if root is not None else get_o_path_contract().root
+    snapshot = _normalize_text(review_pack_snapshot) or "latest"
+    if _is_feeder_review_handoff_group_snapshot(snapshot):
+        supplier_id = _parse_feeder_review_handoff_group_snapshot(snapshot)
+        return _load_feeder_review_handoff_group_source_df(pack_type, root_path=root_path, supplier_id=supplier_id)
     source_df = read_review_pack_dataframe(
-        _feeder_review_pack_path(root_path, pack_type, review_pack_snapshot),
+        _feeder_review_pack_path(root_path, pack_type, snapshot),
         pack_type=pack_type,
-        snapshot_id=_feeder_review_reader_snapshot_id(root_path, review_pack_snapshot),
+        snapshot_id=_feeder_review_reader_snapshot_id(root_path, snapshot),
         dtype=str,
     )
     if source_df.empty:
@@ -2479,12 +3123,34 @@ def _latest_feeder_review_event_by_identity(events_df: pd.DataFrame) -> pd.DataF
     return work.drop(columns=["_event_sort"], errors="ignore").reset_index(drop=True)
 
 
+def _latest_feeder_review_event_by_product(events_df: pd.DataFrame) -> pd.DataFrame:
+    if events_df.empty:
+        return pd.DataFrame(columns=_f_contract_columns("feeder_review_events"))
+    work = events_df.copy()
+    for col in FEEDER_REVIEW_PRODUCT_IDENTITY_COLUMNS:
+        if col not in work.columns:
+            work[col] = ""
+        work[col] = work[col].map(_normalize_text)
+    work = work[work["asin_padded"].map(_normalize_text).ne("")].copy()
+    if work.empty:
+        return pd.DataFrame(columns=_f_contract_columns("feeder_review_events"))
+    work["_event_sort"] = pd.to_datetime(work.get("event_utc", ""), errors="coerce", utc=True)
+    work = work.sort_values(by=["_event_sort", "event_id"], ascending=[False, False], kind="stable")
+    work = work.drop_duplicates(subset=list(FEEDER_REVIEW_PRODUCT_IDENTITY_COLUMNS), keep="first")
+    return work.drop(columns=["_event_sort"], errors="ignore").reset_index(drop=True)
+
+
 def _merge_latest_review_columns(source_df: pd.DataFrame, latest_events_df: pd.DataFrame) -> pd.DataFrame:
     merged = source_df.copy()
     for col in FEEDER_REVIEW_IDENTITY_COLUMNS:
         if col not in merged.columns:
             merged[col] = ""
         merged[col] = merged[col].map(_normalize_text)
+    if "asin_padded" not in merged.columns:
+        asin_source = merged["asin"] if "asin" in merged.columns else pd.Series([""] * len(merged.index), index=merged.index)
+        merged["asin_padded"] = asin_source.map(_pad_asin_to_10)
+    else:
+        merged["asin_padded"] = merged["asin_padded"].map(_normalize_text)
     if latest_events_df.empty:
         merged["latest_review_decision"] = ""
         merged["latest_review_note"] = ""
@@ -2514,7 +3180,51 @@ def _merge_latest_review_columns(source_df: pd.DataFrame, latest_events_df: pd.D
         on=list(FEEDER_REVIEW_IDENTITY_COLUMNS),
         how="left",
     )
-    return joined.fillna("")
+    joined = joined.fillna("")
+    product_events = _latest_feeder_review_event_by_product(latest_events_df)
+    if product_events.empty:
+        return joined
+    product_cols = [
+        *FEEDER_REVIEW_PRODUCT_IDENTITY_COLUMNS,
+        "review_decision",
+        "review_note",
+        "review_reason_code",
+        "review_reason_label",
+        "event_utc",
+    ]
+    product_join = product_events[product_cols].rename(
+        columns={
+            "review_decision": "_product_latest_review_decision",
+            "review_note": "_product_latest_review_note",
+            "review_reason_code": "_product_latest_review_reason_code",
+            "review_reason_label": "_product_latest_review_reason_label",
+            "event_utc": "_product_latest_review_utc",
+        }
+    )
+    joined = joined.merge(product_join, on=list(FEEDER_REVIEW_PRODUCT_IDENTITY_COLUMNS), how="left").fillna("")
+    use_product = joined["latest_review_decision"].map(_normalize_text).eq("") & joined[
+        "_product_latest_review_decision"
+    ].map(_normalize_text).ne("")
+    if use_product.any():
+        copy_pairs = (
+            ("latest_review_decision", "_product_latest_review_decision"),
+            ("latest_review_note", "_product_latest_review_note"),
+            ("latest_review_reason_code", "_product_latest_review_reason_code"),
+            ("latest_review_reason_label", "_product_latest_review_reason_label"),
+            ("latest_review_utc", "_product_latest_review_utc"),
+        )
+        for target, source in copy_pairs:
+            joined.loc[use_product, target] = joined.loc[use_product, source]
+    return joined.drop(
+        columns=[
+            "_product_latest_review_decision",
+            "_product_latest_review_note",
+            "_product_latest_review_reason_code",
+            "_product_latest_review_reason_label",
+            "_product_latest_review_utc",
+        ],
+        errors="ignore",
+    )
 
 
 def build_feeder_review_window_df(
@@ -2735,7 +3445,7 @@ def submit_feeder_review_batch(
 
     for row in reviewed_rows:
         candidate_id = _normalize_text(row.get("candidate_id", ""))
-        review_decision = _normalize_text(row.get("review_decision", "")).lower()
+        review_decision = _normalize_feeder_review_decision(row.get("review_decision", ""))
         if candidate_id == "" or review_decision not in FEEDER_REVIEW_DECISIONS:
             skipped_rows.append(candidate_id or "(missing_candidate_id)")
             continue
@@ -3060,16 +3770,72 @@ def get_submission_targets(root: Path | None = None) -> dict[str, Path]:
     }
 
 
-def load_operator_datasets(root: Path | None = None) -> dict[str, pd.DataFrame]:
+def load_operator_datasets(
+    root: Path | None = None,
+    *,
+    names: tuple[str, ...] | None = None,
+    f_names: tuple[str, ...] | None = None,
+) -> dict[str, pd.DataFrame]:
     root_path = Path(root) if root is not None else get_o_path_contract().root
     ensure_o_directories(root=root_path)
-    names = (
+    default_names = (
         "restock_source_view",
         "restock_decision_events",
         "restock_review_queue",
         "restock_recommendations_live",
-        "restock_profit_checks_live",
-        "restock_profit_check_health",
+    "restock_profit_checks_live",
+    "restock_profit_check_health",
+    "restock_session_review_live",
+    "restock_session_supplier_summary_live",
+    "restock_session_reason_codes",
+    "restock_session_health",
+    "restock_inbound_fba_cost_proof_live",
+    "restock_profit_input_blocker_breakdown_live",
+    "restock_profit_input_blocker_breakdown_health",
+    "restock_token_cost_trust_gate_live",
+    "restock_token_cost_trust_gate_health",
+    "restock_session_draft_decision_events",
+        "restock_session_supplier_proof_events",
+        "restock_session_pack_moq_proof_events",
+        "restock_session_supplier_batch_lines_live",
+        "restock_session_supplier_batch_summary_live",
+        "restock_session_supplier_batch_health",
+        "restock_supplier_file_source_index_live",
+        "restock_supplier_file_source_index_health",
+        "restock_supplier_file_presence_probe_live",
+        "restock_supplier_file_presence_probe_health",
+        "restock_purchase_approval_preview_lines_live",
+        "restock_purchase_approval_preview_summary_live",
+        "restock_purchase_approval_preview_health",
+        "restock_purchase_approval_decision_events",
+        "restock_purchase_approval_guardrails_live",
+        "restock_purchase_approval_guardrails_health",
+        "restock_po_draft_readiness_preview_lines_live",
+        "restock_po_draft_readiness_preview_summary_live",
+        "restock_po_draft_readiness_preview_health",
+        "restock_po_line_design_preview_lines_live",
+        "restock_po_line_design_preview_summary_live",
+        "restock_po_line_design_preview_health",
+        "restock_po_draft_packet_review_lines_live",
+        "restock_po_draft_packet_review_summary_live",
+        "restock_po_draft_packet_review_health",
+        "restock_po_draft_hold_review_lines_live",
+        "restock_po_draft_hold_review_summary_live",
+        "restock_po_draft_hold_review_health",
+        "restock_po_draft_file_shape_preview_lines_live",
+        "restock_po_draft_file_shape_preview_summary_live",
+        "restock_po_draft_file_shape_preview_health",
+        "restock_po_preview_construction_summary_live",
+        "restock_po_preview_construction_summary_health",
+        "restock_po_draft_review_control_events",
+        "restock_po_draft_review_controls_live",
+        "restock_po_draft_review_controls_health",
+        "restock_po_draft_export_preview_lines_live",
+        "restock_po_draft_export_preview_summary_live",
+        "restock_po_draft_export_preview_health",
+        "restock_po_draft_export_gate_events",
+        "restock_po_draft_export_gate_live",
+        "restock_po_draft_export_gate_health",
         "supplier_buy_cost_truth",
         "supplier_paid_cost_profiles_live",
         "supplier_price_list_change_log_live",
@@ -3088,8 +3854,9 @@ def load_operator_datasets(root: Path | None = None) -> dict[str, pd.DataFrame]:
         "send_to_amazon_handoff_log",
         "send_to_amazon_handoff_holds",
     )
-    datasets = {name: _read_contract_df(root_path, name) for name in names}
-    f_names = (
+    selected_names = default_names if names is None else names
+    datasets = {name: _read_contract_df(root_path, name) for name in selected_names}
+    default_f_names = (
         "amazon_listing_intake_live",
         "amazon_listing_sku_reservations_live",
         "amazon_listing_drafts_live",
@@ -3103,8 +3870,20 @@ def load_operator_datasets(root: Path | None = None) -> dict[str, pd.DataFrame]:
         "amazon_listing_holds_live",
         "amazon_listing_health",
     )
-    datasets.update({name: _read_f_contract_df(root_path, name) for name in f_names})
+    selected_f_names = default_f_names if f_names is None else f_names
+    datasets.update({name: _read_f_contract_df(root_path, name) for name in selected_f_names})
     return datasets
+
+
+def _operator_dataset_names_for_route(route: str) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None]:
+    active_route = _normalize_text(route).lower().replace("-", "_")
+    if active_route == "today":
+        return TODAY_OPERATOR_DATASET_NAMES, TODAY_OPERATOR_F_DATASET_NAMES
+    if active_route == "restock_session":
+        return RESTOCK_SESSION_DATASET_NAMES, ()
+    if active_route in {"new_product_review", "price_list_queue"}:
+        return (), ()
+    return None, None
 
 
 def build_amazon_listing_draft_display_df(datasets: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -3669,15 +4448,15 @@ def _render_po_draft_line_html(row: pd.Series) -> str:
         )
     )
     return (
-        "<div style='padding:10px 0;border-top:1px solid #e5e7eb;display:flex;gap:12px;align-items:flex-start;'>"
+        "<div class='o-po-line-card'>"
         f"{image_html}"
-        "<div style='flex:1;min-width:0;'>"
-        f"<div style='font-weight:700;font-size:14px;line-height:1.25;color:#111827;'>{title}</div>"
-        "<div style='display:grid;grid-template-columns:minmax(130px,1.1fr) minmax(130px,.8fr) minmax(90px,.7fr) minmax(110px,.7fr);gap:10px;margin-top:8px;'>"
-        f"<div><div style='font-size:11px;color:#64748b;font-weight:700;'>SKU / ASIN</div><div style='overflow-wrap:anywhere;'>{sku}<br>{asin}</div></div>"
-        f"<div><div style='font-size:11px;color:#64748b;font-weight:700;'>Supply / Barcode</div><div style='overflow-wrap:anywhere;'>{supplier_sku}<br>{barcode}</div></div>"
-        f"<div><div style='font-size:11px;color:#64748b;font-weight:700;'>Order</div><div>{qty} units{pack_line}<br>GBP {unit_cost} each</div></div>"
-        f"<div><div style='font-size:11px;color:#64748b;font-weight:700;'>Line total</div><div>GBP {line_value}<br>{source}</div></div>"
+        "<div class='o-po-line-body'>"
+        f"<div class='o-po-line-title'>{title}</div>"
+        "<div class='o-po-line-grid'>"
+        f"<div><div class='o-po-line-label'>SKU / ASIN</div><div class='o-po-line-value'>{sku}<br>{asin}</div></div>"
+        f"<div><div class='o-po-line-label'>Supply / Barcode</div><div class='o-po-line-value'>{supplier_sku}<br>{barcode}</div></div>"
+        f"<div><div class='o-po-line-label'>Order</div><div class='o-po-line-value'>{qty} units{pack_line}<br>GBP {unit_cost} each</div></div>"
+        f"<div><div class='o-po-line-label'>Line total</div><div class='o-po-line-value'>GBP {line_value}<br>{source}</div></div>"
         "</div>"
         "</div>"
         "</div>"
@@ -3689,8 +4468,24 @@ def render_po_drafts_review_tab(datasets: dict[str, pd.DataFrame]) -> None:
 
     review_df = build_po_draft_review_df(datasets)
     holds_df = datasets.get("purchase_order_draft_holds", pd.DataFrame()).copy()
-    st.subheader("PO Draft Review")
-    st.caption("Review what you would order from each supplier. These are local drafts only.")
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Orders and P&L",
+            title="Review local draft orders",
+            body=(
+                "Review the local draft order packets by supplier before any real buying decision. "
+                "This page is for checking, not automatic ordering."
+            ),
+            steps=[
+                ("Open one supplier draft", "Check the supplier, total units, value, and product lines."),
+                ("Review blocked rows", "Holds stay visible before any order work continues."),
+                ("Keep proof separate", "Raw PO proof tables stay below the review area."),
+            ],
+            safe_note="Local review only. This page does not buy stock, create purchase orders, receive stock, or send anything to Amazon.",
+            tone="neutral",
+        ),
+        unsafe_allow_html=True,
+    )
 
     if review_df.empty:
         st.info("No PO drafts are available yet.")
@@ -3699,11 +4494,15 @@ def render_po_drafts_review_tab(datasets: dict[str, pd.DataFrame]) -> None:
         total_lines = len(review_df.index)
         total_units = int(pd.to_numeric(review_df["ordered_qty"], errors="coerce").fillna(0).sum())
         total_value = pd.to_numeric(review_df["line_value_gbp"], errors="coerce").fillna(0).sum()
-        metric_cols = st.columns(4, gap="small")
-        metric_cols[0].metric("Draft POs", total_pos)
-        metric_cols[1].metric("Lines", total_lines)
-        metric_cols[2].metric("Units", total_units)
-        metric_cols[3].metric("Value", f"GBP {_num_text(float(total_value))}")
+        st.markdown(
+            "<div class='o-work-grid'>"
+            + _operator_work_card_html("Draft orders", total_pos, "Supplier packets waiting locally.", "neutral")
+            + _operator_work_card_html("Product lines", total_lines, "Lines inside those local draft orders.", "neutral")
+            + _operator_work_card_html("Units", total_units, "Total units shown in the draft view.", "neutral")
+            + _operator_work_card_html("Draft value", f"GBP {_num_text(float(total_value))}", "Local draft value only.", "warn")
+            + "</div>",
+            unsafe_allow_html=True,
+        )
 
         for po_id, po_df in review_df.groupby("po_id", sort=False):
             first = po_df.iloc[0]
@@ -3711,10 +4510,11 @@ def render_po_drafts_review_tab(datasets: dict[str, pd.DataFrame]) -> None:
             status = _display_plain(first.get("po_status", ""), "draft")
             units = _display_plain(first.get("total_units", ""), "0")
             value = _display_plain(first.get("total_value_gbp", ""), "0")
-            label = f"{po_id} - {supplier_name} - {len(po_df.index)} line - {units} units - GBP {value}"
+            label = f"{supplier_name} - {len(po_df.index)} line(s) - {units} units - GBP {value}"
             with st.expander(label, expanded=True):
                 st.markdown(
                     f"**Supplier:** {html.escape(supplier_name)}  \n"
+                    f"**Draft:** {html.escape(_normalize_text(po_id) or '-')}  \n"
                     f"**Status:** {html.escape(status)}  \n"
                     f"**Draft total:** {html.escape(units)} units, GBP {html.escape(value)}",
                 )
@@ -3732,14 +4532,192 @@ def render_po_drafts_review_tab(datasets: dict[str, pd.DataFrame]) -> None:
     else:
         st.success("No PO draft holds.")
 
-    with st.expander("Technical audit tables"):
-        st.caption("These are the raw files for debugging and rollback checks.")
+    with st.expander("Proof tables"):
+        st.caption("Raw local proof for debugging and rollback checks. These tables are not Luke's normal buying path.")
         st.subheader("PO Headers")
         st.dataframe(datasets["purchase_orders_live"], width="stretch", hide_index=True)
         st.subheader("PO Lines")
         st.dataframe(datasets["purchase_order_lines_live"], width="stretch", hide_index=True)
         st.subheader("Draft Holds")
         st.dataframe(datasets["purchase_order_draft_holds"], width="stretch", hide_index=True)
+
+
+def _render_receiving_tab(root_path: Path, datasets: dict[str, pd.DataFrame]) -> None:
+    import streamlit as st
+
+    ordered_df = datasets.get("ordered_stock_state", pd.DataFrame()).copy()
+    holds_df = datasets.get("receiving_event_holds", pd.DataFrame()).copy()
+    events_df = datasets.get("receiving_events", pd.DataFrame()).copy()
+
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Receiving",
+            title="Record stock that arrived",
+            body=(
+                "Use this page when a supplier delivery has arrived and Luke needs a local receipt record. "
+                "The record is still local proof, not an Amazon handoff."
+            ),
+            steps=[
+                ("Check ordered stock", "Use the ordered stock proof below to confirm the PO line."),
+                ("Enter received quantity", "Record what arrived and add the warehouse reference if available."),
+                ("Save local receipt", "The receipt is recorded locally for later checks."),
+            ],
+            safe_note="Local receipt record only. This does not send stock to Amazon, change prices, write Sheets, or create a purchase order.",
+            tone="neutral",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    receiving_notice = _normalize_text(st.session_state.get("o_recent_receiving_notice", ""))
+    if receiving_notice:
+        st.markdown(_render_inline_notice(receiving_notice), unsafe_allow_html=True)
+
+    st.markdown(
+        "<div class='o-work-grid'>"
+        + _operator_work_card_html("Ordered stock lines", len(ordered_df.index), "Local ordered-stock proof rows.", "neutral")
+        + _operator_work_card_html("Receiving holds", len(holds_df.index), "Rows blocked from clean receipt.", "warn" if not holds_df.empty else "good")
+        + _operator_work_card_html("Receipts saved", len(events_df.index), "Local receipt records already saved.", "neutral")
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        _operator_local_form_panel_html(
+            title="Save a local receipt record",
+            body="Fill the PO line and quantity that arrived. This records local proof only and does not send anything to Amazon.",
+        ),
+        unsafe_allow_html=True,
+    )
+    with st.form("receiving_event_form"):
+        id_cols = st.columns([1.1, 1.0, 1.2], gap="small")
+        po_id = id_cols[0].text_input("Purchase order ID", key="receiving_po_id")
+        po_line_id = id_cols[1].text_input("Line ID", key="receiving_po_line_id")
+        seller_sku = id_cols[2].text_input("SKU", key="receiving_seller_sku")
+        detail_cols = st.columns([1.0, 1.2, 1.8], gap="small")
+        received_qty = detail_cols[0].text_input("Received quantity", key="receiving_received_qty")
+        warehouse_ref = detail_cols[1].text_input("Warehouse reference", key="receiving_warehouse_ref")
+        note = detail_cols[2].text_input("Note", value="", key="receiving_note")
+        submitted = st.form_submit_button("Save local receipt")
+
+    if submitted:
+        row = submit_receiving_event(
+            root=root_path,
+            po_id=po_id,
+            po_line_id=po_line_id,
+            seller_sku=seller_sku,
+            received_qty=received_qty,
+            warehouse_ref=warehouse_ref,
+            note=note,
+            actor="operator_ui",
+        )
+        st.session_state["o_recent_receiving_notice"] = f"Receipt recorded for {seller_sku or row['event_id']}."
+        st.rerun()
+
+    with st.expander("Ordered stock proof", expanded=True):
+        if ordered_df.empty:
+            st.info("No ordered stock rows are available yet.")
+        else:
+            st.dataframe(ordered_df, width="stretch", hide_index=True)
+    with st.expander("Receiving holds", expanded=False):
+        if holds_df.empty:
+            st.success("No receiving holds.")
+        else:
+            st.dataframe(holds_df, width="stretch", hide_index=True)
+    with st.expander("Recent local receipt records", expanded=False):
+        if events_df.empty:
+            st.info("No local receipt records yet.")
+        else:
+            st.dataframe(events_df.tail(25), width="stretch", hide_index=True)
+
+
+def _render_send_to_amazon_tab(root_path: Path, datasets: dict[str, pd.DataFrame]) -> None:
+    import streamlit as st
+
+    queue_df = datasets.get("send_to_amazon_queue", pd.DataFrame()).copy()
+    handoff_log_df = datasets.get("send_to_amazon_handoff_log", pd.DataFrame()).copy()
+    holds_df = datasets.get("send_to_amazon_handoff_holds", pd.DataFrame()).copy()
+
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Send to Amazon",
+            title="Record stock ready for Amazon handoff",
+            body=(
+                "Use this page only when stock is physically ready for an Amazon handoff record. "
+                "The page records local handoff proof and keeps holds visible."
+            ),
+            steps=[
+                ("Check the handoff queue", "Confirm the SKU and quantity that are ready."),
+                ("Enter handoff details", "Add shipment reference and status when known."),
+                ("Save local handoff", "The record stays local for proof and follow-up."),
+            ],
+            safe_note="Local handoff record only. This does not create a shipment in Amazon, change prices, write Sheets, or buy stock.",
+            tone="neutral",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    handoff_notice = _normalize_text(st.session_state.get("o_recent_handoff_notice", ""))
+    if handoff_notice:
+        st.markdown(_render_inline_notice(handoff_notice), unsafe_allow_html=True)
+
+    st.markdown(
+        "<div class='o-work-grid'>"
+        + _operator_work_card_html("Queue rows", len(queue_df.index), "Rows waiting for local handoff review.", "neutral")
+        + _operator_work_card_html("Handoff holds", len(holds_df.index), "Rows blocked from clean Amazon handoff.", "warn" if not holds_df.empty else "good")
+        + _operator_work_card_html("Handoff records", len(handoff_log_df.index), "Local handoff records already saved.", "neutral")
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        _operator_local_form_panel_html(
+            title="Save a local Amazon handoff record",
+            body="Fill the SKU, quantity, shipment reference, and status. This records local proof only and does not create an Amazon shipment.",
+        ),
+        unsafe_allow_html=True,
+    )
+    with st.form("handoff_event_form"):
+        id_cols = st.columns([1.1, 1.0, 1.2], gap="small")
+        po_id = id_cols[0].text_input("Purchase order ID", key="handoff_po_id")
+        po_line_id = id_cols[1].text_input("Line ID", key="handoff_po_line_id")
+        seller_sku = id_cols[2].text_input("SKU", key="handoff_seller_sku")
+        detail_cols = st.columns([1.0, 1.2, 1.1, 1.7], gap="small")
+        handoff_qty = detail_cols[0].text_input("Handoff quantity", key="handoff_qty")
+        shipment_ref = detail_cols[1].text_input("Shipment reference", key="handoff_shipment_ref")
+        handoff_status = detail_cols[2].selectbox("Status", options=list(HANDOFF_STATUSES), key="handoff_status")
+        note = detail_cols[3].text_input("Note", value="", key="handoff_note")
+        submitted = st.form_submit_button("Save local handoff")
+
+    if submitted:
+        row = submit_send_handoff_event(
+            root=root_path,
+            po_id=po_id,
+            po_line_id=po_line_id,
+            seller_sku=seller_sku,
+            handoff_qty=handoff_qty,
+            shipment_ref=shipment_ref,
+            handoff_status=handoff_status,
+            note=note,
+            actor="operator_ui",
+        )
+        st.session_state["o_recent_handoff_notice"] = f"Handoff recorded for {seller_sku or row['event_id']}."
+        st.rerun()
+
+    with st.expander("Amazon handoff queue", expanded=True):
+        if queue_df.empty:
+            st.info("No send-to-Amazon queue rows are available yet.")
+        else:
+            st.dataframe(queue_df, width="stretch", hide_index=True)
+    with st.expander("Handoff holds", expanded=False):
+        if holds_df.empty:
+            st.success("No Amazon handoff holds.")
+        else:
+            st.dataframe(holds_df, width="stretch", hide_index=True)
+    with st.expander("Recent local handoff records", expanded=False):
+        if handoff_log_df.empty:
+            st.info("No local Amazon handoff records yet.")
+        else:
+            st.dataframe(handoff_log_df.tail(25), width="stretch", hide_index=True)
 
 
 def build_recommendations_display_df(datasets: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -4364,6 +5342,30 @@ def _image_frame_html(image_url: str, *, size: int = 52) -> str:
         f"display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 {size}px;'>"
         f"<img src=\"{safe_url}\" style='width:100%;height:100%;object-fit:contain;display:block;background:#fff;'/>"
         f"</div>"
+    )
+
+
+def _intake_image_html(image_url: object, amazon_dp_url: object) -> str:
+    image_text = _normalize_text(image_url)
+    amazon_url = _normalize_text(amazon_dp_url)
+    if image_text:
+        safe_url = quote(image_text, safe=":/?&=%+-._~#")
+        return (
+            "<div class='o-intake-image-frame'>"
+            f"<img src=\"{safe_url}\" alt='Product image' loading='lazy'/>"
+            "</div>"
+        )
+    amazon_link = ""
+    if amazon_url:
+        amazon_link = (
+            f"<a href='{html.escape(amazon_url, quote=True)}' target='_blank' "
+            "rel='noopener noreferrer'>Open Amazon</a>"
+        )
+    return (
+        "<div class='o-intake-image-placeholder'>"
+        "<div>Image unavailable</div>"
+        f"{amazon_link}"
+        "</div>"
     )
 
 
@@ -5307,15 +6309,1876 @@ def _next_monday(from_date: date | None = None) -> date:
 def _render_operator_theme_css() -> str:
     return """
     <style>
-    div[data-testid="stTextInput"] input {
-        background: #0f172a;
-        color: #f8fafc;
-        border: 2px solid #38bdf8;
+    .stApp {
+        background:
+            radial-gradient(circle at top left, rgba(76, 154, 255, 0.13), transparent 280px),
+            radial-gradient(circle at top right, rgba(23, 184, 144, 0.13), transparent 260px),
+            linear-gradient(180deg, #f7fbff 0%, #f3f8f5 46%, #ffffff 100%);
+        color: #172033;
+    }
+    [data-testid="stAppViewContainer"],
+    [data-testid="stAppViewContainer"] > .main,
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li,
+    [data-testid="stMarkdownContainer"] label,
+    [data-testid="stCaptionContainer"],
+    .stRadio label,
+    .stSelectbox label,
+    .stTextInput label {
+        color: #334155;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        color: #102033;
+        letter-spacing: 0;
+    }
+    section[data-testid="stSidebar"] {
+        background: #ffffff;
+        border-right: 1px solid #d7e3ef;
+        box-shadow: 1px 0 18px rgba(37, 99, 235, 0.07);
+    }
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] strong,
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+        color: #334155;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 8px;
+        min-height: 38px;
+        font-weight: 650;
+        background: #ffffff;
+        border: 1px solid #d7e3ef;
+        color: #172033;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+        border-color: #2f80ed;
+        color: #0f4fb8;
+        background: #eef6ff;
+    }
+    div[data-testid="stButton"] button[kind="primary"] {
+        background: linear-gradient(135deg, #1d72e8 0%, #13a388 100%);
+        border: 1px solid #1d72e8;
+        color: #ffffff;
+        box-shadow: 0 8px 18px rgba(29, 114, 232, 0.16);
+    }
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        border-color: #0f766e;
+        color: #ffffff;
+        filter: brightness(1.02);
+    }
+    div[data-testid="stButton"] button[kind="primary"] p {
+        color: #ffffff !important;
+    }
+    div[data-testid="stButton"] button[kind="secondary"],
+    div[data-testid="stButton"] button:not([kind="primary"]) {
+        background: #ffffff !important;
+        border: 1px solid #b9d4ea !important;
+        color: #172033 !important;
+        box-shadow: 0 5px 14px rgba(38, 91, 150, 0.08);
+    }
+    div[data-testid="stButton"] button[kind="secondary"] p,
+    div[data-testid="stButton"] button:not([kind="primary"]) p {
+        color: #172033 !important;
+    }
+    div[data-testid="stButton"] button[kind="secondary"]:hover,
+    div[data-testid="stButton"] button:not([kind="primary"]):hover {
+        background: #eef7ff !important;
+        border-color: #2f80ed !important;
+        color: #0f4fb8 !important;
+    }
+    div[data-testid="stFormSubmitButton"] button {
+        background: #ffffff !important;
+        border: 1px solid #b9d4ea !important;
+        color: #172033 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 5px 14px rgba(38, 91, 150, 0.08);
+        min-height: 38px;
+        font-weight: 750;
+    }
+    div[data-testid="stFormSubmitButton"] button p {
+        color: #172033 !important;
+    }
+    div[data-testid="stFormSubmitButton"] button:hover {
+        background: #eef7ff !important;
+        border-color: #2f80ed !important;
+        color: #0f4fb8 !important;
+    }
+    div[data-testid="stFormSubmitButton"] button:disabled,
+    div[data-testid="stButton"] button:disabled {
+        background: #eef2f7 !important;
+        border-color: #cbd5e1 !important;
+        color: #64748b !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
+    }
+    div[data-testid="stFormSubmitButton"] button:disabled p,
+    div[data-testid="stButton"] button:disabled p {
+        color: #64748b !important;
+    }
+    div[data-testid="stExpander"] details {
+        border: 1px solid #d7e3ef !important;
+        border-radius: 8px !important;
+        background: #ffffff !important;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+        overflow: hidden;
+    }
+    div[data-testid="stExpander"] details summary {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stExpander"] details summary:hover {
+        background: #f7fbff !important;
+    }
+    div[data-testid="stExpander"] details summary p,
+    div[data-testid="stExpander"] details summary span {
+        color: #0f172a !important;
+        font-weight: 750 !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
+        background: #edf7ff !important;
+        border: 1px solid #2f80ed !important;
+        color: #0f172a !important;
+        box-shadow: 0 6px 16px rgba(47, 128, 237, 0.16) !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] p {
+        color: #0f172a !important;
+        font-weight: 850 !important;
+    }
+    .o-shell-hero {
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(238, 247, 255, 0.98) 55%, rgba(235, 249, 243, 0.98) 100%);
+        padding: 14px 16px;
+        margin: 0 0 14px 0;
+        box-shadow: 0 10px 24px rgba(38, 91, 150, 0.08);
+    }
+    .o-shell-eyebrow {
+        color: #475569;
+        font-size: 12px;
+        font-weight: 750;
+        margin-bottom: 4px;
+    }
+    .o-shell-title {
+        color: #0f172a;
+        font-size: 24px;
+        line-height: 1.22;
+        font-weight: 800;
+    }
+    .o-shell-subtitle {
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.35;
+        margin-top: 4px;
+    }
+    .o-metric-card {
+        min-height: 128px;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        padding: 17px 18px 15px 18px;
+        margin: 0 0 16px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.07);
+    }
+    .o-metric-card.good {
+        border-left: 5px solid #10a66a;
+        background: linear-gradient(180deg, #ffffff 0%, #f1fbf6 100%);
+    }
+    .o-metric-card.warn {
+        border-left: 5px solid #f2a900;
+        background: linear-gradient(180deg, #ffffff 0%, #fff8df 100%);
+    }
+    .o-metric-card.stop {
+        border-left: 5px solid #df4f42;
+        background: linear-gradient(180deg, #ffffff 0%, #fff1ef 100%);
+    }
+    .o-metric-card.neutral {
+        border-left: 5px solid #2f80ed;
+        background: linear-gradient(180deg, #ffffff 0%, #f0f7ff 100%);
+    }
+    .o-metric-label {
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.25;
+        font-weight: 750;
+    }
+    .o-metric-value {
+        color: #0f172a;
+        font-size: 28px;
+        line-height: 1.15;
+        font-weight: 850;
+        margin-top: 8px;
+    }
+    .o-metric-note {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.3;
+        margin-top: 8px;
+    }
+    .o-decision-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 16px;
+        margin: 8px 0 14px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.06);
+    }
+    .o-decision-card.good {
+        background: #eefbf4;
+        border-color: #9fe7bf;
+    }
+    .o-decision-card.warn {
+        background: #fff7dc;
+        border-color: #f5d46b;
+    }
+    .o-decision-card.neutral {
+        background: #edf7ff;
+        border-color: #b7daf7;
+    }
+    .o-decision-title {
+        color: #0f172a;
+        font-size: 18px;
+        line-height: 1.25;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+    .o-decision-body {
+        color: #334155;
+        font-size: 14px;
+        line-height: 1.42;
+    }
+    .o-task-brief {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
+        gap: 18px;
+        align-items: stretch;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 18px;
+        margin: 8px 0 14px 0;
+        box-shadow: 0 10px 24px rgba(38, 91, 150, 0.07);
+    }
+    .o-task-brief.good {
+        border-left: 5px solid #10a66a;
+    }
+    .o-task-brief.warn {
+        border-left: 5px solid #f2a900;
+    }
+    .o-task-brief.neutral {
+        border-left: 5px solid #2f80ed;
+    }
+    .o-task-kicker {
+        color: #2563eb;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+    }
+    .o-task-title {
+        color: #0f172a;
+        font-size: 26px;
+        line-height: 1.14;
+        font-weight: 850;
+        max-width: 760px;
+    }
+    .o-task-body {
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.45;
+        max-width: 780px;
+        margin-top: 8px;
+    }
+    .o-task-safe {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid #b7e4ca;
+        border-radius: 999px;
+        background: #f0fbf5;
+        color: #166534;
+        font-size: 12px;
+        line-height: 1.25;
+        font-weight: 800;
+        padding: 7px 10px;
+        margin-top: 12px;
+    }
+    .o-task-safe-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #10a66a;
+        flex: 0 0 auto;
+    }
+    .o-task-steps {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+    }
+    .o-task-step {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 9px;
+        align-items: start;
+        border: 1px solid #dce8f3;
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 9px 10px;
+        min-height: 54px;
+    }
+    .o-task-step-index {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: #e8f3ff;
+        color: #0f4fb8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 850;
+    }
+    .o-task-step-title {
+        color: #0f172a;
+        font-size: 13px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-task-step-body {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.32;
+        margin-top: 3px;
+    }
+    .o-work-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+        margin: 14px 0 16px 0;
+    }
+    .o-work-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 14px;
+        min-height: 120px;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.06);
+    }
+    .o-work-card.good {
+        border-top: 4px solid #10a66a;
+    }
+    .o-work-card.warn {
+        border-top: 4px solid #f2a900;
+    }
+    .o-work-card.stop {
+        border-top: 4px solid #df4f42;
+    }
+    .o-work-card.neutral {
+        border-top: 4px solid #2f80ed;
+    }
+    .o-work-label {
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-work-value {
+        color: #0f172a;
+        font-size: 26px;
+        line-height: 1.12;
+        font-weight: 850;
+        margin-top: 8px;
+        overflow-wrap: anywhere;
+    }
+    .o-work-body {
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 8px;
+    }
+    .o-po-line-card {
+        padding: 10px 0;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        min-width: 0;
+    }
+    .o-po-line-body {
+        flex: 1;
+        min-width: 0;
+    }
+    .o-po-line-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        overflow-wrap: anywhere;
+    }
+    .o-po-line-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 8px;
+    }
+    .o-po-line-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-po-line-value {
+        color: #172033;
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-work-header {
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #f7fbff 0%, #fffaf0 100%);
+        padding: 14px 16px;
+        margin: 4px 0 14px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.06);
+    }
+    .o-intake-work-kicker {
+        color: #2563eb;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+        margin-bottom: 5px;
+    }
+    .o-intake-work-title {
+        color: #0f172a;
+        font-size: 22px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-work-body {
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-top: 6px;
+        max-width: 760px;
+    }
+    .o-intake-filter-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 2px 0 4px 0;
+    }
+    .o-intake-filter-note {
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.35;
+        margin: 0 0 8px 0;
+    }
+    .o-intake-focus-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+        gap: 10px;
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 10px;
+        margin: 10px 0 12px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.05);
+    }
+    .o-intake-focus-chip {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 11px;
+        min-width: 0;
+    }
+    .o-intake-focus-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-focus-value {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+        gap: 10px;
+        margin: 10px 0 12px 0;
+    }
+    .o-intake-status-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 11px;
+        min-height: 72px;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+    }
+    .o-intake-status-card.good {
+        border-left: 4px solid #10a66a;
+    }
+    .o-intake-status-card.warn {
+        border-left: 4px solid #f2a900;
+    }
+    .o-intake-status-card.neutral {
+        border-left: 4px solid #2f80ed;
+    }
+    .o-intake-status-label {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-status-value {
+        color: #0f172a;
+        font-size: 20px;
+        line-height: 1.15;
+        font-weight: 850;
+        margin-top: 6px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-safe-note {
+        border: 1px solid #b7e4ca;
+        border-radius: 8px;
+        background: #f0fbf5;
+        color: #166534;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 750;
+        padding: 9px 11px;
+        margin: 6px 0 12px 0;
+    }
+    .o-intake-empty-state {
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        padding: 16px;
+        margin: 12px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.06);
+    }
+    .o-intake-empty-title {
+        color: #0f172a;
+        font-size: 17px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-intake-empty-body {
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-top: 6px;
+    }
+    .o-intake-sent-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 11px;
+        margin: 4px 0 10px 0;
+        box-shadow: 0 5px 14px rgba(38, 91, 150, 0.05);
+    }
+    .o-intake-sent-decision {
+        color: #0f172a;
+        font-size: 13px;
+        line-height: 1.3;
+        font-weight: 850;
+    }
+    .o-intake-sent-title {
+        color: #334155;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-sent-meta {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-summary-strip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: #f7fbff;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+        margin: 8px 0 14px 0;
+    }
+    .o-intake-summary-label {
+        font-size: 12px;
+        color: #2563eb;
+        font-weight: 800;
+    }
+    .o-intake-summary-value {
+        font-size: 13px;
+        color: #0f172a;
+        font-weight: 800;
+    }
+    .o-intake-summary-divider {
+        color: #b7c7d8;
+    }
+    .o-intake-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        padding: 16px;
+        margin: 12px 0 10px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.07);
+    }
+    .o-intake-top {
+        display: grid;
+        grid-template-columns: 124px minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+    }
+    .o-intake-image-placeholder {
+        width: 112px;
+        min-height: 112px;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        color: #64748b;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 750;
+        padding: 8px;
+    }
+    .o-intake-image-placeholder a {
+        color: #0f4fb8;
+        font-weight: 850;
+        text-decoration: none;
+    }
+    .o-intake-image-frame {
+        width: 112px;
+        height: 112px;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .o-intake-image-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        background: #ffffff;
+    }
+    .o-intake-supplier {
+        color: #2563eb;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+        margin-bottom: 5px;
+    }
+    .o-intake-title {
+        color: #0f172a;
+        font-size: 18px;
+        line-height: 1.22;
+        font-weight: 850;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-subline {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-facts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+        gap: 7px;
+        margin-top: 10px;
+    }
+    .o-intake-fact {
+        border: 1px solid #dce8f3;
+        border-radius: 8px;
+        background: #f7fbff;
+        padding: 7px 8px;
+        min-height: 56px;
+    }
+    .o-intake-fact-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-fact-value {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 800;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-notes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+    }
+    .o-intake-note {
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 10px 11px;
+    }
+    .o-intake-note.warn {
+        border-color: #f5d46b;
+        background: #fffaf0;
+    }
+    .o-intake-note-label {
+        color: #334155;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-note-body {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-alert {
+        margin-top: 10px;
+        border: 1px solid #f5d46b;
+        border-radius: 8px;
+        background: #fffaf0;
+        padding: 9px 10px;
+    }
+    .o-intake-alert-label {
+        color: #78350f;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-intake-alert-body {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-detail-drawer,
+    .o-restock-detail-drawer {
+        margin-top: 10px;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #f8fbff;
+        color: #334155;
+        overflow: hidden;
+    }
+    .o-intake-detail-drawer summary,
+    .o-restock-detail-drawer summary {
+        cursor: pointer;
+        padding: 8px 10px;
+        color: #0f4fb8;
+        font-size: 12px;
+        line-height: 1.25;
+        font-weight: 850;
+        list-style: none;
+    }
+    .o-intake-detail-drawer summary::-webkit-details-marker,
+    .o-restock-detail-drawer summary::-webkit-details-marker {
+        display: none;
+    }
+    .o-intake-detail-drawer summary::before,
+    .o-restock-detail-drawer summary::before {
+        content: ">";
+        display: inline-block;
+        margin-right: 7px;
+        transition: transform 0.14s ease;
+    }
+    .o-intake-detail-drawer[open] summary::before,
+    .o-restock-detail-drawer[open] summary::before {
+        transform: rotate(90deg);
+    }
+    .o-intake-detail-body,
+    .o-restock-detail-body {
+        border-top: 1px solid #d7e3ef;
+        padding: 9px 10px 10px 10px;
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-detail-row {
+        margin: 0 0 6px 0;
+    }
+    .o-intake-idline {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+        margin-top: 10px;
+        overflow-wrap: anywhere;
+    }
+    .o-intake-idline a {
+        color: #0f4fb8;
+        font-weight: 800;
+        text-decoration: none;
+    }
+    .o-intake-action-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 4px 0 6px 0;
+    }
+    .o-intake-choice-panel {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+        margin: 10px 0 8px 0;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+    }
+    .o-intake-choice-panel-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-intake-choice-panel-body {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 5px;
+    }
+    div[role="radiogroup"][aria-label="Choice"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        width: 100% !important;
+        align-items: stretch !important;
+    }
+    div[role="radiogroup"][aria-label="Choice"] label {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 8px 10px;
+        min-height: 38px;
+        margin: 0 !important;
+        box-shadow: 0 4px 12px rgba(38, 91, 150, 0.04);
+    }
+    div[role="radiogroup"][aria-label="Choice"] label:has(input:checked) {
+        border-color: #2f80ed;
+        background: #edf7ff;
+    }
+    .o-intake-choice-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: #f7fbff;
+        padding: 10px 12px;
+        margin: 12px 0 10px 0;
+    }
+    .o-intake-choice-main {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.3;
+        font-weight: 850;
+        margin-right: 6px;
+    }
+    .o-intake-choice-chip {
+        border: 1px solid #d7e3ef;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #334155;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 800;
+        padding: 5px 8px;
+    }
+    .o-intake-choice-chip.good {
+        border-color: #9fe7bf;
+        background: #eefbf4;
+        color: #166534;
+    }
+    .o-intake-choice-chip.warn {
+        border-color: #f5d46b;
+        background: #fff7dc;
+        color: #78350f;
+    }
+    .o-intake-submit-panel {
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+        margin: 12px 0 10px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.05);
+    }
+    .o-intake-submit-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-intake-submit-body {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: 5px;
+    }
+    .o-admin-note {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px 14px;
+        margin: 8px 0 12px 0;
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+    }
+    .o-admin-live-card {
+        border: 1px solid #cfe4f4;
+        border-left: 5px solid #2f80ed;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 14px;
+        margin: 0 0 12px 0;
+        box-shadow: 0 10px 24px rgba(38, 91, 150, 0.07);
+    }
+    .o-admin-live-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .o-admin-live-eyebrow {
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 1.2;
+    }
+    .o-admin-live-title {
+        color: #0f172a;
+        font-size: 19px;
+        font-weight: 850;
+        line-height: 1.2;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-admin-live-metrics {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .o-admin-live-metric {
+        min-width: 72px;
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #f7fbff;
+        padding: 7px 9px;
+    }
+    .o-admin-live-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-admin-live-value {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-admin-progress-track {
+        height: 7px;
+        border-radius: 999px;
+        background: #e7eef6;
+        margin-top: 12px;
+        overflow: hidden;
+    }
+    .o-admin-progress-fill {
+        height: 7px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2f80ed 0%, #13a388 100%);
+    }
+    .o-admin-compact-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+        margin: 8px 0 12px 0;
+    }
+    .o-admin-compact-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #d7e3ef;
+        border-radius: 999px;
+        background: #f7fbff;
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 750;
+        padding: 6px 9px;
+    }
+    .o-admin-compact-chip strong {
+        color: #0f172a;
+        font-weight: 850;
+    }
+    .o-intake-divider {
+        height: 1px;
+        background: #d7e3ef;
+        margin: 12px 0 8px 0;
+    }
+    .o-intake-recent-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 16px 0 8px 0;
+    }
+    @media (max-width: 760px) {
+        .o-intake-card {
+            padding: 12px;
+        }
+        .o-intake-top {
+            grid-template-columns: 94px minmax(0, 1fr);
+            gap: 12px;
+        }
+        .o-intake-image-placeholder,
+        .o-intake-image-frame {
+            width: 88px;
+            height: 88px;
+            min-height: 88px;
+        }
+        .o-intake-image-placeholder {
+            font-size: 11px;
+            padding: 6px;
+        }
+        .o-intake-title {
+            font-size: 16px;
+            line-height: 1.24;
+        }
+        .o-intake-facts {
+            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+            gap: 7px;
+            margin-top: 10px;
+        }
+        .o-intake-fact {
+            min-height: 56px;
+            padding: 7px 8px;
+        }
+        .o-intake-notes {
+            grid-template-columns: 1fr;
+        }
+        div[role="radiogroup"][aria-label="Choice"] {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        div[role="radiogroup"][aria-label="Choice"] label {
+            width: 100%;
+        }
+        .o-intake-choice-strip {
+            align-items: flex-start;
+        }
+        .o-intake-choice-main {
+            flex: 1 0 100%;
+        }
+    }
+    @media (max-width: 520px) {
+        .o-intake-top {
+            grid-template-columns: 1fr;
+        }
+        .o-intake-image-placeholder,
+        .o-intake-image-frame {
+            width: 96px;
+            height: 96px;
+            min-height: 96px;
+        }
+        .o-intake-facts {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        div[role="radiogroup"][aria-label="Choice"] {
+            grid-template-columns: 1fr;
+        }
+        div[role="radiogroup"][aria-label="Choice"] label {
+            width: 100%;
+        }
+        .o-intake-choice-strip {
+            gap: 6px;
+        }
+        .o-intake-choice-chip {
+            flex: 1 1 44%;
+            text-align: center;
+        }
+    }
+    .o-small-list {
+        margin: 8px 0 0 18px;
+        color: #334155;
+        font-size: 13px;
+        line-height: 1.35;
+    }
+    .o-small-list li {
+        margin: 0 0 4px 0;
+    }
+    .o-restock-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        padding: 12px;
+        margin: 8px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.07);
+    }
+    .o-restock-card.warn {
+        border-left: 5px solid #f2a900;
+    }
+    .o-restock-card.good {
+        border-left: 5px solid #10a66a;
+    }
+    .o-restock-card.neutral {
+        border-left: 5px solid #2f80ed;
+    }
+    .o-restock-top {
+        display: grid;
+        grid-template-columns: 82px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+    }
+    .o-restock-title {
+        color: #0f172a;
+        font-size: 16px;
+        line-height: 1.25;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-meta {
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.35;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+        gap: 7px;
+        margin-top: 10px;
+    }
+    .o-restock-fact {
+        border: 1px solid #dce8f3;
+        border-radius: 8px;
+        background: #f7fbff;
+        padding: 7px 8px;
+        min-height: 54px;
+    }
+    .o-restock-fact-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 800;
+    }
+    .o-restock-fact-value {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 750;
+        margin-top: 5px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-proof {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+    }
+    .o-restock-chip {
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 700;
+        padding: 5px 8px;
+    }
+    .o-restock-chip.warn {
+        border-color: #fbbf24;
+        background: #fffbeb;
+        color: #78350f;
+    }
+    .o-restock-chip.good {
+        border-color: #86efac;
+        background: #f0fdf4;
+        color: #166534;
+    }
+    .o-restock-blocker {
+        margin-top: 10px;
+        border-radius: 8px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #7c2d12;
+        padding: 9px 10px;
+        font-size: 13px;
+        line-height: 1.35;
+    }
+    .o-restock-next-action {
+        margin-top: 9px;
+        border-radius: 8px;
+        background: #eef6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e3a8a;
+        padding: 9px 10px;
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-safe-save {
+        margin-top: 9px;
+        border-radius: 8px;
+        background: #f3fbf7;
+        border: 1px solid #bbf7d0;
+        color: #14532d;
+        padding: 9px 10px;
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-position-marker {
+        margin-top: 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #d8e3ee;
+        color: #334155;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-preview-status {
+        margin-top: 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #d8e3ee;
+        color: #334155;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-preview-status.good {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #14532d;
+    }
+    .o-restock-approval-preview-status.warn {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #78350f;
+    }
+    .o-restock-po-preview-status {
+        margin-top: 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #d8e3ee;
+        color: #334155;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-po-preview-status.good {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #14532d;
+    }
+    .o-restock-po-preview-status.warn {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #78350f;
+    }
+    .o-restock-filter-strip {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+        flex-wrap: wrap;
+        border: 1px solid #cfe4f4;
+        border-radius: 8px;
+        background: #f7fbff;
+        padding: 10px;
+        margin: 10px 0 12px 0;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+    }
+    .o-restock-filter-chip {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 8px 10px;
+        min-width: 132px;
+        flex: 1 1 132px;
+    }
+    .o-restock-filter-label {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 850;
+    }
+    .o-restock-filter-value {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-local-actions {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 11px;
+        margin: 8px 0 8px 0;
+        box-shadow: 0 6px 16px rgba(38, 91, 150, 0.05);
+    }
+    .o-restock-local-actions-title {
+        color: #0f172a;
+        font-size: 13px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-restock-local-actions-body {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+        margin-top: 3px;
+    }
+    .o-restock-proof-history {
+        margin-top: 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #d8e3ee;
+        color: #334155;
+        padding: 9px 10px;
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-missing-proof {
+        margin-top: 8px;
+        border-radius: 8px;
+        background: #fff8f1;
+        border: 1px solid #fed7aa;
+        color: #7c2d12;
+        padding: 9px 10px;
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-missing-proof ul {
+        margin: 6px 0 0 18px;
+        padding: 0;
+    }
+    .o-restock-missing-proof li {
+        margin: 2px 0;
+    }
+    .o-restock-row-proof-drawer {
+        margin: 0 0 12px 0;
+        border-radius: 8px;
+        background: #f8fbff;
+        border: 1px solid #cfe0f2;
+        color: #26384f;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-row-proof-drawer ul {
+        margin: 6px 0 0 18px;
+        padding: 0;
+    }
+    .o-restock-row-proof-drawer li {
+        margin: 3px 0;
+    }
+    .o-restock-site-hero {
+        border: 1px solid #bee2f8;
+        border-radius: 8px;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(236, 248, 255, 0.98) 48%, rgba(231, 248, 239, 0.98) 100%);
+        padding: 24px;
+        margin: 8px 0 14px 0;
+        box-shadow: 0 14px 30px rgba(38, 91, 150, 0.08);
+    }
+    .o-restock-site-title {
+        color: #0f172a;
+        font-size: 30px;
+        line-height: 1.12;
+        font-weight: 850;
+        margin: 0;
+    }
+    .o-restock-site-copy {
+        color: #334155;
+        font-size: 15px;
+        line-height: 1.42;
+        max-width: 760px;
+        margin-top: 8px;
+    }
+    .o-restock-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+        margin: 14px 0 16px 0;
+    }
+    .o-restock-readiness-summary {
+        margin: 12px 0 16px 0;
+    }
+    .o-restock-readiness-title {
+        color: #0f172a;
+        font-size: 16px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-readiness-note {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: -6px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-action-buckets {
+        margin: 4px 0 16px 0;
+    }
+    .o-restock-action-buckets-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-supplier-info-needed {
+        margin: 10px 0 12px 0;
+    }
+    .o-restock-supplier-info-needed-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-supplier-info-needed-note {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: 7px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-readiness-lane {
+        margin: 10px 0 12px 0;
+    }
+    .o-restock-approval-readiness-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-readiness-note {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: 7px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-preview-visibility {
+        margin: 10px 0 12px 0;
+    }
+    .o-restock-approval-preview-visibility-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-approval-preview-visibility-note {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: 7px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-po-preview-visibility {
+        margin: 10px 0 12px 0;
+    }
+    .o-restock-po-preview-visibility-title {
+        color: #0f172a;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 850;
+        margin: 0 0 4px 0;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-po-preview-visibility-note {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.4;
+        margin-top: 7px;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-protected-stage-panel {
+        border: 1px solid #fed7aa;
+        border-radius: 8px;
+        background: #fffaf4;
+        padding: 12px;
+        margin: 10px 0 12px 0;
+        box-shadow: 0 8px 18px rgba(120, 53, 15, 0.06);
+    }
+    .o-restock-protected-stage-title {
+        color: #7c2d12;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 900;
+        margin-bottom: 8px;
+    }
+    .o-restock-protected-stage-note {
+        margin-top: 8px;
+        color: #7c2d12;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-real-po-gate {
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: 12px;
+        margin: 10px 0 12px 0;
+        box-shadow: 0 8px 18px rgba(30, 64, 175, 0.05);
+    }
+    .o-restock-real-po-gate-title {
+        color: #1e3a8a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 900;
+        margin-bottom: 8px;
+    }
+    .o-restock-real-po-gate-note {
+        margin-top: 8px;
+        color: #1e3a8a;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-real-po-worklist {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px;
+        margin: 10px 0 12px 0;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    }
+    .o-restock-real-po-worklist-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 900;
+        margin-bottom: 8px;
+    }
+    .o-restock-real-po-worklist-note {
+        margin-top: 8px;
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-next-proof-hint {
+        margin: 8px 0 12px 0;
+        border-radius: 8px;
+        background: #eef6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e3a8a;
+        padding: 9px 10px;
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-path-strip {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 15px 16px;
+        margin: 8px 0 18px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.07);
+    }
+    .o-restock-path-kicker {
+        color: #2563eb;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+    .o-restock-path-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    .o-restock-path-item {
+        border-left: 3px solid #2f80ed;
+        padding-left: 10px;
+        min-height: 56px;
+    }
+    .o-restock-path-title {
+        color: #0f172a;
+        font-size: 14px;
+        line-height: 1.25;
+        font-weight: 850;
+    }
+    .o-restock-path-body {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.35;
+        margin-top: 4px;
+    }
+    .o-restock-supplier-card {
+        border: 1px solid #d7e3ef;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+        padding: 15px 16px;
+        margin: 8px 0 6px 0;
+        box-shadow: 0 8px 20px rgba(38, 91, 150, 0.07);
+    }
+    .o-restock-supplier-card.ready {
+        border-left: 5px solid #10a66a;
+    }
+    .o-restock-supplier-card.blocked {
+        border-left: 5px solid #f2a900;
+    }
+    .o-restock-supplier-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .o-restock-supplier-name {
+        color: #0f172a;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 850;
+        overflow-wrap: anywhere;
+    }
+    .o-restock-supplier-state {
+        color: #0f4fb8;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 850;
+        margin-top: 5px;
+    }
+    .o-restock-supplier-count {
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+        background: #eef6ff;
+        color: #0f172a;
+        min-width: 82px;
+        padding: 7px 9px;
+        text-align: center;
+    }
+    .o-restock-supplier-count strong {
+        display: block;
+        font-size: 22px;
+        line-height: 1;
+        color: #0f172a;
+    }
+    .o-restock-supplier-count span {
+        display: block;
+        margin-top: 3px;
+        color: #475569;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 800;
+    }
+    .o-restock-supplier-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 12px;
+    }
+    .o-restock-supplier-pill {
+        border: 1px solid #d7e3ef;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 12px;
+        line-height: 1.2;
+        font-weight: 750;
+        padding: 5px 8px;
+    }
+    .o-restock-supplier-note {
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+        margin-top: 10px;
+    }
+    @media (max-width: 700px) {
+        .o-task-brief {
+            grid-template-columns: 1fr;
+            padding: 14px;
+        }
+        .o-task-title {
+            font-size: 22px;
+        }
+        .o-work-grid {
+            grid-template-columns: 1fr;
+        }
+        .o-restock-top {
+            grid-template-columns: 1fr;
+        }
+        .o-restock-stats-grid,
+        .o-restock-path-list {
+            grid-template-columns: 1fr;
+        }
+        .o-restock-supplier-head {
+            flex-direction: column;
+        }
+        .o-restock-supplier-count {
+            width: 100%;
+            text-align: left;
+        }
+    }
+    @media (max-width: 640px) {
+        .o-shell-hero,
+        .o-task-brief,
+        .o-work-card,
+        .o-intake-card,
+        .o-restock-card,
+        .o-restock-supplier-card,
+        .o-intake-submit-panel,
+        .o-restock-local-actions,
+        .o-admin-live-card {
+            padding: 12px;
+        }
+        .o-shell-title {
+            font-size: 21px;
+            line-height: 1.2;
+        }
+        .o-shell-subtitle,
+        .o-task-body,
+        .o-work-body,
+        .o-intake-submit-body,
+        .o-restock-local-actions-body {
+            font-size: 13px;
+        }
+        .o-task-safe {
+            display: flex;
+            align-items: flex-start;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .o-work-card,
+        .o-metric-card {
+            min-height: auto;
+        }
+        .o-work-grid,
+        .o-intake-status-grid,
+        .o-intake-focus-strip,
+        .o-restock-filter-strip,
+        .o-restock-stats-grid,
+        .o-restock-path-list {
+            grid-template-columns: 1fr !important;
+        }
+        .o-po-line-card {
+            display: grid;
+            grid-template-columns: 64px minmax(0, 1fr);
+            gap: 10px;
+        }
+        .o-po-line-grid {
+            grid-template-columns: 1fr !important;
+        }
+        .o-admin-live-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100%;
+        }
+        .o-admin-live-metric {
+            min-width: 0;
+        }
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.65rem !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div {
+            min-width: min(100%, 170px) !important;
+            flex: 1 1 170px !important;
+        }
+        div[data-testid="stTextInput"] input,
+        div[data-baseweb="input"] input {
+            min-height: 38px;
+        }
+        div[data-testid="stDataFrame"] {
+            overflow-x: auto;
+        }
+    }
+    div[data-testid="stTextInput"] input,
+    div[data-baseweb="input"] input,
+    .stTextInput input {
+        background: #ffffff !important;
+        color: #172033 !important;
+        caret-color: #172033 !important;
+        border: 2px solid #9cccf2 !important;
         border-radius: 6px;
     }
-    div[data-testid="stTextInput"] input:focus {
-        border-color: #0ea5e9;
-        box-shadow: 0 0 0 1px #0ea5e9;
+    div[data-testid="stTextInput"] input:focus,
+    div[data-baseweb="input"] input:focus,
+    .stTextInput input:focus {
+        border-color: #2f80ed !important;
+        box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.14) !important;
+    }
+    div[data-baseweb="select"] > div,
+    div[data-testid="stExpander"] details,
+    div[data-testid="stDataFrame"] {
+        background: #ffffff;
+        border-color: #d7e3ef;
+        color: #172033;
+    }
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] input,
+    div[data-testid="stExpander"] summary,
+    div[data-testid="stExpander"] p {
+        color: #172033;
     }
     .o-hover-wrap {
         position: relative;
@@ -5375,11 +8238,714 @@ def _render_inline_notice(message: str) -> str:
     return (
         "<div style='display:inline-flex;align-items:center;gap:8px;"
         "padding:6px 10px;border:1px solid #38bdf8;border-radius:999px;"
-        "background:rgba(14,165,233,0.08);color:#dbeafe;font:500 12px sans-serif;'>"
+        "background:#edf7ff;color:#0f4fb8;font:750 12px sans-serif;'>"
         "<span style='width:7px;height:7px;border-radius:999px;background:#38bdf8;display:inline-block;'></span>"
         f"{html.escape(message)}"
         "</div>"
     )
+
+
+def _render_intake_empty_state_html(title: str, body: str) -> str:
+    return (
+        "<div class='o-intake-empty-state'>"
+        f"<div class='o-intake-empty-title'>{html.escape(_normalize_text(title))}</div>"
+        f"<div class='o-intake-empty-body'>{html.escape(_normalize_text(body))}</div>"
+        "</div>"
+    )
+
+
+def _intake_focus_strip_html(
+    *,
+    work_pack: object,
+    supplier: object,
+    batch: object,
+    shown: object,
+    waiting: object,
+    saved: object,
+) -> str:
+    chips = [
+        ("Work pack", _normalize_text(work_pack) or "-"),
+        ("Supplier", _normalize_text(supplier) or "All suppliers"),
+        ("Group", _normalize_text(batch) or "Auto next 10"),
+        ("Products shown", _normalize_text(shown) or "0"),
+        ("Need choice", _normalize_text(waiting) or "0"),
+        ("Already saved", _normalize_text(saved) or "0"),
+    ]
+    chip_html = "".join(
+        "<div class='o-intake-focus-chip'>"
+        f"<div class='o-intake-focus-label'>{html.escape(label)}</div>"
+        f"<div class='o-intake-focus-value'>{html.escape(value)}</div>"
+        "</div>"
+        for label, value in chips
+    )
+    return f"<div class='o-intake-focus-strip'>{chip_html}</div>"
+
+
+def _intake_choice_panel_html(row_data: pd.Series | dict[str, object]) -> str:
+    sku = (
+        _normalize_text(row_data.get("supplier_sku", ""))
+        or _normalize_text(row_data.get("asin", ""))
+        or "this product"
+    )
+    return (
+        "<div class='o-intake-choice-panel'>"
+        "<div class='o-intake-choice-panel-title'>Luke's choice for this product</div>"
+        "<div class='o-intake-choice-panel-body'>"
+        f"Choose what should happen locally for {html.escape(sku)}. Nothing is sent until the local choices button is pressed."
+        "</div>"
+        "</div>"
+    )
+
+
+def _intake_submit_panel_html(*, ready: int, need_choice: int) -> str:
+    ready_count = max(int(ready), 0)
+    need_count = max(int(need_choice), 0)
+    body = (
+        f"{ready_count} choice{'' if ready_count == 1 else 's'} ready to save locally. "
+        f"{need_count} product{'' if need_count == 1 else 's'} still need Luke's choice."
+    )
+    return (
+        "<div class='o-intake-submit-panel'>"
+        "<div class='o-intake-submit-title'>Save this page's local choices</div>"
+        f"<div class='o-intake-submit-body'>{html.escape(body)} "
+        "This does not buy stock, list products, change prices, write Sheets, or run the scanner.</div>"
+        "</div>"
+    )
+
+
+def _admin_compact_strip_html(items: list[tuple[str, object]]) -> str:
+    chips = "".join(
+        "<span class='o-admin-compact-chip'>"
+        f"{html.escape(_normalize_text(label))} <strong>{html.escape(_normalize_text(value) or '-')}</strong>"
+        "</span>"
+        for label, value in items
+    )
+    return f"<div class='o-admin-compact-strip'>{chips}</div>"
+
+
+def _operator_local_form_panel_html(*, title: object, body: object) -> str:
+    return (
+        "<div class='o-intake-submit-panel'>"
+        f"<div class='o-intake-submit-title'>{html.escape(_normalize_text(title))}</div>"
+        f"<div class='o-intake-submit-body'>{html.escape(_normalize_text(body))}</div>"
+        "</div>"
+    )
+
+
+def _render_intake_sent_choice_card_html(*, decision: object, sku: object, title: object, note: object, when: object) -> str:
+    decision_text = _normalize_text(decision).upper() or "SENT"
+    sku_text = _normalize_text(sku) or "-"
+    title_text = _normalize_text(title) or "(Untitled product)"
+    note_text = _normalize_text(note) or "-"
+    when_text = _normalize_text(when) or "-"
+    return (
+        "<div class='o-intake-sent-card'>"
+        f"<div class='o-intake-sent-decision'>{html.escape(decision_text)} - {html.escape(sku_text)}</div>"
+        f"<div class='o-intake-sent-title'>{html.escape(title_text)}</div>"
+        f"<div class='o-intake-sent-meta'>Note: {html.escape(note_text)} | Sent: {html.escape(when_text)}</div>"
+        "</div>"
+    )
+
+
+def _intake_alert_html(label: object, body: object) -> str:
+    return (
+        "<div class='o-intake-alert'>"
+        f"<div class='o-intake-alert-label'>{html.escape(_normalize_text(label) or 'What to check')}</div>"
+        f"<div class='o-intake-alert-body'>{html.escape(_normalize_text(body) or 'No extra warning from scanner.')}</div>"
+        "</div>"
+    )
+
+
+def _intake_detail_drawer_html(
+    *,
+    why_label: object,
+    why_body: object,
+    id_line_html: str,
+    rank_text: object = "",
+    score_text: object = "",
+    profit_range_text: object = "",
+) -> str:
+    rows: list[str] = []
+    why = _normalize_text(why_body)
+    if why:
+        rows.append(
+            "<div class='o-intake-detail-row'>"
+            f"<strong>{html.escape(_normalize_text(why_label) or 'Why this is here')}:</strong> "
+            f"{html.escape(why)}"
+            "</div>"
+        )
+    rank = _normalize_text(rank_text)
+    score = _normalize_text(score_text)
+    profit_range = _normalize_text(profit_range_text)
+    secondary_bits = []
+    if rank and rank != "-":
+        secondary_bits.append(f"Amazon rank: {rank}")
+    if score and score != "-":
+        secondary_bits.append(f"Scanner score: {score}")
+    if profit_range and profit_range != "- / - / -":
+        secondary_bits.append(f"Profit range: {profit_range}")
+    if secondary_bits:
+        rows.append(
+            "<div class='o-intake-detail-row'>"
+            + html.escape(" | ".join(secondary_bits))
+            + "</div>"
+        )
+    if _normalize_text(id_line_html):
+        rows.append(f"<div class='o-intake-detail-row'>{id_line_html}</div>")
+    body_html = "".join(rows) or "<div class='o-intake-detail-row'>No extra scanner detail shown.</div>"
+    return (
+        "<details class='o-intake-detail-drawer'>"
+        "<summary>Scanner details</summary>"
+        f"<div class='o-intake-detail-body'>{body_html}</div>"
+        "</details>"
+    )
+
+
+def _operator_metric_card_html(label: str, value: object, note: str = "", tone: str = "neutral") -> str:
+    safe_tone = tone if tone in {"good", "warn", "stop", "neutral"} else "neutral"
+    value_text = "" if value is None else str(value).strip()
+    return (
+        f"<div class='o-metric-card {safe_tone}'>"
+        f"<div class='o-metric-label'>{html.escape(_normalize_text(label))}</div>"
+        f"<div class='o-metric-value'>{html.escape(value_text)}</div>"
+        f"<div class='o-metric-note'>{html.escape(_normalize_text(note))}</div>"
+        "</div>"
+    )
+
+
+def _operator_decision_card_html(title: str, body: str, tone: str = "neutral") -> str:
+    safe_tone = tone if tone in {"good", "warn", "neutral"} else "neutral"
+    return (
+        f"<div class='o-decision-card {safe_tone}'>"
+        f"<div class='o-decision-title'>{html.escape(_normalize_text(title))}</div>"
+        f"<div class='o-decision-body'>{html.escape(_normalize_text(body))}</div>"
+        "</div>"
+    )
+
+
+def _operator_task_brief_html(
+    *,
+    kicker: str,
+    title: str,
+    body: str,
+    steps: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+    safe_note: str = "",
+    tone: str = "neutral",
+) -> str:
+    safe_tone = tone if tone in {"good", "warn", "neutral"} else "neutral"
+    step_html = "".join(
+        "<div class='o-task-step'>"
+        f"<div class='o-task-step-index'>{idx}</div>"
+        "<div>"
+        f"<div class='o-task-step-title'>{html.escape(_normalize_text(step_title))}</div>"
+        f"<div class='o-task-step-body'>{html.escape(_normalize_text(step_body))}</div>"
+        "</div>"
+        "</div>"
+        for idx, (step_title, step_body) in enumerate(steps, start=1)
+    )
+    if not step_html:
+        step_html = (
+            "<div class='o-task-step'>"
+            "<div class='o-task-step-index'>1</div>"
+            "<div>"
+            "<div class='o-task-step-title'>Open the next useful screen</div>"
+            "<div class='o-task-step-body'>The page waits for Luke before any local choice is saved.</div>"
+            "</div>"
+            "</div>"
+        )
+    safe_html = ""
+    if _normalize_text(safe_note):
+        safe_html = (
+            "<div class='o-task-safe'>"
+            "<span class='o-task-safe-dot'></span>"
+            f"<span>{html.escape(_normalize_text(safe_note))}</span>"
+            "</div>"
+        )
+    return (
+        f"<div class='o-task-brief {safe_tone}'>"
+        "<div>"
+        f"<div class='o-task-kicker'>{html.escape(_normalize_text(kicker))}</div>"
+        f"<div class='o-task-title'>{html.escape(_normalize_text(title))}</div>"
+        f"<div class='o-task-body'>{html.escape(_normalize_text(body))}</div>"
+        f"{safe_html}"
+        "</div>"
+        f"<div class='o-task-steps'>{step_html}</div>"
+        "</div>"
+    )
+
+
+def _operator_work_card_html(label: str, value: object, body: str = "", tone: str = "neutral") -> str:
+    safe_tone = tone if tone in {"good", "warn", "stop", "neutral"} else "neutral"
+    value_text = "" if value is None else str(value).strip()
+    return (
+        f"<div class='o-work-card {safe_tone}'>"
+        f"<div class='o-work-label'>{html.escape(_normalize_text(label))}</div>"
+        f"<div class='o-work-value'>{html.escape(value_text)}</div>"
+        f"<div class='o-work-body'>{html.escape(_normalize_text(body))}</div>"
+        "</div>"
+    )
+
+
+def _operator_shell_header_html(page_label: str, page_description: str) -> str:
+    return (
+        "<div class='o-shell-hero'>"
+        "<div class='o-shell-eyebrow'>SellerOne local operator UI</div>"
+        f"<div class='o-shell-title'>{html.escape(_normalize_text(page_label))}</div>"
+        f"<div class='o-shell-subtitle'>{html.escape(_normalize_text(page_description))}</div>"
+        "</div>"
+    )
+
+
+def _norm_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=str)
+    if column not in df.columns:
+        return pd.Series([""] * len(df.index), index=df.index, dtype=str)
+    return df[column].map(lambda value: _normalize_text(value).lower())
+
+
+def _text_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=str)
+    if column not in df.columns:
+        return pd.Series([""] * len(df.index), index=df.index, dtype=str)
+    return df[column].map(_normalize_text)
+
+
+def _contains_any(df: pd.DataFrame, columns: list[str], tokens: set[str]) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=bool)
+    mask = pd.Series(False, index=df.index)
+    token_pattern = "|".join(re.escape(token) for token in sorted(tokens) if token)
+    if token_pattern == "":
+        return mask
+    for column in columns:
+        if column in df.columns:
+            mask = mask | _norm_series(df, column).str.contains(token_pattern, na=False, regex=True)
+    return mask
+
+
+def _count_truthy_or_text_rows(df: pd.DataFrame, columns: list[str]) -> int:
+    if df.empty:
+        return 0
+    mask = pd.Series(False, index=df.index)
+    emptyish = {"", "0", "0.0", "false", "no", "none", "nan", "ok", "ready", "clear"}
+    for column in columns:
+        if column not in df.columns:
+            continue
+        values = _norm_series(df, column)
+        mask = mask | values.map(lambda value: value not in emptyish)
+    return int(mask.sum())
+
+
+def _sum_numeric_column(df: pd.DataFrame, column: str) -> float:
+    if df.empty or column not in df.columns:
+        return 0.0
+    return float(pd.to_numeric(df[column], errors="coerce").fillna(0).sum())
+
+
+def _supplier_count(df: pd.DataFrame) -> int:
+    if df.empty or "supplier_name" not in df.columns:
+        return 0
+    labels = df["supplier_name"].map(_supplier_label)
+    labels = labels[labels.map(lambda value: _normalize_text(value) not in {"", "(Unknown supplier)"})]
+    return int(labels.nunique())
+
+
+def _supplier_count_for_mask(df: pd.DataFrame, mask: pd.Series) -> int:
+    if df.empty or "supplier_name" not in df.columns or mask.empty:
+        return 0
+    subset = df[mask].copy()
+    return _supplier_count(subset)
+
+
+def _restock_ready_mask(review_df: pd.DataFrame) -> pd.Series:
+    if review_df.empty:
+        return pd.Series(dtype=bool)
+    row_status = _norm_series(review_df, "row_status")
+    block_reason = _norm_series(review_df, "action_block_reason")
+    ready_status = row_status.isin(
+        {
+            "ready",
+            "ready_for_review",
+            "review_ready",
+            "order_ready",
+            "clean",
+            "ok",
+        }
+    )
+    return ready_status & block_reason.eq("")
+
+
+def _restock_blocked_mask(review_df: pd.DataFrame) -> pd.Series:
+    if review_df.empty:
+        return pd.Series(dtype=bool)
+    block_columns = [
+        "row_status",
+        "action_block_reason",
+        "supplier_match_state",
+        "supplier_stock_state",
+        "supplier_cost_proof_state",
+        "market_price_proof_state",
+        "fee_proof_state",
+        "refund_proof_state",
+        "inbound_cost_proof_state",
+        "pack_moq_proof_state",
+        "supplier_order_viability_state",
+        "operator_decision_state",
+    ]
+    return _contains_any(
+        review_df,
+        block_columns,
+        {
+            "blocked",
+            "block",
+            "hold",
+            "held",
+            "missing",
+            "stale",
+            "not_ready",
+            "not ready",
+            "not_proven",
+            "not proven",
+            "unsafe",
+            "needs",
+        },
+    )
+
+
+def _top_restock_blocker_items(review_df: pd.DataFrame, limit: int = 5) -> list[tuple[str, int]]:
+    if review_df.empty:
+        return []
+    reason_columns = [
+        "action_block_reason",
+        "row_status",
+        "supplier_match_state",
+        "supplier_stock_state",
+        "supplier_cost_proof_state",
+        "market_price_proof_state",
+        "fee_proof_state",
+        "refund_proof_state",
+        "inbound_cost_proof_state",
+        "pack_moq_proof_state",
+        "supplier_order_viability_state",
+    ]
+    emptyish = {"", "ok", "ready", "clean", "0", "false", "no", "none"}
+    counts: dict[str, int] = {}
+    for column in reason_columns:
+        if column not in review_df.columns:
+            continue
+        for value in _text_series(review_df, column).tolist():
+            normalized = _normalize_text(value)
+            if normalized.lower() in emptyish:
+                continue
+            label = " ".join(normalized.replace("_", " ").split())
+            counts[label] = counts.get(label, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+
+
+def _build_today_operator_summary(datasets: dict[str, pd.DataFrame]) -> dict[str, object]:
+    review_df = datasets.get("restock_session_review_live", pd.DataFrame()).copy()
+    product_df = datasets.get("product_db_operator_view", pd.DataFrame()).copy()
+    holds_df = datasets.get("purchase_order_draft_holds", pd.DataFrame()).copy()
+    receiving_holds_df = datasets.get("receiving_event_holds", pd.DataFrame()).copy()
+    handoff_holds_df = datasets.get("send_to_amazon_handoff_holds", pd.DataFrame()).copy()
+    brand_queue_df = datasets.get("brand_approval_queue_live", pd.DataFrame()).copy()
+    listing_drafts_df = datasets.get("amazon_listing_drafts_live", pd.DataFrame()).copy()
+
+    summary_warning = ""
+    try:
+        reorder_df = build_reorder_input_df(datasets)
+    except Exception as exc:
+        reorder_df = pd.DataFrame()
+        summary_warning = f"Reorder summary could not be built: {exc}"
+
+    ready_mask = _restock_ready_mask(review_df)
+    blocked_mask = _restock_blocked_mask(review_df)
+    urgent_mask = pd.Series(dtype=bool)
+    if not reorder_df.empty:
+        urgent_mask = _norm_series(reorder_df, "suggested_action").isin({"full_restock", "test_restock"})
+
+    po_review_df = build_po_draft_review_df(datasets)
+    po_count = int(po_review_df["po_id"].nunique()) if not po_review_df.empty and "po_id" in po_review_df.columns else 0
+    po_units = int(_sum_numeric_column(po_review_df, "ordered_qty")) if not po_review_df.empty else 0
+    po_value = _sum_numeric_column(po_review_df, "line_value_gbp") if not po_review_df.empty else 0.0
+
+    status_columns = [
+        column
+        for column in ("product_status", "operator_status", "lifecycle_state", "status", "listing_status", "product_state")
+        if column in product_df.columns
+    ]
+    product_live = int(_contains_any(product_df, status_columns, {"live", "active"}).sum()) if status_columns else 0
+    product_dropped = int(_contains_any(product_df, status_columns, {"dropped", "discontinued", "inactive"}).sum()) if status_columns else 0
+    stale_columns = [column for column in product_df.columns if "stale" in column.lower() or "freshness" in column.lower()]
+    issue_columns = [
+        column
+        for column in product_df.columns
+        if "issue" in column.lower() or "block" in column.lower() or "hold" in column.lower()
+    ]
+    product_stale = _count_truthy_or_text_rows(product_df, stale_columns)
+    product_issues = _count_truthy_or_text_rows(product_df, issue_columns)
+
+    listing_ready = 0
+    if not listing_drafts_df.empty and "draft_status" in listing_drafts_df.columns:
+        listing_ready = int(
+            _norm_series(listing_drafts_df, "draft_status").isin(
+                {"ready_for_listing_approval", "ready_for_amazon_preview", "ready_for_live_submit"}
+            ).sum()
+        )
+
+    business_decisions_waiting = (
+        po_count
+        + int(len(holds_df.index))
+        + int(len(receiving_holds_df.index))
+        + int(len(handoff_holds_df.index))
+        + int(len(brand_queue_df.index))
+        + listing_ready
+    )
+
+    return {
+        "summary_warning": summary_warning,
+        "restock_rows": int(len(review_df.index)),
+        "restock_ready_rows": int(ready_mask.sum()) if not ready_mask.empty else 0,
+        "restock_blocked_rows": int(blocked_mask.sum()) if not blocked_mask.empty else 0,
+        "restock_suppliers": _supplier_count(review_df),
+        "restock_ready_suppliers": _supplier_count_for_mask(review_df, ready_mask),
+        "urgent_restock_candidates": int(urgent_mask.sum()) if not urgent_mask.empty else 0,
+        "urgent_restock_suppliers": _supplier_count_for_mask(reorder_df, urgent_mask),
+        "top_blockers": _top_restock_blocker_items(review_df),
+        "po_count": po_count,
+        "po_lines": int(len(po_review_df.index)),
+        "po_units": po_units,
+        "po_value": po_value,
+        "po_holds": int(len(holds_df.index)),
+        "receiving_holds": int(len(receiving_holds_df.index)),
+        "handoff_holds": int(len(handoff_holds_df.index)),
+        "brand_queue_rows": int(len(brand_queue_df.index)),
+        "listing_ready_rows": listing_ready,
+        "business_decisions_waiting": int(business_decisions_waiting),
+        "product_rows": int(len(product_df.index)),
+        "product_live": product_live,
+        "product_dropped": product_dropped,
+        "product_stale": product_stale,
+        "product_issues": product_issues,
+    }
+
+
+def _render_operator_sidebar(
+    *,
+    active_page_route: str,
+    label_by_route: dict[str, str],
+    navigate_to,
+) -> None:
+    import streamlit as st
+
+    st.sidebar.title("SellerOne")
+    st.sidebar.caption("Operator UI")
+    for section_title, section_caption, routes in OPERATOR_NAV_SECTIONS:
+        st.sidebar.markdown(f"**{section_title}**")
+        st.sidebar.caption(section_caption)
+        for route in routes:
+            label = OPERATOR_NAV_LABELS.get(route, label_by_route.get(route, route.replace("_", " ").title()))
+            is_active = route == active_page_route
+            clicked = st.sidebar.button(
+                _operator_sidebar_button_label(label, active=is_active),
+                key=f"o_sidebar_nav_{route}",
+                type="primary" if is_active else "secondary",
+                use_container_width=True,
+                help=OPERATOR_PAGE_DESCRIPTIONS.get(route, ""),
+            )
+            if clicked:
+                navigate_to(route)
+        st.sidebar.markdown("")
+    st.sidebar.caption("No page takes a business action unless Luke presses that page's save or record button.")
+
+
+def _render_today_page(datasets: dict[str, pd.DataFrame], navigate_to, root_path: Path) -> None:
+    import streamlit as st
+
+    summary = _build_today_operator_summary(datasets)
+    warning = _normalize_text(summary.get("summary_warning", ""))
+    if warning:
+        st.warning(warning)
+
+    ready_rows = int(summary["restock_ready_rows"])
+    blocked_rows = int(summary["restock_blocked_rows"])
+    restock_rows = int(summary["restock_rows"])
+    urgent_candidates = int(summary["urgent_restock_candidates"])
+    po_count = int(summary["po_count"])
+    scanner_summary: dict[str, object] = {}
+    scanner_summary_warning = ""
+    try:
+        scanner_summary = _build_restock_scanner_check_summary(root_path)
+    except Exception:
+        scanner_summary_warning = "Supplier Intake summary could not be read just now."
+    scanner_waiting = _price_list_int(scanner_summary.get("waiting_count", 0))
+    scanner_lane_text = _restock_scanner_lane_text(scanner_summary.get("lane_counts", {}))
+
+    if scanner_waiting > 0:
+        decision_title = "Start with Supplier Intake"
+        detail = scanner_lane_text or f"{scanner_waiting} waiting"
+        decision_body = (
+            f"{scanner_waiting} scanner-found product"
+            f"{'' if scanner_waiting == 1 else 's'} need Luke's confirmation before restocking. "
+            f"Waiting now: {detail}. Clear those local choices first, then come back to Restocking."
+        )
+        decision_tone = "warn"
+        target_route = "new_product_review"
+        target_label = "Open Intake"
+        brief_steps = [
+            ("Check scanner finds", "Confirm the new supplier products waiting from the price-list scanner."),
+            ("Return to Restocking", "Open one supplier group, not the whole product database."),
+            ("Save local notes only", "Nothing buys stock, lists products, changes prices, or writes Sheets by itself."),
+        ]
+    elif ready_rows > 0:
+        decision_title = "Start with Restocking"
+        decision_body = (
+            f"{ready_rows} row"
+            f"{'' if ready_rows == 1 else 's'} currently look ready for manual review. "
+            "Open one supplier group and review product cards before saving any local note."
+        )
+        decision_tone = "good"
+        target_route = "restock_session"
+        target_label = "Restocking"
+        brief_steps = [
+            ("Choose one supplier", "Start with the supplier group that has useful restocking work."),
+            ("Review product cards", "Check cost, stock, profit, and blocker notes without using a spreadsheet table."),
+            ("Save local notes only", "Draft quantities stay local and never create a purchase order by themselves."),
+        ]
+    elif restock_rows > 0:
+        decision_title = "Restocking is the useful workflow, but buying is not clean yet"
+        decision_body = (
+            f"{blocked_rows} row"
+            f"{'' if blocked_rows == 1 else 's'} are blocked from a clean buy. "
+            "Use Restocking to inspect supplier proof and blocker reasons before trusting any order."
+        )
+        decision_tone = "warn"
+        target_route = "restock_session"
+        target_label = "Restocking"
+        brief_steps = [
+            ("Pick a supplier", "Stay focused on one supplier group at a time."),
+            ("Clear proof gaps", "Look for missing supplier cost, stock, pack, fee, or price proof."),
+            ("Do not buy from Today", "Today only points to the right screen."),
+        ]
+    elif po_count > 0:
+        decision_title = "Review local draft orders"
+        decision_body = (
+            f"{po_count} local draft PO"
+            f"{'' if po_count == 1 else 's'} are available. "
+            "They are still local drafts and do not count as approved purchases."
+        )
+        decision_tone = "neutral"
+        target_route = "po_drafts"
+        target_label = "Draft Orders"
+        brief_steps = [
+            ("Open draft orders", "Review what is waiting locally."),
+            ("Check holds", "Any blocker stays visible before a real purchase decision."),
+            ("Keep proof separate", "Maintenance tables stay under Proof / Admin."),
+        ]
+    else:
+        decision_title = "No clean buying task is ready"
+        decision_body = "The UI can still show products and proof, but there is no automatic business action to take from Today."
+        decision_tone = "neutral"
+        target_route = "product_db"
+        target_label = "Products"
+        brief_steps = [
+            ("Open Products", "Use the product view for general checking."),
+            ("Use Proof / Admin only if needed", "Scanner and maintenance details stay out of the normal path."),
+            ("Wait for a real task", "No buying or listing task is ready from Today."),
+        ]
+
+    if scanner_summary_warning:
+        st.warning(scanner_summary_warning)
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Today",
+            title=decision_title,
+            body=decision_body,
+            steps=brief_steps,
+            safe_note="Read-only starting point. No buying, listing, price, Sheet, scanner, or queue action happens here.",
+            tone=decision_tone,
+        ),
+        unsafe_allow_html=True,
+    )
+    action_cols = st.columns([1.15, 1.15, 1.15, 2.9], gap="small")
+    if action_cols[0].button(target_label, type="primary", key="o_today_open_primary"):
+        if target_route == "new_product_review":
+            suggested_lane = _normalize_text(scanner_summary.get("suggested_lane", "Passes")) or "Passes"
+            if suggested_lane in FEEDER_REVIEW_LANE_SPECS:
+                st.session_state["o_feeder_review_requested_lane"] = suggested_lane
+            suggested_snapshot = _normalize_text(scanner_summary.get("suggested_snapshot", ""))
+            if suggested_snapshot:
+                st.session_state["o_feeder_review_requested_pack_snapshot"] = suggested_snapshot
+            st.session_state["o_feeder_review_show_pack_history"] = False
+        navigate_to(target_route)
+    if action_cols[1].button("Restocking", key="o_today_open_restocking"):
+        navigate_to("restock_session")
+    if action_cols[2].button("Products", key="o_today_open_products"):
+        navigate_to("product_db")
+    action_cols[3].caption("Today chooses a screen to open. It does not make the business decision for Luke.")
+
+    intake_body = (
+        scanner_lane_text
+        if scanner_lane_text
+        else "No scanner-found products are waiting for confirmation."
+    )
+    work_cards_html = (
+        "<div class='o-work-grid'>"
+        + _operator_work_card_html(
+            "Supplier Intake",
+            scanner_waiting,
+            intake_body,
+            "warn" if scanner_waiting else "good",
+        )
+        + _operator_work_card_html(
+            "Restocking",
+            f"{ready_rows} ready",
+            f"{blocked_rows} blocked across {summary['restock_suppliers']} supplier group(s).",
+            "good" if ready_rows else "warn" if restock_rows else "neutral",
+        )
+        + _operator_work_card_html(
+            "Urgent restock candidates",
+            urgent_candidates,
+            f"{summary['urgent_restock_suppliers']} supplier group(s) from local recommendation proof.",
+            "neutral",
+        )
+        + _operator_work_card_html(
+            "Local draft orders",
+            po_count,
+            f"{summary['po_lines']} line(s), {summary['po_units']} unit(s), GBP {_num_text(float(summary['po_value']))}.",
+            "neutral",
+        )
+        + _operator_work_card_html(
+            "Products",
+            summary["product_rows"],
+            f"{summary['product_live']} live, {summary['product_dropped']} dropped, {summary['product_issues']} proof issue(s).",
+            "warn" if int(summary["product_issues"]) or int(summary["product_stale"]) else "neutral",
+        )
+        + "</div>"
+    )
+    st.markdown(work_cards_html, unsafe_allow_html=True)
+
+    with st.expander("Why restocking may be blocked", expanded=False):
+        blocker_items = summary.get("top_blockers", [])
+        if blocker_items:
+            list_html = "<ul class='o-small-list'>"
+            for reason, count in blocker_items:
+                list_html += f"<li>{html.escape(reason)}: {int(count)}</li>"
+            list_html += "</ul>"
+            st.markdown(list_html, unsafe_allow_html=True)
+        else:
+            st.success("No restocking blockers are visible in the current local proof files.")
+
+    with st.expander("Proof/Admin stays available"):
+        st.caption("Scanner queue, repricer tracker, raw decision log, and proof tables are kept under Proof / Admin in the left navigation.")
+        admin_cols = st.columns([1.2, 1.2, 3.2], gap="small")
+        if admin_cols[0].button("Open Proof/Admin", key="o_today_open_proof_admin"):
+            navigate_to("price_list_queue")
+        if admin_cols[1].button("Open Decision Log", key="o_today_open_decision_log"):
+            navigate_to("decision_log")
+        admin_cols[2].caption("These screens show maintenance proof. They are not part of Luke's normal restocking path.")
 
 
 def _read_price_list_queue_df(root: Path | None = None) -> pd.DataFrame:
@@ -5749,6 +9315,45 @@ def _latest_price_list_live_event(root: Path | None = None) -> str:
     return lines[-1]
 
 
+def _price_list_parse_utc(value: str) -> datetime | None:
+    raw = _normalize_text(value)
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _price_list_latest_scanner_progress(root_path: Path) -> tuple[float | None, str]:
+    path = root_path / PRICE_LIST_LIVE_EVENTS_PATH
+    if not path.exists():
+        return None, ""
+    latest: datetime | None = None
+    latest_raw = ""
+    try:
+        with path.open(newline="", encoding="utf-8", errors="replace") as fh:
+            for row in csv.DictReader(fh):
+                if _normalize_text(row.get("event_type", "")).lower() != "scanner_chunk":
+                    continue
+                status = _normalize_text(row.get("status", "")).lower()
+                if status and status != "success":
+                    continue
+                raw = _normalize_text(row.get("event_utc", "") or row.get("observed_utc", ""))
+                parsed = _price_list_parse_utc(raw)
+                if parsed is None:
+                    continue
+                if latest is None or parsed > latest:
+                    latest = parsed
+                    latest_raw = raw
+    except (OSError, csv.Error):
+        return None, ""
+    if latest is None:
+        return None, ""
+    age_seconds = max((datetime.now(timezone.utc) - latest).total_seconds(), 0.0)
+    return age_seconds, latest_raw
+
+
 def _price_list_child_status(root: Path | None = None) -> str:
     root_path = Path(root) if root is not None else get_o_path_contract().root
     path = root_path / PRICE_LIST_CHILD_STATUS_PATH
@@ -5806,7 +9411,30 @@ def _price_list_supervisor_state(root: Path | None = None) -> dict[str, str]:
     parts["age_seconds"] = f"{age_seconds:.1f}"
     parts["age_label"] = _format_price_list_duration(age_seconds)
     state = _normalize_text(parts.get("state", "")).lower()
-    if state == "ok" and age_seconds < 120:
+    stale_seconds = _price_list_int(parts.get("stale_seconds", "900")) or 900
+    scanner_age = _normalize_text(parts.get("scanner_progress_age_seconds", ""))
+    if not scanner_age:
+        live_scanner_age, live_scanner_utc = _price_list_latest_scanner_progress(root_path)
+        if live_scanner_age is not None:
+            scanner_age = f"{live_scanner_age:.1f}"
+            parts["scanner_progress_age_seconds"] = scanner_age
+            parts["scanner_progress_utc"] = live_scanner_utc
+    try:
+        scanner_age_value = float(scanner_age) if scanner_age else None
+    except ValueError:
+        scanner_age_value = None
+    progress_state = _normalize_text(parts.get("progress_state", "")).lower()
+    if scanner_age_value is not None and scanner_age_value > float(stale_seconds):
+        progress_state = "no_row_progress"
+        parts["progress_state"] = progress_state
+        if "scanner_progress_seconds=" not in _normalize_text(parts.get("reason", "")):
+            parts["reason"] = (
+                f"{_normalize_text(parts.get('reason', ''))};"
+                f"scanner_progress_seconds={scanner_age_value:.1f}"
+            ).strip(";")
+    if progress_state == "no_row_progress" or state == "alive_no_progress":
+        badge_state = "no_progress"
+    elif state == "ok" and age_seconds < 120:
         badge_state = "ok"
     elif state == "restart_manager" and age_seconds < 300:
         badge_state = "recovering"
@@ -5927,23 +9555,15 @@ def request_price_list_login_mode_from_ui(
     if not clean_run:
         return {"status": "blocked", "block_reason": "run_id_missing"}
     request_path = root_path / PRICE_LIST_LOGIN_MODE_REQUEST_PATH
-    request_path.parent.mkdir(parents=True, exist_ok=True)
-    request_path.write_text(
-        "\n".join(
-            [
-                f"requested_utc={observed}",
-                "requested_by=operator_ui",
-                "mode=login_recovery",
-                f"supplier_id={clean_supplier}",
-                f"run_id={clean_run}",
-                "status=requested",
-                f"hold_seconds={max(int(hold_seconds), 1)}",
-                "reason=operator_login_button",
-                "",
-            ]
-        ),
-        encoding="ascii",
-        newline="\n",
+    request = write_login_controller_request(
+        requested_by="operator_ui",
+        supplier_id=clean_supplier,
+        run_id=clean_run,
+        status="requested",
+        reason="operator_login_button",
+        hold_seconds=max(int(hold_seconds), 1),
+        observed_utc=observed,
+        paths=LoginControllerRequestPaths(live_dir=request_path.parent, request_path=request_path),
     )
     _append_price_list_live_event(
         root_path,
@@ -5959,7 +9579,7 @@ def request_price_list_login_mode_from_ui(
         "request_path": str(request_path),
         "supplier_id": clean_supplier,
         "run_id": clean_run,
-        "hold_seconds": str(max(int(hold_seconds), 1)),
+        "hold_seconds": request.get("hold_seconds", str(max(int(hold_seconds), 1))),
         "requested_utc": observed,
     }
 
@@ -6075,12 +9695,13 @@ def _price_list_login_badge_html(
     if auth:
         detail = f"{detail} | {auth}"
     return (
-        "<span style='display:inline-flex;align-items:center;gap:6px;"
+        "<span style='display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;width:100%;"
+        "box-sizing:border-box;line-height:1.25;"
         f"color:{color};background:{background};border:1px solid {dot};"
-        "padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800;'>"
-        f"<span style='width:7px;height:7px;border-radius:999px;background:{dot};display:inline-block;'></span>"
-        f"{html.escape(label)}"
-        f"<span style='font-weight:600;opacity:0.8;'>{html.escape(detail)}</span>"
+        "padding:8px 10px;border-radius:8px;font-size:12px;font-weight:800;'>"
+        f"<span style='width:7px;height:7px;border-radius:999px;background:{dot};display:inline-block;flex:0 0 auto;margin-top:4px;'></span>"
+        f"<span style='min-width:0;overflow-wrap:anywhere;'>{html.escape(label)}</span>"
+        f"<span style='flex:1 0 100%;font-weight:600;opacity:0.82;overflow-wrap:anywhere;padding-left:13px;'>{html.escape(detail)}</span>"
         "</span>"
     )
 
@@ -6089,6 +9710,7 @@ def _price_list_supervisor_badge_html(supervisor_state: dict[str, str]) -> str:
     badge_state = _normalize_text(supervisor_state.get("badge_state", "missing")).lower()
     palette = {
         "ok": ("#14532d", "#dcfce7", "#22c55e", "SUPERVISOR OK"),
+        "no_progress": ("#78350f", "#fef3c7", "#f59e0b", "PROCESS ALIVE - NO ROW PROGRESS"),
         "recovering": ("#854d0e", "#fef9c3", "#eab308", "SUPERVISOR RECOVERING"),
         "stale": ("#7f1d1d", "#fee2e2", "#ef4444", "SUPERVISOR STALE"),
         "missing": ("#7f1d1d", "#fee2e2", "#ef4444", "SUPERVISOR MISSING"),
@@ -6101,12 +9723,13 @@ def _price_list_supervisor_badge_html(supervisor_state: dict[str, str]) -> str:
     if reason:
         detail = f"{detail} | {reason}"
     return (
-        "<span style='display:inline-flex;align-items:center;gap:6px;"
+        "<span style='display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;width:100%;"
+        "box-sizing:border-box;line-height:1.25;"
         f"color:{color};background:{background};border:1px solid {dot};"
-        "padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800;'>"
-        f"<span style='width:7px;height:7px;border-radius:999px;background:{dot};display:inline-block;'></span>"
-        f"{html.escape(label)}"
-        f"<span style='font-weight:600;opacity:0.8;'>{html.escape(detail)}</span>"
+        "padding:8px 10px;border-radius:8px;font-size:12px;font-weight:800;'>"
+        f"<span style='width:7px;height:7px;border-radius:999px;background:{dot};display:inline-block;flex:0 0 auto;margin-top:4px;'></span>"
+        f"<span style='min-width:0;overflow-wrap:anywhere;'>{html.escape(label)}</span>"
+        f"<span style='flex:1 0 100%;font-weight:600;opacity:0.82;overflow-wrap:anywhere;padding-left:13px;'>{html.escape(detail)}</span>"
         "</span>"
     )
 
@@ -6418,7 +10041,24 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
         "<script>setTimeout(function(){window.parent.location.reload();}, 60000);</script>",
         height=0,
     )
-    st.subheader("Price List Queue")
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Proof / Admin",
+            title="Scanner queue proof",
+            body=(
+                "Use this screen only when scanner proof or login/admin state needs checking. "
+                "Supplier Intake and Restocking stay as the normal working path."
+            ),
+            steps=[
+                ("Check active scanner", "See whether the current supplier scan is moving or waiting."),
+                ("Review supplier queue", "Look at scanner proof without mixing it into Restocking."),
+                ("Use controls only when intended", "Pause, priority, and login controls stay manual."),
+            ],
+            safe_note="Admin proof screen. It does not buy stock, list products, change prices, or write Sheets.",
+            tone="neutral",
+        ),
+        unsafe_allow_html=True,
+    )
     notice = st.session_state.pop("fpm_queue_control_notice", "")
     if notice:
         st.success(notice)
@@ -6498,34 +10138,32 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
         chunk_rows = _normalize_text(live_status.get("chunk_rows", "")) or "-"
         observed = _normalize_text(live_status.get("observed_utc", "")) or "-"
         st.markdown(
-            "<div style='border:1px solid #164e63;background:#07131f;color:#e0f2fe;"
-            "padding:12px 14px;margin:0 0 12px 0;border-radius:8px;'>"
-            "<div style='display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;'>"
+            "<div class='o-admin-live-card'>"
+            "<div class='o-admin-live-head'>"
             "<div>"
-            "<div style='font-size:12px;color:#7dd3fc;font-weight:700;'>Active Scanner</div>"
-            f"<div style='font-size:18px;color:#f8fafc;font-weight:800;'>{html.escape(active_supplier or '-')}</div>"
+            "<div class='o-admin-live-eyebrow'>Active scanner</div>"
+            f"<div class='o-admin-live-title'>{html.escape(active_supplier or '-')}</div>"
             "</div>"
-            "<div style='display:flex;gap:18px;flex-wrap:wrap;'>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>State</div><div style='font-size:14px;font-weight:700;'>{html.escape(state)}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>Done</div><div style='font-size:14px;font-weight:700;'>{done}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>Pending</div><div style='font-size:14px;font-weight:700;'>{pending}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>PASS</div><div style='font-size:14px;font-weight:700;color:#86efac;'>{int(result_counts.get('pass', 0))}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>FAIL</div><div style='font-size:14px;font-weight:700;color:#fca5a5;'>{int(result_counts.get('fail', 0))}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>BBP</div><div style='font-size:14px;font-weight:700;color:#f87171;'>{bbp_login_rows}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>YES/NO</div><div style='font-size:14px;font-weight:700;color:#facc15;'>{dashboard_login_rows}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>RE SCAN</div><div style='font-size:14px;font-weight:700;color:#fde68a;'>{int(result_counts.get('rescan', 0))}</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>Progress</div><div style='font-size:14px;font-weight:700;'>{pct:.1f}%</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>Speed</div><div style='font-size:14px;font-weight:700;'>{float(eta.get('rows_per_hour', 0.0)):.1f}/h</div></div>"
-            f"<div><div style='font-size:11px;color:#7dd3fc;'>ETA</div><div style='font-size:14px;font-weight:700;'>{html.escape(str(eta.get('eta_label', '-')))}</div></div>"
+            "<div class='o-admin-live-metrics'>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>State</div><div class='o-admin-live-value'>{html.escape(state)}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Done</div><div class='o-admin-live-value'>{done}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Pending</div><div class='o-admin-live-value'>{pending}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Pass</div><div class='o-admin-live-value'>{int(result_counts.get('pass', 0))}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Fail</div><div class='o-admin-live-value'>{int(result_counts.get('fail', 0))}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Login</div><div class='o-admin-live-value'>{login_rows}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Rescan</div><div class='o-admin-live-value'>{int(result_counts.get('rescan', 0))}</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Progress</div><div class='o-admin-live-value'>{pct:.1f}%</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>Speed</div><div class='o-admin-live-value'>{float(eta.get('rows_per_hour', 0.0)):.1f}/h</div></div>"
+            f"<div class='o-admin-live-metric'><div class='o-admin-live-label'>ETA</div><div class='o-admin-live-value'>{html.escape(str(eta.get('eta_label', '-')))}</div></div>"
             "</div>"
             "</div>"
-            "<div style='height:6px;background:#0f172a;border-radius:999px;margin-top:10px;overflow:hidden;'>"
-            f"<div style='height:6px;width:{min(max(pct, 0), 100):.1f}%;background:#38bdf8;'></div>"
+            "<div class='o-admin-progress-track'>"
+            f"<div class='o-admin-progress-fill' style='width:{min(max(pct, 0), 100):.1f}%;'></div>"
             "</div>"
             "</div>",
             unsafe_allow_html=True,
         )
-        login_cols = st.columns([1.4, 1.7, 1.1, 4.3], gap="small")
+        login_cols = st.columns([2.0, 2.5, 1.0, 2.8], gap="small")
         login_cols[0].markdown(
             _price_list_login_badge_html(
                 login_button_state,
@@ -6596,22 +10234,17 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
                 )
             )
     st.markdown(
-        "<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;"
-        "padding:8px 10px;border:1px solid #1f2937;border-radius:10px;background:#0b1220;'>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Suppliers</span><span style='font-size:12px;color:#e2e8f0;'>{summary['total_suppliers']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Recommended</span><span style='font-size:12px;color:#e2e8f0;'>{summary['active']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Manual missing</span><span style='font-size:12px;color:#e2e8f0;'>{summary['manual_missing']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Blocked</span><span style='font-size:12px;color:#e2e8f0;'>{summary['blocked']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Scan</span><span style='font-size:12px;color:#e2e8f0;'>{summary['web_unprocessed']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>PASS</span><span style='font-size:12px;color:#e2e8f0;'>{summary['web_pass']}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>FAIL</span><span style='font-size:12px;color:#e2e8f0;'>{summary['web_fail']}</span>"
-        "</div>",
+        _admin_compact_strip_html(
+            [
+                ("Suppliers", summary["total_suppliers"]),
+                ("Recommended", summary["active"]),
+                ("Manual missing", summary["manual_missing"]),
+                ("Blocked", summary["blocked"]),
+                ("Scan", summary["web_unprocessed"]),
+                ("Pass", summary["web_pass"]),
+                ("Fail", summary["web_fail"]),
+            ]
+        ),
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -6627,13 +10260,13 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
     align-items: start;
 }
 .fpm-queue-position {
-    color: #93c5fd;
+    color: #2563eb;
     font-size: 12px;
     font-weight: 800;
     margin-bottom: 3px;
 }
 .fpm-queue-supplier {
-    color: #f8fafc;
+    color: #0f172a;
     font-size: 17px;
     font-weight: 800;
     line-height: 1.2;
@@ -6651,15 +10284,15 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
     gap: 6px;
     min-height: 26px;
     max-width: 100%;
-    padding: 3px 8px;
-    border: 1px solid #1f2937;
+    padding: 4px 8px;
+    border: 1px solid #d7e3ef;
     border-radius: 999px;
-    background: #0b1220;
-    color: #94a3b8;
+    background: #f7fbff;
+    color: #475569;
     font-size: 12px;
 }
 .fpm-queue-chip strong {
-    color: #e2e8f0;
+    color: #0f172a;
     font-weight: 800;
     overflow-wrap: anywhere;
 }
@@ -6672,12 +10305,12 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
 .fpm-queue-metric {
     min-width: 0;
     padding: 7px 8px;
-    border: 1px solid #1f2937;
+    border: 1px solid #d7e3ef;
     border-radius: 8px;
-    background: #07111f;
+    background: #f7fbff;
 }
 .fpm-queue-metric-label {
-    color: #7dd3fc;
+    color: #64748b;
     font-size: 11px;
     font-weight: 700;
     line-height: 1.1;
@@ -6691,7 +10324,7 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
 }
 .fpm-queue-note {
     margin-top: 10px;
-    color: #cbd5e1;
+    color: #475569;
     font-size: 12px;
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -6722,11 +10355,11 @@ def _render_price_list_queue_tab(root_path: Path) -> None:
         st.markdown("### Manual File Alerts")
         for _, row in manual_df.iterrows():
             st.markdown(
-                "<div style='border:1px solid #7f1d1d;background:#1f1115;color:#fecaca;"
+                "<div style='border:1px solid #f5d46b;background:#fffaf0;color:#78350f;"
                 "padding:8px 10px;margin:0 0 6px 0;border-radius:8px;'>"
                 f"<strong>{html.escape(_normalize_text(row.get('supplier_name', '')))}</strong>"
-                f"<span style='font-size:12px;color:#fca5a5;margin-left:10px;'>{html.escape(_normalize_text(row.get('operator_action', '')))}</span>"
-                f"<div style='font-size:12px;color:#cbd5e1;margin-top:3px;'>{html.escape(_normalize_text(row.get('source_location', '')))}</div>"
+                f"<span style='font-size:12px;color:#92400e;margin-left:10px;'>{html.escape(_normalize_text(row.get('operator_action', '')))}</span>"
+                f"<div style='font-size:12px;color:#475569;margin-top:3px;'>{html.escape(_normalize_text(row.get('source_location', '')))}</div>"
                 "</div>",
                 unsafe_allow_html=True,
             )
@@ -6966,10 +10599,13 @@ def _seed_feeder_review_widget_draft(
     currency_key = f"feeder_currency_{widget_key}"
     tax_included_key = f"feeder_tax_included_{widget_key}"
 
-    draft_decision = _normalize_text(draft.get("draft_decision", "")).lower()
-    decision_display = "Pass" if draft_decision == "pass" else ("Fail" if draft_decision == "fail" else "Select")
+    draft_decision = _normalize_feeder_review_decision(draft.get("draft_decision", ""))
+    decision_display = FEEDER_REVIEW_DECISION_DISPLAY.get(draft_decision, FEEDER_REVIEW_DECISION_DISPLAY[""])
     if decision_key not in st.session_state:
         st.session_state[decision_key] = decision_display
+    elif st.session_state.get(decision_key) not in FEEDER_REVIEW_DECISION_OPTIONS:
+        current_decision = _normalize_feeder_review_decision(st.session_state.get(decision_key, ""))
+        st.session_state[decision_key] = FEEDER_REVIEW_DECISION_DISPLAY.get(current_decision, FEEDER_REVIEW_DECISION_DISPLAY[""])
     draft_reason_code = _normalize_feeder_review_reason_code(draft.get("draft_reason_code", ""))
     if reason_key not in st.session_state:
         st.session_state[reason_key] = _feeder_review_reason_label(draft_reason_code) or "Select reason"
@@ -7019,7 +10655,7 @@ def save_feeder_review_ui_drafts(
         )
         if any(token == "" for token in identity):
             continue
-        decision = _normalize_text(row.get("review_decision", "")).lower()
+        decision = _normalize_feeder_review_decision(row.get("review_decision", ""))
         reason_code = _normalize_feeder_review_reason_code(row.get("review_reason_code", ""))
         note = _normalize_text(row.get("review_note", ""))
         done = bool(row.get("row_done"))
@@ -7140,6 +10776,7 @@ def _render_feeder_review_card(row_data: dict[str, object], *, pack_type: str) -
     asin_raw = _normalize_text(row_data.get("asin", ""))
     asin_padded = _normalize_text(row_data.get("asin_padded", ""))
     amazon_dp_url = _normalize_text(row_data.get("amazon_dp_url", ""))
+    image_url = _normalize_text(row_data.get("main_image", ""))
     brand = _normalize_text(row_data.get("brand", ""))
     main_rank = _normalize_text(row_data.get("main_rank", ""))
     sales_lower = _normalize_text(row_data.get("sales_lower_30d", ""))
@@ -7195,139 +10832,123 @@ def _render_feeder_review_card(row_data: dict[str, object], *, pack_type: str) -
     roi_title = (
         f"ROI: {roi_text}. {profit_signal_text}. Low/Likely/High estimated profit from current range."
     )
-
-    sales_stack_html = (
-        "<div title='Low/Likely/High 30 day units' style='margin-top:2px;font-size:12px;line-height:1.2;text-align:center;'>"
-        f"<div><span style='color:#f87171;'>L</span> {html.escape(sales_low_text)}</div>"
-        f"<div><span style='color:#fb923c;'>M</span> {html.escape(sales_likely_text)}</div>"
-        f"<div><span style='color:#4ade80;'>H</span> {html.escape(sales_high_text)}</div>"
-        "</div>"
-    )
-    profit_stack_html = (
-        f"<div title='{html.escape(roi_title, quote=True)}' style='margin-top:2px;font-size:12px;line-height:1.2;text-align:center;'>"
-        f"<div><span style='color:#f87171;'>L</span> {html.escape(low_profit_text)}</div>"
-        f"<div><span style='color:#fb923c;'>M</span> {html.escape(likely_profit_text)}</div>"
-        f"<div><span style='color:#4ade80;'>H</span> {html.escape(high_profit_text)}</div>"
-        "</div>"
-    )
     commercial_note_human = _humanize_commercial_note(commercial_note)
     watch_text = helper_text or commercial_note_human or "-"
-    title_tooltip = title
-    if brand:
-        title_tooltip = f"{title} | Brand: {brand}"
-    amazon_title = "Open Amazon page"
-    why_symbol = _hover_badge_html(
-        symbol="?",
-        border_color="#475569",
-        text_color="#cbd5e1",
-        heading=why_label or "Why",
-        details_text=why_text,
+    why_display_text = _humanize_intake_evidence_summary(
+        why_text,
+        fallback="No explanation was included in this scanner pack.",
     )
-    watch_symbol = _hover_badge_html(
-        symbol="!",
-        border_color="#f59e0b",
-        text_color="#fbbf24",
-        heading=helper_label or "Watch",
-        details_text=watch_text,
+    watch_display_text = _humanize_intake_evidence_summary(
+        watch_text,
+        fallback="No extra warning from scanner.",
     )
-    amazon_symbol = ""
+    asin_display = asin_padded or asin_raw
+    supplier_id = _normalize_text(row_data.get("active_supplier_id", ""))
+    supplier_label = _normalize_text(row_data.get("active_supplier_label", ""))
+    if not supplier_label and supplier_id:
+        supplier_label = supplier_id.replace("_", " ").title()
+    supplier_label = supplier_label or "Supplier"
+    image_html = _intake_image_html(image_url, amazon_dp_url)
     if amazon_dp_url:
-        amazon_symbol = (
-            f"<a href='{html.escape(amazon_dp_url, quote=True)}' target='_blank' rel='noopener noreferrer' "
-            f"title='{html.escape(amazon_title, quote=True)}' "
-            "style='display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;"
-            "border:1px solid #38bdf8;border-radius:999px;color:#7dd3fc;font-size:11px;font-weight:700;text-decoration:none;'>A</a>"
+        amazon_link = (
+            f"<a href='{html.escape(amazon_dp_url, quote=True)}' target='_blank' "
+            "rel='noopener noreferrer'>Open Amazon</a>"
         )
-    signals_html = (
-        "<div style='display:flex;align-items:center;gap:6px;margin-top:2px;'>"
-        f"{why_symbol}{watch_symbol}{amazon_symbol}"
+    else:
+        amazon_link = ""
+
+    def _fact_html(label: str, value: object, *, title_text: str = "") -> str:
+        title_attr = f" title='{html.escape(title_text, quote=True)}'" if title_text else ""
+        return (
+            f"<div class='o-intake-fact'{title_attr}>"
+            f"<div class='o-intake-fact-label'>{html.escape(label)}</div>"
+            f"<div class='o-intake-fact-value'>{html.escape(_display_plain(value))}</div>"
+            "</div>"
+        )
+
+    sales_range_text = f"{sales_low_text} / {sales_likely_text} / {sales_high_text}"
+    profit_range_text = f"{low_profit_text} / {likely_profit_text} / {high_profit_text}"
+    subline_parts = []
+    if brand:
+        subline_parts.append(f"Brand: {brand}")
+    if original_test_result:
+        subline_parts.append(f"Scanner result: {original_test_result}")
+    subline = " | ".join(subline_parts) or "Price-list scanner candidate"
+    id_parts = []
+    if supplier_sku:
+        id_parts.append(f"Supplier code: {supplier_sku}")
+    if asin_display:
+        id_parts.append(f"ASIN: {asin_display}")
+    id_line = " | ".join(id_parts)
+    if amazon_link:
+        id_line = f"{id_line} | {amazon_link}" if id_line else amazon_link
+
+    product_html = (
+        "<div class='o-intake-card'>"
+        "<div class='o-intake-top'>"
+        f"{image_html}"
+        "<div>"
+        f"<div class='o-intake-supplier'>{html.escape(supplier_label)}</div>"
+        f"<div class='o-intake-title'>{html.escape(title)}</div>"
+        f"<div class='o-intake-subline'>{html.escape(subline)}</div>"
+        "<div class='o-intake-facts'>"
+        f"{_fact_html('30d sales range', sales_range_text, title_text='Low / likely / high estimated units')}"
+        f"{_fact_html('ROI', roi_text, title_text=roi_title)}"
+        f"{_fact_html('Likely profit', likely_profit_text, title_text=f'Low / likely / high profit: {profit_range_text}')}"
+        f"{_fact_html('Start qty', starter_qty_text)}"
+        "</div>"
+        "</div>"
+        "</div>"
+        f"{_intake_alert_html(helper_label or 'What to check', watch_display_text)}"
+        f"{_intake_detail_drawer_html(why_label=why_label or 'Why this is here', why_body=why_display_text, id_line_html=id_line, rank_text=rank_text, score_text=og_score_text, profit_range_text=profit_range_text)}"
         "</div>"
     )
 
     with st.container():
-        cols = st.columns(FEEDER_REVIEW_COLUMN_WIDTHS, gap="small")
-
-        with cols[0]:
-            _render_copy_pair("SKU", supplier_sku, "ASIN", asin_padded or asin_raw, top_fallback="-", bottom_fallback="-")
-        with cols[1]:
-            st.markdown(
-                f"<div title='{html.escape(title_tooltip, quote=True)}' "
-                "style='margin-top:2px;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;"
-                "-webkit-box-orient:vertical;overflow:hidden;font-size:13px;font-weight:600;'>"
-                f"{html.escape(title)}</div>",
-                unsafe_allow_html=True,
+        st.markdown(product_html, unsafe_allow_html=True)
+        st.markdown(_intake_choice_panel_html(row_data), unsafe_allow_html=True)
+        decision_key = f"feeder_decision_{widget_key}"
+        if decision_key in st.session_state and st.session_state.get(decision_key) not in FEEDER_REVIEW_DECISION_OPTIONS:
+            current_decision = _normalize_feeder_review_decision(st.session_state.get(decision_key, ""))
+            st.session_state[decision_key] = FEEDER_REVIEW_DECISION_DISPLAY.get(
+                current_decision,
+                FEEDER_REVIEW_DECISION_DISPLAY[""],
             )
-        with cols[2]:
-            st.markdown(sales_stack_html, unsafe_allow_html=True)
-        with cols[3]:
-            st.markdown(
-                f"<div title='{html.escape(roi_title, quote=True)}' style='margin-top:2px;font-size:13px;text-align:center;'>"
-                f"{html.escape(roi_text)}</div>",
-                unsafe_allow_html=True,
-            )
-        with cols[4]:
-            st.markdown(profit_stack_html, unsafe_allow_html=True)
-        with cols[5]:
-            st.markdown(
-                f"<div title='Original test score' style='margin-top:2px;font-size:13px;text-align:center;'>{html.escape(og_score_text)}</div>",
-                unsafe_allow_html=True,
-            )
-        with cols[6]:
-            st.markdown(
-                f"<div style='margin-top:2px;font-size:13px;text-align:center;'>{html.escape(starter_qty_text)}</div>",
-                unsafe_allow_html=True,
-            )
-        with cols[7]:
-            st.markdown(
-                f"<div style='margin-top:2px;font-size:13px;text-align:center;'>{html.escape(rank_text)}</div>",
-                unsafe_allow_html=True,
-            )
-        with cols[8]:
-            st.markdown(
-                "<div style='display:flex;justify-content:center;'>"
-                f"{signals_html}</div>",
-                unsafe_allow_html=True,
-            )
-        with cols[9]:
-            decision_value = st.selectbox(
-                "Decision",
-                options=["Select", "Pass", "Fail"],
-                index=0,
-                key=f"feeder_decision_{widget_key}",
-                label_visibility="collapsed",
-            )
-        with cols[10]:
+        decision_value = st.radio(
+            "Choice",
+            options=FEEDER_REVIEW_DECISION_OPTIONS,
+            index=0,
+            key=decision_key,
+            horizontal=True,
+        )
+        action_cols = st.columns([1.35, 2.45, 0.9], gap="medium")
+        with action_cols[0]:
             reason_labels = [label for _code, label in FEEDER_REVIEW_REASON_OPTIONS]
             reason_value = st.selectbox(
                 "Reason",
                 options=reason_labels,
                 index=0,
                 key=f"feeder_reason_{widget_key}",
-                label_visibility="collapsed",
             )
-        with cols[11]:
+        with action_cols[1]:
             note_value = st.text_input(
-                "Note",
+                "Optional note",
                 value="",
                 key=f"feeder_note_{widget_key}",
-                label_visibility="collapsed",
                 placeholder="Add note",
             )
-        with cols[12]:
-            done_cols = st.columns([1, 1, 1], gap="small")
-            with done_cols[1]:
-                row_done = st.checkbox(
-                    "Done",
-                    value=False,
-                    key=f"feeder_done_{widget_key}",
-                    label_visibility="collapsed",
-                )
+        with action_cols[2]:
+            row_done = st.checkbox(
+                "Checked",
+                value=False,
+                key=f"feeder_done_{widget_key}",
+            )
 
-        st.markdown("<div style='height:1px;background:#1f2937;margin:6px 0 1px 0;'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='o-intake-divider'></div>", unsafe_allow_html=True)
 
     return {
         "candidate_id": candidate_id,
-        "review_decision": _normalize_text(decision_value).lower(),
+        "review_decision": _normalize_feeder_review_decision(decision_value),
         "review_reason_code": _normalize_feeder_review_reason_code(reason_value),
         "review_reason_label": _feeder_review_reason_label(reason_value),
         "review_note": _normalize_text(note_value),
@@ -7533,21 +11154,50 @@ def _render_ai_product_check_gate_tab(root_path: Path) -> None:
 def _render_new_product_review_tab(root_path: Path) -> None:
     import streamlit as st
 
-    st.subheader("New Product Review")
+    st.markdown(
+        _operator_task_brief_html(
+            kicker="Supplier Intake",
+            title="Check new scanner finds",
+            body=(
+                "Work through scanner-found supplier products one batch at a time. "
+                "Choose whether each product should move forward, be rejected, or be scanned again."
+            ),
+            steps=[
+                ("Choose a work pack", "Start with Best finds, then judgement checks, then close calls."),
+                ("Review product cards", "Use the image, supplier, Amazon title, profit hint, and warning notes."),
+                ("Save local choices", "Only selected choices are recorded locally after Luke presses Save local choices."),
+            ],
+            safe_note="No buying, listing, price change, Sheet write, scanner run, or queue action happens automatically.",
+            tone="neutral",
+        ),
+        unsafe_allow_html=True,
+    )
 
     lane_map = FEEDER_REVIEW_LANE_SPECS
     lane_options = list(lane_map.keys())
     lane_key = "o_feeder_review_lane"
-    selected_lane_label = _normalize_text(st.session_state.get(lane_key, "Passes")) or "Passes"
+    requested_lane_label = _normalize_text(st.session_state.pop("o_feeder_review_requested_lane", ""))
+    if requested_lane_label in lane_map:
+        st.session_state.pop(lane_key, None)
+        selected_lane_label = requested_lane_label
+    else:
+        selected_lane_label = _normalize_text(st.session_state.get(lane_key, "Passes")) or "Passes"
     if selected_lane_label not in lane_map:
         selected_lane_label = "Passes"
-    top_control_cols = st.columns([0.9, 1.2, 2.2], gap="small")
+    st.markdown(
+        "<div class='o-intake-filter-title'>Choose the work pack</div>"
+        "<div class='o-intake-filter-note'>Start with the best scanner finds, or switch to judgement checks and close calls.</div>",
+        unsafe_allow_html=True,
+    )
+    top_control_cols = st.columns([1.55, 1.05, 3.0], gap="small")
     selected_lane_label = top_control_cols[0].selectbox(
-        "Lane",
+        "Work pack",
         options=lane_options,
         index=lane_options.index(selected_lane_label),
         key=lane_key,
+        format_func=_feeder_review_lane_display_label,
     )
+    selected_lane_display = _feeder_review_lane_display_label(selected_lane_label)
     lane_spec = lane_map[selected_lane_label]
     lane_id = lane_spec["lane_id"]
     pack_type = lane_spec["pack_type"]
@@ -7555,9 +11205,10 @@ def _render_new_product_review_tab(root_path: Path) -> None:
 
     show_pack_history_key = "o_feeder_review_show_pack_history"
     show_pack_history = top_control_cols[1].checkbox(
-        "Show older rebuild snapshots",
+        "Show history",
         value=bool(st.session_state.get(show_pack_history_key, False)),
         key=show_pack_history_key,
+        help="Use only when you need to look back at older saved supplier checks.",
     )
     pack_options = list_feeder_review_pack_options(
         root=root_path,
@@ -7567,20 +11218,29 @@ def _render_new_product_review_tab(root_path: Path) -> None:
         lane_label=selected_lane_label,
     )
     if not pack_options:
-        st.info(
-            f"No {selected_lane_label.lower()} rows are waiting. "
-            "Tick Show older rebuild snapshots if you need to inspect historical packs."
+        st.markdown(
+            _render_intake_empty_state_html(
+                "This work pack is clear",
+                f"No {selected_lane_display.lower()} are waiting here. "
+                "Try another work pack, choose a different supplier batch, or tick History to inspect older saved checks.",
+            ),
+            unsafe_allow_html=True,
         )
         return
     pack_option_ids = [option["id"] for option in pack_options] or ["latest"]
     pack_option_labels = {option["id"]: option["label"] for option in pack_options}
     pack_key = "o_feeder_review_pack_snapshot"
-    selected_pack_snapshot = _normalize_text(st.session_state.get(pack_key, "latest")) or "latest"
+    requested_pack_snapshot = _normalize_text(st.session_state.pop("o_feeder_review_requested_pack_snapshot", ""))
+    if requested_pack_snapshot in pack_option_ids:
+        st.session_state.pop(pack_key, None)
+        selected_pack_snapshot = requested_pack_snapshot
+    else:
+        selected_pack_snapshot = _normalize_text(st.session_state.get(pack_key, "latest")) or "latest"
     if selected_pack_snapshot not in pack_option_ids:
         selected_pack_snapshot = pack_option_ids[0]
 
     selected_pack_snapshot = top_control_cols[2].selectbox(
-        "Review pack",
+        "Scanner batch",
         options=pack_option_ids,
         index=pack_option_ids.index(selected_pack_snapshot),
         format_func=lambda value: pack_option_labels.get(value, value),
@@ -7626,20 +11286,26 @@ def _render_new_product_review_tab(root_path: Path) -> None:
             ).index
         )
     )
-    reviewable_total_rows = str(len(pass_count_df.index) + len(near_miss_count_df.index))
     st.markdown(
-        "<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap;"
-        "padding:8px 10px;border:1px solid #1f2937;border-radius:10px;background:#0b1220;'>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Supplier</span><span style='font-size:12px;color:#e2e8f0;'>{html.escape(active_supplier)}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Clean pass</span><span style='font-size:12px;color:#e2e8f0;'>{html.escape(clean_pass_rows)}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Manual review</span><span style='font-size:12px;color:#e2e8f0;'>{html.escape(manual_review_rows)}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>Near miss</span><span style='font-size:12px;color:#e2e8f0;'>{html.escape(near_miss_lane_rows)}</span>"
-        "<span style='color:#334155;'>|</span>"
-        f"<span style='font-size:12px;color:#7dd3fc;'>To review</span><span style='font-size:12px;color:#e2e8f0;'>{html.escape(reviewable_total_rows)}</span>"
-        "</div>",
+        "<div class='o-intake-status-grid'>"
+        "<div class='o-intake-status-card neutral'>"
+        "<div class='o-intake-status-label'>Supplier</div>"
+        f"<div class='o-intake-status-value'>{html.escape(active_supplier)}</div>"
+        "</div>"
+        "<div class='o-intake-status-card good'>"
+        "<div class='o-intake-status-label'>Best scanner finds</div>"
+        f"<div class='o-intake-status-value'>{html.escape(clean_pass_rows)}</div>"
+        "</div>"
+        "<div class='o-intake-status-card warn'>"
+        "<div class='o-intake-status-label'>Needs judgement</div>"
+        f"<div class='o-intake-status-value'>{html.escape(manual_review_rows)}</div>"
+        "</div>"
+        "<div class='o-intake-status-card warn'>"
+        "<div class='o-intake-status-label'>Close calls</div>"
+        f"<div class='o-intake-status-value'>{html.escape(near_miss_lane_rows)}</div>"
+        "</div>"
+        "</div>"
+        "<div class='o-intake-safe-note'>Safe local review only: no buying, listing, price changes, Sheet writes, or scanner runs.</div>",
         unsafe_allow_html=True,
     )
 
@@ -7669,19 +11335,24 @@ def _render_new_product_review_tab(root_path: Path) -> None:
     control_cols = st.columns([1.1, 1.2, 2.2], gap="small")
     supplier_label_map = _supplier_display_map(root_path)
     supplier_filter = control_cols[0].selectbox(
-        "Supplier",
+        "Supplier group",
         options=supplier_options,
         index=supplier_options.index(seed_supplier),
         key=supplier_key,
         format_func=lambda value: _supplier_option_label(value, supplier_label_map),
     )
     review_batch_id = control_cols[1].selectbox(
-        "Batch",
+        "Next group",
         options=review_batch_options,
         index=review_batch_options.index(seed_batch),
         key=batch_key,
     )
-    search_text = control_cols[2].text_input("Search title / SKU / ASIN", value=seed_search, key=search_key)
+    search_text = control_cols[2].text_input(
+        "Search",
+        value=seed_search,
+        key=search_key,
+        placeholder="Title, supplier SKU, ASIN",
+    )
 
     visible_df, meta = build_feeder_review_window_df(
         pack_type,
@@ -7705,20 +11376,31 @@ def _render_new_product_review_tab(root_path: Path) -> None:
     )
     draft_map = _build_feeder_review_draft_map(load_feeder_review_ui_drafts_df(root=root_path))
 
+    st.markdown(
+        _intake_focus_strip_html(
+            work_pack=selected_lane_display,
+            supplier=_supplier_option_label(supplier_filter, supplier_label_map),
+            batch=review_batch_id,
+            shown=meta["visible_rows"],
+            waiting=meta["undecided_rows"],
+            saved=meta["decided_rows"],
+        ),
+        unsafe_allow_html=True,
+    )
     st.caption(
-        f"View {meta['available_rows']} | undecided {meta['undecided_rows']} | reviewed {meta['decided_rows']} | window {meta['visible_rows']}"
+        f"Showing {meta['visible_rows']} product{'' if meta['visible_rows'] == 1 else 's'}. "
+        f"Waiting for choice: {meta['undecided_rows']}. Already sent: {meta['decided_rows']}."
     )
     reviewed_rows: list[dict[str, object]] = []
     if visible_df.empty:
-        st.success("No undecided rows are left in this view.")
+        st.markdown(
+            _render_intake_empty_state_html(
+                "No products need a choice in this view",
+                "This supplier/filter combination is clear. Try a different supplier, working group, or search term to keep reviewing.",
+            ),
+            unsafe_allow_html=True,
+        )
     else:
-        header_cols = st.columns(FEEDER_REVIEW_COLUMN_WIDTHS, gap="small")
-        for idx, (col, label) in enumerate(zip(header_cols, FEEDER_REVIEW_HEADER_LABELS)):
-            align_style = "text-align:center;" if idx >= 2 else "text-align:left;"
-            col.markdown(
-                f"<div style='font-size:12px;font-weight:700;color:#9ca3af;{align_style}'>{html.escape(label)}</div>",
-                unsafe_allow_html=True,
-            )
         for _, row in visible_df.iterrows():
             row_data = row.to_dict()
             _seed_feeder_review_widget_draft(row_data, pack_type=pack_type, draft_map=draft_map)
@@ -7734,6 +11416,7 @@ def _render_new_product_review_tab(root_path: Path) -> None:
 
     pass_selected = sum(1 for row in reviewed_rows if _normalize_text(row.get("review_decision", "")) == "pass")
     fail_selected = sum(1 for row in reviewed_rows if _normalize_text(row.get("review_decision", "")) == "fail")
+    rescan_selected = sum(1 for row in reviewed_rows if _normalize_text(row.get("review_decision", "")) == "rescan")
     decided_rows = [
         row for row in reviewed_rows if _normalize_text(row.get("review_decision", "")).lower() in FEEDER_REVIEW_DECISIONS
     ]
@@ -7741,31 +11424,42 @@ def _render_new_product_review_tab(root_path: Path) -> None:
     done_decided_rows = [row for row in done_rows if row in decided_rows]
     done_missing_decision = len(done_rows) - len(done_decided_rows)
     if reviewed_rows:
-        st.caption(
-            f"Current window selections: pass {pass_selected} | fail {fail_selected} | remaining {len(reviewed_rows) - pass_selected - fail_selected}"
+        remaining_choices = len(reviewed_rows) - pass_selected - fail_selected - rescan_selected
+        st.markdown(
+            "<div class='o-intake-choice-strip'>"
+            f"<span class='o-intake-choice-main'>{len(decided_rows)} choice{'' if len(decided_rows) == 1 else 's'} ready to send</span>"
+            f"<span class='o-intake-choice-chip good'>Pass {pass_selected}</span>"
+            f"<span class='o-intake-choice-chip warn'>Fail {fail_selected}</span>"
+            f"<span class='o-intake-choice-chip'>Re-scan {rescan_selected}</span>"
+            f"<span class='o-intake-choice-chip'>Need choice {remaining_choices}</span>"
+            "</div>",
+            unsafe_allow_html=True,
         )
-        st.caption(
-            f"Done ticked: {len(done_rows)} | selected decisions: {len(decided_rows)} | done but no decision: {done_missing_decision}"
+        st.markdown(
+            _intake_submit_panel_html(ready=len(decided_rows), need_choice=remaining_choices),
+            unsafe_allow_html=True,
         )
     if done_missing_decision > 0:
-        st.warning("Some rows are ticked Done but still have Decision = Select. They will not be sent.")
+        st.warning("Some products are marked checked but still need a choice before they can be sent.")
     last_send_key = f"o_feeder_last_send_rows_{lane_id}"
     last_send_rows = st.session_state.get(last_send_key, [])
-    action_cols = st.columns([1.2, 1.2, 4.0])
+    action_cols = st.columns([1.8, 1.8, 3.2])
     send_disabled = len(decided_rows) == 0
     send_clicked = action_cols[0].button(
-        "Send Batch for Analysis",
-        type="primary",
+        "Save local choices",
+        type="secondary" if send_disabled else "primary",
         disabled=send_disabled,
         key=f"o_feeder_send_{lane_id}",
+        use_container_width=True,
     )
     undo_clicked = action_cols[1].button(
-        "Undo Last Send",
+        "Reopen last saved",
         disabled=(len(last_send_rows) == 0),
         key=f"o_feeder_undo_{lane_id}",
+        use_container_width=True,
     )
     action_cols[2].caption(
-        "Set Decision per row, then send. Done is optional and only marks your checklist in the current view. Undo reopens the most recent send from this lane in this browser session."
+        "This records only the choices selected on this page. It does not buy stock, change prices, write Sheets, or run the scanner."
     )
 
     if send_clicked:
@@ -7802,9 +11496,9 @@ def _render_new_product_review_tab(root_path: Path) -> None:
         skipped_count = len(result.get("skipped_rows", []))
         skipped_note = f" Skipped {skipped_count} row{'' if skipped_count == 1 else 's'}." if skipped_count else ""
         st.session_state["o_recent_feeder_review_notice"] = (
-            f"Sent {result['events_applied']} review row"
-            f"{'' if result['events_applied'] == 1 else 's'} from {selected_lane_label.lower()}."
-            f"{skipped_note} Pass rows now move to Product Listing Profile Review before Amazon draft approval."
+            f"Saved {result['events_applied']} local choice"
+            f"{'' if result['events_applied'] == 1 else 's'} from {selected_lane_display.lower()}."
+            f"{skipped_note} Keep choices move to the next listing check. Nothing is bought or listed automatically."
         )
         st.rerun()
 
@@ -7817,43 +11511,46 @@ def _render_new_product_review_tab(root_path: Path) -> None:
         )
         st.session_state[last_send_key] = []
         st.session_state["o_recent_feeder_review_notice"] = (
-            f"Reopened {undo_result['events_applied']} row"
-            f"{'' if undo_result['events_applied'] == 1 else 's'} in {selected_lane_label.lower()}."
+            f"Reopened {undo_result['events_applied']} choice"
+            f"{'' if undo_result['events_applied'] == 1 else 's'} in {selected_lane_display.lower()}."
         )
         st.rerun()
 
-    with st.expander("Recent sent decisions in this view"):
-        if sent_df.empty:
-            st.caption("No sent decisions found for the current filters.")
-        else:
-            for idx, (_, row) in enumerate(sent_df.iterrows()):
-                row_data = row.to_dict()
-                decision = _normalize_text(row_data.get("latest_review_decision", "")).upper()
-                sku = _normalize_text(row_data.get("supplier_sku", ""))
-                title = _normalize_text(row_data.get("title", "")) or "(Untitled product)"
-                note = _normalize_text(row_data.get("latest_review_note", ""))
-                when = _normalize_text(row_data.get("latest_review_utc", ""))
-                display_cols = st.columns([4.5, 1.2], gap="medium")
-                display_cols[0].markdown(
-                    f"**{decision or '-'}** - {sku or '-'} - {title}\n\n"
-                    f"Note: {note or '-'}\n\n"
-                    f"When: {when or '-'}"
+    if not sent_df.empty:
+        st.markdown("<div class='o-intake-recent-title'>Recently sent choices</div>", unsafe_allow_html=True)
+        for idx, (_, row) in enumerate(sent_df.iterrows()):
+            row_data = row.to_dict()
+            decision = _normalize_text(row_data.get("latest_review_decision", "")).upper()
+            sku = _normalize_text(row_data.get("supplier_sku", ""))
+            title = _normalize_text(row_data.get("title", "")) or "(Untitled product)"
+            note = _normalize_text(row_data.get("latest_review_note", ""))
+            when = _normalize_text(row_data.get("latest_review_utc", ""))
+            display_cols = st.columns([4.5, 1.2], gap="medium")
+            display_cols[0].markdown(
+                _render_intake_sent_choice_card_html(
+                    decision=decision,
+                    sku=sku,
+                    title=title,
+                    note=note,
+                    when=when,
+                ),
+                unsafe_allow_html=True,
+            )
+            reopen_key = (
+                f"o_feeder_reopen_{lane_id}_"
+                f"{_supplier_key_fragment(str(row_data.get('candidate_id', '')))}_{idx}"
+            )
+            if display_cols[1].button("Reopen Choice", key=reopen_key):
+                reopen_result = submit_feeder_review_reopen_batch(
+                    root=root_path,
+                    rows_to_reopen=[row_data],
+                    actor="operator_ui",
+                    source_reference=f"o_ui_feeder_review_reopen:{pack_type}:{lane_id}:single",
                 )
-                reopen_key = (
-                    f"o_feeder_reopen_{lane_id}_"
-                    f"{_supplier_key_fragment(str(row_data.get('candidate_id', '')))}_{idx}"
+                st.session_state["o_recent_feeder_review_notice"] = (
+                    f"Reopened {reopen_result['events_applied']} choice from recently sent choices."
                 )
-                if display_cols[1].button("Reopen", key=reopen_key):
-                    reopen_result = submit_feeder_review_reopen_batch(
-                        root=root_path,
-                        rows_to_reopen=[row_data],
-                        actor="operator_ui",
-                        source_reference=f"o_ui_feeder_review_reopen:{pack_type}:{lane_id}:single",
-                    )
-                    st.session_state["o_recent_feeder_review_notice"] = (
-                        f"Reopened {reopen_result['events_applied']} row from sent decisions."
-                    )
-                    st.rerun()
+                st.rerun()
 
 
 def _render_amazon_listing_draft_lane(root_path: Path, datasets: dict[str, pd.DataFrame]) -> None:
@@ -8235,14 +11932,6808 @@ def _render_brand_approval_queue_tab(root_path: Path) -> None:
     action_cols[1].caption("Approval-blocked rows stay out of Product DB and repricer until approval clears.")
 
 
+def _build_restock_workbench_display_df(filtered_df: pd.DataFrame) -> pd.DataFrame:
+    if filtered_df.empty:
+        return pd.DataFrame(columns=[RESTOCK_WORKBENCH_COLUMN_LABELS[col] for col in RESTOCK_WORKBENCH_COLUMNS])
+    out = filtered_df.copy()
+    for column in RESTOCK_WORKBENCH_COLUMNS:
+        if column not in out.columns:
+            out[column] = ""
+    out = out[RESTOCK_WORKBENCH_COLUMNS].copy()
+    return out.rename(columns=RESTOCK_WORKBENCH_COLUMN_LABELS)
+
+
+def _restock_workable_mask(df: pd.DataFrame) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=bool)
+    suggested = _norm_series(df, "suggested_action")
+    suggested_qty = pd.to_numeric(_text_series(df, "old_suggested_qty"), errors="coerce").fillna(0)
+    draft_qty = pd.to_numeric(_text_series(df, "order_qty_draft"), errors="coerce").fillna(0)
+    latest_decision = _text_series(df, "latest_draft_decision_code")
+    return suggested.isin({"full_restock", "test_restock"}) | (suggested_qty > 0) | (draft_qty > 0) | latest_decision.ne("")
+
+
+_RESTOCK_TOKEN_LABELS = {
+    "missing_supplier_cost": "Supplier cost missing",
+    "missing_current_market_price": "Amazon price missing",
+    "missing_refund_confidence": "Refund proof missing",
+    "missing_inbound_cost_confidence": "Inbound/FBA cost proof missing",
+    "token_cost_not_trusted": "Token cost not proved",
+    "token_cost_not_verified": "Token cost not proved",
+    "missing_b_fallback_token_cost_audit": "B fallback-cost audit missing",
+    "weak_fallback_token_cost": "Fallback token cost risk",
+    "fallback_cost_weak_latest_token": "Fallback token cost risk",
+    "fallback_cost_unproved": "Fallback token cost not proved",
+    "not_verified": "Token cost not proved",
+    "weak_fallback_cost": "Fallback token cost risk",
+    "missing_token_cost": "Token cost missing",
+    "trusted": "Token cost trusted",
+    "missing_market_price": "Amazon price missing",
+    "missing_forward_roi": "ROI missing",
+    "missing_roi": "ROI missing",
+    "velocity_only_sales_truth": "Velocity-only sales proof",
+    "stock_only_no_sales_window": "Stock-only, no recent sales window",
+    "no_recent_sales_truth": "No recent sales truth",
+    "missing_cogs_or_fx": "COGS or FX proof missing",
+    "missing_fee_proof": "Fee proof missing",
+    "missing_refund_proof": "Refund proof missing",
+    "missing_current_price_proof": "Current price proof missing",
+    "missing_current_price": "Amazon price missing",
+    "b_money_bridge_labelled": "Old B money proof only",
+    "bridge_labelled_money": "Old B money proof only",
+    "stock_signal_only": "Stock signal only",
+    "blocked_missing_roi": "Blocked: ROI missing",
+    "blocked_missing_profit_inputs": "Blocked: profit inputs missing",
+    "warning_bridge_labelled_money": "Warning: old B money proof",
+    "blocked_weak_refund_proof": "Blocked: weak refund proof",
+    "blocked_missing_current_price": "Blocked: current price missing",
+    "missing_forward_profit": "Profit missing",
+    "missing_profit_inputs": "Profit input proof missing",
+    "weak_profit_inputs": "Profit input proof weak",
+    "missing_profit_input_confidence": "Profit input confidence missing",
+    "profit_inputs_verified": "Profit inputs verified",
+    "missing_net_fee_model": "Fee model missing",
+    "proof_missing": "Proof missing",
+    "likely_discontinued_candidate": "May be discontinued",
+    "legacy_bridge_not_native_truth": "Old source evidence",
+    "exact_supplier_match_not_proved": "Exact supplier match not proved",
+    "supplier_cost_not_proved": "Supplier cost not proved",
+    "supplier_cost_not_exact": "Supplier cost not exact",
+    "bridge_cost_only": "Older supplier cost proof only",
+    "bridge_market_only": "Older Amazon price proof only",
+    "missing_max_safe_cost": "Max safe cost missing",
+    "supplier_stock_not_verified": "Supplier stock not checked",
+    "backorder_not_verified": "Backorder not checked",
+    "supplier_file_asof_missing": "Supplier file date missing",
+    "pack_moq_not_verified": "Pack/MOQ proof missing",
+    "blocked_from_purchase_approval": "Blocked from purchase approval",
+    "review_only_blocked": "Review only - not approval-ready",
+    "missing_from_latest_supplier_file": "Missing from latest supplier file",
+    "legacy_bridge_not_native_supplier_truth": "Old supplier proof, needs current check",
+    "exact_supplier_sku_or_barcode_found": "Found in supplier file",
+    "not_found_in_latest_local_supplier_file": "Not found in latest supplier file",
+    "not_checked_no_supplier_identity": "No supplier code/barcode to search",
+    "not_checked_no_local_supplier_file": "No local supplier file",
+    "not_checked_supplier_file_read_error": "Supplier file read error",
+    "f_status_failed_local_file_available": "F stale/failed, local file available",
+    "local_file_newer_than_f_status": "Newer local supplier file",
+    "f_status_matches_local_file": "Source file matched",
+    "missing_supplier_cost": "Supplier cost missing",
+    "fee_proof_missing": "Fee proof missing",
+    "missing_refund_confidence": "Refund proof missing",
+    "missing_inbound_cost_confidence": "Inbound/FBA cost proof missing",
+    "missing_profit_inputs": "Profit input proof missing",
+    "weak_profit_inputs": "Profit input proof weak",
+    "missing_profit_input_confidence": "Profit input confidence missing",
+    "profit_inputs_verified": "Profit inputs verified",
+    "pack_or_moq_visible": "Pack/MOQ visible",
+    "blocked_from_clean_buy": "Blocked from clean buy",
+    "unknown_no_order_qty": "No order quantity yet",
+    "review_only_not_po": "Review only",
+    "market_or_history_clue_only": "Only market/history clues",
+}
+
+
+def _humanize_restock_token(raw_value: object) -> str:
+    token = _normalize_text(raw_value)
+    if token == "":
+        return "-"
+    if ":" in token:
+        prefix, token = token.split(":", 1)
+        prefix_label = prefix.replace("_", " ").strip().title()
+    else:
+        prefix_label = ""
+    clean = token.strip().lower().replace(" ", "_")
+    label = _RESTOCK_TOKEN_LABELS.get(clean)
+    if not label and clean.startswith("test_only") and "roi_0" in clean:
+        label = "Test-only profit check, no profit shown"
+    if not label:
+        label = " ".join(clean.replace("_", " ").split()).capitalize()
+    if prefix_label and prefix_label.lower() not in label.lower():
+        return f"{prefix_label}: {label}"
+    return label
+
+
+def _humanize_restock_list(raw_value: object, *, limit: int = 3) -> str:
+    text = _normalize_text(raw_value)
+    if text == "":
+        return "-"
+    parts = [part.strip() for part in re.split(r"[|;]", text) if part.strip()]
+    labels: list[str] = []
+    for part in parts:
+        label = _humanize_restock_token(part)
+        if label not in labels:
+            labels.append(label)
+    if not labels:
+        return "-"
+    if len(labels) > limit:
+        return ", ".join(labels[:limit]) + f", plus {len(labels) - limit} more"
+    return ", ".join(labels)
+
+
+def _restock_fact_value(row: pd.Series | dict[str, object], *fields: str, fallback: str = "-") -> str:
+    for field in fields:
+        value = _normalize_text(row.get(field, ""))
+        if value != "":
+            return value
+    return fallback
+
+
+def _restock_money_value(row: pd.Series | dict[str, object], field: str) -> str:
+    value = _normalize_text(row.get(field, ""))
+    if value == "":
+        return "-"
+    if value.lower().startswith("gbp"):
+        return value
+    return f"GBP {value}"
+
+
+def _restock_percent_value(row: pd.Series | dict[str, object], field: str) -> str:
+    value = _normalize_text(row.get(field, ""))
+    if value == "":
+        return "-"
+    return value if value.endswith("%") else f"{value}%"
+
+
+def _restock_chip_tone(value: object) -> str:
+    text = _normalize_text(value).lower()
+    if text in {
+        "",
+        "ok",
+        "ready",
+        "verified",
+        "clean",
+        "pack_or_moq_visible",
+        "supplier_stock_verified_in_stock",
+        "exact_supplier_sku_or_barcode_found",
+    }:
+        return "good"
+    if "missing" in text or "not_verified" in text or "blocked" in text or "unknown" in text or "not_found" in text or "failed" in text:
+        return "warn"
+    return ""
+
+
+def _supplier_file_card_detail(row: pd.Series | dict[str, object]) -> str:
+    state = _normalize_text(row.get("supplier_file_card_state", ""))
+    file_name = _normalize_text(row.get("supplier_file_card_file_name", ""))
+    file_time = _normalize_text(row.get("supplier_file_card_file_mtime_utc", ""))
+    searched = _normalize_text(row.get("supplier_file_card_searched_rows", ""))
+    handoff = _normalize_text(row.get("supplier_file_card_handoff_state", ""))
+    if state == "":
+        return ""
+    if state == "exact_supplier_sku_or_barcode_found":
+        result = "exact supplier SKU/barcode found"
+    elif state == "not_found_in_latest_local_supplier_file":
+        result = "exact supplier SKU/barcode not found"
+    elif state == "not_checked_no_supplier_identity":
+        result = "no supplier SKU/barcode to search"
+    elif state == "not_checked_no_local_supplier_file":
+        result = "no local supplier file found"
+    elif state == "not_checked_supplier_file_read_error":
+        result = "supplier file could not be read"
+    else:
+        result = _humanize_restock_token(state)
+    parts = [result]
+    if file_name:
+        parts.append(f"file {file_name}")
+    if searched:
+        parts.append(f"{searched} rows searched")
+    if file_time:
+        parts.append(f"file time {file_time}")
+    if handoff == "f_status_failed_local_file_available":
+        parts.append("F stale/failed but local file available")
+    return "; ".join(parts)
+
+
+def _apply_supplier_file_card_context(review_df: pd.DataFrame, supplier_file_probe_df: pd.DataFrame) -> pd.DataFrame:
+    if review_df.empty:
+        return review_df
+    out = review_df.copy()
+    for column in (
+        "supplier_file_card_state",
+        "supplier_file_card_file_name",
+        "supplier_file_card_file_mtime_utc",
+        "supplier_file_card_searched_rows",
+        "supplier_file_card_handoff_state",
+        "supplier_file_card_detail",
+    ):
+        if column not in out.columns:
+            out[column] = ""
+    if supplier_file_probe_df.empty:
+        return out
+
+    probe = supplier_file_probe_df.copy()
+    for column in (
+        "row_id",
+        "seller_sku",
+        "identity_match_state",
+        "latest_supplier_file_name",
+        "latest_supplier_file_mtime_utc",
+        "searched_row_count",
+        "source_index_handoff_state",
+        "probe_utc",
+    ):
+        if column not in probe.columns:
+            probe[column] = ""
+        probe[column] = probe[column].map(_normalize_text)
+    if "probe_utc" in probe.columns:
+        probe = probe.sort_values("probe_utc")
+    by_row_id = {
+        _normalize_text(row.get("row_id", "")): row
+        for _, row in probe.iterrows()
+        if _normalize_text(row.get("row_id", ""))
+    }
+    by_sku = {
+        _normalize_text(row.get("seller_sku", "")): row
+        for _, row in probe.iterrows()
+        if _normalize_text(row.get("seller_sku", ""))
+    }
+    for idx, row in out.iterrows():
+        match = by_row_id.get(_normalize_text(row.get("row_id", "")))
+        if match is None:
+            match = by_sku.get(_normalize_text(row.get("seller_sku", "")))
+        if match is None:
+            continue
+        out.at[idx, "supplier_file_card_state"] = _normalize_text(match.get("identity_match_state", ""))
+        out.at[idx, "supplier_file_card_file_name"] = _normalize_text(match.get("latest_supplier_file_name", ""))
+        out.at[idx, "supplier_file_card_file_mtime_utc"] = _normalize_text(match.get("latest_supplier_file_mtime_utc", ""))
+        out.at[idx, "supplier_file_card_searched_rows"] = _normalize_text(match.get("searched_row_count", ""))
+        out.at[idx, "supplier_file_card_handoff_state"] = _normalize_text(match.get("source_index_handoff_state", ""))
+    for idx, row in out.iterrows():
+        out.at[idx, "supplier_file_card_detail"] = _supplier_file_card_detail(row)
+    return out
+
+
+def _supplier_proof_history_detail(row: pd.Series | dict[str, object]) -> str:
+    proof_id = _normalize_text(row.get("supplier_proof_card_id", "")) or _normalize_text(row.get("latest_supplier_proof_id", ""))
+    if proof_id == "":
+        return "No local supplier proof saved yet."
+    parts: list[str] = []
+    proof_utc = _normalize_text(row.get("supplier_proof_card_utc", "")) or _normalize_text(row.get("latest_supplier_proof_utc", ""))
+    if proof_utc:
+        parts.append(proof_utc)
+    stock_state = _normalize_text(row.get("supplier_proof_card_stock_state", ""))
+    if stock_state:
+        stock_label = _humanize_restock_token(stock_state)
+        stock_qty = _normalize_text(row.get("supplier_proof_card_stock_qty", ""))
+        if stock_qty:
+            stock_label = f"{stock_label}, qty {stock_qty}"
+        parts.append(f"stock {stock_label}")
+    backorder_state = _normalize_text(row.get("supplier_proof_card_backorder_state", ""))
+    if backorder_state:
+        backorder_label = _humanize_restock_token(backorder_state)
+        backorder_eta = _normalize_text(row.get("supplier_proof_card_backorder_eta", ""))
+        if backorder_eta:
+            backorder_label = f"{backorder_label}, ETA {backorder_eta}"
+        parts.append(f"backorder {backorder_label}")
+    file_ref = _normalize_text(row.get("supplier_proof_card_file_reference", ""))
+    if file_ref:
+        parts.append(f"file/ref {file_ref}")
+    note = _normalize_text(row.get("supplier_proof_card_note", "")) or _normalize_text(row.get("latest_supplier_proof_note", ""))
+    if note:
+        parts.append(f"note {note}")
+    return "; ".join(parts) if parts else "Local supplier proof saved."
+
+
+def _pack_moq_proof_history_detail(row: pd.Series | dict[str, object]) -> str:
+    proof_id = _normalize_text(row.get("pack_moq_proof_card_id", "")) or _normalize_text(row.get("latest_pack_moq_proof_id", ""))
+    if proof_id == "":
+        return "No local pack/MOQ proof saved yet."
+    parts: list[str] = []
+    proof_utc = _normalize_text(row.get("pack_moq_proof_card_utc", "")) or _normalize_text(row.get("latest_pack_moq_proof_utc", ""))
+    if proof_utc:
+        parts.append(proof_utc)
+    pack_state = _normalize_text(row.get("pack_moq_proof_card_state", ""))
+    if pack_state:
+        parts.append(_humanize_restock_token(pack_state))
+    pack_multiple = _normalize_text(row.get("pack_moq_proof_card_pack_multiple", ""))
+    supplier_moq = _normalize_text(row.get("pack_moq_proof_card_supplier_moq", ""))
+    valid_order_step = _normalize_text(row.get("pack_moq_proof_card_valid_order_step", ""))
+    if pack_multiple:
+        parts.append(f"pack {pack_multiple}")
+    if supplier_moq:
+        parts.append(f"MOQ {supplier_moq}")
+    if valid_order_step:
+        parts.append(f"step {valid_order_step}")
+    file_ref = _normalize_text(row.get("pack_moq_proof_card_file_reference", "")) or _normalize_text(
+        row.get("latest_pack_moq_proof_file_reference", "")
+    )
+    if file_ref:
+        parts.append(f"file/ref {file_ref}")
+    note = _normalize_text(row.get("pack_moq_proof_card_note", "")) or _normalize_text(row.get("latest_pack_moq_proof_note", ""))
+    if note:
+        parts.append(f"note {note}")
+    return "; ".join(parts) if parts else "Local pack/MOQ proof saved."
+
+
+def _apply_restock_card_proof_history_context(
+    review_df: pd.DataFrame,
+    supplier_proof_events_df: pd.DataFrame,
+    pack_moq_proof_events_df: pd.DataFrame,
+) -> pd.DataFrame:
+    if review_df.empty:
+        return review_df
+    out = review_df.copy()
+    card_columns = (
+        "supplier_proof_card_id",
+        "supplier_proof_card_utc",
+        "supplier_proof_card_stock_state",
+        "supplier_proof_card_stock_qty",
+        "supplier_proof_card_backorder_state",
+        "supplier_proof_card_backorder_eta",
+        "supplier_proof_card_file_reference",
+        "supplier_proof_card_note",
+        "supplier_proof_card_actor",
+        "supplier_proof_card_detail",
+        "pack_moq_proof_card_id",
+        "pack_moq_proof_card_utc",
+        "pack_moq_proof_card_state",
+        "pack_moq_proof_card_pack_multiple",
+        "pack_moq_proof_card_supplier_moq",
+        "pack_moq_proof_card_valid_order_step",
+        "pack_moq_proof_card_file_reference",
+        "pack_moq_proof_card_note",
+        "pack_moq_proof_card_actor",
+        "pack_moq_proof_card_detail",
+    )
+    for column in card_columns:
+        if column not in out.columns:
+            out[column] = ""
+
+    latest_supplier = latest_restock_session_supplier_proof_events(supplier_proof_events_df)
+    supplier_by_row = {
+        _normalize_text(row.get("row_id", "")): row
+        for _, row in latest_supplier.iterrows()
+        if _normalize_text(row.get("row_id", ""))
+    } if not latest_supplier.empty else {}
+
+    latest_pack = latest_restock_session_pack_moq_proof_events(pack_moq_proof_events_df)
+    pack_by_row = {
+        _normalize_text(row.get("row_id", "")): row
+        for _, row in latest_pack.iterrows()
+        if _normalize_text(row.get("row_id", ""))
+    } if not latest_pack.empty else {}
+
+    for idx, row in out.iterrows():
+        row_id = _normalize_text(row.get("row_id", ""))
+        supplier_proof = supplier_by_row.get(row_id)
+        if supplier_proof is not None:
+            out.at[idx, "supplier_proof_card_id"] = _normalize_text(supplier_proof.get("proof_id", ""))
+            out.at[idx, "supplier_proof_card_utc"] = _normalize_text(supplier_proof.get("event_utc", ""))
+            out.at[idx, "supplier_proof_card_stock_state"] = _normalize_text(supplier_proof.get("supplier_stock_state", ""))
+            out.at[idx, "supplier_proof_card_stock_qty"] = _normalize_text(supplier_proof.get("supplier_stock_qty", ""))
+            out.at[idx, "supplier_proof_card_backorder_state"] = _normalize_text(supplier_proof.get("backorder_state", ""))
+            out.at[idx, "supplier_proof_card_backorder_eta"] = _normalize_text(supplier_proof.get("backorder_eta_utc", ""))
+            out.at[idx, "supplier_proof_card_file_reference"] = _normalize_text(supplier_proof.get("supplier_file_reference", ""))
+            out.at[idx, "supplier_proof_card_note"] = _normalize_text(supplier_proof.get("proof_note", ""))
+            out.at[idx, "supplier_proof_card_actor"] = _normalize_text(supplier_proof.get("actor", ""))
+
+        pack_proof = pack_by_row.get(row_id)
+        if pack_proof is not None:
+            out.at[idx, "pack_moq_proof_card_id"] = _normalize_text(pack_proof.get("proof_id", ""))
+            out.at[idx, "pack_moq_proof_card_utc"] = _normalize_text(pack_proof.get("event_utc", ""))
+            out.at[idx, "pack_moq_proof_card_state"] = _normalize_text(pack_proof.get("pack_moq_proof_state", ""))
+            out.at[idx, "pack_moq_proof_card_pack_multiple"] = _normalize_text(pack_proof.get("pack_multiple", ""))
+            out.at[idx, "pack_moq_proof_card_supplier_moq"] = _normalize_text(pack_proof.get("supplier_moq", ""))
+            out.at[idx, "pack_moq_proof_card_valid_order_step"] = _normalize_text(pack_proof.get("valid_order_step", ""))
+            out.at[idx, "pack_moq_proof_card_file_reference"] = _normalize_text(pack_proof.get("proof_file_reference", ""))
+            out.at[idx, "pack_moq_proof_card_note"] = _normalize_text(pack_proof.get("proof_note", ""))
+            out.at[idx, "pack_moq_proof_card_actor"] = _normalize_text(pack_proof.get("actor", ""))
+
+    for idx, row in out.iterrows():
+        out.at[idx, "supplier_proof_card_detail"] = _supplier_proof_history_detail(row)
+        out.at[idx, "pack_moq_proof_card_detail"] = _pack_moq_proof_history_detail(row)
+    return out
+
+
+RESTOCK_CARD_MISSING_PROOF_REASON_FIELDS = (
+    "supplier_proof_missing_reasons",
+    "supplier_batch_readiness_reasons",
+    "action_block_reason",
+    "missing_input_reasons",
+    "restock_missing_proof",
+    "missing_roi_reason",
+    "missing_roi_reason_detail",
+    "profit_check_message",
+)
+RESTOCK_CARD_MISSING_PROOF_STATE_FIELDS = (
+    "supplier_match_state",
+    "supplier_file_card_state",
+    "supplier_proof_state",
+    "supplier_stock_state",
+    "backorder_state",
+    "supplier_cost_proof_state",
+    "market_price_proof_state",
+    "fee_proof_state",
+    "refund_proof_state",
+    "inbound_cost_proof_state",
+    "profit_input_confidence",
+    "profit_confidence",
+    "sales_truth_state",
+    "stock_signal",
+    "restock_business_ready",
+    "restock_decision_state",
+    "pack_moq_proof_state",
+    "supplier_order_viability_state",
+    "operator_decision_state",
+    "action_safety_state",
+    "supplier_batch_readiness_state",
+)
+RESTOCK_CARD_MISSING_PROOF_CLEAR_KEYS = {
+    "",
+    "0",
+    "0.0",
+    "false",
+    "no",
+    "none",
+    "nan",
+    "ok",
+    "ready",
+    "clean",
+    "clear",
+    "verified",
+    "review_ready",
+    "ready_for_review",
+    "ready_for_purchase_approval_review_only",
+    "exact_supplier_sku_or_barcode_found",
+    "supplier_stock_verified_in_stock",
+    "supplier_stock_verified_zero",
+    "backorder_none_confirmed",
+    "backorder_available_confirmed",
+    "supplier_cost_verified",
+    "supplier_cost_proved",
+    "market_price_verified",
+    "fee_proof_ready",
+    "fee_proof_verified",
+    "refund_proof_ready",
+    "refund_proof_verified",
+    "inbound_cost_proof_ready",
+    "inbound_cost_proof_verified",
+    "profit_inputs_verified",
+    "pack_or_moq_visible",
+    "pack_moq_verified",
+    "f_status_matches_local_file",
+    "local_file_newer_than_f_status",
+}
+RESTOCK_CARD_MISSING_PROOF_GENERIC_KEYS = {
+    "proof_missing",
+    "blocked",
+    "blocked_from_clean_buy",
+    "blocked_from_purchase_approval",
+    "review_only_blocked",
+}
+RESTOCK_MISSING_PROOF_ALL_OPTION = "All missing proof types"
+RESTOCK_NEXT_PROOF_HINTS = {
+    "Exact supplier match not proved": "Confirm the exact supplier SKU or barcode in the latest supplier file before approval.",
+    "Supplier stock not checked": "Confirm current supplier stock or out-of-stock status, including quantity where available.",
+    "Backorder not checked": "Confirm whether the supplier can backorder the item, and record an ETA if one is available.",
+    "Supplier file date missing": "Record the supplier file date and file/reference used for the check.",
+    "Supplier cost not proved": "Confirm the current supplier unit cost from the latest supplier file.",
+    "Supplier cost not exact": "Confirm the exact current supplier unit cost before any profit or approval decision.",
+    "Supplier cost missing": "Find the current supplier unit cost before any approval decision.",
+    "Older supplier cost proof only": "Replace old bridge cost with current supplier unit-cost proof.",
+    "Older Amazon price proof only": "Refresh current Amazon price proof before relying on the profit view.",
+    "Amazon price missing": "Refresh current Amazon price proof before relying on the profit view.",
+    "Refund proof missing": "Check refund-impact proof before approval.",
+    "Inbound/FBA cost proof missing": "Confirm inbound/FBA cost confidence before approval.",
+    "Pack/MOQ proof missing": "Confirm pack size, MOQ, and valid order step before approval.",
+    "Old source evidence": "Replace old bridge/source evidence with current local proof.",
+    "Old supplier proof, needs current check": "Replace old supplier proof with current local supplier evidence.",
+    "Missing from latest supplier file": "Confirm whether the item still exists with the supplier; if not, draft Drop or Snooze.",
+    "May be discontinued": "Confirm whether the item still exists with the supplier; if not, draft Drop or Snooze.",
+    "Max safe cost missing": "Confirm the max safe cost before treating the row as approval-ready.",
+    "Test-only profit check, no profit shown": "Refresh real profit proof before any approval decision.",
+}
+RESTOCK_SELECTED_ROW_PROOF_FIELD_HINTS = {
+    "Exact supplier match not proved": "set Exact match, File/ref, File date, and Supplier proof note before Save supplier proof.",
+    "Supplier stock not checked": "set Stock proof, Stock qty if visible, File/ref, and Supplier proof note before Save supplier proof.",
+    "Backorder not checked": "set Backorder, Backorder ETA if visible, File/ref, and Supplier proof note before Save supplier proof.",
+    "Supplier file date missing": "fill File date and File/ref before Save supplier proof.",
+    "Older supplier cost proof only": "fill Cost note, File/ref, and Supplier proof note before Save supplier proof. Cost note is local evidence only.",
+    "Supplier cost not proved": "fill Cost note, File/ref, and Supplier proof note before Save supplier proof. Cost note is local evidence only.",
+    "Supplier cost not exact": "fill Cost note with the exact visible unit cost, plus File/ref before Save supplier proof.",
+    "Supplier cost missing": "fill Cost note with the visible unit cost, plus File/ref before Save supplier proof.",
+    "Pack/MOQ proof missing": "set Pack/MOQ, Pack, MOQ, Step, Pack file/ref, and Pack/MOQ note before Save pack/MOQ proof.",
+    "Old supplier proof, needs current check": "replace bridge proof with current Exact match, Stock proof, Backorder, File date, and File/ref before Save supplier proof.",
+    "Missing from latest supplier file": "confirm Exact match as not found, fill File/ref and Supplier proof note, then use Check later or Mark drop if needed.",
+    "May be discontinued": "confirm whether the supplier still carries it, then use Supplier proof note plus Check later or Mark drop if needed.",
+}
+RESTOCK_SELECTED_ROW_NON_CARD_PROOF_HINTS = {
+    "Older Amazon price proof only": "not saved from this card. Wait for current Amazon price proof before approval.",
+    "Amazon price missing": "not saved from this card. Wait for current Amazon price proof before approval.",
+    "Refund proof missing": "not saved from this card. Wait for refund-impact proof before approval.",
+    "Inbound/FBA cost proof missing": "not saved from this card. Wait for inbound/FBA cost proof before approval.",
+    "Old source evidence": "not cleared by this card alone. Replace old bridge/source evidence before approval.",
+    "Max safe cost missing": "not saved from this card. Wait for Max safe cost proof before approval.",
+    "Test-only profit check, no profit shown": "not saved from this card. Wait for real profit proof before approval.",
+}
+
+
+def _restock_missing_proof_token_key(raw_value: object) -> str:
+    token = _normalize_text(raw_value).lower()
+    if ":" in token:
+        token = token.split(":", 1)[1]
+    return token.strip().replace(" ", "_")
+
+
+def _restock_missing_proof_tokens(raw_value: object) -> list[str]:
+    text = _normalize_text(raw_value)
+    if text == "":
+        return []
+    return [part.strip() for part in re.split(r"[|;\n\r]+", text) if part.strip()]
+
+
+def _restock_missing_proof_label(raw_value: object) -> str:
+    key = _restock_missing_proof_token_key(raw_value)
+    return _RESTOCK_TOKEN_LABELS.get(key) or _humanize_restock_token(raw_value)
+
+
+def _restock_card_missing_proof_items(row: pd.Series | dict[str, object], *, limit: int = 8) -> list[str]:
+    if bool(_restock_ready_mask(pd.DataFrame([dict(row)])).sum()):
+        return []
+
+    labels: list[str] = []
+    generic_labels: list[str] = []
+    seen_keys: set[str] = set()
+    seen: set[str] = set()
+
+    def add_token(token: object) -> None:
+        key = _restock_missing_proof_token_key(token)
+        if key in RESTOCK_CARD_MISSING_PROOF_CLEAR_KEYS:
+            return
+        if key in seen_keys:
+            return
+        label = _restock_missing_proof_label(token)
+        if label == "-":
+            return
+        dedupe_key = label.strip().lower()
+        if dedupe_key in seen:
+            return
+        seen_keys.add(key)
+        seen.add(dedupe_key)
+        if key in RESTOCK_CARD_MISSING_PROOF_GENERIC_KEYS:
+            generic_labels.append(label)
+        else:
+            labels.append(label)
+
+    for field in RESTOCK_CARD_MISSING_PROOF_REASON_FIELDS:
+        for token in _restock_missing_proof_tokens(row.get(field, "")):
+            add_token(token)
+
+    for field in RESTOCK_CARD_MISSING_PROOF_STATE_FIELDS:
+        add_token(row.get(field, ""))
+
+    final_labels = labels if labels else generic_labels
+    if limit > 0 and len(final_labels) > limit:
+        shown = final_labels[:limit]
+        shown.append(f"plus {len(final_labels) - limit} more")
+        return shown
+    return final_labels
+
+
+def _restock_card_missing_proof_detail(row: pd.Series | dict[str, object]) -> str:
+    items = _restock_card_missing_proof_items(row)
+    if not items:
+        return "No missing local proof shown for this card."
+    return "; ".join(items)
+
+
+def _restock_missing_proof_worklist_counts(filtered_df: pd.DataFrame) -> dict[str, int]:
+    counts: dict[str, int] = {RESTOCK_MISSING_PROOF_ALL_OPTION: int(len(filtered_df.index)) if not filtered_df.empty else 0}
+    if filtered_df.empty:
+        return counts
+    for _, row in filtered_df.iterrows():
+        row_items = {
+            item
+            for item in _restock_card_missing_proof_items(row, limit=20)
+            if item and not item.lower().startswith("plus ")
+        }
+        for item in row_items:
+            counts[item] = counts.get(item, 0) + 1
+    return counts
+
+
+def _restock_missing_proof_worklist_options(filtered_df: pd.DataFrame) -> list[str]:
+    counts = _restock_missing_proof_worklist_counts(filtered_df)
+    labels = [
+        label
+        for label in counts
+        if label != RESTOCK_MISSING_PROOF_ALL_OPTION and counts.get(label, 0) > 0
+    ]
+    labels.sort(key=lambda label: (-counts.get(label, 0), label.lower()))
+    return [RESTOCK_MISSING_PROOF_ALL_OPTION, *labels]
+
+
+def _filter_restock_missing_proof_worklist(filtered_df: pd.DataFrame, selected_proof: object) -> pd.DataFrame:
+    selected = _normalize_text(selected_proof)
+    if filtered_df.empty or selected in {"", RESTOCK_MISSING_PROOF_ALL_OPTION}:
+        return filtered_df.copy()
+    mask_values: list[bool] = []
+    for _, row in filtered_df.iterrows():
+        row_items = {
+            item
+            for item in _restock_card_missing_proof_items(row, limit=20)
+            if item and not item.lower().startswith("plus ")
+        }
+        mask_values.append(selected in row_items)
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+def _restock_next_proof_hint(selected_proof: object, proof_counts: dict[str, int]) -> str:
+    selected = _normalize_text(selected_proof)
+    counts = {
+        _normalize_text(label): int(count)
+        for label, count in proof_counts.items()
+        if _normalize_text(label) and _normalize_text(label) != RESTOCK_MISSING_PROOF_ALL_OPTION and int(count) > 0
+    }
+    target_label = selected
+    if target_label in {"", RESTOCK_MISSING_PROOF_ALL_OPTION}:
+        sorted_counts = sorted(counts.items(), key=lambda item: (-item[1], item[0].lower()))
+        target_label = sorted_counts[0][0] if sorted_counts else ""
+    if target_label == "":
+        return "Next proof to collect: none shown for this filter. Clear or change filters to find missing proof rows."
+
+    row_count = counts.get(target_label, 0)
+    count_text = f"{row_count} row{'' if row_count == 1 else 's'}" if row_count else "the selected rows"
+    action = RESTOCK_NEXT_PROOF_HINTS.get(
+        target_label,
+        "Use the card checklist for this proof type, then save local proof only when the evidence is in front of you.",
+    )
+    return f"Next proof to collect: {target_label} ({count_text}). {action}"
+
+
+def _restock_next_proof_hint_html(selected_proof: object, proof_counts: dict[str, int]) -> str:
+    return (
+        "<div class='o-restock-next-proof-hint'>"
+        f"{html.escape(_restock_next_proof_hint(selected_proof, proof_counts))}"
+        "</div>"
+    )
+
+
+def _restock_selected_row_proof_checklist_items(row: pd.Series | dict[str, object], *, limit: int = 8) -> list[str]:
+    missing_items = [
+        item
+        for item in _restock_card_missing_proof_items(row, limit=20)
+        if item and not item.lower().startswith("plus ")
+    ]
+    if not missing_items:
+        return ["No local proof fields are being requested for this row right now. Review latest proof before saving anything."]
+
+    checklist: list[str] = []
+    seen: set[str] = set()
+    for item in missing_items:
+        action = RESTOCK_SELECTED_ROW_PROOF_FIELD_HINTS.get(item)
+        if action:
+            text = f"{item}: {action}"
+        else:
+            note = RESTOCK_SELECTED_ROW_NON_CARD_PROOF_HINTS.get(
+                item,
+                "use the missing-proof list above to decide which evidence path is needed before approval.",
+            )
+            text = f"{item}: {note}"
+        dedupe_key = text.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        checklist.append(text)
+        if limit > 0 and len(checklist) >= limit:
+            break
+
+    remaining = len(missing_items) - len(checklist)
+    if limit > 0 and remaining > 0:
+        checklist.append(f"plus {remaining} more proof item{'' if remaining == 1 else 's'} shown in the card checklist.")
+    return checklist
+
+
+def _restock_selected_row_proof_checklist_html(row: pd.Series | dict[str, object]) -> str:
+    items = _restock_selected_row_proof_checklist_items(row)
+    item_html = "".join(f"<li>{html.escape(item)}</li>" for item in items)
+    return (
+        "<div class='o-restock-row-proof-drawer'>"
+        "<strong>Selected row proof checklist:</strong>"
+        "<ul>"
+        f"{item_html}"
+        "</ul>"
+        "</div>"
+    )
+
+
+def _build_restock_supplier_readiness_summary(filtered_df: pd.DataFrame) -> dict[str, object]:
+    if filtered_df.empty:
+        return {
+            "products": 0,
+            "local_draft_candidates": 0,
+            "local_qty_drafts": 0,
+            "ready_candidates": 0,
+            "missing_proof_rows": 0,
+            "protected_action_blocked_rows": 0,
+            "top_missing_proof": "No missing proof shown",
+        }
+
+    work = filtered_df.copy()
+    ready_mask = _restock_ready_mask(work)
+    local_draft_mask = _restock_workable_mask(work)
+    local_qty_draft_mask = (
+        _text_series(work, "order_qty_draft").map(lambda value: _normalize_text(value) != "")
+        if "order_qty_draft" in work.columns
+        else pd.Series(False, index=work.index)
+    )
+    if "latest_draft_decision_code" in work.columns:
+        local_qty_draft_mask = local_qty_draft_mask | _norm_series(work, "latest_draft_decision_code").eq("order_qty_draft")
+
+    missing_counts: dict[str, int] = {}
+    missing_mask_values: list[bool] = []
+    for _, row in work.iterrows():
+        items = _restock_card_missing_proof_items(row, limit=20)
+        useful_items = [item for item in items if not item.lower().startswith("plus ")]
+        missing_mask_values.append(bool(useful_items))
+        for item in useful_items:
+            missing_counts[item] = missing_counts.get(item, 0) + 1
+    missing_mask = pd.Series(missing_mask_values, index=work.index, dtype=bool)
+
+    protected_blocked_mask = ~ready_mask
+    if "action_block_reason" in work.columns:
+        protected_blocked_mask = protected_blocked_mask | _text_series(work, "action_block_reason").map(
+            lambda value: _normalize_text(value) != ""
+        )
+    protected_blocked_mask = protected_blocked_mask | missing_mask
+
+    top_missing_items = sorted(missing_counts.items(), key=lambda item: (-item[1], item[0]))[:3]
+    top_missing = ", ".join(f"{label} ({count})" for label, count in top_missing_items)
+    if not top_missing:
+        top_missing = "No missing proof shown"
+
+    return {
+        "products": int(len(work.index)),
+        "local_draft_candidates": int(local_draft_mask.sum()) if not local_draft_mask.empty else 0,
+        "local_qty_drafts": int(local_qty_draft_mask.sum()) if not local_qty_draft_mask.empty else 0,
+        "ready_candidates": int(ready_mask.sum()) if not ready_mask.empty else 0,
+        "missing_proof_rows": int(missing_mask.sum()),
+        "protected_action_blocked_rows": int(protected_blocked_mask.sum()) if not protected_blocked_mask.empty else 0,
+        "top_missing_proof": top_missing,
+    }
+
+
+def _restock_supplier_readiness_summary_html(filtered_df: pd.DataFrame, *, supplier_label: object = "") -> str:
+    summary = _build_restock_supplier_readiness_summary(filtered_df)
+    supplier = _normalize_text(supplier_label) or "Selected supplier"
+    products = int(summary.get("products", 0))
+    local_drafts = int(summary.get("local_draft_candidates", 0))
+    missing_proof_rows = int(summary.get("missing_proof_rows", 0))
+    protected_blocked = int(summary.get("protected_action_blocked_rows", 0))
+    ready_candidates = int(summary.get("ready_candidates", 0))
+    local_qty_drafts = int(summary.get("local_qty_drafts", 0))
+    top_missing = _normalize_text(summary.get("top_missing_proof", "")) or "No missing proof shown"
+    ready_note = f"{ready_candidates} ready candidate{'' if ready_candidates == 1 else 's'}"
+    return (
+        "<div class='o-restock-readiness-summary'>"
+        + f"<div class='o-restock-readiness-title'>Selected supplier readiness: {html.escape(supplier)}</div>"
+        + "<div class='o-restock-stats-grid'>"
+        + _operator_metric_card_html("Products in view", str(products), "This supplier only", "neutral")
+        + _operator_metric_card_html("Local draft candidates", str(local_drafts), f"{local_qty_drafts} qty draft{'' if local_qty_drafts == 1 else 's'} saved", "neutral")
+        + _operator_metric_card_html("Missing proof rows", str(missing_proof_rows), f"Top: {top_missing}", "warn" if missing_proof_rows else "good")
+        + _operator_metric_card_html("Protected-action blocked", str(protected_blocked), ready_note, "warn" if protected_blocked else "good")
+        + "</div>"
+        + "<div class='o-restock-readiness-note'>"
+        + "Protected-action blocked means O must not approve, buy, receive, or send these rows to Amazon until proof clears."
+        + "</div>"
+        + _restock_supplier_info_needed_panel_html(filtered_df)
+        + _restock_approval_readiness_lane_html(filtered_df)
+        + _restock_supplier_action_buckets_html(filtered_df)
+        + "</div>"
+    )
+
+
+def _restock_card_next_action(row: pd.Series | dict[str, object]) -> str:
+    decision = _normalize_text(row.get("latest_draft_decision_code", ""))
+    if decision == "drop":
+        return "Already drafted to drop. Keep it out of the buying path unless Luke changes the decision."
+    if decision == "snooze":
+        snooze_until = _normalize_text(row.get("latest_draft_snooze_until_utc", "")) or _normalize_text(row.get("snooze_until_utc", ""))
+        suffix = f" until {snooze_until}" if snooze_until else ""
+        return f"Already drafted to snooze{suffix}. Wait before reviewing again."
+    if decision == "order_qty_draft":
+        return "Draft quantity saved. Wait for supplier, pack, cost, and profit proof before any approval step."
+
+    ready = bool(_restock_ready_mask(pd.DataFrame([dict(row)])).sum())
+    if ready:
+        return "Review the quantity and proof before local approval. This still does not create a purchase order."
+
+    supplier_file_state = _normalize_text(row.get("supplier_file_card_state", ""))
+    supplier_file_handoff = _normalize_text(row.get("supplier_file_card_handoff_state", ""))
+    reason_text = " ".join(
+        _normalize_text(row.get(field, "")).lower()
+        for field in (
+            "action_block_reason",
+            "missing_input_reasons",
+            "profit_check_message",
+            "supplier_proof_missing_reasons",
+            "supplier_batch_readiness_reasons",
+            "supplier_match_state",
+            "supplier_proof_state",
+            "supplier_stock_state",
+            "backorder_state",
+            "supplier_cost_proof_state",
+            "pack_moq_proof_state",
+            "market_price_proof_state",
+            "refund_proof_state",
+            "inbound_cost_proof_state",
+        )
+    )
+
+    if supplier_file_state == "not_found_in_latest_local_supplier_file":
+        return "Investigate supplier. If this is discontinued, draft Drop; if it may return, draft Snooze."
+    if supplier_file_state in {"not_checked_no_local_supplier_file", "not_checked_supplier_file_read_error"}:
+        return "Wait for supplier-file proof or investigate the local supplier file before drafting a buy quantity."
+    if supplier_file_state == "not_checked_no_supplier_identity":
+        return "Investigate supplier code or barcode before this can move toward approval."
+    if supplier_file_handoff in {"f_status_failed_local_file_available", "local_file_newer_than_f_status"} and supplier_file_state == "":
+        return "Refresh local proof so O checks the newest local supplier file before deciding."
+
+    if any(token in reason_text for token in ("missing_from_latest_supplier_file", "likely_discontinued_candidate")):
+        return "Investigate supplier. If the item is gone, draft Drop; if uncertain, draft Snooze."
+    if any(token in reason_text for token in ("supplier_stock_not_verified", "backorder_not_verified", "exact_supplier_match_not_proved")):
+        return "Wait for supplier stock/backorder proof before approval."
+    if any(token in reason_text for token in ("supplier_cost_not_proved", "bridge_cost_only", "missing_supplier_cost", "supplier_cost_not_exact")):
+        return "Wait for exact supplier cost proof before approval."
+    if any(token in reason_text for token in ("pack_moq_not_verified", "pack_moq")):
+        return "Add pack/MOQ proof before approval."
+    if any(token in reason_text for token in ("missing_current_market_price", "missing_market_price", "market_price", "needs_price_check")):
+        return "Wait for market price proof before approval."
+    if any(token in reason_text for token in ("missing_refund_confidence", "refund")):
+        return "Wait for refund-impact proof before approval."
+    if any(token in reason_text for token in ("missing_inbound_cost_confidence", "inbound")):
+        return "Wait for inbound/FBA cost proof before approval."
+
+    return "Keep on hold and wait for the missing proof shown above."
+
+
+RESTOCK_SAFE_SAVE_SUPPLIER_PROOF_LABELS = {
+    "Exact supplier match not proved",
+    "Supplier stock not checked",
+    "Backorder not checked",
+    "Supplier file date missing",
+    "Older supplier cost proof only",
+    "Supplier cost not proved",
+    "Supplier cost not exact",
+    "Supplier cost missing",
+    "Old supplier proof, needs current check",
+}
+RESTOCK_SAFE_SAVE_PACK_PROOF_LABELS = {
+    "Pack/MOQ proof missing",
+}
+RESTOCK_SAFE_SAVE_DISCONTINUED_LABELS = {
+    "Missing from latest supplier file",
+    "May be discontinued",
+}
+RESTOCK_SAFE_SAVE_NON_CARD_LABELS = {
+    "Older Amazon price proof only",
+    "Amazon price missing",
+    "Refund proof missing",
+    "Inbound/FBA cost proof missing",
+    "Old source evidence",
+    "Max safe cost missing",
+    "Test-only profit check, no profit shown",
+}
+
+
+def _restock_card_safe_save_guidance(row: pd.Series | dict[str, object]) -> str:
+    decision = _normalize_text(row.get("latest_draft_decision_code", ""))
+    if decision == "drop":
+        return "Safe local save: no new save needed. This row is already locally marked Drop unless Luke changes it."
+    if decision == "snooze":
+        return "Safe local save: no new save needed. This row is already locally set to Check later unless Luke changes it."
+
+    missing_items = {
+        item
+        for item in _restock_card_missing_proof_items(row, limit=20)
+        if item and not item.lower().startswith("plus ")
+    }
+    supplier_file_state = _normalize_text(row.get("supplier_file_card_state", ""))
+    if supplier_file_state == "not_found_in_latest_local_supplier_file" or missing_items.intersection(RESTOCK_SAFE_SAVE_DISCONTINUED_LABELS):
+        return (
+            "Safe local save: use Mark drop if the supplier evidence shows it is gone, or Check later if it may return. "
+            "Do not Save local qty for this row yet."
+        )
+    if supplier_file_state in {"not_checked_no_local_supplier_file", "not_checked_supplier_file_read_error", "not_checked_no_supplier_identity"}:
+        return "Safe local save: use Check later. Supplier-file proof is not strong enough for a quantity draft yet."
+
+    if missing_items.intersection(RESTOCK_SAFE_SAVE_SUPPLIER_PROOF_LABELS):
+        return (
+            "Safe local save: use Save supplier proof if current supplier evidence is in front of you. "
+            "Fill exact match, stock/backorder, file/ref, and cost note where visible. This does not approve buying."
+        )
+    if missing_items.intersection(RESTOCK_SAFE_SAVE_PACK_PROOF_LABELS):
+        return (
+            "Safe local save: use Save pack/MOQ proof if pack size, MOQ, and order step are visible. "
+            "This does not approve buying."
+        )
+
+    non_card_items = sorted(missing_items.intersection(RESTOCK_SAFE_SAVE_NON_CARD_LABELS))
+    if non_card_items:
+        shown = ", ".join(non_card_items[:3])
+        more = f", plus {len(non_card_items) - 3} more" if len(non_card_items) > 3 else ""
+        return (
+            f"Safe local save: use Check later or leave the row on hold. The remaining blocker is not cleared by card controls: {shown}{more}."
+        )
+
+    ready = bool(_restock_ready_mask(pd.DataFrame([dict(row)])).sum())
+    draft_qty = _positive_int_value(row.get("order_qty_draft", ""))
+    suggested_qty = _positive_int_value(row.get("old_suggested_qty", ""))
+    if decision == "order_qty_draft" or draft_qty:
+        return "Safe local save: quantity is already drafted locally. Review proof before any approval step."
+    if ready or suggested_qty:
+        return "Safe local save: use Save local qty only if the shown quantity is the one Luke wants to consider. This is still not a purchase order."
+
+    return "Safe local save: use Check later until a supplier proof or quantity reason is visible."
+
+
+RESTOCK_SUPPLIER_ACTION_BUCKETS = (
+    "Supplier proof",
+    "Pack/MOQ proof",
+    "Local qty",
+    "Check later",
+    "Mark drop",
+)
+RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION = "All local actions"
+RESTOCK_ROW_PRIORITY_BUCKET_ORDER = {
+    "Supplier proof": 0,
+    "Mark drop": 1,
+    "Pack/MOQ proof": 2,
+    "Local qty": 3,
+    "Check later": 4,
+}
+RESTOCK_ROW_POSITION_BUCKET_EXPLANATIONS = {
+    "Supplier proof": "supplier proof rows come first because they can be moved forward with local supplier evidence",
+    "Mark drop": "missing supplier-file rows come next because they may need a local drop or check-later decision",
+    "Pack/MOQ proof": "pack and MOQ rows follow because the supplier proof is clearer but buying rules still need checking",
+    "Local qty": "local quantity rows follow because they are closest to a draft but still need review before approval",
+    "Check later": "hold rows stay lower because the remaining blocker is not cleared by the card controls",
+}
+
+
+def _restock_card_safe_save_bucket(row: pd.Series | dict[str, object]) -> str:
+    guidance = _restock_card_safe_save_guidance(row).lower()
+    if "save supplier proof" in guidance:
+        return "Supplier proof"
+    if "save pack/moq proof" in guidance:
+        return "Pack/MOQ proof"
+    if "mark drop" in guidance or "locally marked drop" in guidance:
+        return "Mark drop"
+    if "save local qty" in guidance or "quantity is already drafted locally" in guidance:
+        return "Local qty"
+    return "Check later"
+
+
+def _build_restock_supplier_action_bucket_counts(filtered_df: pd.DataFrame) -> dict[str, int]:
+    counts = {label: 0 for label in RESTOCK_SUPPLIER_ACTION_BUCKETS}
+    if filtered_df.empty:
+        return counts
+    for _, row in filtered_df.iterrows():
+        bucket = _restock_card_safe_save_bucket(row)
+        counts[bucket] = counts.get(bucket, 0) + 1
+    return counts
+
+
+def _restock_supplier_action_bucket_options(filtered_df: pd.DataFrame) -> list[str]:
+    counts = _build_restock_supplier_action_bucket_counts(filtered_df)
+    labels = [label for label in RESTOCK_SUPPLIER_ACTION_BUCKETS if counts.get(label, 0) > 0]
+    return [RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION, *labels]
+
+
+def _filter_restock_supplier_action_bucket(filtered_df: pd.DataFrame, selected_bucket: object) -> pd.DataFrame:
+    selected = _normalize_text(selected_bucket)
+    if filtered_df.empty or selected in {"", RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_SUPPLIER_ACTION_BUCKETS:
+        return filtered_df.copy()
+    mask_values = [_restock_card_safe_save_bucket(row) == selected for _, row in filtered_df.iterrows()]
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+def _restock_priority_numeric(value: object) -> float:
+    text = re.sub(r"[^0-9.\-]", "", _normalize_text(value))
+    if text in {"", ".", "-", "-."}:
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def _sort_restock_rows_for_local_action(filtered_df: pd.DataFrame) -> pd.DataFrame:
+    if filtered_df.empty:
+        return filtered_df.copy()
+    out = filtered_df.copy()
+    out["_o_action_bucket_sort"] = out.apply(
+        lambda row: RESTOCK_ROW_PRIORITY_BUCKET_ORDER.get(_restock_card_safe_save_bucket(row), 99),
+        axis=1,
+    )
+    out["_o_suggested_qty_sort"] = out.apply(
+        lambda row: -_restock_priority_numeric(row.get("old_suggested_qty", "")),
+        axis=1,
+    )
+    out["_o_profit_sort"] = out.apply(
+        lambda row: -_restock_priority_numeric(row.get("expected_profit_per_unit_gbp", "")),
+        axis=1,
+    )
+    out["_o_velocity_sort"] = out.apply(
+        lambda row: -_restock_priority_numeric(row.get("velocity_30d", "")),
+        axis=1,
+    )
+    out["_o_title_sort"] = out.apply(
+        lambda row: (
+            _normalize_text(row.get("title", "")).lower(),
+            _normalize_text(row.get("seller_sku", "")).lower(),
+            _normalize_text(row.get("asin", "")).lower(),
+        ),
+        axis=1,
+    )
+    out = out.sort_values(
+        by=[
+            "_o_action_bucket_sort",
+            "_o_suggested_qty_sort",
+            "_o_profit_sort",
+            "_o_velocity_sort",
+            "_o_title_sort",
+        ],
+        kind="mergesort",
+    )
+    return out.drop(
+        columns=[
+            "_o_action_bucket_sort",
+            "_o_suggested_qty_sort",
+            "_o_profit_sort",
+            "_o_velocity_sort",
+            "_o_title_sort",
+        ],
+        errors="ignore",
+    )
+
+
+def _restock_row_position_marker(
+    row: pd.Series | dict[str, object],
+    *,
+    position_index: int | None = None,
+    total_visible: int | None = None,
+) -> str:
+    bucket = _restock_card_safe_save_bucket(row)
+    explanation = RESTOCK_ROW_POSITION_BUCKET_EXPLANATIONS.get(
+        bucket,
+        "this row is sorted by local action, suggested quantity, profit, and recent sales",
+    )
+    suggested_qty = _restock_fact_value(row, "old_suggested_qty", fallback="0")
+    profit_each = _restock_money_value(row, "expected_profit_per_unit_gbp")
+    recent_sales = _restock_fact_value(row, "velocity_30d", fallback="0")
+
+    if position_index and position_index > 0:
+        position_text = f"Work position #{position_index}"
+        if total_visible and total_visible > 0:
+            position_text = f"{position_text} of {total_visible}"
+    else:
+        position_text = "Work position"
+
+    return (
+        f"{position_text}: {bucket} - {explanation}. "
+        f"Tie-breakers: suggested buy {suggested_qty}, profit each {profit_each}, recent sales {recent_sales}."
+    )
+
+
+def _restock_supplier_action_buckets_html(filtered_df: pd.DataFrame) -> str:
+    counts = _build_restock_supplier_action_bucket_counts(filtered_df)
+    return (
+        "<div class='o-restock-action-buckets'>"
+        "<div class='o-restock-action-buckets-title'>What this supplier needs</div>"
+        "<div class='o-restock-stats-grid'>"
+        + _operator_metric_card_html("Supplier proof", str(counts.get("Supplier proof", 0)), "Use Save supplier proof", "warn" if counts.get("Supplier proof", 0) else "neutral")
+        + _operator_metric_card_html("Pack/MOQ proof", str(counts.get("Pack/MOQ proof", 0)), "Use Save pack/MOQ proof", "warn" if counts.get("Pack/MOQ proof", 0) else "neutral")
+        + _operator_metric_card_html("Local qty", str(counts.get("Local qty", 0)), "Use Save local qty", "neutral")
+        + _operator_metric_card_html("Check later", str(counts.get("Check later", 0)), "Use Check later or hold", "neutral")
+        + _operator_metric_card_html("Mark drop", str(counts.get("Mark drop", 0)), "Use Mark drop", "warn" if counts.get("Mark drop", 0) else "neutral")
+        + "</div>"
+        "<div class='o-restock-readiness-note'>"
+        "Action buckets are local guidance only. They do not save proof, draft quantities, approve buying, create purchase orders, or send stock."
+        "</div>"
+        "</div>"
+    )
+
+
+RESTOCK_SUPPLIER_INFO_NEEDED_GROUPS = (
+    {
+        "key": "identity_stock",
+        "label": "Identity/stock",
+        "proof_labels": {
+            "Exact supplier match not proved",
+            "Supplier stock not checked",
+            "Backorder not checked",
+            "Supplier file date missing",
+            "Old supplier proof, needs current check",
+        },
+        "note": "SKU/barcode, stock, backorder, and file date",
+    },
+    {
+        "key": "cost",
+        "label": "Current cost",
+        "proof_labels": {
+            "Older supplier cost proof only",
+            "Supplier cost not proved",
+            "Supplier cost not exact",
+            "Supplier cost missing",
+        },
+        "note": "exact supplier unit cost from current evidence",
+    },
+    {
+        "key": "pack_moq",
+        "label": "Pack/MOQ",
+        "proof_labels": {
+            "Pack/MOQ proof missing",
+        },
+        "note": "pack size, MOQ, and valid order step",
+    },
+    {
+        "key": "missing_supplier_file",
+        "label": "Missing/discontinued",
+        "proof_labels": {
+            "Missing from latest supplier file",
+            "May be discontinued",
+        },
+        "note": "confirm gone, replaced, or waiting to return",
+    },
+    {
+        "key": "non_supplier_proof",
+        "label": "Other proof",
+        "proof_labels": {
+            "Older Amazon price proof only",
+            "Amazon price missing",
+            "Refund proof missing",
+            "Inbound/FBA cost proof missing",
+            "Profit input proof missing",
+            "Profit input confidence missing",
+            "Old source evidence",
+            "Max safe cost missing",
+            "Test-only profit check, no profit shown",
+        },
+        "note": "market, refund, inbound, profit, or Max safe cost proof",
+    },
+)
+
+
+def _build_restock_supplier_info_needed_counts(filtered_df: pd.DataFrame) -> dict[str, dict[str, object]]:
+    counts: dict[str, dict[str, object]] = {
+        str(spec["key"]): {
+            "label": spec["label"],
+            "count": 0,
+            "note": spec["note"],
+            "examples": [],
+        }
+        for spec in RESTOCK_SUPPLIER_INFO_NEEDED_GROUPS
+    }
+    if filtered_df.empty:
+        return counts
+
+    for _, row in filtered_df.iterrows():
+        items = {
+            item
+            for item in _restock_card_missing_proof_items(row, limit=20)
+            if item and not item.lower().startswith("plus ")
+        }
+        sku = (
+            _normalize_text(row.get("seller_sku", ""))
+            or _normalize_text(row.get("asin", ""))
+            or _normalize_text(row.get("title", ""))[:40]
+        )
+        for spec in RESTOCK_SUPPLIER_INFO_NEEDED_GROUPS:
+            key = str(spec["key"])
+            proof_labels = set(spec["proof_labels"])
+            if not items.intersection(proof_labels):
+                continue
+            counts[key]["count"] = int(counts[key]["count"]) + 1
+            examples = counts[key]["examples"]
+            if isinstance(examples, list) and sku and len(examples) < 3:
+                examples.append(sku)
+    return counts
+
+
+def _restock_supplier_info_needed_panel_html(filtered_df: pd.DataFrame) -> str:
+    counts = _build_restock_supplier_info_needed_counts(filtered_df)
+
+    metric_html = ""
+    total_needed = 0
+    for spec in RESTOCK_SUPPLIER_INFO_NEEDED_GROUPS:
+        key = str(spec["key"])
+        row = counts.get(key, {})
+        count = int(row.get("count", 0))
+        total_needed += count
+        examples = row.get("examples", [])
+        example_text = ""
+        if isinstance(examples, list) and examples:
+            example_text = f" Examples: {', '.join(str(value) for value in examples)}."
+        note = f"{_normalize_text(row.get('note', ''))}.{example_text}".strip()
+        metric_html += _operator_metric_card_html(
+            _normalize_text(row.get("label", "")) or str(spec["label"]),
+            str(count),
+            note,
+            "warn" if count else "good",
+        )
+
+    if total_needed:
+        note = "Use this as the supplier-check shopping list for the current filtered rows. It is read-only and does not run scans, write supplier files, or buy stock."
+    else:
+        note = "No supplier-info gaps are shown for the current filtered rows. Other approval proof may still be needed before buying."
+
+    return (
+        "<div class='o-restock-supplier-info-needed'>"
+        "<div class='o-restock-supplier-info-needed-title'>Supplier info still needed</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-supplier-info-needed-note'>{html.escape(note)}</div>"
+        "</div>"
+    )
+
+
+RESTOCK_APPROVAL_SUPPLIER_PROOF_LABELS = (
+    RESTOCK_SAFE_SAVE_SUPPLIER_PROOF_LABELS
+    | RESTOCK_SAFE_SAVE_DISCONTINUED_LABELS
+)
+RESTOCK_APPROVAL_PROFIT_SAFETY_LABELS = (
+    RESTOCK_SAFE_SAVE_NON_CARD_LABELS
+    | {
+        "Older Amazon price proof only",
+        "Amazon price missing",
+        "Refund proof missing",
+        "Inbound/FBA cost proof missing",
+        "Max safe cost missing",
+        "Test-only profit check, no profit shown",
+        "ROI missing",
+        "Profit missing",
+        "Fee model missing",
+    }
+)
+RESTOCK_APPROVAL_READINESS_LANES = (
+    "Ready for approval preview",
+    "Needs local qty",
+    "Needs supplier proof",
+    "Needs pack/MOQ proof",
+    "Needs profit/safety proof",
+    "Hold or drop only",
+)
+RESTOCK_APPROVAL_READINESS_ALL_OPTION = "All approval lanes"
+
+
+def _restock_row_has_local_qty(row: pd.Series | dict[str, object]) -> bool:
+    decision = _normalize_text(row.get("latest_draft_decision_code", ""))
+    return decision == "order_qty_draft" or bool(_positive_int_value(row.get("order_qty_draft", "")))
+
+
+def _restock_approval_readiness_lane(row: pd.Series | dict[str, object]) -> str:
+    state_values = {
+        _normalize_text(row.get("supplier_batch_readiness_state", "")),
+        _normalize_text(row.get("approval_preview_state", "")),
+        _normalize_text(row.get("approval_guardrail_state", "")),
+    }
+    if "ready_for_purchase_approval_review_only" in state_values:
+        return "Ready for approval preview"
+
+    missing_items = {
+        item
+        for item in _restock_card_missing_proof_items(row, limit=20)
+        if item and not item.lower().startswith("plus ")
+    }
+    if missing_items.intersection(RESTOCK_APPROVAL_SUPPLIER_PROOF_LABELS):
+        return "Needs supplier proof"
+    if missing_items.intersection(RESTOCK_SAFE_SAVE_PACK_PROOF_LABELS):
+        return "Needs pack/MOQ proof"
+    if missing_items.intersection(RESTOCK_APPROVAL_PROFIT_SAFETY_LABELS):
+        return "Needs profit/safety proof"
+
+    ready = bool(_restock_ready_mask(pd.DataFrame([dict(row)])).sum())
+    if ready and _restock_row_has_local_qty(row):
+        return "Ready for approval preview"
+    if ready or _positive_int_value(row.get("old_suggested_qty", "")):
+        return "Needs local qty"
+    return "Hold or drop only"
+
+
+def _build_restock_approval_readiness_lane_counts(filtered_df: pd.DataFrame) -> dict[str, dict[str, object]]:
+    counts: dict[str, dict[str, object]] = {
+        lane: {"count": 0, "examples": []}
+        for lane in RESTOCK_APPROVAL_READINESS_LANES
+    }
+    if filtered_df.empty:
+        return counts
+
+    for _, row in filtered_df.iterrows():
+        lane = _restock_approval_readiness_lane(row)
+        if lane not in counts:
+            lane = "Hold or drop only"
+        counts[lane]["count"] = int(counts[lane]["count"]) + 1
+        sku = (
+            _normalize_text(row.get("seller_sku", ""))
+            or _normalize_text(row.get("asin", ""))
+            or _normalize_text(row.get("title", ""))[:40]
+        )
+        examples = counts[lane]["examples"]
+        if isinstance(examples, list) and sku and len(examples) < 3:
+            examples.append(sku)
+    return counts
+
+
+def _restock_approval_readiness_lane_options(filtered_df: pd.DataFrame) -> list[str]:
+    counts = _build_restock_approval_readiness_lane_counts(filtered_df)
+    lanes = [
+        lane
+        for lane in RESTOCK_APPROVAL_READINESS_LANES
+        if int(counts.get(lane, {}).get("count", 0)) > 0
+    ]
+    return [RESTOCK_APPROVAL_READINESS_ALL_OPTION, *lanes]
+
+
+def _filter_restock_approval_readiness_lane(filtered_df: pd.DataFrame, selected_lane: object) -> pd.DataFrame:
+    selected = _normalize_text(selected_lane)
+    if filtered_df.empty or selected in {"", RESTOCK_APPROVAL_READINESS_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_APPROVAL_READINESS_LANES:
+        return filtered_df.copy()
+    mask_values = [_restock_approval_readiness_lane(row) == selected for _, row in filtered_df.iterrows()]
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+def _restock_approval_preview_lookup_key(row: pd.Series | dict[str, object]) -> str:
+    row_id = _normalize_text(row.get("row_id", ""))
+    if row_id:
+        return f"row:{row_id}"
+    sku = _normalize_text(row.get("seller_sku", ""))
+    if sku:
+        return f"sku:{sku.lower()}"
+    asin = _normalize_text(row.get("asin", ""))
+    if asin:
+        return f"asin:{asin.lower()}"
+    return ""
+
+
+def _restock_approval_preview_line_keys(row: pd.Series | dict[str, object]) -> list[str]:
+    keys: list[str] = []
+    row_id = _normalize_text(row.get("row_id", ""))
+    sku = _normalize_text(row.get("seller_sku", ""))
+    asin = _normalize_text(row.get("asin", ""))
+    if row_id:
+        keys.append(f"row:{row_id}")
+    if sku:
+        keys.append(f"sku:{sku.lower()}")
+    if asin:
+        keys.append(f"asin:{asin.lower()}")
+    return keys
+
+
+def _apply_restock_approval_preview_context(
+    review_df: pd.DataFrame,
+    approval_preview_lines_df: pd.DataFrame,
+) -> pd.DataFrame:
+    out = review_df.copy()
+    for column in (
+        "approval_preview_card_packet_id",
+        "approval_preview_card_state",
+        "approval_preview_card_block_reasons",
+        "approval_preview_card_draft_qty",
+        "approval_preview_card_line_value_gbp",
+        "approval_preview_card_creates_live_action",
+    ):
+        if column not in out.columns:
+            out[column] = ""
+    if out.empty or approval_preview_lines_df.empty:
+        return out
+
+    preview_work = approval_preview_lines_df.copy()
+    if "preview_utc" in preview_work.columns:
+        preview_work = preview_work.sort_values(by=["preview_utc"], kind="mergesort")
+
+    preview_by_key: dict[str, pd.Series] = {}
+    for _, preview_row in preview_work.iterrows():
+        for key in _restock_approval_preview_line_keys(preview_row):
+            preview_by_key[key] = preview_row
+
+    for idx, row in out.iterrows():
+        preview_row = None
+        for key in _restock_approval_preview_line_keys(row):
+            if key in preview_by_key:
+                preview_row = preview_by_key[key]
+                break
+        if preview_row is None:
+            continue
+        out.at[idx, "approval_preview_card_packet_id"] = _normalize_text(preview_row.get("approval_packet_id", ""))
+        out.at[idx, "approval_preview_card_state"] = _normalize_text(preview_row.get("approval_preview_state", ""))
+        out.at[idx, "approval_preview_card_block_reasons"] = _normalize_text(preview_row.get("approval_block_reasons", ""))
+        out.at[idx, "approval_preview_card_draft_qty"] = _normalize_text(preview_row.get("draft_order_qty", ""))
+        out.at[idx, "approval_preview_card_line_value_gbp"] = _normalize_text(preview_row.get("draft_line_value_gbp", ""))
+        out.at[idx, "approval_preview_card_creates_live_action"] = _normalize_text(preview_row.get("creates_live_action", ""))
+    return out
+
+
+def _build_restock_approval_preview_visibility_summary(
+    filtered_df: pd.DataFrame,
+    approval_preview_summary_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    if filtered_df.empty:
+        return {
+            "visible_rows": 0,
+            "preview_rows": 0,
+            "ready_preview_rows": 0,
+            "blocked_preview_rows": 0,
+            "packet_count": 0,
+            "packet_ids": [],
+            "draft_order_value_gbp": "",
+            "unsafe_preview_rows": 0,
+        }
+
+    packet_series = _text_series(filtered_df, "approval_preview_card_packet_id")
+    in_preview_mask = packet_series.map(lambda value: _normalize_text(value) != "")
+    preview_rows = int(in_preview_mask.sum())
+    preview_df = filtered_df[in_preview_mask].copy()
+    state_series = _norm_series(preview_df, "approval_preview_card_state") if not preview_df.empty else pd.Series(dtype=str)
+    ready_preview_rows = int(state_series.eq("ready_for_purchase_approval_review_only").sum()) if not state_series.empty else 0
+    block_series = _text_series(preview_df, "approval_preview_card_block_reasons") if not preview_df.empty else pd.Series(dtype=str)
+    blocked_preview_rows = int(
+        (
+            state_series.ne("ready_for_purchase_approval_review_only")
+            | block_series.map(lambda value: _normalize_text(value) != "")
+        ).sum()
+    ) if not preview_df.empty else 0
+    unsafe_preview_rows = int(
+        _text_series(preview_df, "approval_preview_card_creates_live_action")
+        .map(lambda value: _normalize_text(value) not in {"", "0", "0.0", "false", "False"})
+        .sum()
+    ) if not preview_df.empty else 0
+    packet_ids = [
+        packet_id
+        for packet_id in dict.fromkeys(packet_series.map(_normalize_text).tolist())
+        if packet_id
+    ]
+
+    draft_value = ""
+    if approval_preview_summary_df is not None and not approval_preview_summary_df.empty and packet_ids:
+        summary = approval_preview_summary_df.copy()
+        if "approval_packet_id" in summary.columns:
+            summary = summary[summary["approval_packet_id"].map(_normalize_text).isin(packet_ids)].copy()
+        if not summary.empty and "draft_order_value_gbp" in summary.columns:
+            values = pd.to_numeric(_text_series(summary, "draft_order_value_gbp"), errors="coerce").fillna(0)
+            total_value = float(values.sum())
+            draft_value = f"{total_value:.2f}".rstrip("0").rstrip(".")
+    if draft_value == "" and not preview_df.empty and "approval_preview_card_line_value_gbp" in preview_df.columns:
+        values = pd.to_numeric(_text_series(preview_df, "approval_preview_card_line_value_gbp"), errors="coerce").fillna(0)
+        total_value = float(values.sum())
+        if total_value:
+            draft_value = f"{total_value:.2f}".rstrip("0").rstrip(".")
+
+    return {
+        "visible_rows": int(len(filtered_df.index)),
+        "preview_rows": preview_rows,
+        "ready_preview_rows": ready_preview_rows,
+        "blocked_preview_rows": blocked_preview_rows,
+        "packet_count": len(packet_ids),
+        "packet_ids": packet_ids,
+        "draft_order_value_gbp": draft_value,
+        "unsafe_preview_rows": unsafe_preview_rows,
+    }
+
+
+def _restock_approval_preview_visibility_panel_html(
+    filtered_df: pd.DataFrame,
+    approval_preview_summary_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_approval_preview_visibility_summary(filtered_df, approval_preview_summary_df)
+    preview_rows = int(summary.get("preview_rows", 0))
+    ready_rows = int(summary.get("ready_preview_rows", 0))
+    blocked_rows = int(summary.get("blocked_preview_rows", 0))
+    packet_count = int(summary.get("packet_count", 0))
+    unsafe_rows = int(summary.get("unsafe_preview_rows", 0))
+    value_text = _normalize_text(summary.get("draft_order_value_gbp", ""))
+    packet_ids = summary.get("packet_ids", [])
+    packet_note = ""
+    if isinstance(packet_ids, list) and packet_ids:
+        packet_note = f" Packet: {', '.join(str(value) for value in packet_ids[:3])}."
+    if packet_count > 3:
+        packet_note += f" plus {packet_count - 3} more."
+    value_note = f"Draft value GBP {value_text}" if value_text else "No draft value shown"
+    unsafe_note = "Unsafe preview rows visible" if unsafe_rows else "All preview rows are local/no-live-action"
+
+    return (
+        "<div class='o-restock-approval-preview-visibility'>"
+        "<div class='o-restock-approval-preview-visibility-title'>Existing approval preview packet status</div>"
+        "<div class='o-restock-stats-grid'>"
+        + _operator_metric_card_html("Preview rows in view", str(preview_rows), f"{ready_rows} ready, {blocked_rows} blocked", "good" if ready_rows and not unsafe_rows else "neutral")
+        + _operator_metric_card_html("Preview packets", str(packet_count), (packet_note.strip() or "No packet shown for this filter"), "neutral")
+        + _operator_metric_card_html("Draft value", f"GBP {value_text}" if value_text else "-", value_note, "neutral")
+        + _operator_metric_card_html("Safety", str(unsafe_rows), unsafe_note, "warn" if unsafe_rows else "good")
+        + "</div>"
+        "<div class='o-restock-approval-preview-visibility-note'>"
+        "Approval preview status is read-only. It does not approve buying, create purchase orders, write PO files, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_card_approval_preview_status_html(row: pd.Series | dict[str, object]) -> str:
+    packet_id = _normalize_text(row.get("approval_preview_card_packet_id", ""))
+    state = _normalize_text(row.get("approval_preview_card_state", ""))
+    block_reasons = _humanize_restock_list(row.get("approval_preview_card_block_reasons", ""), limit=2)
+    qty = _normalize_text(row.get("approval_preview_card_draft_qty", ""))
+    value = _normalize_text(row.get("approval_preview_card_line_value_gbp", ""))
+    creates_live_action = _normalize_text(row.get("approval_preview_card_creates_live_action", ""))
+    if packet_id == "":
+        return (
+            "<div class='o-restock-approval-preview-status'>"
+            "<strong>Approval preview:</strong> Not in a local approval preview packet yet."
+            "</div>"
+        )
+
+    unsafe = creates_live_action not in {"", "0", "0.0", "false", "False"}
+    ready = state == "ready_for_purchase_approval_review_only" and not unsafe
+    tone_class = " good" if ready else " warn"
+    detail_parts = [f"packet {packet_id}", _humanize_restock_token(state)]
+    if qty:
+        detail_parts.append(f"qty {qty}")
+    if value:
+        detail_parts.append(f"value GBP {value}")
+    if block_reasons != "-":
+        detail_parts.append(f"blocked by {block_reasons}")
+    if unsafe:
+        detail_parts.append("unsafe live-action flag present")
+    detail = " - ".join(part for part in detail_parts if part)
+    return (
+        f"<div class='o-restock-approval-preview-status{tone_class}'>"
+        f"<strong>Approval preview:</strong> {html.escape(detail)}. Review-only, not a purchase order."
+        "</div>"
+    )
+
+
+RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION = "All preview statuses"
+RESTOCK_APPROVAL_PREVIEW_STATUS_BUCKETS = (
+    "Ready preview line",
+    "Blocked preview line",
+    "Not in approval preview",
+)
+
+
+def _restock_approval_preview_status_bucket(row: pd.Series | dict[str, object]) -> str:
+    packet_id = _normalize_text(row.get("approval_preview_card_packet_id", ""))
+    if packet_id == "":
+        return "Not in approval preview"
+    creates_live_action = _normalize_text(row.get("approval_preview_card_creates_live_action", ""))
+    unsafe = creates_live_action not in {"", "0", "0.0", "false", "False"}
+    state = _normalize_text(row.get("approval_preview_card_state", ""))
+    block_reasons = _normalize_text(row.get("approval_preview_card_block_reasons", ""))
+    if state == "ready_for_purchase_approval_review_only" and not block_reasons and not unsafe:
+        return "Ready preview line"
+    return "Blocked preview line"
+
+
+def _build_restock_approval_preview_status_counts(filtered_df: pd.DataFrame) -> dict[str, int]:
+    counts = {bucket: 0 for bucket in RESTOCK_APPROVAL_PREVIEW_STATUS_BUCKETS}
+    if filtered_df.empty:
+        return counts
+    for _, row in filtered_df.iterrows():
+        bucket = _restock_approval_preview_status_bucket(row)
+        counts[bucket] = counts.get(bucket, 0) + 1
+    return counts
+
+
+def _restock_approval_preview_status_options(filtered_df: pd.DataFrame) -> list[str]:
+    counts = _build_restock_approval_preview_status_counts(filtered_df)
+    buckets = [
+        bucket
+        for bucket in RESTOCK_APPROVAL_PREVIEW_STATUS_BUCKETS
+        if counts.get(bucket, 0) > 0
+    ]
+    return [RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION, *buckets]
+
+
+def _filter_restock_approval_preview_status(filtered_df: pd.DataFrame, selected_status: object) -> pd.DataFrame:
+    selected = _normalize_text(selected_status)
+    if filtered_df.empty or selected in {"", RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_APPROVAL_PREVIEW_STATUS_BUCKETS:
+        return filtered_df.copy()
+    mask_values = [_restock_approval_preview_status_bucket(row) == selected for _, row in filtered_df.iterrows()]
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+RESTOCK_PO_PREVIEW_STAGE_SPECS = (
+    {
+        "key": "po_readiness",
+        "label": "PO readiness preview",
+        "id_fields": ("po_readiness_preview_id",),
+        "state_field": "po_draft_readiness_state",
+        "block_field": "po_draft_block_reasons",
+        "qty_fields": ("draft_order_qty",),
+        "value_fields": ("draft_line_value_gbp",),
+    },
+    {
+        "key": "po_line_design",
+        "label": "PO line design preview",
+        "id_fields": ("po_line_design_packet_id", "po_line_design_id"),
+        "state_field": "line_design_state",
+        "block_field": "line_design_block_reasons",
+        "qty_fields": ("designed_order_qty",),
+        "value_fields": ("designed_line_value_gbp",),
+    },
+    {
+        "key": "po_packet_review",
+        "label": "PO packet review",
+        "id_fields": ("po_draft_packet_review_id", "po_line_design_packet_id"),
+        "state_field": "packet_review_line_state",
+        "block_field": "packet_review_block_reasons",
+        "qty_fields": ("review_order_qty",),
+        "value_fields": ("review_line_value_gbp",),
+    },
+    {
+        "key": "po_hold_review",
+        "label": "PO hold review",
+        "id_fields": ("po_draft_hold_review_id", "po_draft_packet_review_id"),
+        "state_field": "hold_review_line_state",
+        "block_field": "hold_review_reasons",
+        "qty_fields": ("hold_order_qty",),
+        "value_fields": ("hold_line_value_gbp",),
+    },
+    {
+        "key": "po_file_shape",
+        "label": "PO file-shape preview",
+        "id_fields": ("po_draft_file_shape_preview_id", "po_draft_hold_review_id"),
+        "state_field": "file_shape_line_state",
+        "block_field": "file_shape_block_reasons",
+        "qty_fields": ("file_shape_qty",),
+        "value_fields": ("file_shape_line_value_gbp",),
+    },
+    {
+        "key": "po_export_preview",
+        "label": "PO export preview",
+        "id_fields": ("po_draft_export_preview_id", "po_draft_file_shape_preview_id"),
+        "state_field": "export_preview_line_state",
+        "block_field": "export_preview_block_reasons",
+        "qty_fields": ("export_preview_qty",),
+        "value_fields": ("export_preview_line_value_gbp",),
+    },
+)
+RESTOCK_PO_PREVIEW_STAGE_LABELS = {
+    str(spec["key"]): str(spec["label"])
+    for spec in RESTOCK_PO_PREVIEW_STAGE_SPECS
+}
+RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION = "All PO preview statuses"
+RESTOCK_PO_PREVIEW_STATUS_BUCKETS = (
+    "Ready PO preview line",
+    "Held PO preview line",
+    "Blocked PO preview line",
+    "Unsafe PO preview flag",
+    "Not in PO preview",
+)
+RESTOCK_PO_PREVIEW_UNSAFE_FIELDS = (
+    "po_file_write_allowed",
+    "po_creation_allowed",
+    "purchase_commitment_allowed",
+    "receiving_allowed",
+    "send_to_amazon_allowed",
+    "creates_live_action",
+)
+
+
+def _restock_local_preview_money_text(value: object) -> str:
+    text = _normalize_text(value)
+    if text == "":
+        return ""
+    if text.lower().startswith("gbp"):
+        return text
+    return f"GBP {text}"
+
+
+def _restock_po_preview_line_keys(row: pd.Series | dict[str, object]) -> list[str]:
+    keys: list[str] = []
+    row_id = _normalize_text(row.get("row_id", ""))
+    sku = _normalize_text(row.get("seller_sku", ""))
+    asin = _normalize_text(row.get("asin", ""))
+    if row_id:
+        keys.append(f"row:{row_id}")
+    if sku:
+        keys.append(f"sku:{sku.lower()}")
+    if asin:
+        keys.append(f"asin:{asin.lower()}")
+    return keys
+
+
+def _first_restock_po_preview_value(row: pd.Series | dict[str, object], fields: tuple[str, ...]) -> str:
+    for field in fields:
+        value = _normalize_text(row.get(field, ""))
+        if value:
+            return value
+    return ""
+
+
+def _restock_po_preview_unsafe_flags(row: pd.Series | dict[str, object]) -> list[str]:
+    flags: list[str] = []
+    for field in RESTOCK_PO_PREVIEW_UNSAFE_FIELDS:
+        value = _normalize_text(row.get(field, ""))
+        if value == "" or value.lower() in {"0", "0.0", "false", "no"}:
+            continue
+        flags.append(field)
+    return flags
+
+
+def _apply_restock_po_preview_context(
+    review_df: pd.DataFrame,
+    po_readiness_lines_df: pd.DataFrame | None = None,
+    po_line_design_lines_df: pd.DataFrame | None = None,
+    po_packet_review_lines_df: pd.DataFrame | None = None,
+    po_hold_review_lines_df: pd.DataFrame | None = None,
+    po_file_shape_lines_df: pd.DataFrame | None = None,
+    po_export_preview_lines_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    out = review_df.copy()
+    for column in (
+        "po_preview_card_stage_key",
+        "po_preview_card_stage_label",
+        "po_preview_card_state",
+        "po_preview_card_packet_id",
+        "po_preview_card_block_reasons",
+        "po_preview_card_qty",
+        "po_preview_card_value_gbp",
+        "po_preview_card_unsafe_flags",
+    ):
+        if column not in out.columns:
+            out[column] = ""
+    if out.empty:
+        return out
+
+    stage_frames = (
+        po_readiness_lines_df if po_readiness_lines_df is not None else pd.DataFrame(),
+        po_line_design_lines_df if po_line_design_lines_df is not None else pd.DataFrame(),
+        po_packet_review_lines_df if po_packet_review_lines_df is not None else pd.DataFrame(),
+        po_hold_review_lines_df if po_hold_review_lines_df is not None else pd.DataFrame(),
+        po_file_shape_lines_df if po_file_shape_lines_df is not None else pd.DataFrame(),
+        po_export_preview_lines_df if po_export_preview_lines_df is not None else pd.DataFrame(),
+    )
+
+    for spec, stage_df in zip(RESTOCK_PO_PREVIEW_STAGE_SPECS, stage_frames):
+        if stage_df is None or stage_df.empty:
+            continue
+        stage_work = stage_df.copy()
+        time_cols = [col for col in ("preview_utc", "review_utc", "hold_utc", "shape_utc", "export_preview_utc") if col in stage_work.columns]
+        if time_cols:
+            stage_work = stage_work.sort_values(by=time_cols, kind="mergesort")
+        stage_by_key: dict[str, pd.Series] = {}
+        for _, stage_row in stage_work.iterrows():
+            for key in _restock_po_preview_line_keys(stage_row):
+                stage_by_key[key] = stage_row
+
+        for idx, row in out.iterrows():
+            stage_row = None
+            for key in _restock_po_preview_line_keys(row):
+                if key in stage_by_key:
+                    stage_row = stage_by_key[key]
+                    break
+            if stage_row is None:
+                continue
+            packet_id = _first_restock_po_preview_value(stage_row, tuple(str(field) for field in spec["id_fields"]))
+            qty = _first_restock_po_preview_value(stage_row, tuple(str(field) for field in spec["qty_fields"]))
+            value = _first_restock_po_preview_value(stage_row, tuple(str(field) for field in spec["value_fields"]))
+            unsafe_flags = _restock_po_preview_unsafe_flags(stage_row)
+            out.at[idx, "po_preview_card_stage_key"] = str(spec["key"])
+            out.at[idx, "po_preview_card_stage_label"] = str(spec["label"])
+            out.at[idx, "po_preview_card_state"] = _normalize_text(stage_row.get(str(spec["state_field"]), ""))
+            out.at[idx, "po_preview_card_packet_id"] = packet_id
+            out.at[idx, "po_preview_card_block_reasons"] = _normalize_text(stage_row.get(str(spec["block_field"]), ""))
+            out.at[idx, "po_preview_card_qty"] = qty
+            out.at[idx, "po_preview_card_value_gbp"] = value
+            out.at[idx, "po_preview_card_unsafe_flags"] = "|".join(unsafe_flags)
+    return out
+
+
+def _restock_po_preview_status_bucket(row: pd.Series | dict[str, object]) -> str:
+    stage_key = _normalize_text(row.get("po_preview_card_stage_key", ""))
+    if stage_key == "":
+        return "Not in PO preview"
+    if _normalize_text(row.get("po_preview_card_unsafe_flags", "")):
+        return "Unsafe PO preview flag"
+    state = _normalize_text(row.get("po_preview_card_state", ""))
+    block_reasons = _normalize_text(row.get("po_preview_card_block_reasons", ""))
+    if "held" in state or stage_key == "po_hold_review":
+        return "Held PO preview line"
+    if block_reasons or "blocked" in state or "block" in state:
+        return "Blocked PO preview line"
+    return "Ready PO preview line"
+
+
+def _build_restock_po_preview_status_counts(filtered_df: pd.DataFrame) -> dict[str, int]:
+    counts = {bucket: 0 for bucket in RESTOCK_PO_PREVIEW_STATUS_BUCKETS}
+    if filtered_df.empty:
+        return counts
+    for _, row in filtered_df.iterrows():
+        bucket = _restock_po_preview_status_bucket(row)
+        counts[bucket] = counts.get(bucket, 0) + 1
+    return counts
+
+
+def _restock_po_preview_status_options(filtered_df: pd.DataFrame) -> list[str]:
+    counts = _build_restock_po_preview_status_counts(filtered_df)
+    buckets = [
+        bucket
+        for bucket in RESTOCK_PO_PREVIEW_STATUS_BUCKETS
+        if counts.get(bucket, 0) > 0
+    ]
+    return [RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION, *buckets]
+
+
+def _filter_restock_po_preview_status(filtered_df: pd.DataFrame, selected_status: object) -> pd.DataFrame:
+    selected = _normalize_text(selected_status)
+    if filtered_df.empty or selected in {"", RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_PO_PREVIEW_STATUS_BUCKETS:
+        return filtered_df.copy()
+    mask_values = [_restock_po_preview_status_bucket(row) == selected for _, row in filtered_df.iterrows()]
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+def _build_restock_po_preview_visibility_summary(
+    filtered_df: pd.DataFrame,
+    po_construction_summary_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    stage_counts = {str(spec["key"]): 0 for spec in RESTOCK_PO_PREVIEW_STAGE_SPECS}
+    if filtered_df.empty:
+        return {
+            "visible_rows": 0,
+            "preview_rows": 0,
+            "stage_counts": stage_counts,
+            "furthest_stage_key": "",
+            "furthest_stage_label": "No PO preview stage shown",
+            "unsafe_rows": 0,
+            "construction_stage_label": "",
+            "construction_stage_state": "",
+        }
+
+    stage_series = _text_series(filtered_df, "po_preview_card_stage_key").map(_normalize_text)
+    for stage_key in stage_counts:
+        stage_counts[stage_key] = int(stage_series.eq(stage_key).sum())
+    preview_rows = int(stage_series.map(lambda value: value != "").sum())
+    unsafe_rows = int(
+        _text_series(filtered_df, "po_preview_card_unsafe_flags")
+        .map(lambda value: _normalize_text(value) != "")
+        .sum()
+    )
+    furthest_stage_key = ""
+    for spec in RESTOCK_PO_PREVIEW_STAGE_SPECS:
+        key = str(spec["key"])
+        if stage_counts.get(key, 0) > 0:
+            furthest_stage_key = key
+
+    construction_stage_label = ""
+    construction_stage_state = ""
+    if po_construction_summary_df is not None and not po_construction_summary_df.empty:
+        summary = po_construction_summary_df.copy()
+        if "summary_utc" in summary.columns:
+            summary = summary.sort_values(by=["summary_utc"], kind="mergesort")
+        latest = summary.iloc[-1]
+        construction_stage_label = _normalize_text(latest.get("stage_label", ""))
+        construction_stage_state = _normalize_text(latest.get("stage_state", ""))
+
+    return {
+        "visible_rows": int(len(filtered_df.index)),
+        "preview_rows": preview_rows,
+        "stage_counts": stage_counts,
+        "furthest_stage_key": furthest_stage_key,
+        "furthest_stage_label": RESTOCK_PO_PREVIEW_STAGE_LABELS.get(furthest_stage_key, "No PO preview stage shown"),
+        "unsafe_rows": unsafe_rows,
+        "construction_stage_label": construction_stage_label,
+        "construction_stage_state": construction_stage_state,
+    }
+
+
+def _restock_po_preview_visibility_panel_html(
+    filtered_df: pd.DataFrame,
+    po_construction_summary_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_po_preview_visibility_summary(filtered_df, po_construction_summary_df)
+    stage_counts = summary.get("stage_counts", {})
+    if not isinstance(stage_counts, dict):
+        stage_counts = {}
+    preview_rows = int(summary.get("preview_rows", 0))
+    unsafe_rows = int(summary.get("unsafe_rows", 0))
+    furthest_stage = _normalize_text(summary.get("furthest_stage_label", "")) or "No PO preview stage shown"
+    construction_label = _normalize_text(summary.get("construction_stage_label", ""))
+    construction_state = _humanize_restock_token(summary.get("construction_stage_state", ""))
+    construction_note = (
+        f"Latest construction summary: {construction_label} - {construction_state}"
+        if construction_label
+        else "No construction summary shown"
+    )
+
+    metric_html = (
+        _operator_metric_card_html("Rows in PO preview", str(preview_rows), f"Furthest visible: {furthest_stage}", "good" if preview_rows and not unsafe_rows else "neutral")
+        + _operator_metric_card_html("File-shape rows", str(int(stage_counts.get("po_file_shape", 0))), "Local file shape only, no PO file written", "neutral")
+        + _operator_metric_card_html("Export-preview rows", str(int(stage_counts.get("po_export_preview", 0))), "Preview only, no export or PO file", "neutral")
+        + _operator_metric_card_html("Safety", str(unsafe_rows), "Unsafe write/action flags visible" if unsafe_rows else "All PO preview rows are no-live-action", "warn" if unsafe_rows else "good")
+    )
+    return (
+        "<div class='o-restock-po-preview-visibility'>"
+        "<div class='o-restock-po-preview-visibility-title'>Existing PO preview construction status</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-po-preview-visibility-note'>{html.escape(construction_note)}. "
+        "PO preview status is read-only. It does not create PO files, create purchase orders, commit buying, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_card_po_preview_status_html(row: pd.Series | dict[str, object]) -> str:
+    stage_label = _normalize_text(row.get("po_preview_card_stage_label", ""))
+    if stage_label == "":
+        return (
+            "<div class='o-restock-po-preview-status'>"
+            "<strong>PO preview:</strong> Not in the local PO-preview construction chain yet."
+            "</div>"
+        )
+    packet_id = _normalize_text(row.get("po_preview_card_packet_id", ""))
+    state = _humanize_restock_token(row.get("po_preview_card_state", ""))
+    block_reasons = _humanize_restock_list(row.get("po_preview_card_block_reasons", ""), limit=2)
+    qty = _normalize_text(row.get("po_preview_card_qty", ""))
+    value = _restock_local_preview_money_text(row.get("po_preview_card_value_gbp", ""))
+    unsafe_flags = _normalize_text(row.get("po_preview_card_unsafe_flags", ""))
+    bucket = _restock_po_preview_status_bucket(row)
+    tone_class = " warn" if bucket in {"Held PO preview line", "Blocked PO preview line", "Unsafe PO preview flag"} else " good"
+    parts = [stage_label, state]
+    if packet_id:
+        parts.append(f"packet {packet_id}")
+    if qty:
+        parts.append(f"qty {qty}")
+    if value:
+        parts.append(f"value {value}")
+    if block_reasons != "-":
+        parts.append(f"blocked by {block_reasons}")
+    if unsafe_flags:
+        parts.append(f"unsafe flags {unsafe_flags}")
+    detail = " - ".join(part for part in parts if part)
+    return (
+        f"<div class='o-restock-po-preview-status{tone_class}'>"
+        f"<strong>PO preview:</strong> {html.escape(detail)}. Local preview only, no PO file."
+        "</div>"
+    )
+
+
+def _restock_latest_state(df: pd.DataFrame, state_col: str) -> str:
+    if df.empty or state_col not in df.columns:
+        return "not started"
+    states = _text_series(df, state_col).map(_normalize_text)
+    states = states[states.map(lambda value: value != "")]
+    if states.empty:
+        return "not verified"
+    return _humanize_restock_token(states.iloc[-1])
+
+
+def _restock_unsafe_truthy_count(df: pd.DataFrame) -> int:
+    if df.empty:
+        return 0
+    count = 0
+    for field in RESTOCK_PO_PREVIEW_UNSAFE_FIELDS:
+        if field not in df.columns:
+            continue
+        count += int(
+            _text_series(df, field)
+            .map(lambda value: _normalize_text(value).lower() in {"1", "true", "yes"})
+            .sum()
+        )
+    return count
+
+
+def _build_restock_protected_stage_visibility_summary(
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+    purchase_orders_df: pd.DataFrame | None = None,
+    purchase_order_lines_df: pd.DataFrame | None = None,
+    receiving_events_df: pd.DataFrame | None = None,
+    receiving_event_holds_df: pd.DataFrame | None = None,
+    send_to_amazon_queue_df: pd.DataFrame | None = None,
+    send_to_amazon_handoff_log_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    approval_guardrails_df = approval_guardrails_df if approval_guardrails_df is not None else pd.DataFrame()
+    po_review_controls_df = po_review_controls_df if po_review_controls_df is not None else pd.DataFrame()
+    po_export_gate_df = po_export_gate_df if po_export_gate_df is not None else pd.DataFrame()
+    purchase_orders_df = purchase_orders_df if purchase_orders_df is not None else pd.DataFrame()
+    purchase_order_lines_df = purchase_order_lines_df if purchase_order_lines_df is not None else pd.DataFrame()
+    receiving_events_df = receiving_events_df if receiving_events_df is not None else pd.DataFrame()
+    receiving_event_holds_df = receiving_event_holds_df if receiving_event_holds_df is not None else pd.DataFrame()
+    send_to_amazon_queue_df = send_to_amazon_queue_df if send_to_amazon_queue_df is not None else pd.DataFrame()
+    send_to_amazon_handoff_log_df = (
+        send_to_amazon_handoff_log_df if send_to_amazon_handoff_log_df is not None else pd.DataFrame()
+    )
+    unsafe_flags = (
+        _restock_unsafe_truthy_count(approval_guardrails_df)
+        + _restock_unsafe_truthy_count(po_review_controls_df)
+        + _restock_unsafe_truthy_count(po_export_gate_df)
+        + _restock_unsafe_truthy_count(send_to_amazon_queue_df)
+        + _restock_unsafe_truthy_count(send_to_amazon_handoff_log_df)
+    )
+    return {
+        "approval_guardrail_rows": int(len(approval_guardrails_df.index)),
+        "approval_guardrail_state": _restock_latest_state(approval_guardrails_df, "approval_guardrail_state"),
+        "po_review_control_rows": int(len(po_review_controls_df.index)),
+        "po_review_control_state": _restock_latest_state(po_review_controls_df, "review_control_state"),
+        "po_export_gate_rows": int(len(po_export_gate_df.index)),
+        "po_export_gate_state": _restock_latest_state(po_export_gate_df, "export_gate_state"),
+        "purchase_order_rows": int(len(purchase_orders_df.index)),
+        "purchase_order_line_rows": int(len(purchase_order_lines_df.index)),
+        "receiving_event_rows": int(len(receiving_events_df.index)),
+        "receiving_hold_rows": int(len(receiving_event_holds_df.index)),
+        "send_queue_rows": int(len(send_to_amazon_queue_df.index)),
+        "send_handoff_rows": int(len(send_to_amazon_handoff_log_df.index)),
+        "unsafe_flags": int(unsafe_flags),
+    }
+
+
+def _restock_protected_stage_visibility_panel_html(
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+    purchase_orders_df: pd.DataFrame | None = None,
+    purchase_order_lines_df: pd.DataFrame | None = None,
+    receiving_events_df: pd.DataFrame | None = None,
+    receiving_event_holds_df: pd.DataFrame | None = None,
+    send_to_amazon_queue_df: pd.DataFrame | None = None,
+    send_to_amazon_handoff_log_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_protected_stage_visibility_summary(
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+        purchase_orders_df=purchase_orders_df,
+        purchase_order_lines_df=purchase_order_lines_df,
+        receiving_events_df=receiving_events_df,
+        receiving_event_holds_df=receiving_event_holds_df,
+        send_to_amazon_queue_df=send_to_amazon_queue_df,
+        send_to_amazon_handoff_log_df=send_to_amazon_handoff_log_df,
+    )
+    unsafe_flags = int(summary.get("unsafe_flags", 0))
+    order_note = (
+        f"{int(summary.get('purchase_order_rows', 0))} PO row(s), "
+        f"{int(summary.get('purchase_order_line_rows', 0))} line row(s). Existing rows are proof/history until native O completion is proven."
+    )
+    receiving_note = (
+        f"{int(summary.get('receiving_event_rows', 0))} received-event row(s), "
+        f"{int(summary.get('receiving_hold_rows', 0))} hold row(s). Not a live restock completion lane yet."
+    )
+    send_note = (
+        f"{int(summary.get('send_queue_rows', 0))} queue row(s), "
+        f"{int(summary.get('send_handoff_rows', 0))} handoff row(s)."
+    )
+    metric_html = (
+        _operator_metric_card_html(
+            "Approval guardrail",
+            str(int(summary.get("approval_guardrail_rows", 0))),
+            _normalize_text(summary.get("approval_guardrail_state", "")) or "not started",
+            "warn",
+        )
+        + _operator_metric_card_html(
+            "PO controls",
+            str(int(summary.get("po_review_control_rows", 0))),
+            _normalize_text(summary.get("po_review_control_state", "")) or "not started",
+            "warn",
+        )
+        + _operator_metric_card_html(
+            "PO export gate",
+            str(int(summary.get("po_export_gate_rows", 0))),
+            _normalize_text(summary.get("po_export_gate_state", "")) or "not started",
+            "warn",
+        )
+        + _operator_metric_card_html(
+            "Unsafe action flags",
+            str(unsafe_flags),
+            "No protected action enabled" if unsafe_flags == 0 else "Protected action flag visible",
+            "good" if unsafe_flags == 0 else "warn",
+        )
+    )
+    return (
+        "<div class='o-restock-protected-stage-panel'>"
+        "<div class='o-restock-protected-stage-title'>Protected stages still local-only</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        "<div class='o-restock-protected-stage-note'>"
+        f"{html.escape(order_note)} {html.escape(receiving_note)} {html.escape(send_note)} "
+        "This panel is read-only. It does not approve buying, create purchase orders, write PO files, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_latest_state_token(df: pd.DataFrame, state_col: str) -> str:
+    if df.empty or state_col not in df.columns:
+        return ""
+    states = _text_series(df, state_col).map(_normalize_text)
+    states = states[states.map(lambda value: value != "")]
+    return states.iloc[-1] if not states.empty else ""
+
+
+def _build_restock_real_po_readiness_gate_summary(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    approval_guardrails_df = approval_guardrails_df if approval_guardrails_df is not None else pd.DataFrame()
+    po_review_controls_df = po_review_controls_df if po_review_controls_df is not None else pd.DataFrame()
+    po_export_gate_df = po_export_gate_df if po_export_gate_df is not None else pd.DataFrame()
+    ready_rows = int(_restock_ready_mask(filtered_df).sum()) if not filtered_df.empty else 0
+    unsafe_flags = (
+        _restock_unsafe_truthy_count(approval_guardrails_df)
+        + _restock_unsafe_truthy_count(po_review_controls_df)
+        + _restock_unsafe_truthy_count(po_export_gate_df)
+    )
+    approval_state = _restock_latest_state_token(approval_guardrails_df, "approval_guardrail_state")
+    po_control_state = _restock_latest_state_token(po_review_controls_df, "review_control_state")
+    export_gate_state = _restock_latest_state_token(po_export_gate_df, "export_gate_state")
+    reasons: list[str] = []
+    if ready_rows <= 0:
+        reasons.append("no clean buy-ready rows in this view")
+    if approval_state != "local_review_accept_not_commitment":
+        reasons.append("approval guardrail is not accepted")
+    if po_control_state != "local_po_draft_shape_ready_not_po":
+        reasons.append("PO review control is not ready")
+    if export_gate_state != "local_export_candidate_ready_not_po":
+        reasons.append("PO export gate is not ready")
+    if unsafe_flags:
+        reasons.append("unsafe action flags are visible")
+    gate_state = "ready_for_luke_real_po_decision" if not reasons else "closed"
+    return {
+        "gate_state": gate_state,
+        "visible_rows": int(len(filtered_df.index)),
+        "ready_rows": ready_rows,
+        "approval_state": approval_state,
+        "po_control_state": po_control_state,
+        "export_gate_state": export_gate_state,
+        "unsafe_flags": int(unsafe_flags),
+        "reasons": reasons,
+    }
+
+
+def _restock_real_po_readiness_gate_panel_html(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_real_po_readiness_gate_summary(
+        filtered_df,
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+    )
+    reasons = summary.get("reasons", [])
+    if not isinstance(reasons, list):
+        reasons = []
+    gate_state = _normalize_text(summary.get("gate_state", "closed"))
+    gate_label = "Closed" if gate_state == "closed" else "Ready for Luke decision"
+    reason_text = "; ".join(str(reason) for reason in reasons) if reasons else "all local readiness checks are clear"
+    metric_html = (
+        _operator_metric_card_html(
+            "Real PO gate",
+            gate_label,
+            reason_text,
+            "warn" if gate_state == "closed" else "good",
+        )
+        + _operator_metric_card_html(
+            "Clean rows in view",
+            str(int(summary.get("ready_rows", 0))),
+            f"{int(summary.get('visible_rows', 0))} visible row(s)",
+            "good" if int(summary.get("ready_rows", 0)) else "warn",
+        )
+        + _operator_metric_card_html(
+            "PO export gate",
+            _humanize_restock_token(summary.get("export_gate_state", "")) or "Not ready",
+            "Must be locally candidate-ready before any real PO step.",
+            "good" if _normalize_text(summary.get("export_gate_state", "")) == "local_export_candidate_ready_not_po" else "warn",
+        )
+        + _operator_metric_card_html(
+            "Unsafe action flags",
+            str(int(summary.get("unsafe_flags", 0))),
+            "No protected action enabled" if int(summary.get("unsafe_flags", 0)) == 0 else "Protected action flag visible",
+            "good" if int(summary.get("unsafe_flags", 0)) == 0 else "warn",
+        )
+    )
+    return (
+        "<div class='o-restock-real-po-gate'>"
+        "<div class='o-restock-real-po-gate-title'>Real PO readiness gate</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        "<div class='o-restock-real-po-gate-note'>"
+        "This gate is read-only. A closed gate is healthy while O is mid-build. "
+        "It does not approve buying, create purchase orders, write PO files, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+RESTOCK_REAL_PO_CLEARANCE_LANES = (
+    "Supplier stock proof",
+    "Supplier cost proof",
+    "Market and profit proof",
+    "Refund and inbound proof",
+    "Local order quantity proof",
+    "Approval and PO gates",
+)
+RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION = "All gate clearance lanes"
+RESTOCK_REAL_PO_CLEARANCE_ACTIONS = {
+    "Supplier stock proof": "Confirm supplier identity, stock/backorder, and current file evidence locally.",
+    "Supplier cost proof": "Confirm exact visible supplier unit cost before any approval or PO path.",
+    "Market and profit proof": "Wait for current market, fee, Max safe cost, and profit proof to be clean.",
+    "Refund and inbound proof": "Wait for refund impact and inbound/FBA send-cost proof to be modelled.",
+    "Local order quantity proof": "Only save a local draft quantity after supplier and profit proof support it.",
+    "Approval and PO gates": "Keep approval, PO control, and export gate local-only until upstream proof is clean.",
+}
+
+
+def _restock_real_po_clearance_lanes_for_row(row: pd.Series | dict[str, object]) -> list[str]:
+    lanes: list[str] = []
+    block_text = "|".join(
+        _normalize_text(row.get(field, "")).lower()
+        for field in ("action_block_reason", "missing_input_reasons", "profit_check_message", "operator_decision_state")
+    )
+
+    supplier_stock_state = _normalize_text(row.get("supplier_stock_state", "")).lower()
+    supplier_match_state = _normalize_text(row.get("supplier_match_state", "")).lower()
+    backorder_state = _normalize_text(row.get("backorder_state", "")).lower()
+    supplier_file_asof = _normalize_text(row.get("supplier_file_asof_utc", ""))
+    if (
+        "supplier:" in block_text
+        or "discontinued" in block_text
+        or "supplier_stock" in block_text
+        or supplier_stock_state in {"", "supplier_stock_not_verified", "not_verified"}
+        or supplier_match_state in {"", "not_verified", "supplier_match_not_verified"}
+        or backorder_state in {"", "backorder_not_verified", "not_verified"}
+        or supplier_file_asof == ""
+    ):
+        lanes.append("Supplier stock proof")
+
+    supplier_cost_state = _normalize_text(row.get("supplier_cost_proof_state", "")).lower()
+    current_supplier_cost = _normalize_text(row.get("current_supplier_cost_gbp", ""))
+    if (
+        "supplier_cost" in block_text
+        or "missing_supplier_cost" in block_text
+        or supplier_cost_state in {"", "missing_supplier_cost", "supplier_cost_not_exact", "bridge_cost_only", "not_verified"}
+        or current_supplier_cost == ""
+    ):
+        lanes.append("Supplier cost proof")
+
+    market_state = _normalize_text(row.get("market_price_proof_state", "")).lower()
+    fee_state = _normalize_text(row.get("fee_proof_state", "")).lower()
+    profit_text = _normalize_text(row.get("profit_check_message", "")).lower()
+    if (
+        "market_price" in block_text
+        or "missing_market_price" in block_text
+        or "missing_max_safe_cost" in block_text
+        or "missing_forward_roi" in block_text
+        or "missing_forward_profit" in block_text
+        or "missing_net_fee_model" in block_text
+        or "needs price check" in profit_text
+        or "do not buy now" in profit_text
+        or "test only" in profit_text
+        or "drop review only" in profit_text
+        or market_state in {"", "missing_current_market_price", "bridge_market_only", "not_verified"}
+        or fee_state in {"", "fee_proof_missing", "not_verified"}
+    ):
+        lanes.append("Market and profit proof")
+
+    refund_state = _normalize_text(row.get("refund_proof_state", "")).lower()
+    inbound_state = _normalize_text(row.get("inbound_cost_proof_state", "")).lower()
+    if (
+        "refund:" in block_text
+        or "inbound_cost:" in block_text
+        or refund_state in {"", "missing_refund_confidence", "not_verified"}
+        or inbound_state in {"", "missing_inbound_cost_confidence", "not_verified"}
+    ):
+        lanes.append("Refund and inbound proof")
+
+    order_qty = _normalize_text(row.get("order_qty_draft", ""))
+    supplier_order_state = _normalize_text(row.get("supplier_order_viability_state", "")).lower()
+    if (
+        "order:" in block_text
+        or order_qty in {"", "0", "0.0"}
+        or supplier_order_state in {"", "unknown_no_order_qty", "blocked_supplier_moq_too_low"}
+    ):
+        lanes.append("Local order quantity proof")
+
+    return lanes
+
+
+def _build_restock_real_po_gate_clearance_worklist_summary(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    gate_summary = _build_restock_real_po_readiness_gate_summary(
+        filtered_df,
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+    )
+    counts: dict[str, dict[str, object]] = {
+        lane: {"count": 0, "examples": []}
+        for lane in RESTOCK_REAL_PO_CLEARANCE_LANES
+    }
+    if not filtered_df.empty:
+        for _, row in filtered_df.iterrows():
+            sku = _normalize_text(row.get("seller_sku", "")) or _normalize_text(row.get("asin", "")) or "row"
+            for lane in _restock_real_po_clearance_lanes_for_row(row):
+                entry = counts[lane]
+                entry["count"] = int(entry.get("count", 0)) + 1
+                examples = entry.get("examples", [])
+                if isinstance(examples, list) and len(examples) < 3 and sku not in examples:
+                    examples.append(sku)
+
+    gate_reasons = gate_summary.get("reasons", [])
+    if not isinstance(gate_reasons, list):
+        gate_reasons = []
+    if any("approval" in str(reason).lower() or "po " in str(reason).lower() for reason in gate_reasons):
+        entry = counts["Approval and PO gates"]
+        entry["count"] = max(int(entry.get("count", 0)), int(len(filtered_df.index)))
+
+    active_lanes = [
+        lane for lane in RESTOCK_REAL_PO_CLEARANCE_LANES
+        if int(counts.get(lane, {}).get("count", 0)) > 0
+    ]
+    top_lane = active_lanes[0] if active_lanes else ""
+    if active_lanes:
+        top_lane = sorted(active_lanes, key=lambda lane: (-int(counts[lane]["count"]), lane.lower()))[0]
+    return {
+        "visible_rows": int(len(filtered_df.index)),
+        "gate_state": gate_summary.get("gate_state", "closed"),
+        "counts": counts,
+        "active_lanes": active_lanes,
+        "top_lane": top_lane,
+        "top_action": RESTOCK_REAL_PO_CLEARANCE_ACTIONS.get(top_lane, ""),
+    }
+
+
+def _restock_real_po_gate_clearance_worklist_panel_html(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_real_po_gate_clearance_worklist_summary(
+        filtered_df,
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+    )
+    counts = summary.get("counts", {})
+    if not isinstance(counts, dict):
+        counts = {}
+    top_lane = _normalize_text(summary.get("top_lane", ""))
+    top_action = _normalize_text(summary.get("top_action", ""))
+    lanes = sorted(
+        RESTOCK_REAL_PO_CLEARANCE_LANES,
+        key=lambda lane: (-int(counts.get(lane, {}).get("count", 0)), lane.lower()),
+    )
+    metric_html = ""
+    for lane in lanes[:6]:
+        entry = counts.get(lane, {"count": 0, "examples": []})
+        examples = entry.get("examples", [])
+        example_text = ""
+        if isinstance(examples, list) and examples:
+            example_text = f" Examples: {', '.join(str(value) for value in examples)}."
+        metric_html += _operator_metric_card_html(
+            lane,
+            str(int(entry.get("count", 0))),
+            f"{RESTOCK_REAL_PO_CLEARANCE_ACTIONS.get(lane, '')}{example_text}",
+            "warn" if int(entry.get("count", 0)) else "neutral",
+        )
+    next_text = (
+        f"Start with {top_lane}: {top_action}"
+        if top_lane
+        else "No gate-clearance lanes are visible for this filter."
+    )
+    return (
+        "<div class='o-restock-real-po-worklist'>"
+        "<div class='o-restock-real-po-worklist-title'>Real PO gate clearance worklist</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-real-po-worklist-note'>{html.escape(next_text)} "
+        "This is a read-only worklist. It does not approve buying, write PO files, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_real_po_gate_clearance_lane_counts(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> dict[str, int]:
+    summary = _build_restock_real_po_gate_clearance_worklist_summary(
+        filtered_df,
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+    )
+    counts = summary.get("counts", {})
+    out = {lane: 0 for lane in RESTOCK_REAL_PO_CLEARANCE_LANES}
+    if isinstance(counts, dict):
+        for lane in RESTOCK_REAL_PO_CLEARANCE_LANES:
+            entry = counts.get(lane, {})
+            if isinstance(entry, dict):
+                out[lane] = int(entry.get("count", 0))
+    return out
+
+
+def _restock_real_po_gate_clearance_lane_options(
+    filtered_df: pd.DataFrame,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> list[str]:
+    counts = _restock_real_po_gate_clearance_lane_counts(
+        filtered_df,
+        approval_guardrails_df=approval_guardrails_df,
+        po_review_controls_df=po_review_controls_df,
+        po_export_gate_df=po_export_gate_df,
+    )
+    lanes = [lane for lane in RESTOCK_REAL_PO_CLEARANCE_LANES if counts.get(lane, 0) > 0]
+    lanes.sort(key=lambda lane: (-counts.get(lane, 0), lane.lower()))
+    return [RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION, *lanes]
+
+
+def _filter_restock_real_po_gate_clearance_lane(
+    filtered_df: pd.DataFrame,
+    selected_lane: object,
+    *,
+    approval_guardrails_df: pd.DataFrame | None = None,
+    po_review_controls_df: pd.DataFrame | None = None,
+    po_export_gate_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    selected = _normalize_text(selected_lane)
+    if filtered_df.empty or selected in {"", RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_REAL_PO_CLEARANCE_LANES:
+        return filtered_df.copy()
+    if selected == "Approval and PO gates":
+        gate_summary = _build_restock_real_po_readiness_gate_summary(
+            filtered_df,
+            approval_guardrails_df=approval_guardrails_df,
+            po_review_controls_df=po_review_controls_df,
+            po_export_gate_df=po_export_gate_df,
+        )
+        reasons = gate_summary.get("reasons", [])
+        if isinstance(reasons, list) and any("approval" in str(reason).lower() or "po " in str(reason).lower() for reason in reasons):
+            return filtered_df.copy()
+        return filtered_df.iloc[0:0].copy()
+    mask_values = [
+        selected in _restock_real_po_clearance_lanes_for_row(row)
+        for _, row in filtered_df.iterrows()
+    ]
+    return filtered_df[pd.Series(mask_values, index=filtered_df.index, dtype=bool)].copy()
+
+
+def _build_restock_real_po_supplier_gate_clearance_summary(filtered_df: pd.DataFrame) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "visible_rows": int(len(filtered_df.index)),
+        "stock_rows": 0,
+        "cost_rows": 0,
+        "both_rows": 0,
+        "stock_only_rows": 0,
+        "cost_only_rows": 0,
+        "supplier_lanes_clear_rows": 0,
+        "examples": {
+            "both": [],
+            "stock_only": [],
+            "cost_only": [],
+        },
+    }
+    if filtered_df.empty:
+        return summary
+
+    examples = summary["examples"]
+    if not isinstance(examples, dict):
+        examples = {}
+        summary["examples"] = examples
+
+    for _, row in filtered_df.iterrows():
+        lanes = set(_restock_real_po_clearance_lanes_for_row(row))
+        needs_stock = "Supplier stock proof" in lanes
+        needs_cost = "Supplier cost proof" in lanes
+        sku = (
+            _normalize_text(row.get("seller_sku", ""))
+            or _normalize_text(row.get("asin", ""))
+            or _normalize_text(row.get("title", ""))[:40]
+            or "row"
+        )
+        if needs_stock:
+            summary["stock_rows"] = int(summary["stock_rows"]) + 1
+        if needs_cost:
+            summary["cost_rows"] = int(summary["cost_rows"]) + 1
+        if needs_stock and needs_cost:
+            summary["both_rows"] = int(summary["both_rows"]) + 1
+            both_examples = examples.setdefault("both", [])
+            if isinstance(both_examples, list) and len(both_examples) < 3 and sku not in both_examples:
+                both_examples.append(sku)
+        elif needs_stock:
+            summary["stock_only_rows"] = int(summary["stock_only_rows"]) + 1
+            stock_examples = examples.setdefault("stock_only", [])
+            if isinstance(stock_examples, list) and len(stock_examples) < 3 and sku not in stock_examples:
+                stock_examples.append(sku)
+        elif needs_cost:
+            summary["cost_only_rows"] = int(summary["cost_only_rows"]) + 1
+            cost_examples = examples.setdefault("cost_only", [])
+            if isinstance(cost_examples, list) and len(cost_examples) < 3 and sku not in cost_examples:
+                cost_examples.append(sku)
+        else:
+            summary["supplier_lanes_clear_rows"] = int(summary["supplier_lanes_clear_rows"]) + 1
+    return summary
+
+
+def _restock_real_po_supplier_gate_clearance_panel_html(filtered_df: pd.DataFrame) -> str:
+    summary = _build_restock_real_po_supplier_gate_clearance_summary(filtered_df)
+    examples = summary.get("examples", {})
+    if not isinstance(examples, dict):
+        examples = {}
+
+    def example_text(key: str) -> str:
+        values = examples.get(key, [])
+        if not isinstance(values, list) or not values:
+            return ""
+        return f" Examples: {', '.join(str(value) for value in values)}."
+
+    stock_rows = int(summary.get("stock_rows", 0))
+    cost_rows = int(summary.get("cost_rows", 0))
+    both_rows = int(summary.get("both_rows", 0))
+    clear_rows = int(summary.get("supplier_lanes_clear_rows", 0))
+    if both_rows:
+        next_text = "Start with rows needing both stock and cost proof: confirm exact match, stock/backorder, exact unit cost, file date/ref, and proof note."
+    elif stock_rows:
+        next_text = "Start with stock proof: confirm exact supplier match, stock/backorder, file date/ref, and proof note."
+    elif cost_rows:
+        next_text = "Start with cost proof: confirm the exact visible supplier unit cost, file date/ref, and proof note."
+    else:
+        next_text = "Supplier stock and cost lanes are clear for this view. Other proof lanes may still block PO readiness."
+
+    metric_html = (
+        _operator_metric_card_html(
+            "Stock proof lane",
+            str(stock_rows),
+            f"Exact match, stock/backorder, and current supplier file evidence.{example_text('stock_only')}",
+            "warn" if stock_rows else "good",
+        )
+        + _operator_metric_card_html(
+            "Cost proof lane",
+            str(cost_rows),
+            f"Exact visible supplier unit cost from current evidence.{example_text('cost_only')}",
+            "warn" if cost_rows else "good",
+        )
+        + _operator_metric_card_html(
+            "Both supplier lanes",
+            str(both_rows),
+            f"Rows need stock proof and cost proof before any approval path.{example_text('both')}",
+            "warn" if both_rows else "good",
+        )
+        + _operator_metric_card_html(
+            "Supplier lanes clear",
+            str(clear_rows),
+            "Still may need market, refund, inbound, quantity, approval, or PO proof.",
+            "good" if clear_rows else "neutral",
+        )
+    )
+    return (
+        "<div class='o-restock-supplier-gate-clearance'>"
+        "<div class='o-restock-supplier-gate-clearance-title'>Supplier gate clearance</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-supplier-gate-clearance-note'>{html.escape(next_text)} "
+        "This is a read-only supplier gate view. It does not fetch supplier files, change supplier files, approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _build_restock_supplier_file_evidence_visibility_summary(
+    filtered_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> dict[str, object]:
+    supplier_file_probe_df = supplier_file_probe_df if supplier_file_probe_df is not None else pd.DataFrame()
+    summary: dict[str, object] = {
+        "visible_rows": int(len(filtered_df.index)),
+        "probe_rows": 0,
+        "file_checked_rows": 0,
+        "exact_match_rows": 0,
+        "not_found_rows": 0,
+        "no_file_rows": 0,
+        "read_error_rows": 0,
+        "unsafe_rows": 0,
+        "file_examples": [],
+    }
+    if filtered_df.empty or supplier_file_probe_df.empty:
+        return summary
+
+    row_ids = {
+        _normalize_text(row.get("row_id", ""))
+        for _, row in filtered_df.iterrows()
+        if _normalize_text(row.get("row_id", ""))
+    }
+    skus = {
+        _normalize_text(row.get("seller_sku", ""))
+        for _, row in filtered_df.iterrows()
+        if _normalize_text(row.get("seller_sku", ""))
+    }
+    probe = supplier_file_probe_df.copy()
+    for column in (
+        "row_id",
+        "seller_sku",
+        "latest_supplier_file_name",
+        "latest_supplier_file_state",
+        "identity_match_state",
+        "clears_supplier_proof",
+        "purchase_approval_allowed",
+        "po_creation_allowed",
+        "purchase_commitment_allowed",
+        "creates_live_action",
+        "read_error",
+    ):
+        if column not in probe.columns:
+            probe[column] = ""
+        probe[column] = probe[column].map(_normalize_text)
+    matched_probe = probe[
+        probe["row_id"].map(lambda value: value in row_ids)
+        | probe["seller_sku"].map(lambda value: value in skus)
+    ].copy()
+    summary["probe_rows"] = int(len(matched_probe.index))
+    if matched_probe.empty:
+        return summary
+
+    identity_states = matched_probe["identity_match_state"].map(lambda value: value.lower())
+    file_states = matched_probe["latest_supplier_file_state"].map(lambda value: value.lower())
+    summary["file_checked_rows"] = int(
+        (
+            file_states.map(lambda value: "checked" in value)
+            | matched_probe["latest_supplier_file_name"].map(lambda value: value != "")
+        ).sum()
+    )
+    summary["exact_match_rows"] = int(identity_states.eq("exact_supplier_sku_or_barcode_found").sum())
+    summary["not_found_rows"] = int(identity_states.eq("not_found_in_latest_local_supplier_file").sum())
+    summary["no_file_rows"] = int(identity_states.eq("not_checked_no_local_supplier_file").sum())
+    summary["read_error_rows"] = int(
+        identity_states.eq("not_checked_supplier_file_read_error").sum()
+        + matched_probe["read_error"].map(lambda value: value != "").sum()
+    )
+    unsafe_columns = (
+        "clears_supplier_proof",
+        "purchase_approval_allowed",
+        "po_creation_allowed",
+        "purchase_commitment_allowed",
+        "creates_live_action",
+    )
+    unsafe_mask = pd.Series(False, index=matched_probe.index)
+    for column in unsafe_columns:
+        unsafe_mask = unsafe_mask | matched_probe[column].map(lambda value: _normalize_truthy_flag(value) == "1")
+    summary["unsafe_rows"] = int(unsafe_mask.sum())
+    file_examples = []
+    for value in matched_probe["latest_supplier_file_name"].tolist():
+        if value and value not in file_examples:
+            file_examples.append(value)
+        if len(file_examples) >= 3:
+            break
+    summary["file_examples"] = file_examples
+    return summary
+
+
+def _restock_supplier_file_evidence_visibility_panel_html(
+    filtered_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> str:
+    summary = _build_restock_supplier_file_evidence_visibility_summary(filtered_df, supplier_file_probe_df)
+    file_examples = summary.get("file_examples", [])
+    file_note = ""
+    if isinstance(file_examples, list) and file_examples:
+        file_note = f" Files: {', '.join(str(value) for value in file_examples)}."
+    probe_rows = int(summary.get("probe_rows", 0))
+    file_checked_rows = int(summary.get("file_checked_rows", 0))
+    exact_match_rows = int(summary.get("exact_match_rows", 0))
+    not_found_rows = int(summary.get("not_found_rows", 0))
+    no_file_rows = int(summary.get("no_file_rows", 0))
+    read_error_rows = int(summary.get("read_error_rows", 0))
+    unsafe_rows = int(summary.get("unsafe_rows", 0))
+    if probe_rows:
+        next_text = "Use this as local file evidence only. Exact matches still need local supplier proof saved from the product card."
+    else:
+        next_text = "No local supplier-file probe rows are visible for this supplier view yet. The cards stay blocked until local proof is saved."
+
+    metric_html = (
+        _operator_metric_card_html(
+            "Probe rows",
+            str(probe_rows),
+            f"Rows with local supplier-file evidence for this view.{file_note}",
+            "neutral" if probe_rows else "warn",
+        )
+        + _operator_metric_card_html(
+            "Local files checked",
+            str(file_checked_rows),
+            "O has read-only local file evidence.",
+            "good" if file_checked_rows else "neutral",
+        )
+        + _operator_metric_card_html(
+            "Exact matches found",
+            str(exact_match_rows),
+            "Still does not clear supplier proof by itself.",
+            "good" if exact_match_rows else "neutral",
+        )
+        + _operator_metric_card_html(
+            "Not found",
+            str(not_found_rows),
+            "Use as a local clue for drop, snooze, or supplier follow-up.",
+            "warn" if not_found_rows else "neutral",
+        )
+        + _operator_metric_card_html(
+            "No file/read issue",
+            str(no_file_rows + read_error_rows),
+            "No local supplier file or file read problem for matched probe rows.",
+            "warn" if (no_file_rows + read_error_rows) else "neutral",
+        )
+        + _operator_metric_card_html(
+            "Unsafe flags",
+            str(unsafe_rows),
+            "Must stay 0. Supplier-file evidence cannot clear proof or approve buying.",
+            "good" if unsafe_rows == 0 else "warn",
+        )
+    )
+    return (
+        "<div class='o-restock-supplier-file-evidence'>"
+        "<div class='o-restock-supplier-file-evidence-title'>Supplier file evidence</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-supplier-file-evidence-note'>{html.escape(next_text)} "
+        "This panel is read-only. It does not import supplier files, change F status, clear supplier proof, approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _build_restock_supplier_file_proof_coverage_summary(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    supplier_file_probe_df = supplier_file_probe_df if supplier_file_probe_df is not None else pd.DataFrame()
+    current_view_df = current_view_df if current_view_df is not None else pd.DataFrame()
+    summary: dict[str, object] = {
+        "review_rows": int(len(review_df.index)),
+        "covered_rows": 0,
+        "uncovered_rows": int(len(review_df.index)),
+        "supplier_count": 0,
+        "covered_supplier_count": 0,
+        "uncovered_supplier_count": 0,
+        "current_view_rows": int(len(current_view_df.index)),
+        "current_view_covered_rows": 0,
+        "exact_match_probe_rows": 0,
+        "not_found_probe_rows": 0,
+        "unsafe_rows": 0,
+        "uncovered_supplier_examples": [],
+    }
+    if review_df.empty:
+        return summary
+
+    review = review_df.copy()
+    for column in ("row_id", "seller_sku", "_supplier_label", "supplier_name", "supplier_code"):
+        if column not in review.columns:
+            review[column] = ""
+        review[column] = review[column].map(_normalize_text)
+    supplier_labels = review["_supplier_label"].where(
+        review["_supplier_label"].map(lambda value: value != ""),
+        review["supplier_name"].where(review["supplier_name"].map(lambda value: value != ""), review["supplier_code"]),
+    )
+    review["_coverage_supplier_label"] = supplier_labels.map(lambda value: value or "(Unknown supplier)")
+    summary["supplier_count"] = int(review["_coverage_supplier_label"].nunique())
+
+    if supplier_file_probe_df.empty:
+        top_uncovered = (
+            review["_coverage_supplier_label"]
+            .value_counts()
+            .sort_values(ascending=False)
+            .head(3)
+            .to_dict()
+        )
+        summary["uncovered_supplier_count"] = int(summary["supplier_count"])
+        summary["uncovered_supplier_examples"] = [f"{supplier} ({count})" for supplier, count in top_uncovered.items()]
+        return summary
+
+    probe = supplier_file_probe_df.copy()
+    for column in (
+        "row_id",
+        "seller_sku",
+        "identity_match_state",
+        "clears_supplier_proof",
+        "purchase_approval_allowed",
+        "po_creation_allowed",
+        "purchase_commitment_allowed",
+        "creates_live_action",
+    ):
+        if column not in probe.columns:
+            probe[column] = ""
+        probe[column] = probe[column].map(_normalize_text)
+    probe_row_ids = {
+        value for value in probe["row_id"].tolist() if value
+    }
+    probe_skus = {
+        value for value in probe["seller_sku"].tolist() if value
+    }
+    covered_mask = review.apply(
+        lambda row: (
+            (_normalize_text(row.get("row_id", "")) in probe_row_ids and _normalize_text(row.get("row_id", "")) != "")
+            or (_normalize_text(row.get("seller_sku", "")) in probe_skus and _normalize_text(row.get("seller_sku", "")) != "")
+        ),
+        axis=1,
+    )
+    covered_rows = int(covered_mask.sum())
+    summary["covered_rows"] = covered_rows
+    summary["uncovered_rows"] = int(len(review.index) - covered_rows)
+    covered_suppliers = set(review.loc[covered_mask, "_coverage_supplier_label"].tolist())
+    all_suppliers = set(review["_coverage_supplier_label"].tolist())
+    summary["covered_supplier_count"] = int(len(covered_suppliers))
+    summary["uncovered_supplier_count"] = int(len(all_suppliers - covered_suppliers))
+    top_uncovered = (
+        review.loc[~covered_mask, "_coverage_supplier_label"]
+        .value_counts()
+        .sort_values(ascending=False)
+        .head(3)
+        .to_dict()
+    )
+    summary["uncovered_supplier_examples"] = [f"{supplier} ({count})" for supplier, count in top_uncovered.items()]
+
+    if current_view_df is not None and not current_view_df.empty:
+        current_view = current_view_df.copy()
+        for column in ("row_id", "seller_sku"):
+            if column not in current_view.columns:
+                current_view[column] = ""
+            current_view[column] = current_view[column].map(_normalize_text)
+        current_mask = current_view.apply(
+            lambda row: (
+                (_normalize_text(row.get("row_id", "")) in probe_row_ids and _normalize_text(row.get("row_id", "")) != "")
+                or (_normalize_text(row.get("seller_sku", "")) in probe_skus and _normalize_text(row.get("seller_sku", "")) != "")
+            ),
+            axis=1,
+        )
+        summary["current_view_covered_rows"] = int(current_mask.sum())
+
+    review_row_ids = {
+        value for value in review["row_id"].tolist() if value
+    }
+    review_skus = {
+        value for value in review["seller_sku"].tolist() if value
+    }
+    matched_probe = probe[
+        probe["row_id"].map(lambda value: value in review_row_ids)
+        | probe["seller_sku"].map(lambda value: value in review_skus)
+    ].copy()
+    identity_states = matched_probe["identity_match_state"].map(lambda value: value.lower())
+    summary["exact_match_probe_rows"] = int(identity_states.eq("exact_supplier_sku_or_barcode_found").sum())
+    summary["not_found_probe_rows"] = int(identity_states.eq("not_found_in_latest_local_supplier_file").sum())
+    unsafe_mask = pd.Series(False, index=matched_probe.index)
+    for column in (
+        "clears_supplier_proof",
+        "purchase_approval_allowed",
+        "po_creation_allowed",
+        "purchase_commitment_allowed",
+        "creates_live_action",
+    ):
+        unsafe_mask = unsafe_mask | matched_probe[column].map(lambda value: _normalize_truthy_flag(value) == "1")
+    summary["unsafe_rows"] = int(unsafe_mask.sum())
+    return summary
+
+
+def _restock_supplier_file_proof_coverage_map_panel_html(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_supplier_file_proof_coverage_summary(
+        review_df,
+        supplier_file_probe_df,
+        current_view_df,
+    )
+    review_rows = int(summary.get("review_rows", 0))
+    covered_rows = int(summary.get("covered_rows", 0))
+    uncovered_rows = int(summary.get("uncovered_rows", 0))
+    supplier_count = int(summary.get("supplier_count", 0))
+    covered_supplier_count = int(summary.get("covered_supplier_count", 0))
+    uncovered_supplier_count = int(summary.get("uncovered_supplier_count", 0))
+    current_view_rows = int(summary.get("current_view_rows", 0))
+    current_view_covered_rows = int(summary.get("current_view_covered_rows", 0))
+    exact_rows = int(summary.get("exact_match_probe_rows", 0))
+    not_found_rows = int(summary.get("not_found_probe_rows", 0))
+    unsafe_rows = int(summary.get("unsafe_rows", 0))
+    examples = summary.get("uncovered_supplier_examples", [])
+    example_note = ""
+    if isinstance(examples, list) and examples:
+        example_note = f" Top uncovered: {', '.join(str(value) for value in examples)}."
+    current_view_note = (
+        f"{current_view_covered_rows} of {current_view_rows} visible row(s) have probe evidence."
+        if current_view_rows
+        else "No current view rows."
+    )
+    coverage_note = (
+        f"{covered_rows} of {review_rows} restock row(s) have local supplier-file probe evidence. "
+        f"{uncovered_rows} still need probe coverage before supplier proof can be easier to clear."
+    )
+    metric_html = (
+        _operator_metric_card_html(
+            "Rows with probe evidence",
+            str(covered_rows),
+            coverage_note,
+            "good" if covered_rows else "warn",
+        )
+        + _operator_metric_card_html(
+            "Rows without probe evidence",
+            str(uncovered_rows),
+            f"Coverage gap for local supplier-file proof.{example_note}",
+            "warn" if uncovered_rows else "good",
+        )
+        + _operator_metric_card_html(
+            "Suppliers with probe evidence",
+            f"{covered_supplier_count}/{supplier_count}",
+            f"{uncovered_supplier_count} supplier group(s) still have no probe-covered rows.",
+            "good" if covered_supplier_count == supplier_count and supplier_count else "warn",
+        )
+        + _operator_metric_card_html(
+            "Current view coverage",
+            f"{current_view_covered_rows}/{current_view_rows}",
+            current_view_note,
+            "good" if current_view_rows and current_view_covered_rows == current_view_rows else "warn",
+        )
+        + _operator_metric_card_html(
+            "Probe outcomes",
+            f"{exact_rows} exact / {not_found_rows} not found",
+            "Probe outcomes are proof-only clues, not supplier proof clearance.",
+            "neutral",
+        )
+        + _operator_metric_card_html(
+            "Unsafe flags",
+            str(unsafe_rows),
+            "Must stay 0. Coverage cannot import files, clear proof, approve buying, or create POs.",
+            "good" if unsafe_rows == 0 else "warn",
+        )
+    )
+    return (
+        "<div class='o-restock-supplier-file-coverage-map'>"
+        "<div class='o-restock-supplier-file-coverage-map-title'>Supplier file proof coverage</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        "<div class='o-restock-supplier-file-coverage-map-note'>"
+        "This map is read-only. It does not fetch supplier files, import supplier files, change F status, clear supplier proof, approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _uncovered_supplier_file_proof_rows(review_df: pd.DataFrame, supplier_file_probe_df: pd.DataFrame | None) -> pd.DataFrame:
+    supplier_file_probe_df = supplier_file_probe_df if supplier_file_probe_df is not None else pd.DataFrame()
+    if review_df.empty:
+        return review_df.copy()
+    review = review_df.copy()
+    for column in ("row_id", "seller_sku"):
+        if column not in review.columns:
+            review[column] = ""
+        review[column] = review[column].map(_normalize_text)
+    if supplier_file_probe_df.empty:
+        return review
+    probe = supplier_file_probe_df.copy()
+    for column in ("row_id", "seller_sku"):
+        if column not in probe.columns:
+            probe[column] = ""
+        probe[column] = probe[column].map(_normalize_text)
+    probe_row_ids = {value for value in probe["row_id"].tolist() if value}
+    probe_skus = {value for value in probe["seller_sku"].tolist() if value}
+    covered_mask = review.apply(
+        lambda row: (
+            (_normalize_text(row.get("row_id", "")) in probe_row_ids and _normalize_text(row.get("row_id", "")) != "")
+            or (_normalize_text(row.get("seller_sku", "")) in probe_skus and _normalize_text(row.get("seller_sku", "")) != "")
+        ),
+        axis=1,
+    )
+    return review.loc[~covered_mask].copy()
+
+
+def _build_restock_supplier_proof_work_queue_summary(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    current_view_df = current_view_df if current_view_df is not None else pd.DataFrame()
+    uncovered = _uncovered_supplier_file_proof_rows(review_df, supplier_file_probe_df)
+    current_uncovered = _uncovered_supplier_file_proof_rows(current_view_df, supplier_file_probe_df) if not current_view_df.empty else pd.DataFrame()
+    summary: dict[str, object] = {
+        "uncovered_rows": int(len(uncovered.index)),
+        "supplier_groups": 0,
+        "top_supplier": "",
+        "top_supplier_rows": 0,
+        "top_supplier_action": "",
+        "top_action": "",
+        "top_action_rows": 0,
+        "current_view_uncovered_rows": int(len(current_uncovered.index)),
+        "action_counts": {},
+        "supplier_examples": [],
+    }
+    if uncovered.empty:
+        return summary
+
+    work = uncovered.copy()
+    for column in ("_supplier_label", "supplier_name", "supplier_code", "seller_sku", "asin"):
+        if column not in work.columns:
+            work[column] = ""
+        work[column] = work[column].map(_normalize_text)
+    work["_proof_queue_supplier"] = work["_supplier_label"].where(
+        work["_supplier_label"].map(lambda value: value != ""),
+        work["supplier_name"].where(work["supplier_name"].map(lambda value: value != ""), work["supplier_code"]),
+    ).map(lambda value: value or "(Unknown supplier)")
+    work["_proof_queue_action"] = [
+        _restock_card_safe_save_bucket(row)
+        for _, row in work.iterrows()
+    ]
+    supplier_counts = work["_proof_queue_supplier"].value_counts().sort_values(ascending=False)
+    action_counts_series = work["_proof_queue_action"].value_counts().sort_values(ascending=False)
+    summary["supplier_groups"] = int(len(supplier_counts.index))
+    if not supplier_counts.empty:
+        summary["top_supplier"] = _normalize_text(supplier_counts.index[0])
+        summary["top_supplier_rows"] = int(supplier_counts.iloc[0])
+        top_supplier_df = work[work["_proof_queue_supplier"] == supplier_counts.index[0]].copy()
+        top_supplier_actions = top_supplier_df["_proof_queue_action"].value_counts().sort_values(ascending=False)
+        if not top_supplier_actions.empty:
+            summary["top_supplier_action"] = _normalize_text(top_supplier_actions.index[0])
+    if not action_counts_series.empty:
+        summary["top_action"] = _normalize_text(action_counts_series.index[0])
+        summary["top_action_rows"] = int(action_counts_series.iloc[0])
+    summary["action_counts"] = {str(label): int(count) for label, count in action_counts_series.to_dict().items()}
+    summary["supplier_examples"] = [f"{supplier} ({count})" for supplier, count in supplier_counts.head(4).to_dict().items()]
+    return summary
+
+
+def _restock_supplier_proof_work_queue_panel_html(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_supplier_proof_work_queue_summary(review_df, supplier_file_probe_df, current_view_df)
+    uncovered_rows = int(summary.get("uncovered_rows", 0))
+    supplier_groups = int(summary.get("supplier_groups", 0))
+    top_supplier = _normalize_text(summary.get("top_supplier", ""))
+    top_supplier_rows = int(summary.get("top_supplier_rows", 0))
+    top_supplier_action = _normalize_text(summary.get("top_supplier_action", ""))
+    top_action = _normalize_text(summary.get("top_action", ""))
+    top_action_rows = int(summary.get("top_action_rows", 0))
+    current_view_uncovered = int(summary.get("current_view_uncovered_rows", 0))
+    supplier_examples = summary.get("supplier_examples", [])
+    supplier_examples_text = ""
+    if isinstance(supplier_examples, list) and supplier_examples:
+        supplier_examples_text = f" Top groups: {', '.join(str(value) for value in supplier_examples)}."
+    next_text = (
+        f"Start with {top_supplier}: {top_supplier_rows} uncovered row(s), main local action {top_supplier_action or 'review proof'}."
+        if top_supplier
+        else "No uncovered supplier-file proof rows are visible."
+    )
+    metric_html = (
+        _operator_metric_card_html(
+            "Uncovered proof rows",
+            str(uncovered_rows),
+            f"Rows without supplier-file probe evidence.{supplier_examples_text}",
+            "warn" if uncovered_rows else "good",
+        )
+        + _operator_metric_card_html(
+            "Supplier groups to work",
+            str(supplier_groups),
+            "Open one supplier group at a time.",
+            "warn" if supplier_groups else "good",
+        )
+        + _operator_metric_card_html(
+            "Top supplier group",
+            top_supplier or "-",
+            f"{top_supplier_rows} row(s); main action {top_supplier_action or '-'}",
+            "warn" if top_supplier_rows else "neutral",
+        )
+        + _operator_metric_card_html(
+            "Top local action",
+            top_action or "-",
+            f"{top_action_rows} uncovered row(s)",
+            "warn" if top_action_rows else "neutral",
+        )
+        + _operator_metric_card_html(
+            "Current view uncovered",
+            str(current_view_uncovered),
+            "Rows in the selected supplier view that still lack probe evidence.",
+            "warn" if current_view_uncovered else "good",
+        )
+    )
+    return (
+        "<div class='o-restock-supplier-proof-work-queue'>"
+        "<div class='o-restock-supplier-proof-work-queue-title'>Supplier proof work queue</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-supplier-proof-work-queue-note'>{html.escape(next_text)} "
+        "This queue is read-only. It does not fetch supplier files, clear supplier proof, save events, approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+RESTOCK_SUPPLIER_PROOF_QUEUE_CURRENT_OPTION = "Current supplier selection"
+RESTOCK_SUPPLIER_PROOF_QUEUE_UNCOVERED_OPTION = "All uncovered supplier-proof rows"
+RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_PREFIX = "Top queue supplier:"
+RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_ACTION_PREFIX = "Top queue action:"
+RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_ACTION_PREFIX = "Top supplier plus action:"
+
+
+def _restock_supplier_proof_queue_work_frame(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> pd.DataFrame:
+    uncovered = _uncovered_supplier_file_proof_rows(review_df, supplier_file_probe_df)
+    if uncovered.empty:
+        return uncovered.copy()
+    work = uncovered.copy()
+    for column in ("_supplier_label", "supplier_name", "supplier_code"):
+        if column not in work.columns:
+            work[column] = ""
+        work[column] = work[column].map(_normalize_text)
+    work["_proof_queue_supplier"] = work["_supplier_label"].where(
+        work["_supplier_label"].map(lambda value: value != ""),
+        work["supplier_name"].where(work["supplier_name"].map(lambda value: value != ""), work["supplier_code"]),
+    ).map(lambda value: value or "(Unknown supplier)")
+    work["_proof_queue_action"] = [
+        _restock_card_safe_save_bucket(row)
+        for _, row in work.iterrows()
+    ]
+    return work
+
+
+def _restock_supplier_proof_queue_focus_summary(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> dict[str, object]:
+    work = _restock_supplier_proof_queue_work_frame(review_df, supplier_file_probe_df)
+    summary: dict[str, object] = {
+        "uncovered_rows": int(len(work.index)),
+        "top_supplier": "",
+        "top_supplier_rows": 0,
+        "top_action": "",
+        "top_action_rows": 0,
+        "top_supplier_action": "",
+        "top_supplier_action_rows": 0,
+    }
+    if work.empty:
+        return summary
+    supplier_counts = work["_proof_queue_supplier"].value_counts().sort_values(ascending=False)
+    action_counts = work["_proof_queue_action"].value_counts().sort_values(ascending=False)
+    if not supplier_counts.empty:
+        top_supplier = _normalize_text(supplier_counts.index[0])
+        summary["top_supplier"] = top_supplier
+        summary["top_supplier_rows"] = int(supplier_counts.iloc[0])
+        top_supplier_df = work[work["_proof_queue_supplier"] == supplier_counts.index[0]].copy()
+        top_supplier_actions = top_supplier_df["_proof_queue_action"].value_counts().sort_values(ascending=False)
+        if not top_supplier_actions.empty:
+            summary["top_supplier_action"] = _normalize_text(top_supplier_actions.index[0])
+            summary["top_supplier_action_rows"] = int(top_supplier_actions.iloc[0])
+    if not action_counts.empty:
+        summary["top_action"] = _normalize_text(action_counts.index[0])
+        summary["top_action_rows"] = int(action_counts.iloc[0])
+    return summary
+
+
+def _restock_supplier_proof_queue_focus_options(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> list[str]:
+    summary = _restock_supplier_proof_queue_focus_summary(review_df, supplier_file_probe_df)
+    options = [RESTOCK_SUPPLIER_PROOF_QUEUE_CURRENT_OPTION]
+    if int(summary.get("uncovered_rows", 0)) > 0:
+        options.append(RESTOCK_SUPPLIER_PROOF_QUEUE_UNCOVERED_OPTION)
+    top_supplier = _normalize_text(summary.get("top_supplier", ""))
+    top_supplier_rows = int(summary.get("top_supplier_rows", 0))
+    top_action = _normalize_text(summary.get("top_action", ""))
+    top_action_rows = int(summary.get("top_action_rows", 0))
+    top_supplier_action = _normalize_text(summary.get("top_supplier_action", ""))
+    top_supplier_action_rows = int(summary.get("top_supplier_action_rows", 0))
+    if top_supplier:
+        options.append(f"{RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_PREFIX} {top_supplier} ({top_supplier_rows})")
+    if top_action:
+        options.append(f"{RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_ACTION_PREFIX} {top_action} ({top_action_rows})")
+    if top_supplier and top_supplier_action:
+        options.append(
+            f"{RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_ACTION_PREFIX} {top_supplier} / {top_supplier_action} ({top_supplier_action_rows})"
+        )
+    return options
+
+
+def _filter_restock_supplier_proof_queue_focus(
+    queue_scope_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    selected_focus: object,
+    *,
+    selected_supplier: object = "",
+) -> pd.DataFrame:
+    selected = _normalize_text(selected_focus)
+    if queue_scope_df.empty:
+        return queue_scope_df.copy()
+    if selected in {"", RESTOCK_SUPPLIER_PROOF_QUEUE_CURRENT_OPTION}:
+        supplier = _normalize_text(selected_supplier)
+        if supplier and "_supplier_label" in queue_scope_df.columns:
+            return queue_scope_df[queue_scope_df["_supplier_label"].map(_normalize_text) == supplier].copy()
+        return queue_scope_df.copy()
+    work = _restock_supplier_proof_queue_work_frame(queue_scope_df, supplier_file_probe_df)
+    if work.empty:
+        return work.copy()
+    summary = _restock_supplier_proof_queue_focus_summary(queue_scope_df, supplier_file_probe_df)
+    if selected == RESTOCK_SUPPLIER_PROOF_QUEUE_UNCOVERED_OPTION:
+        return work.copy()
+    if selected.startswith(RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_ACTION_PREFIX):
+        supplier = _normalize_text(summary.get("top_supplier", ""))
+        action = _normalize_text(summary.get("top_supplier_action", ""))
+        if supplier and action:
+            return work[
+                (work["_proof_queue_supplier"].map(_normalize_text) == supplier)
+                & (work["_proof_queue_action"].map(_normalize_text) == action)
+            ].copy()
+        return work.iloc[0:0].copy()
+    if selected.startswith(RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_SUPPLIER_PREFIX):
+        supplier = _normalize_text(summary.get("top_supplier", ""))
+        if supplier:
+            return work[work["_proof_queue_supplier"].map(_normalize_text) == supplier].copy()
+        return work.iloc[0:0].copy()
+    if selected.startswith(RESTOCK_SUPPLIER_PROOF_QUEUE_TOP_ACTION_PREFIX):
+        action = _normalize_text(summary.get("top_action", ""))
+        if action:
+            return work[work["_proof_queue_action"].map(_normalize_text) == action].copy()
+        return work.iloc[0:0].copy()
+    return queue_scope_df.copy()
+
+
+RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES = (
+    "Exact match check",
+    "Stock/backorder check",
+    "Cost check",
+    "File/ref check",
+    "Drop/check-later",
+)
+
+
+def _restock_supplier_proof_action_workbench_flags(row: pd.Series | dict[str, object]) -> dict[str, bool]:
+    block_text = "|".join(
+        _normalize_text(row.get(field, "")).lower()
+        for field in (
+            "action_block_reason",
+            "missing_input_reasons",
+            "supplier_proof_missing_reasons",
+            "supplier_batch_readiness_reasons",
+            "profit_check_message",
+            "operator_decision_state",
+            "supplier_file_card_detail",
+        )
+    )
+    supplier_file_state = _normalize_text(row.get("supplier_file_card_state", "")).lower()
+    supplier_match_state = _normalize_text(row.get("supplier_match_state", "")).lower()
+    supplier_proof_state = _normalize_text(row.get("supplier_proof_state", "")).lower()
+    stock_state = (
+        _normalize_text(row.get("supplier_stock_state", ""))
+        or _normalize_text(row.get("supplier_proof_card_stock_state", ""))
+    ).lower()
+    backorder_state = (
+        _normalize_text(row.get("backorder_state", ""))
+        or _normalize_text(row.get("supplier_proof_card_backorder_state", ""))
+    ).lower()
+    supplier_cost_state = _normalize_text(row.get("supplier_cost_proof_state", "")).lower()
+    current_supplier_cost = (
+        _normalize_text(row.get("current_supplier_cost_gbp", ""))
+        or _normalize_text(row.get("supplier_cost_gbp", ""))
+        or _normalize_text(row.get("buy_cost_gbp", ""))
+    )
+    supplier_file_asof = _restock_card_supplier_file_asof(row)
+    supplier_file_ref = _restock_card_supplier_file_reference(row) or _normalize_text(row.get("supplier_proof_card_file_reference", ""))
+    action_bucket = _restock_card_safe_save_bucket(row)
+
+    exact_needed = (
+        "missing_supplier_match" in block_text
+        or "exact_supplier_match_not_proved" in block_text
+        or "supplier_match" in block_text
+        or supplier_match_state in {"", "not_verified", "supplier_match_not_verified"}
+        or supplier_proof_state in {"", "not_verified", "supplier_proof_missing", "exact_supplier_match_not_proved"}
+        or supplier_file_state in {"not_found_in_latest_local_supplier_file", "not_checked_no_supplier_identity"}
+    )
+    stock_needed = (
+        "supplier_stock" in block_text
+        or "backorder" in block_text
+        or stock_state in {"", "supplier_stock_not_verified", "not_verified"}
+        or backorder_state in {"", "backorder_not_verified", "not_verified"}
+    )
+    cost_needed = (
+        "supplier_cost" in block_text
+        or "missing_supplier_cost" in block_text
+        or supplier_cost_state in {"", "missing_supplier_cost", "supplier_cost_not_exact", "bridge_cost_only", "not_verified"}
+        or current_supplier_cost in {"", "0", "0.0"}
+    )
+    file_needed = (
+        "supplier_file_asof_missing" in block_text
+        or "supplier_file" in block_text
+        or supplier_file_state in {"", "not_checked_no_local_supplier_file", "not_checked_supplier_file_read_error", "not_checked_no_supplier_identity"}
+        or supplier_file_asof == ""
+        or supplier_file_ref == ""
+    )
+    drop_or_check_later = (
+        action_bucket in {"Mark drop", "Check later"}
+        and (
+            "missing_from_latest_supplier_file" in block_text
+            or "likely_discontinued" in block_text
+            or "discontinued" in block_text
+            or supplier_file_state in {"not_found_in_latest_local_supplier_file", "not_checked_no_local_supplier_file", "not_checked_supplier_file_read_error"}
+        )
+    )
+
+    return {
+        "Exact match check": bool(exact_needed),
+        "Stock/backorder check": bool(stock_needed),
+        "Cost check": bool(cost_needed),
+        "File/ref check": bool(file_needed),
+        "Drop/check-later": bool(drop_or_check_later),
+    }
+
+
+def _build_restock_supplier_proof_action_workbench_summary(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> dict[str, object]:
+    current_view_df = current_view_df if current_view_df is not None else pd.DataFrame()
+    selected_df = current_view_df.copy() if not current_view_df.empty else review_df.copy()
+    all_uncovered = _uncovered_supplier_file_proof_rows(review_df, supplier_file_probe_df)
+    selected_uncovered = _uncovered_supplier_file_proof_rows(selected_df, supplier_file_probe_df) if not selected_df.empty else pd.DataFrame()
+    field_counts = {lane: 0 for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES}
+    examples: dict[str, list[str]] = {lane: [] for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES}
+
+    for _, row in selected_uncovered.iterrows():
+        flags = _restock_supplier_proof_action_workbench_flags(row)
+        sku = _normalize_text(row.get("seller_sku", "")) or _normalize_text(row.get("asin", "")) or _normalize_text(row.get("row_id", ""))
+        for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES:
+            if not flags.get(lane, False):
+                continue
+            field_counts[lane] = field_counts.get(lane, 0) + 1
+            if sku and len(examples[lane]) < 3:
+                examples[lane].append(sku)
+
+    top_field = ""
+    top_field_rows = 0
+    active_counts = [(lane, count) for lane, count in field_counts.items() if count > 0]
+    if active_counts:
+        top_field, top_field_rows = sorted(active_counts, key=lambda item: (-item[1], item[0]))[0]
+
+    return {
+        "selected_rows": int(len(selected_df.index)),
+        "selected_queue_rows": int(len(selected_uncovered.index)),
+        "all_uncovered_rows": int(len(all_uncovered.index)),
+        "field_counts": field_counts,
+        "examples": examples,
+        "top_field": top_field,
+        "top_field_rows": int(top_field_rows),
+    }
+
+
+def _restock_supplier_proof_action_workbench_panel_html(
+    review_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    current_view_df: pd.DataFrame | None = None,
+) -> str:
+    summary = _build_restock_supplier_proof_action_workbench_summary(review_df, supplier_file_probe_df, current_view_df)
+    selected_queue_rows = int(summary.get("selected_queue_rows", 0))
+    selected_rows = int(summary.get("selected_rows", 0))
+    all_uncovered = int(summary.get("all_uncovered_rows", 0))
+    field_counts = summary.get("field_counts", {})
+    examples = summary.get("examples", {})
+    if not isinstance(field_counts, dict):
+        field_counts = {}
+    if not isinstance(examples, dict):
+        examples = {}
+
+    metric_html = _operator_metric_card_html(
+        "Selected queue rows",
+        str(selected_queue_rows),
+        f"{selected_rows} selected row(s); {all_uncovered} uncovered supplier-proof row(s) overall.",
+        "warn" if selected_queue_rows else "good",
+    )
+    lane_notes = {
+        "Exact match check": "Confirm the product identity in the latest local supplier file.",
+        "Stock/backorder check": "Confirm stock state, backorder state, or supplier availability.",
+        "Cost check": "Confirm exact visible unit cost before any approval path.",
+        "File/ref check": "Record the supplier file date and reference used for the proof.",
+        "Drop/check-later": "Investigate missing or discontinued supplier rows before any buy path.",
+    }
+    for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES:
+        count = int(field_counts.get(lane, 0))
+        lane_examples = examples.get(lane, [])
+        example_text = ""
+        if isinstance(lane_examples, list) and lane_examples:
+            example_text = f" Examples: {', '.join(str(value) for value in lane_examples)}."
+        metric_html += _operator_metric_card_html(
+            lane,
+            str(count),
+            f"{lane_notes[lane]}{example_text}",
+            "warn" if count else "good",
+        )
+
+    top_field = _normalize_text(summary.get("top_field", ""))
+    top_field_rows = int(summary.get("top_field_rows", 0))
+    next_text = (
+        f"Start with {top_field}: {top_field_rows} selected queue row(s)."
+        if top_field
+        else "No supplier proof action fields are open in the selected queue rows."
+    )
+    return (
+        "<div class='o-restock-supplier-proof-action-workbench'>"
+        "<div class='o-restock-supplier-proof-action-workbench-title'>Supplier proof action workbench</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        f"<div class='o-restock-supplier-proof-action-workbench-note'>{html.escape(next_text)} "
+        "This workbench is read-only. It does not fetch supplier files, save proof, clear proof, approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION = "All supplier proof fields"
+
+
+def _build_restock_supplier_proof_field_focus_counts(
+    filtered_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> dict[str, int]:
+    queue_df = _uncovered_supplier_file_proof_rows(filtered_df, supplier_file_probe_df) if not filtered_df.empty else pd.DataFrame()
+    counts = {RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION: int(len(queue_df.index))}
+    for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES:
+        counts[lane] = 0
+    for _, row in queue_df.iterrows():
+        flags = _restock_supplier_proof_action_workbench_flags(row)
+        for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES:
+            if flags.get(lane, False):
+                counts[lane] = counts.get(lane, 0) + 1
+    return counts
+
+
+def _restock_supplier_proof_field_focus_options(
+    filtered_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+) -> list[str]:
+    counts = _build_restock_supplier_proof_field_focus_counts(filtered_df, supplier_file_probe_df)
+    options = [RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION]
+    options.extend(
+        lane
+        for lane in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES
+        if int(counts.get(lane, 0)) > 0
+    )
+    return options
+
+
+def _filter_restock_supplier_proof_field_focus(
+    filtered_df: pd.DataFrame,
+    supplier_file_probe_df: pd.DataFrame | None,
+    selected_focus: object,
+) -> pd.DataFrame:
+    selected = _normalize_text(selected_focus)
+    if filtered_df.empty or selected in {"", RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION}:
+        return filtered_df.copy()
+    if selected not in RESTOCK_SUPPLIER_PROOF_ACTION_WORKBENCH_LANES:
+        return filtered_df.copy()
+    queue_df = _uncovered_supplier_file_proof_rows(filtered_df, supplier_file_probe_df)
+    if queue_df.empty:
+        return queue_df.copy()
+    mask_values = [
+        _restock_supplier_proof_action_workbench_flags(row).get(selected, False)
+        for _, row in queue_df.iterrows()
+    ]
+    return queue_df[pd.Series(mask_values, index=queue_df.index, dtype=bool)].copy()
+
+
+def _restock_approval_readiness_lane_html(filtered_df: pd.DataFrame) -> str:
+    counts = _build_restock_approval_readiness_lane_counts(filtered_df)
+    notes = {
+        "Ready for approval preview": "review-only preview shape; still not an order",
+        "Needs local qty": "proof is close, but a local quantity draft is still needed",
+        "Needs supplier proof": "supplier identity, stock, cost, or discontinued proof is still needed",
+        "Needs pack/MOQ proof": "pack size, MOQ, or order-step proof is still needed",
+        "Needs profit/safety proof": "market, fee, refund, inbound, profit, or Max safe cost proof is still needed",
+        "Hold or drop only": "not ready for local approval preview from this card state",
+    }
+    tones = {
+        "Ready for approval preview": "good",
+        "Needs local qty": "neutral",
+        "Needs supplier proof": "warn",
+        "Needs pack/MOQ proof": "warn",
+        "Needs profit/safety proof": "warn",
+        "Hold or drop only": "neutral",
+    }
+    metric_html = ""
+    for lane in RESTOCK_APPROVAL_READINESS_LANES:
+        row = counts.get(lane, {"count": 0, "examples": []})
+        examples = row.get("examples", [])
+        example_text = ""
+        if isinstance(examples, list) and examples:
+            example_text = f" Examples: {', '.join(str(value) for value in examples)}."
+        metric_html += _operator_metric_card_html(
+            lane,
+            str(int(row.get("count", 0))),
+            f"{notes[lane]}.{example_text}",
+            tones[lane],
+        )
+
+    return (
+        "<div class='o-restock-approval-readiness-lane'>"
+        "<div class='o-restock-approval-readiness-title'>Approval preview readiness</div>"
+        "<div class='o-restock-stats-grid'>"
+        f"{metric_html}"
+        "</div>"
+        "<div class='o-restock-approval-readiness-note'>"
+        "This lane is read-only. It does not approve buying, create purchase orders, receive stock, or send anything to Amazon."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_review_focus_strip_html(
+    *,
+    supplier: object,
+    products: object,
+    proof_filter: object,
+    blocked: object,
+) -> str:
+    chips = [
+        ("Supplier", _normalize_text(supplier) or "-"),
+        ("Products shown", _normalize_text(products) or "0"),
+        ("Proof problem", _normalize_text(proof_filter) or RESTOCK_MISSING_PROOF_ALL_OPTION),
+        ("Blocked from clean buy", _normalize_text(blocked) or "0"),
+    ]
+    chip_html = "".join(
+        "<div class='o-restock-filter-chip'>"
+        f"<div class='o-restock-filter-label'>{html.escape(label)}</div>"
+        f"<div class='o-restock-filter-value'>{html.escape(value)}</div>"
+        "</div>"
+        for label, value in chips
+    )
+    return f"<div class='o-restock-filter-strip'>{chip_html}</div>"
+
+
+def _restock_local_actions_header_html(row: pd.Series | dict[str, object]) -> str:
+    sku = _normalize_text(row.get("seller_sku", "")) or _normalize_text(row.get("asin", "")) or "this product"
+    return (
+        "<div class='o-restock-local-actions'>"
+        "<div class='o-restock-local-actions-title'>Local actions for this card</div>"
+        "<div class='o-restock-local-actions-body'>"
+        f"Save notes only for {html.escape(sku)}. These controls do not buy stock, create purchase orders, write Sheets, change prices, or touch scanner queues."
+        "</div>"
+        "</div>"
+    )
+
+
+def _restock_card_html(
+    row: pd.Series | dict[str, object],
+    *,
+    position_index: int | None = None,
+    total_visible: int | None = None,
+) -> str:
+    title = html.escape(_display_plain(row.get("title", ""), "Untitled product"))
+    supplier = html.escape(_display_plain(row.get("supplier_name", ""), "Unknown supplier"))
+    image_url = _normalize_text(row.get("main_image", ""))
+    image_html = _image_frame_html(image_url, size=76) if image_url else (
+        "<div style='width:76px;height:76px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;"
+        "display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;font-weight:800;'>No image</div>"
+    )
+    ready = bool(_restock_ready_mask(pd.DataFrame([dict(row)])).sum())
+    suggested_action = _normalize_text(row.get("suggested_action", ""))
+    tone = "good" if ready else ("warn" if suggested_action in {"full_restock", "test_restock"} else "neutral")
+    facts = [
+        ("Stock", _restock_fact_value(row, "available_now", fallback="0")),
+        ("Already ordered", _restock_fact_value(row, "ordered_open", fallback="0")),
+        ("Recent sales", _restock_fact_value(row, "velocity_30d")),
+        ("Suggested buy", _restock_fact_value(row, "old_suggested_qty")),
+        ("Supplier cost", _restock_money_value(row, "current_supplier_cost_gbp")),
+        ("Amazon price", _restock_money_value(row, "current_amazon_price_gbp")),
+        ("Profit each", _restock_money_value(row, "expected_profit_per_unit_gbp")),
+        ("ROI", _restock_percent_value(row, "expected_roi_pct")),
+    ]
+    fact_html = "".join(
+        "<div class='o-restock-fact'>"
+        f"<div class='o-restock-fact-label'>{html.escape(label)}</div>"
+        f"<div class='o-restock-fact-value'>{html.escape(value)}</div>"
+        "</div>"
+        for label, value in facts
+    )
+    proof_fields = [
+        ("Supplier stock", "supplier_stock_state"),
+        ("Supplier file", "supplier_file_card_state"),
+        ("Supplier cost", "supplier_cost_proof_state"),
+        ("Fees", "fee_proof_state"),
+        ("Refunds", "refund_proof_state"),
+        ("Inbound/FBA", "inbound_cost_proof_state"),
+        ("Profit inputs", "profit_input_confidence"),
+        ("Pack/MOQ", "pack_moq_proof_state"),
+    ]
+    proof_html = ""
+    for label, field in proof_fields:
+        raw_value = _normalize_text(row.get(field, ""))
+        if field == "supplier_file_card_state" and raw_value == "":
+            continue
+        chip_tone = _restock_chip_tone(raw_value)
+        tone_class = f" {chip_tone}" if chip_tone else ""
+        proof_html += (
+            f"<span class='o-restock-chip{tone_class}'>"
+            f"{html.escape(label)}: {html.escape(_humanize_restock_token(raw_value))}"
+            "</span>"
+        )
+    blocker = _humanize_restock_list(
+        _restock_fact_value(row, "action_block_reason", "missing_input_reasons", "profit_check_message", fallback=""),
+        limit=4,
+    )
+    blocker_html = "" if blocker == "-" else f"<div class='o-restock-blocker'><strong>Why not clean yet:</strong> {html.escape(blocker)}</div>"
+    supplier_file_detail = _normalize_text(row.get("supplier_file_card_detail", ""))
+    supplier_file_html = (
+        ""
+        if supplier_file_detail == ""
+        else f"<div class='o-restock-meta'><strong>Supplier file:</strong> {html.escape(supplier_file_detail)}</div>"
+    )
+    supplier_proof_detail = _normalize_text(row.get("supplier_proof_card_detail", "")) or "No local supplier proof saved yet."
+    pack_moq_proof_detail = _normalize_text(row.get("pack_moq_proof_card_detail", "")) or "No local pack/MOQ proof saved yet."
+    proof_history_html = (
+        "<div class='o-restock-proof-history'>"
+        "<strong>Latest local proof:</strong><br>"
+        f"Supplier proof: {html.escape(supplier_proof_detail)}<br>"
+        f"Pack/MOQ proof: {html.escape(pack_moq_proof_detail)}"
+        "</div>"
+    )
+    missing_proof_items = _restock_card_missing_proof_items(row)
+    if missing_proof_items:
+        missing_items_html = "".join(f"<li>{html.escape(item)}</li>" for item in missing_proof_items)
+        missing_proof_html = (
+            "<div class='o-restock-missing-proof'>"
+            "<strong>Still blocking approval readiness:</strong>"
+            f"<ul>{missing_items_html}</ul>"
+            "</div>"
+        )
+    else:
+        missing_proof_html = (
+            "<div class='o-restock-missing-proof'>"
+            "<strong>Still blocking approval readiness:</strong> No missing local proof shown for this card."
+            "</div>"
+        )
+    proof_chip_html = proof_html or "<span class='o-restock-chip'>No proof chips shown</span>"
+    proof_detail_html = (
+        "<details class='o-restock-detail-drawer'>"
+        "<summary>Proof details</summary>"
+        "<div class='o-restock-detail-body'>"
+        f"<div class='o-restock-proof'>{proof_chip_html}</div>"
+        f"{supplier_file_html}"
+        f"{proof_history_html}"
+        f"{missing_proof_html}"
+        "</div>"
+        "</details>"
+    )
+    next_action = _restock_card_next_action(row)
+    next_action_html = f"<div class='o-restock-next-action'><strong>Safest next action:</strong> {html.escape(next_action)}</div>"
+    safe_save = _restock_card_safe_save_guidance(row)
+    safe_save_html = f"<div class='o-restock-safe-save'><strong>Safe local save:</strong> {html.escape(safe_save.replace('Safe local save: ', '', 1))}</div>"
+    position_marker = _restock_row_position_marker(row, position_index=position_index, total_visible=total_visible)
+    position_marker_html = (
+        "<div class='o-restock-position-marker'>"
+        f"<strong>Why this card is here:</strong> {html.escape(position_marker)}"
+        "</div>"
+    )
+    approval_preview_status_html = _restock_card_approval_preview_status_html(row)
+    po_preview_status_html = _restock_card_po_preview_status_html(row)
+    decision = _humanize_restock_token(row.get("latest_draft_decision_code", "")) if _normalize_text(row.get("latest_draft_decision_code", "")) else "No Luke decision yet"
+    note = _normalize_text(row.get("latest_draft_note", ""))
+    decision_html = (
+        f"<div class='o-restock-meta'><strong>Luke decision:</strong> {html.escape(decision)}"
+        f"{' - ' + html.escape(note) if note else ''}</div>"
+    )
+    return (
+        f"<div class='o-restock-card {tone}'>"
+        "<div class='o-restock-top'>"
+        f"{image_html}"
+        "<div>"
+        f"<div class='o-restock-title'>{title}</div>"
+        f"<div class='o-restock-meta'><strong>Supplier:</strong> {supplier}</div>"
+        f"{decision_html}"
+        "</div>"
+        "</div>"
+        f"<div class='o-restock-grid'>{fact_html}</div>"
+        f"{blocker_html}"
+        f"{position_marker_html}"
+        f"{approval_preview_status_html}"
+        f"{po_preview_status_html}"
+        f"{next_action_html}"
+        f"{safe_save_html}"
+        f"{proof_detail_html}"
+        "</div>"
+    )
+
+
+def _restock_card_control_key(row: pd.Series | dict[str, object], suffix: str) -> str:
+    identity = (
+        _normalize_text(row.get("row_id", ""))
+        or _normalize_text(row.get("seller_sku", ""))
+        or _normalize_text(row.get("asin", ""))
+        or "row"
+    )
+    return f"o_restock_card_{_supplier_key_fragment(identity)}_{_supplier_key_fragment(suffix)}"
+
+
+def _restock_card_default_draft_qty(row: pd.Series | dict[str, object]) -> int:
+    return (
+        _positive_int_value(row.get("order_qty_draft", ""))
+        or _positive_int_value(row.get("old_suggested_qty", ""))
+        or 1
+    )
+
+
+RESTOCK_CARD_STOCK_LABEL_TO_STATE = {
+    "Not verified": "supplier_stock_not_verified",
+    "In stock": "supplier_stock_verified_in_stock",
+    "Out of stock": "supplier_stock_verified_zero",
+}
+RESTOCK_CARD_BACKORDER_LABEL_TO_STATE = {
+    "Not verified": "backorder_not_verified",
+    "No backorder": "backorder_none_confirmed",
+    "Backorder wait": "backorder_wait",
+}
+RESTOCK_CARD_PACK_LABEL_TO_STATE = {
+    "Not verified": "pack_moq_not_verified",
+    "Verified": "pack_moq_verified",
+}
+RESTOCK_CARD_EXACT_MATCH_OPTIONS = ("Not proved", "Exact SKU/barcode visible", "Not found in latest supplier file")
+
+
+def _label_for_restock_state(value: object, label_to_state: dict[str, str], default_label: str) -> str:
+    state = _normalize_text(value)
+    for label, mapped_state in label_to_state.items():
+        if state == mapped_state:
+            return label
+    return default_label
+
+
+def _restock_card_exact_match_label(row: pd.Series | dict[str, object]) -> str:
+    supplier_file_state = _normalize_text(row.get("supplier_file_card_state", ""))
+    supplier_proof_state = _normalize_text(row.get("supplier_proof_state", ""))
+    if supplier_file_state == "not_found_in_latest_local_supplier_file":
+        return "Not found in latest supplier file"
+    if "exact" in supplier_proof_state and "proved" in supplier_proof_state:
+        return "Exact SKU/barcode visible"
+    return "Not proved"
+
+
+def _restock_card_pack_label(row: pd.Series | dict[str, object]) -> str:
+    state = _normalize_text(row.get("pack_moq_proof_state", ""))
+    if state in {"pack_moq_verified", "pack_or_moq_visible"}:
+        return "Verified"
+    return "Not verified"
+
+
+def _restock_card_supplier_file_reference(row: pd.Series | dict[str, object]) -> str:
+    return (
+        _normalize_text(row.get("supplier_file_card_file_name", ""))
+        or _normalize_text(row.get("latest_supplier_file_name", ""))
+        or _normalize_text(row.get("supplier_file_reference", ""))
+    )
+
+
+def _restock_card_supplier_file_asof(row: pd.Series | dict[str, object]) -> str:
+    return (
+        _normalize_text(row.get("supplier_file_card_file_mtime_utc", ""))
+        or _normalize_text(row.get("supplier_file_asof_utc", ""))
+    )
+
+
+def _refresh_restock_card_local_chain(root_path: Path) -> None:
+    build_restock_session_view(root=root_path)
+    build_restock_supplier_batch_drafts(root=root_path, refresh_session=False)
+    build_supplier_file_presence_probe(root=root_path, refresh_batches=False)
+    build_purchase_approval_preview(root=root_path, refresh_batches=False)
+    build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+    build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+    build_po_line_design_preview(root=root_path, refresh_readiness=False)
+    build_po_draft_packet_review(root=root_path, refresh_design=False)
+    build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+    build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+    build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+
+
+def _render_restock_card_local_controls(row: pd.Series | dict[str, object], *, root_path: Path) -> None:
+    import streamlit as st
+
+    row_dict = dict(row)
+    row_id = _normalize_text(row_dict.get("row_id", ""))
+    sku_or_asin = _normalize_text(row_dict.get("seller_sku", "")) or _normalize_text(row_dict.get("asin", ""))
+    disabled = row_id == "" or sku_or_asin == ""
+    st.markdown(_restock_local_actions_header_html(row_dict), unsafe_allow_html=True)
+    note = st.text_input(
+        "Note for this card",
+        value="",
+        key=_restock_card_control_key(row_dict, "note"),
+        placeholder="Optional local note",
+        disabled=disabled,
+    )
+    control_cols = st.columns([1.0, 1.0, 1.0, 2.1], gap="small")
+    draft_qty = control_cols[0].number_input(
+        "Draft qty",
+        min_value=1,
+        step=1,
+        value=_restock_card_default_draft_qty(row_dict),
+        key=_restock_card_control_key(row_dict, "draft_qty"),
+        disabled=disabled,
+    )
+    snooze_until = control_cols[1].date_input(
+        "Review date",
+        value=_next_monday(),
+        key=_restock_card_control_key(row_dict, "snooze_until"),
+        disabled=disabled,
+    )
+    if control_cols[0].button("Save local qty", key=_restock_card_control_key(row_dict, "save_qty"), disabled=disabled):
+        try:
+            saved = submit_restock_session_draft_decision(
+                root=root_path,
+                session_row=row_dict,
+                decision_code="order_qty_draft",
+                draft_order_qty=draft_qty,
+                decision_note=note,
+                actor="operator_ui",
+                event_source_reference="o_ui_restock_session_card",
+            )
+            _refresh_restock_card_local_chain(root_path)
+            st.session_state["o_recent_submit_notice"] = (
+                f"Saved local draft quantity for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+            )
+            st.rerun()
+        except ValueError as exc:
+            st.error(f"Draft not saved: {exc}")
+    if control_cols[1].button("Check later", key=_restock_card_control_key(row_dict, "save_snooze"), disabled=disabled):
+        try:
+            saved = submit_restock_session_draft_decision(
+                root=root_path,
+                session_row=row_dict,
+                decision_code="snooze",
+                snooze_until_utc=snooze_until,
+                decision_note=note,
+                actor="operator_ui",
+                event_source_reference="o_ui_restock_session_card",
+            )
+            _refresh_restock_card_local_chain(root_path)
+            st.session_state["o_recent_submit_notice"] = (
+                f"Snoozed {saved.get('seller_sku', '') or saved.get('asin', '')} locally."
+            )
+            st.rerun()
+        except ValueError as exc:
+            st.error(f"Snooze not saved: {exc}")
+    if control_cols[2].button("Mark drop", key=_restock_card_control_key(row_dict, "save_drop"), disabled=disabled):
+        try:
+            saved = submit_restock_session_draft_decision(
+                root=root_path,
+                session_row=row_dict,
+                decision_code="drop",
+                decision_note=note,
+                actor="operator_ui",
+                event_source_reference="o_ui_restock_session_card",
+            )
+            _refresh_restock_card_local_chain(root_path)
+            st.session_state["o_recent_submit_notice"] = (
+                f"Saved local drop draft for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+            )
+            st.rerun()
+        except ValueError as exc:
+            st.error(f"Drop not saved: {exc}")
+    control_cols[3].caption("Card controls are local drafts only. They do not buy stock or create purchase orders.")
+
+
+def _compose_supplier_card_proof_note(*, exact_match_label: str, cost_note: object, proof_note: object) -> str:
+    parts = [f"Exact match: {_normalize_text(exact_match_label)}"]
+    cost_text = _normalize_text(cost_note)
+    note_text = _normalize_text(proof_note)
+    if cost_text:
+        parts.append(f"Cost note: {cost_text}")
+    if note_text:
+        parts.append(note_text)
+    return " | ".join(parts)
+
+
+def _render_restock_card_supplier_proof_controls(row: pd.Series | dict[str, object], *, root_path: Path) -> None:
+    import streamlit as st
+
+    row_dict = dict(row)
+    row_id = _normalize_text(row_dict.get("row_id", ""))
+    sku_or_asin = _normalize_text(row_dict.get("seller_sku", "")) or _normalize_text(row_dict.get("asin", ""))
+    disabled = row_id == "" or sku_or_asin == ""
+    expander_label = f"Local supplier proof - {sku_or_asin or 'row'}"
+    with st.expander(expander_label, expanded=False):
+        st.markdown(_restock_selected_row_proof_checklist_html(row_dict), unsafe_allow_html=True)
+        st.caption(
+            "Local proof only. Exact match and cost entries are notes until native O proof confirms them."
+        )
+        exact_label = st.selectbox(
+            "Exact match",
+            options=list(RESTOCK_CARD_EXACT_MATCH_OPTIONS),
+            index=list(RESTOCK_CARD_EXACT_MATCH_OPTIONS).index(_restock_card_exact_match_label(row_dict)),
+            key=_restock_card_control_key(row_dict, "supplier_exact_match"),
+            disabled=disabled,
+        )
+        supplier_cols = st.columns([1.0, 0.8, 1.0, 1.0, 1.2], gap="small")
+        stock_default = _label_for_restock_state(
+            row_dict.get("supplier_stock_state", ""),
+            RESTOCK_CARD_STOCK_LABEL_TO_STATE,
+            "Not verified",
+        )
+        stock_label = supplier_cols[0].selectbox(
+            "Stock proof",
+            options=list(RESTOCK_CARD_STOCK_LABEL_TO_STATE.keys()),
+            index=list(RESTOCK_CARD_STOCK_LABEL_TO_STATE.keys()).index(stock_default),
+            key=_restock_card_control_key(row_dict, "supplier_stock_state"),
+            disabled=disabled,
+        )
+        stock_qty = supplier_cols[1].text_input(
+            "Stock qty",
+            value=_normalize_text(row_dict.get("supplier_stock_qty", "")),
+            key=_restock_card_control_key(row_dict, "supplier_stock_qty"),
+            disabled=disabled,
+        )
+        backorder_default = _label_for_restock_state(
+            row_dict.get("backorder_state", ""),
+            RESTOCK_CARD_BACKORDER_LABEL_TO_STATE,
+            "Not verified",
+        )
+        backorder_label = supplier_cols[2].selectbox(
+            "Backorder",
+            options=list(RESTOCK_CARD_BACKORDER_LABEL_TO_STATE.keys()),
+            index=list(RESTOCK_CARD_BACKORDER_LABEL_TO_STATE.keys()).index(backorder_default),
+            key=_restock_card_control_key(row_dict, "supplier_backorder_state"),
+            disabled=disabled,
+        )
+        backorder_eta = supplier_cols[3].text_input(
+            "Backorder ETA",
+            value=_normalize_text(row_dict.get("backorder_eta_utc", "")),
+            key=_restock_card_control_key(row_dict, "supplier_backorder_eta"),
+            disabled=disabled,
+        )
+        supplier_file_asof = supplier_cols[4].text_input(
+            "File date",
+            value=_restock_card_supplier_file_asof(row_dict),
+            key=_restock_card_control_key(row_dict, "supplier_file_asof"),
+            disabled=disabled,
+        )
+        supplier_ref_cols = st.columns([1.3, 1.4, 1.6], gap="small")
+        supplier_file_ref = supplier_ref_cols[0].text_input(
+            "File/ref",
+            value=_restock_card_supplier_file_reference(row_dict),
+            key=_restock_card_control_key(row_dict, "supplier_file_ref"),
+            disabled=disabled,
+        )
+        cost_note = supplier_ref_cols[1].text_input(
+            "Cost note",
+            value="",
+            key=_restock_card_control_key(row_dict, "supplier_cost_note"),
+            placeholder="Example: cost GBP 3.20 visible",
+            disabled=disabled,
+        )
+        supplier_note = supplier_ref_cols[2].text_input(
+            "Supplier proof note",
+            value="",
+            key=_restock_card_control_key(row_dict, "supplier_proof_note"),
+            disabled=disabled,
+        )
+        if st.button("Save supplier proof", key=_restock_card_control_key(row_dict, "save_supplier_proof"), disabled=disabled):
+            try:
+                saved = submit_restock_session_supplier_proof_event(
+                    root=root_path,
+                    session_row=row_dict,
+                    supplier_stock_state=RESTOCK_CARD_STOCK_LABEL_TO_STATE.get(stock_label, "supplier_stock_not_verified"),
+                    supplier_stock_qty=stock_qty,
+                    backorder_state=RESTOCK_CARD_BACKORDER_LABEL_TO_STATE.get(backorder_label, "backorder_not_verified"),
+                    backorder_eta_utc=backorder_eta,
+                    supplier_file_asof_utc=supplier_file_asof,
+                    supplier_file_reference=supplier_file_ref,
+                    proof_note=_compose_supplier_card_proof_note(
+                        exact_match_label=exact_label,
+                        cost_note=cost_note,
+                        proof_note=supplier_note,
+                    ),
+                    actor="operator_ui",
+                    event_source_reference="o_ui_restock_session_card_supplier_proof",
+                )
+                _refresh_restock_card_local_chain(root_path)
+                st.session_state["o_recent_submit_notice"] = (
+                    f"Saved local supplier proof for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+                )
+                st.rerun()
+            except ValueError as exc:
+                st.error(f"Supplier proof not saved: {exc}")
+
+        pack_cols = st.columns([1.0, 0.8, 0.8, 0.8, 1.3], gap="small")
+        pack_label = pack_cols[0].selectbox(
+            "Pack/MOQ",
+            options=list(RESTOCK_CARD_PACK_LABEL_TO_STATE.keys()),
+            index=list(RESTOCK_CARD_PACK_LABEL_TO_STATE.keys()).index(_restock_card_pack_label(row_dict)),
+            key=_restock_card_control_key(row_dict, "pack_moq_state"),
+            disabled=disabled,
+        )
+        pack_multiple = pack_cols[1].text_input(
+            "Pack",
+            value=_normalize_text(row_dict.get("pack_multiple", "")),
+            key=_restock_card_control_key(row_dict, "pack_multiple"),
+            disabled=disabled,
+        )
+        supplier_moq = pack_cols[2].text_input(
+            "MOQ",
+            value=_normalize_text(row_dict.get("supplier_moq", "")),
+            key=_restock_card_control_key(row_dict, "supplier_moq"),
+            disabled=disabled,
+        )
+        valid_order_step = pack_cols[3].text_input(
+            "Step",
+            value=_normalize_text(row_dict.get("valid_order_step", "")),
+            key=_restock_card_control_key(row_dict, "valid_order_step"),
+            disabled=disabled,
+        )
+        pack_file_ref = pack_cols[4].text_input(
+            "Pack file/ref",
+            value="",
+            key=_restock_card_control_key(row_dict, "pack_file_ref"),
+            disabled=disabled,
+        )
+        pack_note = st.text_input(
+            "Pack/MOQ note",
+            value="",
+            key=_restock_card_control_key(row_dict, "pack_moq_note"),
+            disabled=disabled,
+        )
+        if st.button("Save pack/MOQ proof", key=_restock_card_control_key(row_dict, "save_pack_moq"), disabled=disabled):
+            try:
+                saved = submit_restock_session_pack_moq_proof_event(
+                    root=root_path,
+                    session_row=row_dict,
+                    pack_moq_proof_state=RESTOCK_CARD_PACK_LABEL_TO_STATE.get(pack_label, "pack_moq_not_verified"),
+                    pack_multiple=pack_multiple,
+                    supplier_moq=supplier_moq,
+                    valid_order_step=valid_order_step,
+                    proof_file_reference=pack_file_ref,
+                    proof_note=pack_note,
+                    actor="operator_ui",
+                    event_source_reference="o_ui_restock_session_card_pack_moq",
+                )
+                _refresh_restock_card_local_chain(root_path)
+                st.session_state["o_recent_submit_notice"] = (
+                    f"Saved local pack/MOQ proof for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+                )
+                st.rerun()
+            except ValueError as exc:
+                st.error(f"Pack/MOQ proof not saved: {exc}")
+
+
+def _build_restock_site_supplier_worklist(review_df: pd.DataFrame, summary_df: pd.DataFrame) -> pd.DataFrame:
+    if review_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "supplier",
+                "review_products",
+                "all_products",
+                "clean_buy_products",
+                "blocked_products",
+                "draft_qty_products",
+                "main_blocker",
+            ]
+        )
+
+    work = review_df.copy()
+    for column in (
+        "supplier_name",
+        "row_status",
+        "seller_sku",
+        "asin",
+        "title",
+        "suggested_action",
+        "old_suggested_qty",
+        "order_qty_draft",
+        "latest_draft_decision_code",
+        "action_block_reason",
+    ):
+        if column not in work.columns:
+            work[column] = ""
+    work["_supplier_label"] = work["supplier_name"].map(_supplier_label)
+    work["_workable_candidate"] = _restock_workable_mask(work)
+
+    review_source = work[work["_workable_candidate"]].copy()
+    if review_source.empty:
+        review_source = work.copy()
+
+    summary_lookup: dict[str, pd.Series] = {}
+    if not summary_df.empty and "supplier_name" in summary_df.columns:
+        summary_work = summary_df.copy()
+        summary_work["_supplier_label"] = summary_work["supplier_name"].map(_supplier_label)
+        for _, summary_row in summary_work.iterrows():
+            supplier = _normalize_text(summary_row.get("_supplier_label", ""))
+            if supplier and supplier not in summary_lookup:
+                summary_lookup[supplier] = summary_row
+
+    rows: list[dict[str, object]] = []
+    for supplier, supplier_review_df in review_source.groupby("_supplier_label", sort=False):
+        supplier_all_df = work[work["_supplier_label"] == supplier].copy()
+        ready_mask = _restock_ready_mask(supplier_review_df)
+        blocked_mask = _restock_blocked_mask(supplier_review_df)
+        draft_qty_products = int(
+            _text_series(supplier_review_df, "order_qty_draft").map(lambda value: _normalize_text(value) != "").sum()
+        )
+        summary_row = summary_lookup.get(_normalize_text(supplier))
+        main_blocker = ""
+        if summary_row is not None:
+            main_blocker = _humanize_restock_list(summary_row.get("top_block_reasons", ""), limit=2)
+        if main_blocker in {"", "-"}:
+            blockers = _top_restock_blocker_items(supplier_review_df, limit=1)
+            main_blocker = _humanize_restock_token(blockers[0][0]) if blockers else "-"
+
+        rows.append(
+            {
+                "supplier": _normalize_text(supplier) or "(Unknown supplier)",
+                "review_products": int(len(supplier_review_df.index)),
+                "all_products": int(len(supplier_all_df.index)),
+                "clean_buy_products": int(ready_mask.sum()) if not ready_mask.empty else 0,
+                "blocked_products": int(blocked_mask.sum()) if not blocked_mask.empty else 0,
+                "draft_qty_products": draft_qty_products,
+                "main_blocker": main_blocker,
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out["_supplier_sort"] = out["supplier"].map(lambda value: _normalize_text(value).lower())
+    out = out.sort_values(
+        by=["clean_buy_products", "review_products", "_supplier_sort"],
+        ascending=[False, False, True],
+    ).drop(columns=["_supplier_sort"])
+    return out.reset_index(drop=True)
+
+
+def _restock_site_hero_html() -> str:
+    return _operator_task_brief_html(
+        kicker="Restocking",
+        title="Restocking starts with suppliers",
+        body=(
+            "This page keeps the warehouse-style data out of the way. Start with one supplier group, "
+            "then check only the product cards that need Luke's attention."
+        ),
+        steps=[
+            ("Pick a supplier", "Use the supplier queue instead of a table of every SKU."),
+            ("Review product cards", "See cost, stock, profit, proof, and blockers for that supplier."),
+            ("Save local notes", "Draft quantities stay local and never create a purchase order by themselves."),
+        ],
+        safe_note="Local review only. No buying, price change, Sheet write, scanner run, or queue change.",
+        tone="neutral",
+    )
+
+
+def _restock_path_strip_html(items: list[tuple[str, str]]) -> str:
+    item_html = "".join(
+        "<div class='o-restock-path-item'>"
+        f"<div class='o-restock-path-title'>{html.escape(_normalize_text(title))}</div>"
+        f"<div class='o-restock-path-body'>{html.escape(_normalize_text(body))}</div>"
+        "</div>"
+        for title, body in items
+    )
+    return (
+        "<div class='o-restock-path-strip'>"
+        "<div class='o-restock-path-kicker'>Today's restock path</div>"
+        f"<div class='o-restock-path-list'>{item_html}</div>"
+        "</div>"
+    )
+
+
+def _restock_supplier_card_html(row: pd.Series | dict[str, object]) -> str:
+    supplier = _display_plain(row.get("supplier", ""), "(Unknown supplier)")
+    review_products = _display_plain(row.get("review_products", "0"), "0")
+    clean_buy_products = _display_plain(row.get("clean_buy_products", "0"), "0")
+    blocked_products = _display_plain(row.get("blocked_products", "0"), "0")
+    draft_qty_products = _display_plain(row.get("draft_qty_products", "0"), "0")
+    blocker = _display_plain(row.get("main_blocker", ""), "-")
+    tone = "ready" if int(float(clean_buy_products or 0)) > 0 else "blocked"
+    state_label = "Ready candidates inside" if tone == "ready" else "Needs proof before buying"
+    return (
+        f"<div class='o-restock-supplier-card {tone}'>"
+        "<div class='o-restock-supplier-head'>"
+        "<div>"
+        f"<div class='o-restock-supplier-name'>{html.escape(supplier)}</div>"
+        f"<div class='o-restock-supplier-state'>{html.escape(state_label)}</div>"
+        "</div>"
+        "<div class='o-restock-supplier-count'>"
+        f"<strong>{html.escape(review_products)}</strong>"
+        "<span>to check</span>"
+        "</div>"
+        "</div>"
+        "<div class='o-restock-supplier-stats'>"
+        f"<span class='o-restock-supplier-pill'>{html.escape(clean_buy_products)} ready candidate{'' if clean_buy_products == '1' else 's'}</span>"
+        f"<span class='o-restock-supplier-pill'>{html.escape(blocked_products)} blocked</span>"
+        f"<span class='o-restock-supplier-pill'>{html.escape(draft_qty_products)} draft qty saved</span>"
+        "</div>"
+        f"<div class='o-restock-supplier-note'><strong>Main blocker:</strong> {html.escape(blocker)}</div>"
+        "</div>"
+    )
+
+
+def _restock_scanner_summary_cache_key(root_path: Path) -> tuple[tuple[str, int, int], ...]:
+    paths: list[Path] = []
+    try:
+        paths.append(root_path / get_f_output_contract("feeder_review_events").rel_path)
+    except Exception:
+        pass
+    reports_dir = root_path / "out" / "analysis_reports"
+    if reports_dir.exists():
+        patterns = [
+            "f_live_price_file_review_summary*.csv",
+            f"{FEEDER_REVIEW_PACK_FILE_STEMS['passes']}*.csv",
+            f"{FEEDER_REVIEW_PACK_FILE_STEMS['near_misses']}*.csv",
+        ]
+        for pattern in patterns:
+            paths.extend(reports_dir.glob(pattern))
+    handoff_root = root_path / "out" / "systems" / "F" / "price_list_manager" / "review_handoffs"
+    if handoff_root.exists():
+        paths.extend(handoff_root.glob("*/*/manifest.csv"))
+        paths.extend(handoff_root.glob("*/*/candidate_manifest.csv"))
+    live_dir = root_path / "out" / "systems" / "F" / "price_list_manager" / "live"
+    for name in ("review_handoff_manifest.csv", "f061_handoff_preview.csv"):
+        paths.append(live_dir / name)
+    return tuple(sorted(_file_cache_fingerprint(path) for path in paths))
+
+
+@_streamlit_cache_data(show_spinner=False, max_entries=24, ttl=120)
+def _build_restock_scanner_check_summary_cached(root_text: str, cache_key: tuple[tuple[str, int, int], ...]) -> dict[str, object]:
+    return _build_restock_scanner_check_summary_uncached(Path(root_text))
+
+
+def _build_restock_scanner_check_summary(root_path: Path) -> dict[str, object]:
+    return _build_restock_scanner_check_summary_cached(str(root_path), _restock_scanner_summary_cache_key(root_path))
+
+
+def _build_restock_scanner_check_summary_uncached(root_path: Path) -> dict[str, object]:
+    latest_events_df = _latest_feeder_review_event_by_identity(load_feeder_review_events_df(root=root_path))
+    lane_counts: dict[str, int] = {}
+    supplier_names: set[str] = set()
+    total_waiting = 0
+    pack_count = 0
+    suggested_lane = "Passes"
+    suggested_snapshot = "latest"
+    suggested_waiting = 0
+
+    for lane_label, lane_spec in FEEDER_REVIEW_LANE_SPECS.items():
+        options = list_feeder_review_pack_options(
+            root=root_path,
+            pack_type=lane_spec["pack_type"],
+            lane_filter=lane_spec["lane_filter"],
+            lane_label=lane_label,
+        )
+        lane_waiting = 0
+        for option in options:
+            snapshot = _normalize_text(option.get("id", ""))
+            if not snapshot:
+                continue
+            counts = _feeder_review_lane_todo_counts(
+                root_path,
+                snapshot,
+                pack_type=lane_spec["pack_type"],
+                lane_filter=lane_spec["lane_filter"],
+                latest_events_df=latest_events_df,
+            )
+            waiting = _price_list_int(counts.get("undecided_rows", 0))
+            if waiting <= 0:
+                continue
+            pack_count += 1
+            lane_waiting += waiting
+            if waiting > suggested_waiting:
+                suggested_lane = lane_label
+                suggested_snapshot = snapshot
+                suggested_waiting = waiting
+            summary = load_feeder_review_summary(root=root_path, review_pack_snapshot=snapshot)
+            supplier_name = (
+                _normalize_text(summary.get("active_supplier_label", ""))
+                or _normalize_text(summary.get("active_supplier_id", ""))
+            )
+            if supplier_name:
+                supplier_names.add(supplier_name)
+        if lane_waiting > 0:
+            lane_counts[lane_label] = lane_waiting
+            total_waiting += lane_waiting
+
+    return {
+        "waiting_count": total_waiting,
+        "supplier_count": len(supplier_names),
+        "pack_count": pack_count,
+        "lane_counts": lane_counts,
+        "suggested_lane": suggested_lane,
+        "suggested_snapshot": suggested_snapshot,
+    }
+
+
+def _restock_scanner_lane_text(lane_counts: dict[str, int]) -> str:
+    display_labels = {
+        "Passes": ("clean pass", "clean passes"),
+        "Manual review": ("manual check", "manual checks"),
+        "Near misses": ("close call", "close calls"),
+    }
+    parts: list[str] = []
+    for lane_label in FEEDER_REVIEW_LANE_SPECS:
+        count = _price_list_int(lane_counts.get(lane_label, 0))
+        if count <= 0:
+            continue
+        singular, plural = display_labels.get(lane_label, (lane_label.lower(), f"{lane_label.lower()}s"))
+        parts.append(f"{count} {singular if count == 1 else plural}")
+    return ", ".join(parts)
+
+
+def _render_restock_site_overview(
+    root_path: Path,
+    review_df: pd.DataFrame,
+    summary_df: pd.DataFrame,
+) -> None:
+    import streamlit as st
+
+    supplier_worklist_df = _build_restock_site_supplier_worklist(review_df, summary_df)
+    scanner_check_summary = _build_restock_scanner_check_summary(root_path)
+    scanner_waiting_count = _price_list_int(scanner_check_summary.get("waiting_count", 0))
+    workable_mask = _restock_workable_mask(review_df)
+    review_products = int(workable_mask.sum()) if not workable_mask.empty else 0
+    if review_products == 0 and not review_df.empty:
+        review_products = int(len(review_df.index))
+    clean_buy_products = int(_restock_ready_mask(review_df).sum()) if not review_df.empty else 0
+    blocked_products = int(_restock_blocked_mask(review_df).sum()) if not review_df.empty else 0
+
+    st.markdown(_restock_site_hero_html(), unsafe_allow_html=True)
+    if clean_buy_products:
+        st.markdown(
+            _operator_decision_card_html(
+                "Clean-buy candidates are waiting",
+                f"{clean_buy_products} product{'' if clean_buy_products == 1 else 's'} look ready for Luke to review. Opening a supplier only changes this screen.",
+                "good",
+            ),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            _operator_decision_card_html(
+                "No clean buy is ready yet",
+                "The useful job is to clear supplier proof and product blockers. Nothing on this page buys stock automatically.",
+                "warn",
+            ),
+            unsafe_allow_html=True,
+        )
+
+    if scanner_waiting_count > 0:
+        lane_text = _restock_scanner_lane_text(scanner_check_summary.get("lane_counts", {}))
+        supplier_count = _price_list_int(scanner_check_summary.get("supplier_count", 0))
+        supplier_phrase = (
+            f" across {supplier_count} supplier{'' if supplier_count == 1 else 's'}"
+            if supplier_count
+            else ""
+        )
+        detail = f"{lane_text}{supplier_phrase}" if lane_text else f"{scanner_waiting_count} waiting"
+        st.markdown(
+            _operator_decision_card_html(
+                "Supplier Intake should happen first",
+                (
+                    f"{scanner_waiting_count} price-list scanner product"
+                    f"{'' if scanner_waiting_count == 1 else 's'} need Luke's confirmation before restocking. "
+                    f"Waiting now: {detail}."
+                ),
+                "warn",
+            ),
+            unsafe_allow_html=True,
+        )
+        intake_cols = st.columns([1.15, 3.0], gap="small")
+        if intake_cols[0].button("Open Intake", type="primary", key="o_restock_open_supplier_intake"):
+            suggested_lane = _normalize_text(scanner_check_summary.get("suggested_lane", "Passes")) or "Passes"
+            if suggested_lane in FEEDER_REVIEW_LANE_SPECS:
+                st.session_state["o_feeder_review_requested_lane"] = suggested_lane
+            suggested_snapshot = _normalize_text(scanner_check_summary.get("suggested_snapshot", ""))
+            if suggested_snapshot:
+                st.session_state["o_feeder_review_requested_pack_snapshot"] = suggested_snapshot
+            st.session_state["o_feeder_review_show_pack_history"] = False
+            st.session_state["o_active_page_route"] = "new_product_review"
+            try:
+                st.query_params["page"] = "new_product_review"
+            except Exception:
+                st.experimental_set_query_params(page="new_product_review")
+            st.rerun()
+        intake_cols[1].caption(
+            "This only opens the review page. It does not run the scanner, change queues, buy stock, or write Sheets."
+        )
+    else:
+        st.markdown(
+            _operator_decision_card_html(
+                "Supplier Intake is clear",
+                "0 price-list scanner products are waiting for Luke before this restocking check.",
+                "neutral",
+            ),
+            unsafe_allow_html=True,
+        )
+
+    stats_html = (
+        "<div class='o-restock-stats-grid'>"
+        + _operator_metric_card_html("Products to check", str(review_products), "Useful restocking work", "neutral")
+        + _operator_metric_card_html("Supplier groups", str(len(supplier_worklist_df.index)), "Open one at a time", "neutral")
+        + _operator_metric_card_html("Ready candidates", str(clean_buy_products), "Still needs Luke's choice", "good" if clean_buy_products else "warn")
+        + _operator_metric_card_html("Blocked products", str(blocked_products), "Proof or safety issue visible", "warn" if blocked_products else "good")
+        + "</div>"
+    )
+    st.markdown(stats_html, unsafe_allow_html=True)
+
+    st.markdown(
+        _restock_path_strip_html(
+            [
+                ("Choose a supplier", "Start with one supplier group, not every SKU in the system."),
+                ("Review product cards", "See cost, stock, profit, and blocker reasons only for that supplier."),
+                ("Save local notes", "Drafts stay local and never create a purchase order by themselves."),
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### Choose a supplier")
+    if supplier_worklist_df.empty:
+        st.info("No restocking supplier queue is available yet.")
+        return
+
+    supplier_options = supplier_worklist_df["supplier"].tolist()
+    current_supplier = _normalize_text(st.session_state.get("o_restock_selected_supplier", ""))
+    if current_supplier not in supplier_options:
+        current_supplier = supplier_options[0]
+    selected_supplier = st.selectbox(
+        "Supplier to open",
+        options=supplier_options,
+        index=supplier_options.index(current_supplier),
+        key="o_restock_overview_supplier_pick",
+        format_func=lambda value: f"{value} ({int(supplier_worklist_df[supplier_worklist_df['supplier'] == value]['review_products'].iloc[0])})",
+    )
+    action_cols = st.columns([1.1, 3.0], gap="small")
+    if action_cols[0].button("Open selected supplier", type="primary", key="o_restock_open_supplier_review"):
+        st.session_state["o_restock_selected_supplier"] = selected_supplier
+        st.session_state["o_restock_requested_site_mode"] = "Supplier Review"
+        st.rerun()
+    action_cols[1].caption("This opens the local review screen only. It does not buy stock, change prices, write Sheets, or touch scanner queues.")
+
+    st.markdown("#### Suggested supplier jobs")
+    for idx, (_, supplier_row) in enumerate(supplier_worklist_df.head(8).iterrows(), start=1):
+        supplier_name = _normalize_text(supplier_row.get("supplier", ""))
+        st.markdown(_restock_supplier_card_html(supplier_row), unsafe_allow_html=True)
+        supplier_action_cols = st.columns([1.15, 3.2], gap="small")
+        if supplier_action_cols[0].button(
+            "Review this supplier",
+            type="primary" if idx == 1 else "secondary",
+            key=f"o_restock_supplier_card_{idx}_{_supplier_key_fragment(supplier_name)}",
+        ):
+            st.session_state["o_restock_selected_supplier"] = supplier_name
+            st.session_state["o_restock_requested_site_mode"] = "Supplier Review"
+            st.rerun()
+        supplier_action_cols[1].caption("Opens product cards for this supplier only.")
+
+
+def _render_restock_workbench_overview(
+    filtered_df: pd.DataFrame,
+    *,
+    supplier_label: object = "",
+    all_review_df: pd.DataFrame | None = None,
+    supplier_file_probe_df: pd.DataFrame | None = None,
+    approval_preview_summary_df: pd.DataFrame | None = None,
+    po_construction_summary_df: pd.DataFrame | None = None,
+    real_po_gate_panel_html: str = "",
+    real_po_clearance_worklist_html: str = "",
+    protected_stage_panel_html: str = "",
+) -> None:
+    import streamlit as st
+
+    if filtered_df.empty:
+        st.info("No rows match the current Restocking filters.")
+        return
+
+    ready_mask = _restock_ready_mask(filtered_df)
+    ready_rows = int(ready_mask.sum()) if not ready_mask.empty else 0
+    if ready_rows > 0:
+        st.markdown(
+            _operator_decision_card_html(
+                "Manual review rows are available",
+                f"{ready_rows} row{'' if ready_rows == 1 else 's'} look ready for manual review. Luke still has to save any draft decision himself.",
+                "good",
+            ),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            _operator_decision_card_html(
+                "No clean-buy rows in this view",
+                "Use the product cards below to see what proof is missing and why the buy is blocked before any buying decision.",
+                "warn",
+            ),
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        _restock_supplier_readiness_summary_html(filtered_df, supplier_label=supplier_label),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_approval_preview_visibility_panel_html(filtered_df, approval_preview_summary_df),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_supplier_file_evidence_visibility_panel_html(filtered_df, supplier_file_probe_df),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_supplier_file_proof_coverage_map_panel_html(
+            all_review_df if all_review_df is not None else filtered_df,
+            supplier_file_probe_df,
+            filtered_df,
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_supplier_proof_work_queue_panel_html(
+            all_review_df if all_review_df is not None else filtered_df,
+            supplier_file_probe_df,
+            filtered_df,
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_supplier_proof_action_workbench_panel_html(
+            all_review_df if all_review_df is not None else filtered_df,
+            supplier_file_probe_df,
+            filtered_df,
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        _restock_po_preview_visibility_panel_html(filtered_df, po_construction_summary_df),
+        unsafe_allow_html=True,
+    )
+    if real_po_gate_panel_html:
+        st.markdown(real_po_gate_panel_html, unsafe_allow_html=True)
+    if real_po_clearance_worklist_html:
+        st.markdown(real_po_clearance_worklist_html, unsafe_allow_html=True)
+    st.markdown(
+        _restock_real_po_supplier_gate_clearance_panel_html(filtered_df),
+        unsafe_allow_html=True,
+    )
+    if protected_stage_panel_html:
+        st.markdown(protected_stage_panel_html, unsafe_allow_html=True)
+
+
+def _render_restock_workbench_table(filtered_df: pd.DataFrame, *, root_path: Path) -> None:
+    import streamlit as st
+
+    st.markdown("### Products to review")
+    st.caption(
+        "These cards are priority-sorted by local action, suggested quantity, profit, and recent sales. Maintenance tables stay below this working view and out of the main path."
+    )
+    if filtered_df.empty:
+        st.info("No rows match the current Restocking filters.")
+        return
+    visible_df = filtered_df.head(60)
+    total_visible = int(len(visible_df.index))
+    for position_index, (_, row) in enumerate(visible_df.iterrows(), start=1):
+        st.markdown(_restock_card_html(row, position_index=position_index, total_visible=total_visible), unsafe_allow_html=True)
+        _render_restock_card_local_controls(row, root_path=root_path)
+        _render_restock_card_supplier_proof_controls(row, root_path=root_path)
+    if len(filtered_df.index) > 60:
+        st.caption(f"Showing the first 60 rows. Use supplier or search filters to narrow the remaining {len(filtered_df.index) - 60}.")
+
+
+def _o_health_bad_count(health_df: pd.DataFrame) -> int:
+    if health_df.empty or "status" not in health_df.columns:
+        return 0
+    return int(
+        health_df["status"].map(lambda value: _normalize_text(value).lower() not in {"", "ok"}).sum()
+    )
+
+
+def _o_stage_state_counts(df: pd.DataFrame, state_col: str, ready_states: set[str]) -> tuple[int, int]:
+    if df.empty or state_col not in df.columns:
+        return 0, 0
+    states = df[state_col].map(_normalize_text)
+    blocked_count = int(states.map(lambda value: value == "blocked" or "blocked" in value).sum())
+    ready_count = int(states.map(lambda value: value in ready_states).sum())
+    return ready_count, blocked_count
+
+
+def _o_progress_row(
+    *,
+    stage: str,
+    rows_df: pd.DataFrame,
+    health_df: pd.DataFrame,
+    state_col: str,
+    ready_states: set[str],
+    meaning: str,
+    next_step: str,
+) -> dict[str, str]:
+    row_count = len(rows_df.index)
+    health_bad = _o_health_bad_count(health_df)
+    ready_count, blocked_count = _o_stage_state_counts(rows_df, state_col, ready_states)
+    if health_bad:
+        state = "health blocker"
+    elif row_count == 0:
+        state = "waiting for rows"
+    elif ready_count and blocked_count:
+        state = "part ready"
+    elif ready_count:
+        state = "local rows ready"
+    elif blocked_count:
+        state = "blocked rows visible"
+    else:
+        state = "rows visible"
+    return {
+        "Stage": stage,
+        "Rows": str(row_count),
+        "Ready": str(ready_count),
+        "Blocked": str(blocked_count),
+        "State": state,
+        "Meaning": meaning,
+        "Next local step": next_step,
+    }
+
+
+def _build_o_restock_progress_df(datasets: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    stages = [
+        {
+            "stage": "Session view",
+            "rows": "restock_session_review_live",
+            "health": "restock_session_health",
+            "state_col": "row_status",
+            "ready": {"ready", "manual_review_ready", "review_ready"},
+            "meaning": "Products are visible for local restock review.",
+            "next": "Refresh the local restock proof.",
+        },
+        {
+            "stage": "Supplier batch drafts",
+            "rows": "restock_session_supplier_batch_lines_live",
+            "health": "restock_session_supplier_batch_health",
+            "state_col": "supplier_batch_readiness_state",
+            "ready": {"ready_for_purchase_approval_review_only"},
+            "meaning": "Draft quantities are grouped by supplier.",
+            "next": "Save a local draft quantity for a chosen row.",
+        },
+        {
+            "stage": "Supplier source index",
+            "rows": "restock_supplier_file_source_index_live",
+            "health": "restock_supplier_file_source_index_health",
+            "state_col": "source_handoff_state",
+            "ready": {
+                "local_file_available_no_f_status",
+                "local_file_newer_than_f_status",
+                "f_status_failed_local_file_available",
+                "f_status_matches_local_file",
+            },
+            "meaning": "O compares F source status with the latest local supplier folders.",
+            "next": "Refresh the local supplier-file source index.",
+        },
+        {
+            "stage": "Supplier file probe",
+            "rows": "restock_supplier_file_presence_probe_live",
+            "health": "restock_supplier_file_presence_probe_health",
+            "state_col": "identity_match_state",
+            "ready": {"exact_supplier_sku_or_barcode_found"},
+            "meaning": "Latest local supplier files are checked for the exact supplier SKU or barcode.",
+            "next": "Check the latest local supplier file proof.",
+        },
+        {
+            "stage": "Purchase approval preview",
+            "rows": "restock_purchase_approval_preview_lines_live",
+            "health": "restock_purchase_approval_preview_health",
+            "state_col": "approval_preview_state",
+            "ready": {"ready_for_purchase_approval_review_only"},
+            "meaning": "Rows are shaped for local approval review.",
+            "next": "Complete supplier proof and pack/MOQ proof.",
+        },
+        {
+            "stage": "Approval guardrails",
+            "rows": "restock_purchase_approval_guardrails_live",
+            "health": "restock_purchase_approval_guardrails_health",
+            "state_col": "approval_guardrail_state",
+            "ready": {"local_review_accept_not_commitment"},
+            "meaning": "Local approval decisions are checked against safety rules.",
+            "next": "Save a local approval guardrail decision.",
+        },
+        {
+            "stage": "PO draft readiness",
+            "rows": "restock_po_draft_readiness_preview_lines_live",
+            "health": "restock_po_draft_readiness_preview_health",
+            "state_col": "po_draft_readiness_state",
+            "ready": {"ready_for_local_po_draft_review_only"},
+            "meaning": "Rows are checked before local PO draft design.",
+            "next": "Build the local PO draft readiness preview.",
+        },
+        {
+            "stage": "PO line design",
+            "rows": "restock_po_line_design_preview_lines_live",
+            "health": "restock_po_line_design_preview_health",
+            "state_col": "line_design_state",
+            "ready": {"ready_for_local_po_line_design_review_only"},
+            "meaning": "Local line quantities, costs, and values are shaped.",
+            "next": "Build the local PO line design preview.",
+        },
+        {
+            "stage": "PO packet review",
+            "rows": "restock_po_draft_packet_review_lines_live",
+            "health": "restock_po_draft_packet_review_health",
+            "state_col": "packet_review_line_state",
+            "ready": {"ready_for_local_po_draft_packet_review_only"},
+            "meaning": "Local lines are grouped into a supplier packet.",
+            "next": "Build the local supplier packet review.",
+        },
+        {
+            "stage": "PO hold review",
+            "rows": "restock_po_draft_hold_review_lines_live",
+            "health": "restock_po_draft_hold_review_health",
+            "state_col": "hold_review_line_state",
+            "ready": {"held_for_local_po_draft_review_only"},
+            "meaning": "Rows are held locally before any real PO path exists.",
+            "next": "Build the local hold review.",
+        },
+        {
+            "stage": "PO file-shape preview",
+            "rows": "restock_po_draft_file_shape_preview_lines_live",
+            "health": "restock_po_draft_file_shape_preview_health",
+            "state_col": "file_shape_line_state",
+            "ready": {"ready_for_local_po_draft_file_shape_review_only"},
+            "meaning": "The future file shape is previewed locally.",
+            "next": "Build the local file-shape preview.",
+        },
+        {
+            "stage": "PO review controls",
+            "rows": "restock_po_draft_review_controls_live",
+            "health": "restock_po_draft_review_controls_health",
+            "state_col": "review_control_state",
+            "ready": {"local_po_draft_shape_ready_not_po"},
+            "meaning": "A local operator control marks the file shape decision.",
+            "next": "Save a local file-shape review control.",
+        },
+        {
+            "stage": "PO export preview",
+            "rows": "restock_po_draft_export_preview_lines_live",
+            "health": "restock_po_draft_export_preview_health",
+            "state_col": "export_preview_line_state",
+            "ready": {"ready_for_local_po_draft_export_preview_only"},
+            "meaning": "The future export packet is previewed locally.",
+            "next": "Build the local export preview.",
+        },
+        {
+            "stage": "PO export gate",
+            "rows": "restock_po_draft_export_gate_live",
+            "health": "restock_po_draft_export_gate_health",
+            "state_col": "export_gate_state",
+            "ready": {"local_export_candidate_ready_not_po"},
+            "meaning": "A local operator gate marks candidate-ready, still not a PO.",
+            "next": "Save a local export-gate decision.",
+        },
+    ]
+    return pd.DataFrame(
+        [
+            _o_progress_row(
+                stage=stage["stage"],
+                rows_df=datasets.get(stage["rows"], pd.DataFrame()).copy(),
+                health_df=datasets.get(stage["health"], pd.DataFrame()).copy(),
+                state_col=stage["state_col"],
+                ready_states=set(stage["ready"]),
+                meaning=stage["meaning"],
+                next_step=stage["next"],
+            )
+            for stage in stages
+        ]
+    )
+
+
+def _o_progress_next_step(progress_df: pd.DataFrame) -> str:
+    if progress_df.empty:
+        return "Refresh the local restock proof."
+    for _, row in progress_df.iterrows():
+        state = _normalize_text(row.get("State", ""))
+        rows = _normalize_text(row.get("Rows", ""))
+        if state == "health blocker":
+            return _normalize_text(row.get("Next local step", "")) or "Fix the local health blocker."
+        if rows == "0":
+            return _normalize_text(row.get("Next local step", "")) or "Build the next local preview stage."
+    return "Stay local until a protected real-PO decision is approved."
+
+
+def _render_o_restock_progress_strip(datasets: dict[str, pd.DataFrame]) -> None:
+    import streamlit as st
+
+    progress_df = _build_o_restock_progress_df(datasets)
+    next_step = _o_progress_next_step(progress_df)
+    st.subheader("Restock progress")
+    st.caption(f"Next local step: {next_step}")
+    st.dataframe(progress_df, width="stretch", hide_index=True)
+
+
+def _restock_inbound_cost_proof_summary(proof_df: pd.DataFrame) -> dict[str, str]:
+    if proof_df.empty:
+        return {
+            "status": "not_checked",
+            "message": "Inbound/FBA cost proof has not been built yet.",
+            "event_rows": "0",
+            "event_linked_rows": "0",
+            "sku_cost_rows": "0",
+            "restock_safe_rows": "0",
+            "restock_missing_rows": "0",
+        }
+    work = proof_df.copy()
+    for col in (
+        "check_name",
+        "status",
+        "proof_state",
+        "source_rows",
+        "linked_rows",
+        "restock_rows_with_sku_cost",
+        "restock_rows_missing_sku_cost",
+        "proof_message",
+    ):
+        if col not in work.columns:
+            work[col] = ""
+    by_check = {
+        _normalize_text(row.get("check_name", "")): row
+        for _, row in work.iterrows()
+        if _normalize_text(row.get("check_name", ""))
+    }
+    events = by_check.get("inbound_cost_events", {})
+    sku = by_check.get("sku_cost_allocation", {})
+    restock = by_check.get("restock_source_attachment", {})
+    missing_rows = _normalize_text(restock.get("restock_rows_missing_sku_cost", "")) or "0"
+    safe_rows = _normalize_text(restock.get("restock_rows_with_sku_cost", "")) or "0"
+    missing_count = _positive_int_value(missing_rows) or 0
+    safe_count = _positive_int_value(safe_rows) or 0
+    status = "ok" if missing_count == 0 and safe_count > 0 else "warn"
+    return {
+        "status": status,
+        "message": _normalize_text(restock.get("proof_message", "")) or "O restock rows still need SKU-level inbound/FBA cost proof.",
+        "event_rows": _normalize_text(events.get("source_rows", "")) or "0",
+        "event_linked_rows": _normalize_text(events.get("linked_rows", "")) or "0",
+        "sku_cost_rows": _normalize_text(sku.get("linked_rows", "")) or "0",
+        "restock_safe_rows": safe_rows,
+        "restock_missing_rows": missing_rows,
+    }
+
+
+def _render_restock_inbound_cost_proof_panel(proof_df: pd.DataFrame) -> None:
+    import streamlit as st
+
+    summary = _restock_inbound_cost_proof_summary(proof_df)
+    label = "safe" if summary["status"] == "ok" else "still missing"
+    text = (
+        f"Inbound/FBA cost proof is {label}. "
+        f"Events: {summary['event_rows']}; shipment-linked events: {summary['event_linked_rows']}; "
+        f"SKU cost rows: {summary['sku_cost_rows']}; "
+        f"O rows with SKU cost: {summary['restock_safe_rows']}; "
+        f"O rows still missing SKU cost: {summary['restock_missing_rows']}."
+    )
+    if summary["status"] == "ok":
+        st.success(text)
+    elif summary["status"] == "not_checked":
+        st.info(summary["message"])
+    else:
+        st.warning(text)
+        st.caption(summary["message"])
+    st.caption("This is read-only proof. It does not buy stock, write Sheets, change prices, create POs, receive stock, or send anything to Amazon.")
+
+
+def _profit_input_blocker_summary(blocker_df: pd.DataFrame, health_df: pd.DataFrame) -> dict[str, str]:
+    if blocker_df.empty and health_df.empty:
+        return {
+            "status": "not_checked",
+            "weak_rows": "0",
+            "minimum_rows": "0",
+            "refund": "0",
+            "inbound": "0",
+            "profit": "0",
+            "token_cost": "0",
+            "message": "Profit-input blocker proof has not been built yet.",
+        }
+    weak_rows = str(len(blocker_df.index))
+    minimum_rows = "0"
+    refund = "0"
+    inbound = "0"
+    profit = "0"
+    token_cost = "0"
+    if not health_df.empty:
+        work = health_df.copy()
+        for col in ("check", "value", "status"):
+            if col not in work.columns:
+                work[col] = ""
+        by_check = {
+            _normalize_text(row.get("check", "")): row
+            for _, row in work.iterrows()
+            if _normalize_text(row.get("check", ""))
+        }
+        summary = by_check.get("profit_input_blocker_rows", {})
+        lanes = by_check.get("weak_input_lanes", {})
+        value = _normalize_text(summary.get("value", ""))
+        lane_value = _normalize_text(lanes.get("value", ""))
+        for part in value.split(";"):
+            key, _, val = part.partition("=")
+            if key == "minimum_input_rows":
+                minimum_rows = val or minimum_rows
+            elif key == "weak_rows":
+                weak_rows = val or weak_rows
+        for part in lane_value.split(";"):
+            key, _, val = part.partition("=")
+            if key == "refund":
+                refund = val or refund
+            elif key == "inbound":
+                inbound = val or inbound
+            elif key == "profit":
+                profit = val or profit
+            elif key == "token_cost":
+                token_cost = val or token_cost
+    status = "ok" if (_positive_int_value(weak_rows) or 0) == 0 else "warn"
+    return {
+        "status": status,
+        "weak_rows": weak_rows,
+        "minimum_rows": minimum_rows,
+        "refund": refund,
+        "inbound": inbound,
+        "profit": profit,
+        "token_cost": token_cost,
+        "message": "Expected profit is still blocked where proof is weak.",
+    }
+
+
+def _render_profit_input_blocker_panel(blocker_df: pd.DataFrame, health_df: pd.DataFrame) -> None:
+    import streamlit as st
+
+    summary = _profit_input_blocker_summary(blocker_df, health_df)
+    text = (
+        f"Profit-input blockers: {summary['weak_rows']} weak rows from "
+        f"{summary['minimum_rows']} rows with basic restock inputs. "
+        f"Refund blockers: {summary['refund']}; inbound/FBA blockers: {summary['inbound']}; "
+        f"profit-confidence blockers: {summary['profit']}; token-cost blockers: {summary['token_cost']}."
+    )
+    if summary["status"] == "not_checked":
+        st.info(summary["message"])
+    elif summary["status"] == "ok":
+        st.success(text)
+    else:
+        st.warning(text)
+        st.caption("These rows stay blocked from clean buy and PO creation until real proof exists.")
+    if not blocker_df.empty:
+        display_cols = [
+            "seller_sku",
+            "asin",
+            "supplier_name",
+            "primary_blocker",
+            "next_safe_action",
+            "refund_proof_state",
+            "inbound_cost_confidence",
+            "profit_input_confidence",
+            "token_cost_trust_state",
+            "action_safety_state",
+        ]
+        visible_cols = [col for col in display_cols if col in blocker_df.columns]
+        st.dataframe(blocker_df[visible_cols], width="stretch", hide_index=True)
+
+
+def _inbound_fba_source_options_summary(options_df: pd.DataFrame, health_df: pd.DataFrame) -> dict[str, str]:
+    direct_safe = "0"
+    protected = "0"
+    if not health_df.empty:
+        work = health_df.copy()
+        for col in ("check", "value"):
+            if col not in work.columns:
+                work[col] = ""
+        by_check = {
+            _normalize_text(row.get("check", "")): row
+            for _, row in work.iterrows()
+            if _normalize_text(row.get("check", ""))
+        }
+        direct_row = by_check.get("direct_safe_routes", {})
+        protected_row = by_check.get("protected_routes", {})
+        for part in _normalize_text(direct_row.get("value", "")).split(";"):
+            key, _, val = part.partition("=")
+            if key == "direct_safe_routes":
+                direct_safe = val or direct_safe
+            elif key == "protected_routes":
+                protected = val or protected
+        for part in _normalize_text(protected_row.get("value", "")).split(";"):
+            key, _, val = part.partition("=")
+            if key == "protected_routes":
+                protected = val or protected
+    route_rows = str(len(options_df.index))
+    status = "ok" if (_positive_int_value(direct_safe) or 0) > 0 else ("not_checked" if options_df.empty and health_df.empty else "warn")
+    return {
+        "status": status,
+        "route_rows": route_rows,
+        "direct_safe": direct_safe,
+        "protected": protected,
+    }
+
+
+def _render_inbound_fba_source_options_panel(options_df: pd.DataFrame, health_df: pd.DataFrame) -> None:
+    import streamlit as st
+
+    summary = _inbound_fba_source_options_summary(options_df, health_df)
+    text = (
+        f"Inbound/FBA source routes: {summary['route_rows']} checked. "
+        f"Direct safe routes: {summary['direct_safe']}; protected routes: {summary['protected']}."
+    )
+    if summary["status"] == "not_checked":
+        st.info("Inbound/FBA source-route proof has not been built yet.")
+    elif summary["status"] == "ok":
+        st.success(text)
+    else:
+        st.warning(text)
+        st.caption("No protected or estimated route is treated as clean profit proof.")
+    if not options_df.empty:
+        display_cols = [
+            "route_id",
+            "route_class",
+            "status",
+            "source_rows",
+            "linked_rows",
+            "safe_for_profit_use",
+            "needs_luke_decision",
+            "next_step",
+        ]
+        visible_cols = [col for col in display_cols if col in options_df.columns]
+        st.dataframe(options_df[visible_cols], width="stretch", hide_index=True)
+
+
+def _token_cost_trust_label(value: object) -> str:
+    state = _normalize_text(value).lower()
+    labels = {
+        "trusted": "Token cost trusted",
+        "weak_fallback_cost": "Fallback token cost risk",
+        "missing_token_cost": "Token cost missing",
+        "not_verified": "Token cost not proved",
+    }
+    return labels.get(state, _humanize_restock_token(state) if state else "Token cost not proved")
+
+
+def _render_restock_token_cost_trust_panel(trust_df: pd.DataFrame, health_df: pd.DataFrame) -> None:
+    import streamlit as st
+
+    if trust_df.empty and health_df.empty:
+        st.info("Token cost trust proof has not been built yet.")
+        return
+    counts: dict[str, int] = {}
+    if not trust_df.empty and "token_cost_trust_state" in trust_df.columns:
+        counts = {
+            _token_cost_trust_label(state): int(count)
+            for state, count in trust_df["token_cost_trust_state"].map(lambda value: _normalize_text(value).lower()).value_counts().items()
+        }
+    summary = ", ".join(f"{label}: {count}" for label, count in counts.items()) or "No token cost rows."
+    if "Token cost trusted" in counts and len(counts) == 1:
+        st.success(f"Token cost trust: {summary}")
+    else:
+        st.warning(f"Token cost trust: {summary}")
+        st.caption("Rows without trusted token cost stay blocked from clean buy and PO creation.")
+    if not trust_df.empty:
+        display_cols = [
+            "seller_sku",
+            "current_token_cost_gbp",
+            "token_cost_trust_state",
+            "token_cost_trust_basis",
+            "token_cost_trust_blockers",
+            "safe_for_clean_buy",
+        ]
+        visible_cols = [col for col in display_cols if col in trust_df.columns]
+        st.dataframe(trust_df[visible_cols], width="stretch", hide_index=True)
+
+
+def _render_restock_local_proof_controls(root_path: Path) -> None:
+    import streamlit as st
+
+    refresh_col, refresh_note_col = st.columns([1, 3])
+    if refresh_col.button("Refresh local proof", key="o_restock_session_refresh"):
+        build_token_cost_trust_gate(root=root_path)
+        build_restock_source_view(root=root_path)
+        build_restock_recommendations(root=root_path)
+        build_reorder_input_coverage_report(root=root_path)
+        build_restock_profit_checks(root=root_path)
+        build_inbound_fba_cost_proof(root=root_path)
+        build_restock_session_view(root=root_path)
+        build_profit_input_blocker_breakdown(root=root_path)
+        build_inbound_fba_source_options(root=root_path)
+        build_restock_supplier_batch_drafts(root=root_path, refresh_session=False)
+        build_supplier_file_presence_probe(root=root_path, refresh_batches=False)
+        build_purchase_approval_preview(root=root_path, refresh_batches=False)
+        build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+        build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+        build_po_line_design_preview(root=root_path, refresh_readiness=False)
+        build_po_draft_packet_review(root=root_path, refresh_design=False)
+        build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+        build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+        build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+        build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+        build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+        build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+        st.session_state["o_recent_submit_notice"] = "Restocking proof refreshed locally."
+        st.rerun()
+    refresh_note_col.caption("This refreshes local proof only. It does not buy stock, write Sheets, change prices, or touch scanner queues.")
+
+
+def _render_restock_session_tab(root_path: Path, datasets: dict[str, pd.DataFrame]) -> None:
+    import streamlit as st
+
+    health_df = datasets.get("restock_session_health", pd.DataFrame()).copy()
+    inbound_cost_proof_df = datasets.get("restock_inbound_fba_cost_proof_live", pd.DataFrame()).copy()
+    profit_input_blocker_df = datasets.get("restock_profit_input_blocker_breakdown_live", pd.DataFrame()).copy()
+    profit_input_blocker_health_df = datasets.get("restock_profit_input_blocker_breakdown_health", pd.DataFrame()).copy()
+    inbound_source_options_df = datasets.get("restock_inbound_fba_source_options_live", pd.DataFrame()).copy()
+    inbound_source_options_health_df = datasets.get("restock_inbound_fba_source_options_health", pd.DataFrame()).copy()
+    token_cost_trust_df = datasets.get("restock_token_cost_trust_gate_live", pd.DataFrame()).copy()
+    token_cost_trust_health_df = datasets.get("restock_token_cost_trust_gate_health", pd.DataFrame()).copy()
+    review_df = datasets.get("restock_session_review_live", pd.DataFrame()).copy()
+    summary_df = datasets.get("restock_session_supplier_summary_live", pd.DataFrame()).copy()
+    reason_df = datasets.get("restock_session_reason_codes", pd.DataFrame()).copy()
+    draft_events_df = datasets.get("restock_session_draft_decision_events", pd.DataFrame()).copy()
+    supplier_proof_events_df = datasets.get("restock_session_supplier_proof_events", pd.DataFrame()).copy()
+    pack_moq_proof_events_df = datasets.get("restock_session_pack_moq_proof_events", pd.DataFrame()).copy()
+    batch_lines_df = datasets.get("restock_session_supplier_batch_lines_live", pd.DataFrame()).copy()
+    batch_summary_df = datasets.get("restock_session_supplier_batch_summary_live", pd.DataFrame()).copy()
+    batch_health_df = datasets.get("restock_session_supplier_batch_health", pd.DataFrame()).copy()
+    supplier_file_source_index_df = datasets.get("restock_supplier_file_source_index_live", pd.DataFrame()).copy()
+    supplier_file_source_index_health_df = datasets.get("restock_supplier_file_source_index_health", pd.DataFrame()).copy()
+    supplier_file_probe_df = datasets.get("restock_supplier_file_presence_probe_live", pd.DataFrame()).copy()
+    supplier_file_probe_health_df = datasets.get("restock_supplier_file_presence_probe_health", pd.DataFrame()).copy()
+    approval_preview_lines_df = datasets.get("restock_purchase_approval_preview_lines_live", pd.DataFrame()).copy()
+    approval_preview_summary_df = datasets.get("restock_purchase_approval_preview_summary_live", pd.DataFrame()).copy()
+    approval_preview_health_df = datasets.get("restock_purchase_approval_preview_health", pd.DataFrame()).copy()
+    approval_decision_events_df = datasets.get("restock_purchase_approval_decision_events", pd.DataFrame()).copy()
+    approval_guardrails_df = datasets.get("restock_purchase_approval_guardrails_live", pd.DataFrame()).copy()
+    approval_guardrails_health_df = datasets.get("restock_purchase_approval_guardrails_health", pd.DataFrame()).copy()
+    po_readiness_lines_df = datasets.get("restock_po_draft_readiness_preview_lines_live", pd.DataFrame()).copy()
+    po_readiness_summary_df = datasets.get("restock_po_draft_readiness_preview_summary_live", pd.DataFrame()).copy()
+    po_readiness_health_df = datasets.get("restock_po_draft_readiness_preview_health", pd.DataFrame()).copy()
+    po_line_design_lines_df = datasets.get("restock_po_line_design_preview_lines_live", pd.DataFrame()).copy()
+    po_line_design_summary_df = datasets.get("restock_po_line_design_preview_summary_live", pd.DataFrame()).copy()
+    po_line_design_health_df = datasets.get("restock_po_line_design_preview_health", pd.DataFrame()).copy()
+    po_packet_review_lines_df = datasets.get("restock_po_draft_packet_review_lines_live", pd.DataFrame()).copy()
+    po_packet_review_summary_df = datasets.get("restock_po_draft_packet_review_summary_live", pd.DataFrame()).copy()
+    po_packet_review_health_df = datasets.get("restock_po_draft_packet_review_health", pd.DataFrame()).copy()
+    po_hold_review_lines_df = datasets.get("restock_po_draft_hold_review_lines_live", pd.DataFrame()).copy()
+    po_hold_review_summary_df = datasets.get("restock_po_draft_hold_review_summary_live", pd.DataFrame()).copy()
+    po_hold_review_health_df = datasets.get("restock_po_draft_hold_review_health", pd.DataFrame()).copy()
+    po_file_shape_lines_df = datasets.get("restock_po_draft_file_shape_preview_lines_live", pd.DataFrame()).copy()
+    po_file_shape_summary_df = datasets.get("restock_po_draft_file_shape_preview_summary_live", pd.DataFrame()).copy()
+    po_file_shape_health_df = datasets.get("restock_po_draft_file_shape_preview_health", pd.DataFrame()).copy()
+    po_construction_summary_df = datasets.get("restock_po_preview_construction_summary_live", pd.DataFrame()).copy()
+    po_construction_summary_health_df = datasets.get("restock_po_preview_construction_summary_health", pd.DataFrame()).copy()
+    po_review_control_events_df = datasets.get("restock_po_draft_review_control_events", pd.DataFrame()).copy()
+    po_review_controls_df = datasets.get("restock_po_draft_review_controls_live", pd.DataFrame()).copy()
+    po_review_controls_health_df = datasets.get("restock_po_draft_review_controls_health", pd.DataFrame()).copy()
+    po_export_preview_lines_df = datasets.get("restock_po_draft_export_preview_lines_live", pd.DataFrame()).copy()
+    po_export_preview_summary_df = datasets.get("restock_po_draft_export_preview_summary_live", pd.DataFrame()).copy()
+    po_export_preview_health_df = datasets.get("restock_po_draft_export_preview_health", pd.DataFrame()).copy()
+    po_export_gate_events_df = datasets.get("restock_po_draft_export_gate_events", pd.DataFrame()).copy()
+    po_export_gate_df = datasets.get("restock_po_draft_export_gate_live", pd.DataFrame()).copy()
+    po_export_gate_health_df = datasets.get("restock_po_draft_export_gate_health", pd.DataFrame()).copy()
+    purchase_orders_df = datasets.get("purchase_orders_live", pd.DataFrame()).copy()
+    purchase_order_lines_df = datasets.get("purchase_order_lines_live", pd.DataFrame()).copy()
+    receiving_events_df = datasets.get("receiving_events", pd.DataFrame()).copy()
+    receiving_event_holds_df = datasets.get("receiving_event_holds", pd.DataFrame()).copy()
+    send_to_amazon_queue_df = datasets.get("send_to_amazon_queue", pd.DataFrame()).copy()
+    send_to_amazon_handoff_log_df = datasets.get("send_to_amazon_handoff_log", pd.DataFrame()).copy()
+
+    bad_health = pd.DataFrame()
+    if not health_df.empty and "status" in health_df.columns:
+        bad_health = health_df[health_df["status"].map(lambda value: _normalize_text(value).lower() != "ok")].copy()
+    if not health_df.empty and not bad_health.empty:
+        st.warning("Restocking proof has warnings or blockers.")
+
+    recent_notice = _normalize_text(st.session_state.get("o_recent_submit_notice", ""))
+    if recent_notice:
+        st.markdown(_render_inline_notice(recent_notice), unsafe_allow_html=True)
+
+    if review_df.empty:
+        st.info("No session rows yet. Refresh the local proof to build the current session view.")
+        if not health_df.empty:
+            st.dataframe(health_df, width="stretch", hide_index=True)
+        return
+
+    for col in (
+        "supplier_name",
+        "source_class",
+        "row_status",
+        "seller_sku",
+        "asin",
+        "title",
+        "supplier_sku",
+        "barcode",
+        "suggested_action",
+        "old_suggested_qty",
+        "order_qty_draft",
+        "latest_draft_decision_code",
+    ):
+        if col not in review_df.columns:
+            review_df[col] = ""
+    review_df = _apply_supplier_file_card_context(review_df, supplier_file_probe_df)
+    review_df = _apply_restock_card_proof_history_context(review_df, supplier_proof_events_df, pack_moq_proof_events_df)
+    review_df = _apply_restock_approval_preview_context(review_df, approval_preview_lines_df)
+    review_df = _apply_restock_po_preview_context(
+        review_df,
+        po_readiness_lines_df,
+        po_line_design_lines_df,
+        po_packet_review_lines_df,
+        po_hold_review_lines_df,
+        po_file_shape_lines_df,
+        po_export_preview_lines_df,
+    )
+    review_df["_supplier_label"] = review_df["supplier_name"].map(_supplier_label)
+    review_df["_workable_candidate"] = _restock_workable_mask(review_df)
+
+    mode_options = ["Overview", "Supplier Review", "Admin Proof"]
+    business_mode_options = ["Overview", "Supplier Review"]
+    requested_mode = _normalize_text(st.session_state.get("o_restock_requested_site_mode", ""))
+    if requested_mode in mode_options:
+        st.session_state["o_restock_site_mode"] = requested_mode
+        st.session_state["o_restock_requested_site_mode"] = ""
+    if st.session_state.get("o_restock_site_mode") not in mode_options:
+        st.session_state["o_restock_site_mode"] = "Overview"
+    current_mode = _normalize_text(st.session_state.get("o_restock_site_mode", "Overview"))
+    if current_mode == "Admin Proof":
+        page_mode = "Admin Proof"
+        back_cols = st.columns([1.1, 3.0], gap="small")
+        if back_cols[0].button("Back to Restocking", type="primary", key="o_restock_back_to_business"):
+            st.session_state["o_restock_requested_site_mode"] = "Overview"
+            st.rerun()
+        back_cols[1].caption("Proof/admin stays separate from Luke's normal restocking work.")
+    else:
+        if current_mode not in business_mode_options:
+            st.session_state["o_restock_site_mode"] = "Overview"
+        page_mode = st.radio(
+            "Restocking task",
+            options=business_mode_options,
+            key="o_restock_site_mode",
+            horizontal=True,
+            format_func=lambda value: "Start here" if value == "Overview" else "Supplier review",
+        )
+        with st.expander("Maintenance proof", expanded=False):
+            st.caption("Proof/admin is still available here, but it is not Luke's main working path.")
+            proof_cols = st.columns([1.1, 3.0], gap="small")
+            if proof_cols[0].button("Open proof/admin", key="o_restock_open_admin_proof"):
+                st.session_state["o_restock_requested_site_mode"] = "Admin Proof"
+                st.rerun()
+            proof_cols[1].caption("This only opens local maintenance evidence. It does not buy stock, change prices, write Sheets, or touch scanner queues.")
+            _render_restock_local_proof_controls(root_path)
+            _render_restock_token_cost_trust_panel(token_cost_trust_df, token_cost_trust_health_df)
+            _render_restock_inbound_cost_proof_panel(inbound_cost_proof_df)
+            _render_profit_input_blocker_panel(profit_input_blocker_df, profit_input_blocker_health_df)
+            _render_inbound_fba_source_options_panel(inbound_source_options_df, inbound_source_options_health_df)
+
+    if page_mode == "Overview":
+        _render_restock_site_overview(root_path, review_df, summary_df)
+        return
+
+    if page_mode == "Admin Proof":
+        st.markdown("### Admin proof")
+        st.caption("Maintenance proof and local preview outputs live here. This mode is for Codex/admin checks, not Luke's normal restocking path.")
+        _render_restock_local_proof_controls(root_path)
+        _render_restock_token_cost_trust_panel(token_cost_trust_df, token_cost_trust_health_df)
+        _render_restock_inbound_cost_proof_panel(inbound_cost_proof_df)
+        _render_profit_input_blocker_panel(profit_input_blocker_df, profit_input_blocker_health_df)
+        _render_inbound_fba_source_options_panel(inbound_source_options_df, inbound_source_options_health_df)
+        _render_o_restock_progress_strip(datasets)
+    else:
+        st.markdown("### Supplier review")
+        st.caption("Pick one supplier and review only the products that need attention.")
+
+    view_options = ["Worth checking", "All supplier products"]
+    controls_a, controls_b, controls_c = st.columns([1.35, 1.35, 2.4])
+    view_filter = controls_a.selectbox(
+        "Show",
+        options=view_options,
+        index=0,
+        key="o_session_view_filter_v3",
+    )
+    base_df = review_df[review_df["_workable_candidate"]].copy() if view_filter == "Worth checking" else review_df.copy()
+    if base_df.empty:
+        base_df = review_df.copy()
+    supplier_counts = base_df["_supplier_label"].value_counts().sort_values(ascending=False)
+    supplier_options = supplier_counts.index.tolist()
+    if not supplier_options:
+        supplier_options = ["(Unknown supplier)"]
+    preferred_supplier = _normalize_text(st.session_state.get("o_restock_selected_supplier", ""))
+    supplier_index = supplier_options.index(preferred_supplier) if preferred_supplier in supplier_options else 0
+    supplier_filter = controls_b.selectbox(
+        "Supplier group",
+        options=supplier_options,
+        index=supplier_index,
+        key="o_session_supplier_filter_v3",
+        format_func=lambda value: f"{value} ({int(supplier_counts.get(value, 0))})",
+    )
+    st.session_state["o_restock_selected_supplier"] = supplier_filter
+    search_text = controls_c.text_input("Search", value="", key="o_session_search_v3", placeholder="SKU, ASIN, title, barcode")
+
+    source_filter = "All sources"
+    row_status_filter = "All rows"
+    with st.expander("Advanced filters", expanded=False):
+        source_options = ["All sources", *sorted({_normalize_text(value) for value in base_df["source_class"].tolist() if _normalize_text(value)})]
+        status_options = ["All rows", *sorted({_normalize_text(value) for value in base_df["row_status"].tolist() if _normalize_text(value)})]
+        more_a, more_b = st.columns([1.1, 1.1])
+        source_filter = more_a.selectbox("Source", options=source_options, index=0, key="o_session_source_filter_v2")
+        row_status_filter = more_b.selectbox("State", options=status_options, index=0, key="o_session_status_filter_v2")
+
+    queue_scope_df = base_df.copy()
+    if source_filter != "All sources":
+        queue_scope_df = queue_scope_df[queue_scope_df["source_class"].map(_normalize_text) == source_filter].copy()
+    if row_status_filter != "All rows":
+        queue_scope_df = queue_scope_df[queue_scope_df["row_status"].map(_normalize_text) == row_status_filter].copy()
+    query = _normalize_text(search_text).lower()
+    if query:
+        mask = pd.Series(False, index=queue_scope_df.index)
+        for col in ("seller_sku", "asin", "title", "supplier_sku", "barcode"):
+            mask = mask | queue_scope_df[col].astype(str).str.lower().str.contains(query, na=False)
+        queue_scope_df = queue_scope_df[mask].copy()
+
+    if page_mode != "Admin Proof":
+        queue_focus_options = _restock_supplier_proof_queue_focus_options(queue_scope_df, supplier_file_probe_df)
+        current_queue_focus = _normalize_text(st.session_state.get("o_session_supplier_proof_queue_focus_v1", ""))
+        if current_queue_focus and current_queue_focus not in queue_focus_options:
+            st.session_state["o_session_supplier_proof_queue_focus_v1"] = RESTOCK_SUPPLIER_PROOF_QUEUE_CURRENT_OPTION
+        queue_focus_index = (
+            queue_focus_options.index(_normalize_text(st.session_state.get("o_session_supplier_proof_queue_focus_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_supplier_proof_queue_focus_v1", "")) in queue_focus_options
+            else 0
+        )
+        queue_focus_filter = st.selectbox(
+            "Supplier proof queue focus",
+            options=queue_focus_options,
+            index=queue_focus_index,
+            key="o_session_supplier_proof_queue_focus_v1",
+        )
+        filtered_df = _filter_restock_supplier_proof_queue_focus(
+            queue_scope_df,
+            supplier_file_probe_df,
+            queue_focus_filter,
+            selected_supplier=supplier_filter,
+        )
+        if queue_focus_filter != RESTOCK_SUPPLIER_PROOF_QUEUE_CURRENT_OPTION:
+            st.caption(
+                f"Showing supplier-proof queue focus: {queue_focus_filter}. "
+                "This is a view filter only and does not fetch supplier files, clear proof, or create purchase orders."
+            )
+
+        field_focus_counts = _build_restock_supplier_proof_field_focus_counts(filtered_df, supplier_file_probe_df)
+        field_focus_options = _restock_supplier_proof_field_focus_options(filtered_df, supplier_file_probe_df)
+        current_field_focus_filter = _normalize_text(st.session_state.get("o_session_supplier_proof_field_focus_v1", ""))
+        if current_field_focus_filter and current_field_focus_filter not in field_focus_options:
+            st.session_state["o_session_supplier_proof_field_focus_v1"] = RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION
+        field_focus_index = (
+            field_focus_options.index(_normalize_text(st.session_state.get("o_session_supplier_proof_field_focus_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_supplier_proof_field_focus_v1", "")) in field_focus_options
+            else 0
+        )
+        field_focus_filter = st.selectbox(
+            "Supplier proof field focus",
+            options=field_focus_options,
+            index=field_focus_index,
+            key="o_session_supplier_proof_field_focus_v1",
+            format_func=lambda value: f"{value} ({int(field_focus_counts.get(value, 0))})",
+        )
+        filtered_df = _filter_restock_supplier_proof_field_focus(filtered_df, supplier_file_probe_df, field_focus_filter)
+        if field_focus_filter != RESTOCK_SUPPLIER_PROOF_FIELD_FOCUS_ALL_OPTION:
+            st.caption(
+                f"Showing supplier-proof field focus: {field_focus_filter}. "
+                "This is a view filter only and does not fetch supplier files, save proof, clear proof, or create purchase orders."
+            )
+
+        proof_counts = _restock_missing_proof_worklist_counts(filtered_df)
+        proof_options = _restock_missing_proof_worklist_options(filtered_df)
+        current_proof_filter = _normalize_text(st.session_state.get("o_session_missing_proof_filter_v1", ""))
+        if current_proof_filter and current_proof_filter not in proof_options:
+            st.session_state["o_session_missing_proof_filter_v1"] = RESTOCK_MISSING_PROOF_ALL_OPTION
+        proof_index = (
+            proof_options.index(_normalize_text(st.session_state.get("o_session_missing_proof_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_missing_proof_filter_v1", "")) in proof_options
+            else 0
+        )
+        proof_filter = st.selectbox(
+            "Proof problem to work on",
+            options=proof_options,
+            index=proof_index,
+            key="o_session_missing_proof_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(proof_counts.get(value, 0))})"
+                if value != RESTOCK_MISSING_PROOF_ALL_OPTION
+                else f"{value} ({int(proof_counts.get(value, len(filtered_df.index)))})"
+            ),
+        )
+        st.markdown(_restock_next_proof_hint_html(proof_filter, proof_counts), unsafe_allow_html=True)
+        filtered_df = _filter_restock_missing_proof_worklist(filtered_df, proof_filter)
+        if proof_filter != RESTOCK_MISSING_PROOF_ALL_OPTION:
+            st.caption(f"Showing rows missing: {proof_filter}. This is a view filter only.")
+
+        action_bucket_counts = _build_restock_supplier_action_bucket_counts(filtered_df)
+        action_bucket_options = _restock_supplier_action_bucket_options(filtered_df)
+        current_action_bucket_filter = _normalize_text(st.session_state.get("o_session_action_bucket_filter_v1", ""))
+        if current_action_bucket_filter and current_action_bucket_filter not in action_bucket_options:
+            st.session_state["o_session_action_bucket_filter_v1"] = RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION
+        action_bucket_index = (
+            action_bucket_options.index(_normalize_text(st.session_state.get("o_session_action_bucket_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_action_bucket_filter_v1", "")) in action_bucket_options
+            else 0
+        )
+        action_bucket_filter = st.selectbox(
+            "Local action bucket",
+            options=action_bucket_options,
+            index=action_bucket_index,
+            key="o_session_action_bucket_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(action_bucket_counts.get(value, 0))})"
+                if value != RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION
+                else f"{value} ({int(len(filtered_df.index))})"
+            ),
+        )
+        filtered_df = _filter_restock_supplier_action_bucket(filtered_df, action_bucket_filter)
+        if action_bucket_filter != RESTOCK_SUPPLIER_ACTION_BUCKET_ALL_OPTION:
+            st.caption(f"Showing rows for local action: {action_bucket_filter}. This is a view filter only.")
+
+        approval_lane_counts = _build_restock_approval_readiness_lane_counts(filtered_df)
+        approval_lane_options = _restock_approval_readiness_lane_options(filtered_df)
+        current_approval_lane_filter = _normalize_text(st.session_state.get("o_session_approval_lane_filter_v1", ""))
+        if current_approval_lane_filter and current_approval_lane_filter not in approval_lane_options:
+            st.session_state["o_session_approval_lane_filter_v1"] = RESTOCK_APPROVAL_READINESS_ALL_OPTION
+        approval_lane_index = (
+            approval_lane_options.index(_normalize_text(st.session_state.get("o_session_approval_lane_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_approval_lane_filter_v1", "")) in approval_lane_options
+            else 0
+        )
+        approval_lane_filter = st.selectbox(
+            "Approval readiness lane",
+            options=approval_lane_options,
+            index=approval_lane_index,
+            key="o_session_approval_lane_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(approval_lane_counts.get(value, {}).get('count', 0))})"
+                if value != RESTOCK_APPROVAL_READINESS_ALL_OPTION
+                else f"{value} ({int(len(filtered_df.index))})"
+            ),
+        )
+        filtered_df = _filter_restock_approval_readiness_lane(filtered_df, approval_lane_filter)
+        if approval_lane_filter != RESTOCK_APPROVAL_READINESS_ALL_OPTION:
+            st.caption(f"Showing rows in approval lane: {approval_lane_filter}. This is a view filter only and does not approve buying.")
+
+        approval_preview_status_counts = _build_restock_approval_preview_status_counts(filtered_df)
+        approval_preview_status_options = _restock_approval_preview_status_options(filtered_df)
+        current_approval_preview_status_filter = _normalize_text(st.session_state.get("o_session_approval_preview_status_filter_v1", ""))
+        if current_approval_preview_status_filter and current_approval_preview_status_filter not in approval_preview_status_options:
+            st.session_state["o_session_approval_preview_status_filter_v1"] = RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION
+        approval_preview_status_index = (
+            approval_preview_status_options.index(_normalize_text(st.session_state.get("o_session_approval_preview_status_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_approval_preview_status_filter_v1", "")) in approval_preview_status_options
+            else 0
+        )
+        approval_preview_status_filter = st.selectbox(
+            "Approval preview status",
+            options=approval_preview_status_options,
+            index=approval_preview_status_index,
+            key="o_session_approval_preview_status_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(approval_preview_status_counts.get(value, 0))})"
+                if value != RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION
+                else f"{value} ({int(len(filtered_df.index))})"
+            ),
+        )
+        filtered_df = _filter_restock_approval_preview_status(filtered_df, approval_preview_status_filter)
+        if approval_preview_status_filter != RESTOCK_APPROVAL_PREVIEW_STATUS_ALL_OPTION:
+            st.caption(f"Showing rows with approval-preview status: {approval_preview_status_filter}. This is a view filter only and does not approve buying.")
+
+        po_preview_status_counts = _build_restock_po_preview_status_counts(filtered_df)
+        po_preview_status_options = _restock_po_preview_status_options(filtered_df)
+        current_po_preview_status_filter = _normalize_text(st.session_state.get("o_session_po_preview_status_filter_v1", ""))
+        if current_po_preview_status_filter and current_po_preview_status_filter not in po_preview_status_options:
+            st.session_state["o_session_po_preview_status_filter_v1"] = RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION
+        po_preview_status_index = (
+            po_preview_status_options.index(_normalize_text(st.session_state.get("o_session_po_preview_status_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_po_preview_status_filter_v1", "")) in po_preview_status_options
+            else 0
+        )
+        po_preview_status_filter = st.selectbox(
+            "PO preview status",
+            options=po_preview_status_options,
+            index=po_preview_status_index,
+            key="o_session_po_preview_status_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(po_preview_status_counts.get(value, 0))})"
+                if value != RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION
+                else f"{value} ({int(len(filtered_df.index))})"
+            ),
+        )
+        filtered_df = _filter_restock_po_preview_status(filtered_df, po_preview_status_filter)
+        if po_preview_status_filter != RESTOCK_PO_PREVIEW_STATUS_ALL_OPTION:
+            st.caption(f"Showing rows with PO-preview status: {po_preview_status_filter}. This is a view filter only and does not create PO files.")
+
+        clearance_lane_counts = _restock_real_po_gate_clearance_lane_counts(
+            filtered_df,
+            approval_guardrails_df=approval_guardrails_df,
+            po_review_controls_df=po_review_controls_df,
+            po_export_gate_df=po_export_gate_df,
+        )
+        clearance_lane_options = _restock_real_po_gate_clearance_lane_options(
+            filtered_df,
+            approval_guardrails_df=approval_guardrails_df,
+            po_review_controls_df=po_review_controls_df,
+            po_export_gate_df=po_export_gate_df,
+        )
+        current_clearance_lane_filter = _normalize_text(st.session_state.get("o_session_real_po_clearance_lane_filter_v1", ""))
+        if current_clearance_lane_filter and current_clearance_lane_filter not in clearance_lane_options:
+            st.session_state["o_session_real_po_clearance_lane_filter_v1"] = RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION
+        clearance_lane_index = (
+            clearance_lane_options.index(_normalize_text(st.session_state.get("o_session_real_po_clearance_lane_filter_v1", "")))
+            if _normalize_text(st.session_state.get("o_session_real_po_clearance_lane_filter_v1", "")) in clearance_lane_options
+            else 0
+        )
+        clearance_lane_filter = st.selectbox(
+            "Real PO clearance lane",
+            options=clearance_lane_options,
+            index=clearance_lane_index,
+            key="o_session_real_po_clearance_lane_filter_v1",
+            format_func=lambda value: (
+                f"{value} ({int(clearance_lane_counts.get(value, 0))})"
+                if value != RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION
+                else f"{value} ({int(len(filtered_df.index))})"
+            ),
+        )
+        filtered_df = _filter_restock_real_po_gate_clearance_lane(
+            filtered_df,
+            clearance_lane_filter,
+            approval_guardrails_df=approval_guardrails_df,
+            po_review_controls_df=po_review_controls_df,
+            po_export_gate_df=po_export_gate_df,
+        )
+        if clearance_lane_filter != RESTOCK_REAL_PO_CLEARANCE_ALL_OPTION:
+            st.caption(f"Showing rows in real-PO clearance lane: {clearance_lane_filter}. This is a view filter only and does not approve or create purchase orders.")
+    else:
+        filtered_df = queue_scope_df.copy()
+    filtered_df = _sort_restock_rows_for_local_action(filtered_df)
+
+    blocked_count = int(filtered_df.get("row_status", pd.Series(dtype=str)).map(_normalize_text).eq("blocked").sum())
+    if page_mode != "Admin Proof":
+        st.markdown(
+            _restock_review_focus_strip_html(
+                supplier=supplier_filter,
+                products=len(filtered_df.index),
+                proof_filter=proof_filter,
+                blocked=blocked_count,
+            ),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            f"Showing {len(filtered_df.index)} product{'' if len(filtered_df.index) == 1 else 's'} for {supplier_filter}. "
+            f"Blocked from clean buy: {blocked_count}."
+        )
+    supplier_summary_match = summary_df.copy()
+    if not supplier_summary_match.empty and "supplier_name" in supplier_summary_match.columns:
+        supplier_summary_match["_supplier_label"] = supplier_summary_match["supplier_name"].map(_supplier_label)
+        supplier_summary_match = supplier_summary_match[supplier_summary_match["_supplier_label"] == supplier_filter].copy()
+    if page_mode != "Admin Proof" and not supplier_summary_match.empty:
+        supplier_row = supplier_summary_match.iloc[0]
+        top_reasons = _humanize_restock_list(supplier_row.get("top_block_reasons", ""), limit=3)
+        st.markdown(
+            _operator_decision_card_html(
+                f"Supplier: {supplier_filter}",
+                (
+                    f"{_display_plain(supplier_row.get('total_rows', len(filtered_df.index)), str(len(filtered_df.index)))} total product(s). "
+                    f"{_display_plain(supplier_row.get('ready_for_review_rows', '0'), '0')} ready. "
+                    f"Main blocker: {top_reasons}."
+                ),
+                "neutral",
+            ),
+            unsafe_allow_html=True,
+        )
+    if page_mode != "Admin Proof":
+        _render_restock_workbench_overview(
+            filtered_df,
+            supplier_label=supplier_filter,
+            all_review_df=review_df,
+            supplier_file_probe_df=supplier_file_probe_df,
+            approval_preview_summary_df=approval_preview_summary_df,
+            po_construction_summary_df=po_construction_summary_df,
+            real_po_gate_panel_html=_restock_real_po_readiness_gate_panel_html(
+                filtered_df,
+                approval_guardrails_df=approval_guardrails_df,
+                po_review_controls_df=po_review_controls_df,
+                po_export_gate_df=po_export_gate_df,
+            ),
+            real_po_clearance_worklist_html=_restock_real_po_gate_clearance_worklist_panel_html(
+                filtered_df,
+                approval_guardrails_df=approval_guardrails_df,
+                po_review_controls_df=po_review_controls_df,
+                po_export_gate_df=po_export_gate_df,
+            ),
+            protected_stage_panel_html=_restock_protected_stage_visibility_panel_html(
+                approval_guardrails_df=approval_guardrails_df,
+                po_review_controls_df=po_review_controls_df,
+                po_export_gate_df=po_export_gate_df,
+                purchase_orders_df=purchase_orders_df,
+                purchase_order_lines_df=purchase_order_lines_df,
+                receiving_events_df=receiving_events_df,
+                receiving_event_holds_df=receiving_event_holds_df,
+                send_to_amazon_queue_df=send_to_amazon_queue_df,
+                send_to_amazon_handoff_log_df=send_to_amazon_handoff_log_df,
+            ),
+        )
+        _render_restock_workbench_table(filtered_df, root_path=root_path)
+
+    for col in ("reason_code", "reason_label", "safe_to_draft", "creates_live_action"):
+        if col not in reason_df.columns:
+            reason_df[col] = ""
+    allowed_reasons = reason_df[
+        (reason_df["safe_to_draft"].map(lambda value: _normalize_text(value) == "1"))
+        & (reason_df["creates_live_action"].map(lambda value: _normalize_text(value) == "0"))
+        & (reason_df["reason_code"].map(_normalize_text) != "")
+    ].copy()
+    reason_label_by_code = {
+        _normalize_text(row.get("reason_code", "")): _normalize_text(row.get("reason_label", "")) or _normalize_text(row.get("reason_code", ""))
+        for _, row in allowed_reasons.iterrows()
+    }
+    decision_codes = [code for code in reason_label_by_code if code]
+
+    with st.expander("Save a local decision", expanded=False):
+        if filtered_df.empty:
+            st.info("No filtered rows to draft against.")
+        elif not decision_codes:
+            st.warning("No local draft reason codes are available.")
+        else:
+            row_choices: list[tuple[str, str]] = []
+            for _, row in filtered_df.iterrows():
+                row_id = _normalize_text(row.get("row_id", ""))
+                sku = _normalize_text(row.get("seller_sku", ""))
+                asin = _normalize_text(row.get("asin", ""))
+                title = _normalize_text(row.get("title", ""))
+                supplier = _normalize_text(row.get("supplier_name", ""))
+                label = " | ".join(part for part in (supplier, sku or asin, title[:80]) if part)
+                if row_id:
+                    row_choices.append((label or row_id, row_id))
+            if not row_choices:
+                st.warning("Filtered rows are missing session row IDs.")
+                return
+            row_label_to_id = {label: row_id for label, row_id in row_choices}
+            selected_row_label = st.selectbox(
+                "Row",
+                options=list(row_label_to_id.keys()),
+                key="o_session_draft_row",
+            )
+            decision_label_to_code = {
+                reason_label_by_code[code]: code
+                for code in decision_codes
+            }
+            selected_decision_label = st.selectbox(
+                "Decision",
+                options=list(decision_label_to_code.keys()),
+                key="o_session_draft_decision",
+            )
+            selected_row_id = row_label_to_id.get(selected_row_label, "")
+            selected_row_df = filtered_df[filtered_df["row_id"].map(_normalize_text) == selected_row_id].copy()
+            selected_row = selected_row_df.iloc[0].to_dict() if not selected_row_df.empty else {}
+            decision_code = decision_label_to_code.get(selected_decision_label, "")
+            draft_qty: object = ""
+            snooze_value: object = ""
+            form_cols = st.columns([1.0, 1.0, 2.4])
+            if decision_code == "order_qty_draft":
+                default_qty = _positive_int_value(selected_row.get("old_suggested_qty", "")) or 1
+                draft_qty = form_cols[0].number_input(
+                    "Qty",
+                    min_value=1,
+                    step=1,
+                    value=default_qty,
+                    key="o_session_draft_qty",
+                )
+            elif decision_code == "snooze":
+                snooze_value = form_cols[1].date_input(
+                    "Snooze until",
+                    value=_next_monday(),
+                    key="o_session_draft_snooze_until",
+                )
+            decision_note = form_cols[2].text_input("Note", value="", key="o_session_draft_note")
+            save_cols = st.columns([1.0, 3.0])
+            if save_cols[0].button("Save Draft", type="primary", key="o_session_save_draft"):
+                try:
+                    saved = submit_restock_session_draft_decision(
+                        root=root_path,
+                        session_row=selected_row,
+                        decision_code=decision_code,
+                        draft_order_qty=draft_qty,
+                        snooze_until_utc=snooze_value,
+                        decision_note=decision_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_restock_session",
+                    )
+                    build_restock_session_view(root=root_path)
+                    build_restock_supplier_batch_drafts(root=root_path, refresh_session=False)
+                    build_supplier_file_presence_probe(root=root_path, refresh_batches=False)
+                    build_purchase_approval_preview(root=root_path, refresh_batches=False)
+                    build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+                    build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+                    build_po_line_design_preview(root=root_path, refresh_readiness=False)
+                    build_po_draft_packet_review(root=root_path, refresh_design=False)
+                    build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+                    build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+                    build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+                    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+                    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved draft decision {saved.get('decision_code', '')} for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Draft not saved: {exc}")
+            save_cols[1].caption("Drafts stay local. They do not create purchase orders, receiving events, or Amazon handoffs.")
+
+        if not draft_events_df.empty:
+            show_cols = [
+                col
+                for col in (
+                    "event_utc",
+                    "seller_sku",
+                    "asin",
+                    "supplier_name",
+                    "decision_code",
+                    "draft_order_qty",
+                    "snooze_until_utc",
+                    "decision_note",
+                    "creates_live_action",
+                )
+                if col in draft_events_df.columns
+            ]
+            st.dataframe(draft_events_df.tail(25)[show_cols], width="stretch", hide_index=True)
+
+    if page_mode == "Supplier Review":
+        return
+
+    with st.expander("Supplier batch drafts", expanded=False):
+        st.caption("Local draft batches only. These are not purchase orders and cannot commit a buy.")
+        if batch_lines_df.empty:
+            st.info("No supplier batch draft lines yet. Save an order quantity draft first.")
+        else:
+            if not batch_summary_df.empty:
+                st.dataframe(batch_summary_df, width="stretch", hide_index=True)
+            line_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "source_class",
+                    "draft_order_qty",
+                    "current_supplier_cost_gbp",
+                    "draft_line_value_gbp",
+                    "supplier_proof_checklist_status",
+                    "supplier_proof_missing_reasons",
+                    "supplier_match_state",
+                    "supplier_stock_state",
+                    "supplier_stock_qty",
+                    "backorder_state",
+                    "backorder_eta_utc",
+                    "supplier_file_asof_utc",
+                    "supplier_file_reference",
+                    "latest_supplier_proof_id",
+                    "pack_moq_proof_state",
+                    "pack_multiple",
+                    "supplier_moq",
+                    "valid_order_step",
+                    "latest_pack_moq_proof_id",
+                    "supplier_batch_readiness_state",
+                    "supplier_batch_readiness_reasons",
+                    "line_state",
+                    "action_block_reason",
+                    "creates_live_action",
+                )
+                if col in batch_lines_df.columns
+            ]
+            st.dataframe(batch_lines_df[line_cols], width="stretch", hide_index=True)
+
+            st.markdown("#### Supplier proof")
+            proof_choices: list[tuple[str, int]] = []
+            for idx, row in batch_lines_df.reset_index(drop=True).iterrows():
+                label = " | ".join(
+                    part
+                    for part in (
+                        _normalize_text(row.get("supplier_name", "")),
+                        _normalize_text(row.get("seller_sku", "")) or _normalize_text(row.get("asin", "")),
+                        _normalize_text(row.get("title", ""))[:80],
+                    )
+                    if part
+                )
+                proof_choices.append((label or _normalize_text(row.get("row_id", "")) or f"row {idx + 1}", int(idx)))
+            proof_label_to_index = {label: idx for label, idx in proof_choices}
+            selected_proof_label = st.selectbox(
+                "Batch line",
+                options=list(proof_label_to_index.keys()),
+                key="o_session_supplier_proof_row",
+            )
+            selected_proof_row = batch_lines_df.reset_index(drop=True).iloc[proof_label_to_index[selected_proof_label]].to_dict()
+            stock_label_to_state = {
+                "Not verified": "supplier_stock_not_verified",
+                "In stock": "supplier_stock_verified_in_stock",
+                "Out of stock": "supplier_stock_verified_zero",
+            }
+            backorder_label_to_state = {
+                "Not verified": "backorder_not_verified",
+                "No backorder": "backorder_none_confirmed",
+                "Backorder wait": "backorder_wait",
+            }
+            proof_cols = st.columns([1.1, 0.7, 1.1, 0.9, 1.3, 1.8])
+            stock_label = proof_cols[0].selectbox(
+                "Stock",
+                options=list(stock_label_to_state.keys()),
+                key="o_session_supplier_proof_stock_state",
+            )
+            stock_qty = proof_cols[1].text_input("Stock qty", value="", key="o_session_supplier_proof_stock_qty")
+            backorder_label = proof_cols[2].selectbox(
+                "Backorder",
+                options=list(backorder_label_to_state.keys()),
+                key="o_session_supplier_proof_backorder_state",
+            )
+            backorder_eta = proof_cols[3].text_input("ETA", value="", key="o_session_supplier_proof_backorder_eta")
+            file_asof = proof_cols[4].text_input("File date", value="", key="o_session_supplier_proof_file_asof")
+            file_reference = proof_cols[5].text_input("File ref", value="", key="o_session_supplier_proof_file_ref")
+            proof_note = st.text_input("Proof note", value="", key="o_session_supplier_proof_note")
+            proof_save_cols = st.columns([1.2, 3.2])
+            if proof_save_cols[0].button("Save Supplier Proof", type="primary", key="o_session_save_supplier_proof"):
+                try:
+                    saved = submit_restock_session_supplier_proof_event(
+                        root=root_path,
+                        session_row=selected_proof_row,
+                        supplier_stock_state=stock_label_to_state.get(stock_label, "supplier_stock_not_verified"),
+                        supplier_stock_qty=stock_qty,
+                        backorder_state=backorder_label_to_state.get(backorder_label, "backorder_not_verified"),
+                        backorder_eta_utc=backorder_eta,
+                        supplier_file_asof_utc=file_asof,
+                        supplier_file_reference=file_reference,
+                        proof_note=proof_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_restock_supplier_proof",
+                    )
+                    build_restock_supplier_batch_drafts(root=root_path, refresh_session=False)
+                    build_supplier_file_presence_probe(root=root_path, refresh_batches=False)
+                    build_purchase_approval_preview(root=root_path, refresh_batches=False)
+                    build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+                    build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+                    build_po_line_design_preview(root=root_path, refresh_readiness=False)
+                    build_po_draft_packet_review(root=root_path, refresh_design=False)
+                    build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+                    build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+                    build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+                    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+                    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved supplier proof for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Supplier proof not saved: {exc}")
+            proof_save_cols[1].caption("Supplier proof stays local. It does not create purchase orders or change Product DB facts.")
+
+            if not supplier_proof_events_df.empty:
+                proof_event_cols = [
+                    col
+                    for col in (
+                        "event_utc",
+                        "seller_sku",
+                        "asin",
+                        "supplier_name",
+                        "supplier_stock_state",
+                        "supplier_stock_qty",
+                        "backorder_state",
+                        "backorder_eta_utc",
+                        "supplier_file_asof_utc",
+                        "supplier_file_reference",
+                        "proof_note",
+                        "creates_live_action",
+                    )
+                    if col in supplier_proof_events_df.columns
+                ]
+                st.dataframe(supplier_proof_events_df.tail(25)[proof_event_cols], width="stretch", hide_index=True)
+
+            st.markdown("#### Pack / MOQ proof")
+            pack_label = st.selectbox(
+                "Pack line",
+                options=list(proof_label_to_index.keys()),
+                key="o_session_pack_moq_proof_row",
+            )
+            selected_pack_row = batch_lines_df.reset_index(drop=True).iloc[proof_label_to_index[pack_label]].to_dict()
+            pack_state_label_to_value = {
+                "Not verified": "pack_moq_not_verified",
+                "Verified": "pack_moq_verified",
+            }
+            pack_cols = st.columns([1.0, 0.8, 0.8, 0.8, 1.7])
+            pack_state_label = pack_cols[0].selectbox(
+                "Pack state",
+                options=list(pack_state_label_to_value.keys()),
+                key="o_session_pack_moq_state",
+            )
+            pack_multiple = pack_cols[1].text_input("Pack", value="", key="o_session_pack_moq_pack")
+            supplier_moq = pack_cols[2].text_input("MOQ", value="", key="o_session_pack_moq_moq")
+            valid_order_step = pack_cols[3].text_input("Step", value="", key="o_session_pack_moq_step")
+            pack_file_ref = pack_cols[4].text_input("Pack file ref", value="", key="o_session_pack_moq_file_ref")
+            pack_note = st.text_input("Pack note", value="", key="o_session_pack_moq_note")
+            pack_save_cols = st.columns([1.2, 3.2])
+            if pack_save_cols[0].button("Save Pack Proof", type="primary", key="o_session_save_pack_moq_proof"):
+                try:
+                    saved = submit_restock_session_pack_moq_proof_event(
+                        root=root_path,
+                        session_row=selected_pack_row,
+                        pack_moq_proof_state=pack_state_label_to_value.get(pack_state_label, "pack_moq_not_verified"),
+                        pack_multiple=pack_multiple,
+                        supplier_moq=supplier_moq,
+                        valid_order_step=valid_order_step,
+                        proof_file_reference=pack_file_ref,
+                        proof_note=pack_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_restock_pack_moq_proof",
+                    )
+                    build_restock_supplier_batch_drafts(root=root_path, refresh_session=False)
+                    build_supplier_file_presence_probe(root=root_path, refresh_batches=False)
+                    build_purchase_approval_preview(root=root_path, refresh_batches=False)
+                    build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+                    build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+                    build_po_line_design_preview(root=root_path, refresh_readiness=False)
+                    build_po_draft_packet_review(root=root_path, refresh_design=False)
+                    build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+                    build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+                    build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+                    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+                    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved pack/MOQ proof for {saved.get('seller_sku', '') or saved.get('asin', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Pack/MOQ proof not saved: {exc}")
+            pack_save_cols[1].caption("Pack/MOQ proof stays local. It does not create purchase orders or change Product DB facts.")
+
+            if not pack_moq_proof_events_df.empty:
+                pack_event_cols = [
+                    col
+                    for col in (
+                        "event_utc",
+                        "seller_sku",
+                        "asin",
+                        "supplier_name",
+                        "pack_moq_proof_state",
+                        "pack_multiple",
+                        "supplier_moq",
+                        "valid_order_step",
+                        "proof_file_reference",
+                        "proof_note",
+                        "creates_live_action",
+                    )
+                    if col in pack_moq_proof_events_df.columns
+                ]
+                st.dataframe(pack_moq_proof_events_df.tail(25)[pack_event_cols], width="stretch", hide_index=True)
+        if not batch_health_df.empty:
+            health_bad = batch_health_df[
+                batch_health_df.get("status", pd.Series(dtype=str)).map(lambda value: _normalize_text(value).lower() != "ok")
+            ].copy()
+            if health_bad.empty:
+                st.caption("Supplier batch draft proof is local and safe.")
+            else:
+                st.warning("Supplier batch draft proof has a blocker.")
+                st.dataframe(health_bad, width="stretch", hide_index=True)
+
+    with st.expander("Supplier file source index", expanded=False):
+        st.caption("Read-only source handoff proof. This compares F source status with local supplier folders and does not import files or rewrite F.")
+        if supplier_file_source_index_df.empty:
+            st.info("No supplier file source index rows yet. Refresh local proof first.")
+        else:
+            source_index_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "supplier_id",
+                    "f_source_status",
+                    "f_source_state",
+                    "f_latest_source_name",
+                    "f_latest_source_mtime_utc",
+                    "f_latest_source_path_exists",
+                    "local_latest_file_name",
+                    "local_latest_file_mtime_utc",
+                    "local_file_count",
+                    "source_handoff_state",
+                    "handoff_explanation",
+                    "can_be_used_for_presence_probe",
+                    "clears_supplier_proof",
+                    "imports_supplier_file",
+                    "updates_f_status",
+                    "creates_live_action",
+                )
+                if col in supplier_file_source_index_df.columns
+            ]
+            st.dataframe(supplier_file_source_index_df[source_index_cols], width="stretch", hide_index=True)
+        if not supplier_file_source_index_health_df.empty:
+            source_index_health_bad = supplier_file_source_index_health_df[
+                supplier_file_source_index_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if source_index_health_bad.empty:
+                st.caption("Supplier file source index is local and safe.")
+            else:
+                st.warning("Supplier file source index has a blocker.")
+                st.dataframe(source_index_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("Supplier file probe", expanded=False):
+        st.caption("Read-only local supplier-file check. This does not clear supplier proof, approve buying, create purchase orders, or commit stock.")
+        if supplier_file_probe_df.empty:
+            st.info("No supplier file probe rows yet. Save an order quantity draft and refresh local proof first.")
+        else:
+            probe_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "supplier_sku",
+                    "barcode",
+                    "latest_supplier_file_name",
+                    "latest_supplier_file_mtime_utc",
+                    "latest_supplier_file_state",
+                    "identity_match_state",
+                    "matched_by",
+                    "matched_row_count",
+                    "searched_row_count",
+                    "searched_identity_columns",
+                    "probe_explanation",
+                    "source_index_handoff_state",
+                    "source_index_handoff_explanation",
+                    "clears_supplier_proof",
+                    "purchase_approval_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "creates_live_action",
+                )
+                if col in supplier_file_probe_df.columns
+            ]
+            st.dataframe(supplier_file_probe_df[probe_cols], width="stretch", hide_index=True)
+        if not supplier_file_probe_health_df.empty:
+            probe_health_bad = supplier_file_probe_health_df[
+                supplier_file_probe_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if probe_health_bad.empty:
+                st.caption("Supplier file probe is local and safe.")
+            else:
+                st.warning("Supplier file probe has a blocker.")
+                st.dataframe(probe_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("Purchase approval preview", expanded=False):
+        st.caption("Local preview only. This does not approve buying and does not create purchase orders.")
+        if approval_preview_lines_df.empty:
+            st.info("No approval preview lines yet. Save an order quantity draft and clear local proof first.")
+        else:
+            if not approval_preview_summary_df.empty:
+                st.dataframe(approval_preview_summary_df, width="stretch", hide_index=True)
+            preview_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "draft_order_qty",
+                    "current_supplier_cost_gbp",
+                    "draft_line_value_gbp",
+                    "approval_preview_state",
+                    "approval_block_reasons",
+                    "supplier_batch_readiness_state",
+                    "supplier_proof_checklist_status",
+                    "source_class",
+                    "creates_live_action",
+                )
+                if col in approval_preview_lines_df.columns
+            ]
+            st.dataframe(approval_preview_lines_df[preview_cols], width="stretch", hide_index=True)
+        if not approval_preview_health_df.empty:
+            preview_health_bad = approval_preview_health_df[
+                approval_preview_health_df.get("status", pd.Series(dtype=str)).map(lambda value: _normalize_text(value).lower() != "ok")
+            ].copy()
+            if preview_health_bad.empty:
+                st.caption("Purchase approval preview is local and safe.")
+            else:
+                st.warning("Purchase approval preview has a blocker.")
+                st.dataframe(preview_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("Approval decision guardrails", expanded=False):
+        st.caption("Local guardrail only. A local accept does not create a purchase order or commit a buy.")
+        if approval_preview_summary_df.empty:
+            st.info("No approval preview packets yet.")
+        else:
+            packet_choices: list[tuple[str, int]] = []
+            for idx, row in approval_preview_summary_df.reset_index(drop=True).iterrows():
+                label = " | ".join(
+                    part
+                    for part in (
+                        _normalize_text(row.get("supplier_name", "")),
+                        _normalize_text(row.get("approval_packet_id", "")),
+                        f"ready { _normalize_text(row.get('ready_line_count', '0')) }",
+                        f"blocked { _normalize_text(row.get('blocked_line_count', '0')) }",
+                    )
+                    if part
+                )
+                packet_choices.append((label or f"packet {idx + 1}", int(idx)))
+            packet_label_to_index = {label: idx for label, idx in packet_choices}
+            selected_packet_label = st.selectbox(
+                "Packet",
+                options=list(packet_label_to_index.keys()),
+                key="o_session_approval_guard_packet",
+            )
+            selected_packet = approval_preview_summary_df.reset_index(drop=True).iloc[
+                packet_label_to_index[selected_packet_label]
+            ].to_dict()
+            decision_label_to_state = {
+                "Needs more proof": "local_review_more_proof_needed",
+                "Reject local review": "local_review_reject",
+                "Accept local review": "local_review_accept_not_commitment",
+            }
+            decision_label = st.selectbox(
+                "Local decision",
+                options=list(decision_label_to_state.keys()),
+                key="o_session_approval_guard_decision",
+            )
+            guard_note = st.text_input("Guardrail note", value="", key="o_session_approval_guard_note")
+            guard_save_cols = st.columns([1.2, 3.2])
+            if guard_save_cols[0].button("Save Local Review", type="primary", key="o_session_save_approval_guard"):
+                try:
+                    saved = submit_purchase_approval_decision_event(
+                        root=root_path,
+                        preview_summary_row=selected_packet,
+                        decision_state=decision_label_to_state.get(decision_label, "local_review_more_proof_needed"),
+                        decision_note=guard_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_purchase_approval_guardrails",
+                    )
+                    build_purchase_approval_guardrails(root=root_path, refresh_preview=False)
+                    build_po_draft_readiness_preview(root=root_path, refresh_guardrails=False)
+                    build_po_line_design_preview(root=root_path, refresh_readiness=False)
+                    build_po_draft_packet_review(root=root_path, refresh_design=False)
+                    build_po_draft_hold_review(root=root_path, refresh_packet_review=False)
+                    build_po_draft_file_shape_preview(root=root_path, refresh_hold_review=False)
+                    build_po_preview_construction_summary(root=root_path, refresh_file_shape=False)
+                    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+                    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved local review decision for {saved.get('supplier_name', '') or saved.get('approval_packet_id', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Local review not saved: {exc}")
+            guard_save_cols[1].caption("Guardrail decisions stay local and cannot create purchase orders.")
+
+        if not approval_guardrails_df.empty:
+            guardrail_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "approval_packet_id",
+                    "line_count",
+                    "ready_line_count",
+                    "blocked_line_count",
+                    "draft_order_value_gbp",
+                    "preview_packet_state",
+                    "latest_decision_state",
+                    "approval_guardrail_state",
+                    "approval_guardrail_reasons",
+                    "creates_live_action",
+                )
+                if col in approval_guardrails_df.columns
+            ]
+            st.dataframe(approval_guardrails_df[guardrail_cols], width="stretch", hide_index=True)
+        if not approval_decision_events_df.empty:
+            event_cols = [
+                col
+                for col in (
+                    "event_utc",
+                    "approval_packet_id",
+                    "supplier_name",
+                    "decision_state",
+                    "expected_line_count",
+                    "expected_ready_line_count",
+                    "expected_blocked_line_count",
+                    "decision_note",
+                    "creates_live_action",
+                )
+                if col in approval_decision_events_df.columns
+            ]
+            st.dataframe(approval_decision_events_df.tail(25)[event_cols], width="stretch", hide_index=True)
+        if not approval_guardrails_health_df.empty:
+            guardrail_health_bad = approval_guardrails_health_df[
+                approval_guardrails_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if guardrail_health_bad.empty:
+                st.caption("Approval decision guardrails are local and safe.")
+            else:
+                st.warning("Approval decision guardrails have a blocker.")
+                st.dataframe(guardrail_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO preview construction summary", expanded=False):
+        st.caption("Local construction summary only. This shows the preview chain and does not create purchase orders or write PO files.")
+        if po_construction_summary_df.empty:
+            st.info("No PO preview construction summary yet. Refresh the local proof to build the chain view.")
+        else:
+            construction_cols = [
+                col
+                for col in (
+                    "stage_label",
+                    "line_rows",
+                    "ready_or_held_rows",
+                    "blocked_rows",
+                    "health_bad_rows",
+                    "stage_state",
+                    "stage_block_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_construction_summary_df.columns
+            ]
+            st.dataframe(po_construction_summary_df[construction_cols], width="stretch", hide_index=True)
+        if not po_construction_summary_health_df.empty:
+            construction_health_bad = po_construction_summary_health_df[
+                po_construction_summary_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if construction_health_bad.empty:
+                st.caption("PO preview construction summary is local and safe.")
+            else:
+                st.warning("PO preview construction summary has a blocker.")
+                st.dataframe(construction_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft readiness preview", expanded=False):
+        st.caption("Local readiness preview only. This does not create purchase orders or write to PO files.")
+        if po_readiness_lines_df.empty:
+            st.info("No PO draft readiness lines yet. A preview packet needs a local accepted review first.")
+        else:
+            if not po_readiness_summary_df.empty:
+                st.dataframe(po_readiness_summary_df, width="stretch", hide_index=True)
+            po_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "draft_order_qty",
+                    "current_supplier_cost_gbp",
+                    "draft_line_value_gbp",
+                    "approval_guardrail_state",
+                    "po_draft_readiness_state",
+                    "po_draft_block_reasons",
+                    "po_creation_allowed",
+                    "creates_live_action",
+                )
+                if col in po_readiness_lines_df.columns
+            ]
+            st.dataframe(po_readiness_lines_df[po_cols], width="stretch", hide_index=True)
+        if not po_readiness_health_df.empty:
+            po_health_bad = po_readiness_health_df[
+                po_readiness_health_df.get("status", pd.Series(dtype=str)).map(lambda value: _normalize_text(value).lower() != "ok")
+            ].copy()
+            if po_health_bad.empty:
+                st.caption("PO draft readiness preview is local and safe.")
+            else:
+                st.warning("PO draft readiness preview has a blocker.")
+                st.dataframe(po_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO line design preview", expanded=False):
+        st.caption("Local design preview only. This does not create purchase orders, write PO files, receive stock, or send to Amazon.")
+        if po_line_design_lines_df.empty:
+            st.info("No PO line design rows yet. PO readiness rows need a local accepted review first.")
+        else:
+            if not po_line_design_summary_df.empty:
+                st.dataframe(po_line_design_summary_df, width="stretch", hide_index=True)
+            line_design_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "designed_order_qty",
+                    "designed_unit_cost_gbp",
+                    "designed_line_value_gbp",
+                    "source_po_draft_readiness_state",
+                    "line_design_state",
+                    "line_design_block_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_line_design_lines_df.columns
+            ]
+            st.dataframe(po_line_design_lines_df[line_design_cols], width="stretch", hide_index=True)
+        if not po_line_design_health_df.empty:
+            line_design_health_bad = po_line_design_health_df[
+                po_line_design_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if line_design_health_bad.empty:
+                st.caption("PO line design preview is local and safe.")
+            else:
+                st.warning("PO line design preview has a blocker.")
+                st.dataframe(line_design_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft packet review", expanded=False):
+        st.caption("Local packet review only. This does not create purchase orders, write PO files, receive stock, or send to Amazon.")
+        if po_packet_review_lines_df.empty:
+            st.info("No PO draft packet review rows yet. PO line design rows need to be locally ready first.")
+        else:
+            if not po_packet_review_summary_df.empty:
+                st.dataframe(po_packet_review_summary_df, width="stretch", hide_index=True)
+            packet_review_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "review_order_qty",
+                    "review_unit_cost_gbp",
+                    "review_line_value_gbp",
+                    "source_line_design_state",
+                    "packet_review_line_state",
+                    "packet_review_block_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_packet_review_lines_df.columns
+            ]
+            st.dataframe(po_packet_review_lines_df[packet_review_cols], width="stretch", hide_index=True)
+        if not po_packet_review_health_df.empty:
+            packet_review_health_bad = po_packet_review_health_df[
+                po_packet_review_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if packet_review_health_bad.empty:
+                st.caption("PO draft packet review is local and safe.")
+            else:
+                st.warning("PO draft packet review has a blocker.")
+                st.dataframe(packet_review_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft hold review", expanded=False):
+        st.caption("Local hold review only. This does not create purchase orders, write PO files, write PO hold files, receive stock, or send to Amazon.")
+        if po_hold_review_lines_df.empty:
+            st.info("No PO draft hold review rows yet. PO draft packet review rows need to be locally ready first.")
+        else:
+            if not po_hold_review_summary_df.empty:
+                st.dataframe(po_hold_review_summary_df, width="stretch", hide_index=True)
+            hold_review_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "hold_order_qty",
+                    "hold_unit_cost_gbp",
+                    "hold_line_value_gbp",
+                    "source_packet_review_line_state",
+                    "hold_review_line_state",
+                    "hold_review_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_hold_review_lines_df.columns
+            ]
+            st.dataframe(po_hold_review_lines_df[hold_review_cols], width="stretch", hide_index=True)
+        if not po_hold_review_health_df.empty:
+            hold_review_health_bad = po_hold_review_health_df[
+                po_hold_review_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if hold_review_health_bad.empty:
+                st.caption("PO draft hold review is local and safe.")
+            else:
+                st.warning("PO draft hold review has a blocker.")
+                st.dataframe(hold_review_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft file-shape preview", expanded=False):
+        st.caption("Local file-shape preview only. This does not create purchase orders, write PO files, write PO hold files, receive stock, or send to Amazon.")
+        if po_file_shape_lines_df.empty:
+            st.info("No PO draft file-shape preview rows yet. PO draft hold review rows need to be locally held first.")
+        else:
+            if not po_file_shape_summary_df.empty:
+                st.dataframe(po_file_shape_summary_df, width="stretch", hide_index=True)
+            file_shape_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "file_shape_qty",
+                    "file_shape_unit_cost_gbp",
+                    "file_shape_line_value_gbp",
+                    "source_hold_review_line_state",
+                    "file_shape_line_state",
+                    "file_shape_block_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_file_shape_lines_df.columns
+            ]
+            st.dataframe(po_file_shape_lines_df[file_shape_cols], width="stretch", hide_index=True)
+        if not po_file_shape_health_df.empty:
+            file_shape_health_bad = po_file_shape_health_df[
+                po_file_shape_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if file_shape_health_bad.empty:
+                st.caption("PO draft file-shape preview is local and safe.")
+            else:
+                st.warning("PO draft file-shape preview has a blocker.")
+                st.dataframe(file_shape_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft review controls", expanded=False):
+        st.caption("Local review controls only. These decisions do not create purchase orders or write PO files.")
+        if po_file_shape_summary_df.empty:
+            st.info("No PO draft file-shape packets yet.")
+        else:
+            packet_choices: list[tuple[str, int]] = []
+            for idx, row in po_file_shape_summary_df.reset_index(drop=True).iterrows():
+                label = " | ".join(
+                    part
+                    for part in (
+                        _normalize_text(row.get("supplier_name", "")),
+                        _normalize_text(row.get("po_draft_file_shape_preview_id", "")),
+                        f"ready { _normalize_text(row.get('ready_line_count', '0')) }",
+                        f"blocked { _normalize_text(row.get('blocked_line_count', '0')) }",
+                    )
+                    if part
+                )
+                packet_choices.append((label or f"file-shape packet {idx + 1}", int(idx)))
+            packet_label_to_index = {label: idx for label, idx in packet_choices}
+            selected_packet_label = st.selectbox(
+                "File-shape packet",
+                options=list(packet_label_to_index.keys()),
+                key="o_session_po_draft_review_control_packet",
+            )
+            selected_packet = po_file_shape_summary_df.reset_index(drop=True).iloc[
+                packet_label_to_index[selected_packet_label]
+            ].to_dict()
+            decision_label_to_state = {
+                "Needs more proof": "local_po_draft_more_proof_needed",
+                "Keep on local hold": "local_po_draft_keep_on_hold",
+                "Shape ready only": "local_po_draft_shape_ready_not_po",
+            }
+            decision_label = st.selectbox(
+                "Local control",
+                options=list(decision_label_to_state.keys()),
+                key="o_session_po_draft_review_control_decision",
+            )
+            control_note = st.text_input("Control note", value="", key="o_session_po_draft_review_control_note")
+            control_save_cols = st.columns([1.2, 3.2])
+            if control_save_cols[0].button("Save Review Control", type="primary", key="o_session_save_po_draft_review_control"):
+                try:
+                    saved = submit_po_draft_review_control_event(
+                        root=root_path,
+                        file_shape_summary_row=selected_packet,
+                        decision_state=decision_label_to_state.get(decision_label, "local_po_draft_more_proof_needed"),
+                        decision_note=control_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_po_draft_review_controls",
+                    )
+                    build_po_draft_review_controls(root=root_path, refresh_construction_summary=False)
+                    build_po_draft_export_preview(root=root_path, refresh_review_controls=False)
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved local PO draft review control for {saved.get('supplier_name', '') or saved.get('po_draft_file_shape_preview_id', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Review control not saved: {exc}")
+            control_save_cols[1].caption("Review controls stay local. They cannot create purchase orders, receiving events, or Amazon handoffs.")
+
+        if not po_review_controls_df.empty:
+            control_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "po_draft_file_shape_preview_id",
+                    "line_count",
+                    "ready_line_count",
+                    "blocked_line_count",
+                    "file_shape_value_gbp",
+                    "source_file_shape_state",
+                    "latest_decision_state",
+                    "review_control_state",
+                    "review_control_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_review_controls_df.columns
+            ]
+            st.dataframe(po_review_controls_df[control_cols], width="stretch", hide_index=True)
+        if not po_review_control_events_df.empty:
+            event_cols = [
+                col
+                for col in (
+                    "event_utc",
+                    "po_draft_file_shape_preview_id",
+                    "supplier_name",
+                    "decision_state",
+                    "expected_line_count",
+                    "expected_ready_line_count",
+                    "expected_blocked_line_count",
+                    "decision_note",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_review_control_events_df.columns
+            ]
+            st.dataframe(po_review_control_events_df.tail(25)[event_cols], width="stretch", hide_index=True)
+        if not po_review_controls_health_df.empty:
+            controls_health_bad = po_review_controls_health_df[
+                po_review_controls_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if controls_health_bad.empty:
+                st.caption("PO draft review controls are local and safe.")
+            else:
+                st.warning("PO draft review controls have a blocker.")
+                st.dataframe(controls_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft export preview", expanded=False):
+        st.caption("Local export preview only. This does not create purchase orders, write PO files, commit buying, receive stock, or send to Amazon.")
+        if po_export_preview_lines_df.empty:
+            st.info("No PO draft export preview rows yet. A file-shape packet needs a local shape-ready review control first.")
+        else:
+            if not po_export_preview_summary_df.empty:
+                st.dataframe(po_export_preview_summary_df, width="stretch", hide_index=True)
+            export_preview_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "seller_sku",
+                    "asin",
+                    "title",
+                    "export_preview_qty",
+                    "export_preview_unit_cost_gbp",
+                    "export_preview_line_value_gbp",
+                    "source_file_shape_line_state",
+                    "source_review_control_state",
+                    "export_preview_line_state",
+                    "export_preview_block_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_export_preview_lines_df.columns
+            ]
+            st.dataframe(po_export_preview_lines_df[export_preview_cols], width="stretch", hide_index=True)
+        if not po_export_preview_health_df.empty:
+            export_preview_health_bad = po_export_preview_health_df[
+                po_export_preview_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if export_preview_health_bad.empty:
+                st.caption("PO draft export preview is local and safe.")
+            else:
+                st.warning("PO draft export preview has a blocker.")
+                st.dataframe(export_preview_health_bad, width="stretch", hide_index=True)
+
+    with st.expander("PO draft export gate", expanded=False):
+        st.caption("Local final gate only. This can mark a preview as candidate-ready, but it still does not create or write a purchase order.")
+        if po_export_preview_summary_df.empty:
+            st.info("No PO draft export preview packets yet.")
+        else:
+            export_packet_choices: list[tuple[str, int]] = []
+            for idx, row in po_export_preview_summary_df.reset_index(drop=True).iterrows():
+                label = " | ".join(
+                    part
+                    for part in (
+                        _normalize_text(row.get("supplier_name", "")),
+                        _normalize_text(row.get("po_draft_export_preview_id", "")),
+                        f"ready { _normalize_text(row.get('ready_line_count', '0')) }",
+                        f"blocked { _normalize_text(row.get('blocked_line_count', '0')) }",
+                    )
+                    if part
+                )
+                export_packet_choices.append((label or f"export packet {idx + 1}", int(idx)))
+            export_packet_label_to_index = {label: idx for label, idx in export_packet_choices}
+            selected_export_packet_label = st.selectbox(
+                "Export preview packet",
+                options=list(export_packet_label_to_index.keys()),
+                key="o_session_po_draft_export_gate_packet",
+            )
+            selected_export_packet = po_export_preview_summary_df.reset_index(drop=True).iloc[
+                export_packet_label_to_index[selected_export_packet_label]
+            ].to_dict()
+            export_gate_label_to_state = {
+                "Needs more proof": "local_export_more_proof_needed",
+                "Keep on local hold": "local_export_keep_on_hold",
+                "Candidate ready only": "local_export_candidate_ready_not_po",
+            }
+            export_gate_label = st.selectbox(
+                "Local export gate",
+                options=list(export_gate_label_to_state.keys()),
+                key="o_session_po_draft_export_gate_decision",
+            )
+            export_gate_note = st.text_input("Gate note", value="", key="o_session_po_draft_export_gate_note")
+            export_gate_save_cols = st.columns([1.2, 3.2])
+            if export_gate_save_cols[0].button("Save Export Gate", type="primary", key="o_session_save_po_draft_export_gate"):
+                try:
+                    saved = submit_po_draft_export_gate_event(
+                        root=root_path,
+                        export_summary_row=selected_export_packet,
+                        decision_state=export_gate_label_to_state.get(export_gate_label, "local_export_more_proof_needed"),
+                        decision_note=export_gate_note,
+                        actor="operator_ui",
+                        event_source_reference="o_ui_po_draft_export_gate",
+                    )
+                    build_po_draft_export_gate(root=root_path, refresh_export_preview=False)
+                    st.session_state["o_recent_submit_notice"] = (
+                        f"Saved local PO draft export gate for {saved.get('supplier_name', '') or saved.get('po_draft_export_preview_id', '')}."
+                    )
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(f"Export gate not saved: {exc}")
+            export_gate_save_cols[1].caption("Export gates stay local. They cannot create purchase orders, receiving events, or Amazon handoffs.")
+
+        if not po_export_gate_df.empty:
+            export_gate_cols = [
+                col
+                for col in (
+                    "supplier_name",
+                    "po_draft_export_preview_id",
+                    "line_count",
+                    "ready_line_count",
+                    "blocked_line_count",
+                    "export_preview_value_gbp",
+                    "source_export_preview_state",
+                    "latest_decision_state",
+                    "export_gate_state",
+                    "export_gate_reasons",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_export_gate_df.columns
+            ]
+            st.dataframe(po_export_gate_df[export_gate_cols], width="stretch", hide_index=True)
+        if not po_export_gate_events_df.empty:
+            gate_event_cols = [
+                col
+                for col in (
+                    "event_utc",
+                    "po_draft_export_preview_id",
+                    "supplier_name",
+                    "decision_state",
+                    "expected_line_count",
+                    "expected_ready_line_count",
+                    "expected_blocked_line_count",
+                    "decision_note",
+                    "po_file_write_allowed",
+                    "po_creation_allowed",
+                    "purchase_commitment_allowed",
+                    "receiving_allowed",
+                    "send_to_amazon_allowed",
+                    "creates_live_action",
+                )
+                if col in po_export_gate_events_df.columns
+            ]
+            st.dataframe(po_export_gate_events_df.tail(25)[gate_event_cols], width="stretch", hide_index=True)
+        if not po_export_gate_health_df.empty:
+            export_gate_health_bad = po_export_gate_health_df[
+                po_export_gate_health_df.get("status", pd.Series(dtype=str)).map(
+                    lambda value: _normalize_text(value).lower() != "ok"
+                )
+            ].copy()
+            if export_gate_health_bad.empty:
+                st.caption("PO draft export gate is local and safe.")
+            else:
+                st.warning("PO draft export gate has a blocker.")
+                st.dataframe(export_gate_health_bad, width="stretch", hide_index=True)
+
+    if not summary_df.empty:
+        with st.expander("Supplier summary", expanded=False):
+            st.dataframe(summary_df, width="stretch", hide_index=True)
+
+    with st.expander("Session health", expanded=False):
+        if health_df.empty:
+            st.info("No health proof yet.")
+        else:
+            st.dataframe(health_df, width="stretch", hide_index=True)
+
+
 def render_operator_ui(root: Path | None = None) -> None:
     import streamlit as st
 
     root_path = Path(root) if root is not None else get_o_path_contract().root
     st.set_page_config(page_title="O Flow Operator", layout="wide")
-    st.title("Restocking Workspace")
     st.markdown(_render_operator_theme_css(), unsafe_allow_html=True)
-    st.caption("Review one supplier at a time. Enter only the rows you want to send.")
     if "o_recent_submit_notice" not in st.session_state:
         st.session_state["o_recent_submit_notice"] = ""
     if "o_recent_skipped_notice" not in st.session_state:
@@ -8268,12 +18759,11 @@ def render_operator_ui(root: Path | None = None) -> None:
     if "o_reorder_drafts" not in st.session_state:
         st.session_state["o_reorder_drafts"] = {}
 
-    datasets = load_operator_datasets(root=root_path)
-
     page_options = list(OPERATOR_PAGE_OPTIONS)
     page_labels = [label for label, _ in page_options]
     route_by_label = {label: route for label, route in page_options}
     label_by_route = {route: label for label, route in page_options}
+    valid_routes = set(label_by_route)
 
     def _query_page_route() -> str:
         raw = ""
@@ -8289,45 +18779,72 @@ def render_operator_ui(root: Path | None = None) -> None:
         route = _normalize_text(raw).lower().replace("-", "_")
         if route in OPERATOR_HIDDEN_PAGE_REDIRECTS:
             return OPERATOR_HIDDEN_PAGE_REDIRECTS[route]
-        return route if route in label_by_route else "reorder"
+        return route if route in valid_routes else "today"
 
     def _set_query_page_route(route: str) -> None:
-        safe_route = route if route in label_by_route else "reorder"
+        safe_route = route if route in valid_routes else "today"
         try:
             st.query_params["page"] = safe_route
         except Exception:
             st.experimental_set_query_params(page=safe_route)
 
+    def _navigate_to(route: str) -> None:
+        safe_route = _normalize_text(route).lower().replace("-", "_")
+        if safe_route in OPERATOR_HIDDEN_PAGE_REDIRECTS:
+            safe_route = OPERATOR_HIDDEN_PAGE_REDIRECTS[safe_route]
+        if safe_route not in valid_routes:
+            safe_route = "today"
+        st.session_state["o_active_page_route"] = safe_route
+        _set_query_page_route(safe_route)
+        st.rerun()
+
     if "o_active_page_route" not in st.session_state:
         st.session_state["o_active_page_route"] = _query_page_route()
     query_route = _query_page_route()
-    if query_route != st.session_state.get("o_active_page_route", "reorder"):
+    if query_route != st.session_state.get("o_active_page_route", "today"):
         st.session_state["o_active_page_route"] = query_route
-    active_page_route = _normalize_text(st.session_state.get("o_active_page_route", "reorder")).lower().replace("-", "_")
+    active_page_route = _normalize_text(st.session_state.get("o_active_page_route", "today")).lower().replace("-", "_")
     if active_page_route in OPERATOR_HIDDEN_PAGE_REDIRECTS:
         active_page_route = OPERATOR_HIDDEN_PAGE_REDIRECTS[active_page_route]
         st.session_state["o_active_page_route"] = active_page_route
-    elif active_page_route not in label_by_route:
-        active_page_route = "reorder"
+    elif active_page_route not in valid_routes:
+        active_page_route = "today"
         st.session_state["o_active_page_route"] = active_page_route
 
-    selected_page_label = st.radio(
-        "Page",
-        options=page_labels,
-        index=page_labels.index(label_by_route[active_page_route]),
-        key="o_page_route_nav",
-        horizontal=True,
+    dataset_names, f_dataset_names = _operator_dataset_names_for_route(active_page_route)
+    datasets = load_operator_datasets(root=root_path, names=dataset_names, f_names=f_dataset_names)
+
+    _set_query_page_route(active_page_route)
+    _render_operator_sidebar(
+        active_page_route=active_page_route,
+        label_by_route=label_by_route,
+        navigate_to=_navigate_to,
     )
-    selected_page_route = route_by_label[selected_page_label]
-    if selected_page_route != active_page_route:
-        st.session_state["o_active_page_route"] = selected_page_route
-        _set_query_page_route(selected_page_route)
-        st.rerun()
-    _set_query_page_route(selected_page_route)
-    active_page_route = selected_page_route
+    active_page_label = OPERATOR_NAV_LABELS.get(active_page_route, label_by_route.get(active_page_route, "Today"))
+    st.markdown(
+        _operator_shell_header_html(
+            active_page_label,
+            OPERATOR_PAGE_DESCRIPTIONS.get(active_page_route, ""),
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if active_page_route == "today":
+        _render_today_page(datasets, _navigate_to, root_path)
 
     if active_page_route == "reorder":
-        st.subheader("Reorder")
+        st.subheader("Old Reorder Workbench")
+        st.warning(
+            "This is the old dense supplier table. Use Restocking for the normal buying review."
+        )
+        show_legacy_reorder = st.checkbox(
+            "Show old dense reorder table",
+            value=False,
+            key="o_show_legacy_reorder_workbench",
+        )
+        if not show_legacy_reorder:
+            st.info("The cleaner Restocking page is the main working path. Nothing runs from this old page unless you open it and press its send controls.")
+            st.stop()
         reorder_df = build_reorder_input_df(datasets)
         st.caption(
             "Work one supplier at a time. Fill in Qty and Price only for the rows you are sending."
@@ -8418,6 +18935,9 @@ def render_operator_ui(root: Path | None = None) -> None:
                         st.session_state["o_recent_skipped_notice"] = _format_skipped_restock_rows(result["skipped_rows"])
                         st.rerun()
 
+    if active_page_route == "restock_session":
+        _render_restock_session_tab(root_path, datasets)
+
     if active_page_route == "price_list_queue":
         _render_price_list_queue_tab(root_path)
 
@@ -8448,78 +18968,10 @@ def render_operator_ui(root: Path | None = None) -> None:
         render_po_drafts_review_tab(datasets)
 
     if active_page_route == "receiving":
-        st.subheader("Receiving")
-        receiving_notice = _normalize_text(st.session_state.get("o_recent_receiving_notice", ""))
-        if receiving_notice:
-            st.markdown(_render_inline_notice(receiving_notice), unsafe_allow_html=True)
-
-        st.caption("Record stock that has arrived.")
-        st.subheader("Ordered Stock")
-        st.dataframe(datasets["ordered_stock_state"], width="stretch", hide_index=True)
-        st.subheader("Receiving Holds")
-        st.dataframe(datasets["receiving_event_holds"], width="stretch", hide_index=True)
-
-        with st.form("receiving_event_form"):
-            po_id = st.text_input("PO ID")
-            po_line_id = st.text_input("PO Line ID")
-            seller_sku = st.text_input("SKU", key="receiving_seller_sku")
-            received_qty = st.text_input("Received Qty")
-            warehouse_ref = st.text_input("Warehouse Ref")
-            note = st.text_input("Note", value="")
-            submitted = st.form_submit_button("Record Receipt")
-
-        if submitted:
-            row = submit_receiving_event(
-                root=root_path,
-                po_id=po_id,
-                po_line_id=po_line_id,
-                seller_sku=seller_sku,
-                received_qty=received_qty,
-                warehouse_ref=warehouse_ref,
-                note=note,
-                actor="operator_ui",
-            )
-            st.session_state["o_recent_receiving_notice"] = f"Receipt recorded for {seller_sku or row['event_id']}."
-            st.rerun()
+        _render_receiving_tab(root_path, datasets)
 
     if active_page_route == "send_to_amazon":
-        st.subheader("Send to Amazon")
-        handoff_notice = _normalize_text(st.session_state.get("o_recent_handoff_notice", ""))
-        if handoff_notice:
-            st.markdown(_render_inline_notice(handoff_notice), unsafe_allow_html=True)
-
-        st.caption("Record stock that is ready to send in.")
-        st.subheader("Queue")
-        st.dataframe(datasets["send_to_amazon_queue"], width="stretch", hide_index=True)
-        st.subheader("Handoff Log")
-        st.dataframe(datasets["send_to_amazon_handoff_log"], width="stretch", hide_index=True)
-        st.subheader("Handoff Holds")
-        st.dataframe(datasets["send_to_amazon_handoff_holds"], width="stretch", hide_index=True)
-
-        with st.form("handoff_event_form"):
-            po_id = st.text_input("PO ID", key="handoff_po_id")
-            po_line_id = st.text_input("PO Line ID", key="handoff_po_line_id")
-            seller_sku = st.text_input("SKU", key="handoff_seller_sku")
-            handoff_qty = st.text_input("Handoff Qty")
-            shipment_ref = st.text_input("Shipment Ref")
-            handoff_status = st.selectbox("Status", options=list(HANDOFF_STATUSES))
-            note = st.text_input("Note", value="", key="handoff_note")
-            submitted = st.form_submit_button("Record Handoff")
-
-        if submitted:
-            row = submit_send_handoff_event(
-                root=root_path,
-                po_id=po_id,
-                po_line_id=po_line_id,
-                seller_sku=seller_sku,
-                handoff_qty=handoff_qty,
-                shipment_ref=shipment_ref,
-                handoff_status=handoff_status,
-                note=note,
-                actor="operator_ui",
-            )
-            st.session_state["o_recent_handoff_notice"] = f"Handoff recorded for {seller_sku or row['event_id']}."
-            st.rerun()
+        _render_send_to_amazon_tab(root_path, datasets)
 
 
 def main() -> None:

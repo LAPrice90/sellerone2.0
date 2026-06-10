@@ -1,0 +1,10 @@
+{
+  "source_id": "B_SELLERBOARD_EMAIL_ADMIN_INBOX",
+  "source_access_method": "local_gmail_oauth",
+  "expected_source_mailbox": "admin@drjselect.co.uk",
+  "gmail_label": "Sellerboard",
+  "gmail_token_path": "secrets/price_list_manager/gmail_token.json",
+  "gmail_client_secret_path": "secrets/price_list_manager/gmail_client_secret.json",
+  "required_attachment_name_contains": "OrderList",
+  "notes": "B Sellerboard daily email intake should use the same local Gmail OAuth doorway as FPM016. The local token is only the doorway; B is not manager-proven until read-only source proof sees the Sellerboard label, message, and OrderList attachment metadata. Authorization remains a Luke decision only if the local OAuth files are missing or invalid."
+}

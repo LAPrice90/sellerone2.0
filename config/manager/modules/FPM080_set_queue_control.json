@@ -1,0 +1,63 @@
+{
+  "id": "FPM080_set_queue_control",
+  "display_name": "FPM080 Queue Control Setter",
+  "flow": "F",
+  "purpose": "Register the queue-control writer so the manager can inspect existing supplier priority controls without adding, clearing, or changing them.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM080_set_queue_control.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM080_set_queue_control.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "queue_controls",
+      "path": "out/systems/F/price_list_manager/test_mode/queue_controls.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "status_dashboard",
+      "path": "out/systems/F/price_list_manager/test_mode/status_dashboard.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "queue_controls",
+      "path": "out/systems/F/price_list_manager/test_mode/queue_controls.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "queue_control_rows_are_control_history_not_permission",
+    "queue_control_changes_need_separate_approval"
+  ],
+  "needs_user_signals": [
+    "queue_control_change_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. Reading existing queue controls is allowed; setting or clearing queue controls is protected and outside MOT."
+}

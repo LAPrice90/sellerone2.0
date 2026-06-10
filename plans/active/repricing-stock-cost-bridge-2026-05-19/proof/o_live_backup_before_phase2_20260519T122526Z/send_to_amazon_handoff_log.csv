@@ -1,0 +1,1 @@
+event_utc,event_id,po_id,po_line_id,seller_sku,asin,handoff_qty,shipment_ref,handoff_status,actor,cost_mode,recommendation_basis,source_event_id,note,available_before_handoff,available_after_handoff

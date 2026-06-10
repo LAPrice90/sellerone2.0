@@ -1,0 +1,89 @@
+{
+  "id": "FPM070_stage_f061_handoff",
+  "display_name": "FPM070 Stage F061 Handoff",
+  "flow": "F",
+  "purpose": "Describe the staged F061 handoff builder so the manager can inspect staged handoff readiness and block reasons without applying anything to the live scanner.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM070_stage_f061_handoff.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM070_stage_f061_handoff.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "f061_handoff_preview",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_preview.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "manager_decisions",
+      "path": "out/systems/F/price_list_manager/test_mode/manager_decisions.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "batch_scan_eligibility",
+      "path": "out/systems/F/price_list_manager/test_mode/batch_scan_eligibility.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "f061_handoff_approvals",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_approvals.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "f061_handoff_preview",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_preview.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "staged_active_run",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_staged_active_run.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "staged_run_state",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_staged_run_state.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "f061_handoff_preview_warn_after_10080_minutes",
+    "staged_files_must_not_be_treated_as_live_queue",
+    "live_apply_requires_separate_approval"
+  ],
+  "needs_user_signals": [
+    "handoff_approval_required",
+    "f061_not_idle",
+    "source_shape_guard_blocked"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "align_local_db",
+    "apply_live_handoff"
+  ],
+  "manager_notes": "V1.3 registration only. The manager may read staged handoff evidence but must not run this script, request live apply, approve handoff, or write live F061 queue files."
+}

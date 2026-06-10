@@ -148,6 +148,127 @@ def test_o001_prefers_30_day_velocity_row_when_multiple_windows_exist(tmp_path: 
         "2026-04-03T09:00:00Z,2026-04-03,SKU-001,ASIN001,9.0,9.2,1,9.1\n",
         encoding="utf-8",
     )
+    (out_dir / "inbound_costs_allocated_sku.csv").write_text(
+        "shipment_id,sku,received_qty,total_received_qty,currency,allocated_amount,allocated_tax,allocated_total\n"
+        "SHIP-1,SKU-001,10,10,GBP,5,1,6\n",
+        encoding="utf-8",
+    )
+    (out_dir / "order_master.csv").write_text(
+        "Date,Order ID,country_code,SKU,Quantity Ordered,currency_code,Price_ExVAT,COGS_ExVAT,FBA_Fee_ExVAT\n",
+        encoding="utf-8",
+    )
+    live = out_dir / "systems" / "O" / "live"
+    live.mkdir(parents=True, exist_ok=True)
+    (live / "restock_token_cost_trust_gate_live.csv").write_text(
+        "proof_utc,seller_sku,current_token_cost_gbp,token_cost_trust_state,token_cost_trust_basis,"
+        "token_cost_trust_source,token_cost_trust_blockers,b_fallback_audit_rows,b_weak_fallback_rows_for_sku,"
+        "token_ledger_fallback_rows_for_sku,safe_for_clean_buy,safe_for_po,source_path\n"
+        "2026-04-03T11:00:00Z,SKU-001,5.0,trusted,no_b_fallback_cost_risk_for_sku,"
+        "out/systems/B/refunds/b_fallback_token_cost_audit.csv,,1,0,0,1,1,out/sku_performance_summary.csv\n",
+        encoding="utf-8",
+    )
+
+    out_df = build_restock_source_view(root=tmp_path, asof_utc="2026-04-03T11:00:00Z")
+    row = out_df.loc[out_df["seller_sku"] == "SKU-001"].iloc[0]
+    assert row["velocity_30d"] == "1.1"
+
+
+def test_o001_carries_refund_confidence_fields_from_performance_summary(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "product_db_preview.csv").write_text(
+        "seller_sku,asin,supplier_code,supplier_name,supplier_pack_size,moq,supplier_catalog_price,last_purchase_price,sale_status,vat_rate\n"
+        "SKU-001,ASIN001,SUP-A,Alpha,1,1,5.0,4.8,active,20\n",
+        encoding="utf-8",
+    )
+    (out_dir / "inventory_summaries.csv").write_text(
+        "seller_sku,asin,total_quantity,available,inbound_working,inbound_shipped,inbound_receiving,last_updated_time\n"
+        "SKU-001,ASIN001,5,2,0,0,0,2026-04-03T09:00:00Z\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_sales_velocity.csv").write_text(
+        "sku,v7,v30,v90,available,total_quantity,asof_date\n"
+        "SKU-001,1.1,1.0,0.9,2,5,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_performance_summary.csv").write_text(
+        "sku,expected_refund_cost_per_unit_gbp,refund_unit_rate_30d,refund_unit_rate_90d,refund_units_30d,sales_units_30d,refund_cost_basis,refund_proof_state,refund_sample_confidence,roi_at_our_price_pct,roi_at_buy_box_price_pct,break_even_price_gbp,current_token_cost_gbp,asof_date\n"
+        "SKU-001,0.6,0.1,0.08,1,10,sale_cohort_90d,api_proved_or_not_applicable,high,20,21,6.0,5.0,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "listing_offer_snapshot_latest.csv").write_text(
+        "timestamp_utc,asof_date,sku,asin,our_price,buy_box_price,buy_box_present_flag,lowest_fba_price\n"
+        "2026-04-03T09:00:00Z,2026-04-03,SKU-001,ASIN001,9.0,9.2,1,9.1\n",
+        encoding="utf-8",
+    )
+    (out_dir / "inbound_costs_allocated_sku.csv").write_text(
+        "shipment_id,sku,received_qty,total_received_qty,currency,allocated_amount,allocated_tax,allocated_total\n"
+        "SHIP-1,SKU-001,10,10,GBP,5,1,6\n",
+        encoding="utf-8",
+    )
+    (out_dir / "order_master.csv").write_text(
+        "Date,Order ID,country_code,SKU,Quantity Ordered,currency_code,Price_ExVAT,COGS_ExVAT,FBA_Fee_ExVAT\n",
+        encoding="utf-8",
+    )
+    live = out_dir / "systems" / "O" / "live"
+    live.mkdir(parents=True, exist_ok=True)
+    (live / "restock_token_cost_trust_gate_live.csv").write_text(
+        "proof_utc,seller_sku,current_token_cost_gbp,token_cost_trust_state,token_cost_trust_basis,"
+        "token_cost_trust_source,token_cost_trust_blockers,b_fallback_audit_rows,b_weak_fallback_rows_for_sku,"
+        "token_ledger_fallback_rows_for_sku,safe_for_clean_buy,safe_for_po,source_path\n"
+        "2026-04-03T11:00:00Z,SKU-001,5.0,trusted,no_b_fallback_cost_risk_for_sku,"
+        "out/systems/B/refunds/b_fallback_token_cost_audit.csv,,1,0,0,1,1,out/sku_performance_summary.csv\n",
+        encoding="utf-8",
+    )
+
+    out_df = build_restock_source_view(root=tmp_path, asof_utc="2026-04-03T11:00:00Z")
+    row = out_df.loc[out_df["seller_sku"] == "SKU-001"].iloc[0]
+    assert row["expected_refund_cost_per_unit_gbp"] == "0.6"
+    assert row["refund_unit_rate_30d"] == "0.1"
+    assert row["refund_unit_rate_90d"] == "0.08"
+    assert row["refund_cost_basis"] == "sale_cohort_90d"
+    assert row["refund_proof_state"] == "api_proved_or_not_applicable"
+    assert row["expected_inbound_cost_per_unit_gbp"] == "0.6"
+    assert row["inbound_cost_basis"] == "allocated_inbound_cost_per_received_unit"
+    assert row["inbound_cost_confidence"] == "sku_allocated"
+    assert row["profit_input_confidence"] == "profit_inputs_verified"
+    assert row["profit_input_blockers"] == ""
+    assert "REFUND_PROOF_WEAK" not in row["source_notes"]
+
+
+def test_o001_carries_e_roi_and_restock_confidence_fields(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "product_db_preview.csv").write_text(
+        "seller_sku,asin,supplier_code,supplier_name,supplier_pack_size,moq,supplier_catalog_price,last_purchase_price,sale_status,vat_rate\n"
+        "SKU-001,ASIN001,SUP-A,Alpha,1,1,5.0,4.8,active,20\n",
+        encoding="utf-8",
+    )
+    (out_dir / "inventory_summaries.csv").write_text(
+        "seller_sku,asin,total_quantity,available,inbound_working,inbound_shipped,inbound_receiving,last_updated_time\n"
+        "SKU-001,ASIN001,5,2,0,0,0,2026-04-03T09:00:00Z\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_sales_velocity.csv").write_text(
+        "sku,v7,v30,v90,available,total_quantity,asof_date\n"
+        "SKU-001,1.1,1.0,0.9,2,5,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_performance_summary.csv").write_text(
+        "sku,expected_refund_cost_per_unit_gbp,refund_unit_rate_30d,refund_unit_rate_90d,refund_units_30d,sales_units_30d,refund_cost_basis,refund_proof_state,refund_sample_confidence,profit_confidence,sales_truth_state,stock_signal,restock_business_ready,restock_decision_state,restock_missing_proof,missing_roi_reason,missing_roi_reason_detail,roi_at_our_price_pct,roi_at_buy_box_price_pct,break_even_price_gbp,current_token_cost_gbp,asof_date\n"
+        "SKU-001,0.6,0.1,0.08,1,10,sale_cohort_90d,api_proved_or_not_applicable,high,profit_missing,velocity_only,yes,no,blocked_missing_roi,missing_roi;velocity_only_sales_truth,velocity_only_sales_truth,velocity_only_sales_truth,20,21,6.0,5.0,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "listing_offer_snapshot_latest.csv").write_text(
+        "timestamp_utc,asof_date,sku,asin,our_price,buy_box_price,buy_box_present_flag,lowest_fba_price\n"
+        "2026-04-03T09:00:00Z,2026-04-03,SKU-001,ASIN001,9.0,9.2,1,9.1\n",
+        encoding="utf-8",
+    )
+    (out_dir / "inbound_costs_allocated_sku.csv").write_text(
+        "shipment_id,sku,received_qty,total_received_qty,currency,allocated_amount,allocated_tax,allocated_total\n"
+        "SHIP-1,SKU-001,10,10,GBP,5,1,6\n",
+        encoding="utf-8",
+    )
     (out_dir / "order_master.csv").write_text(
         "Date,Order ID,country_code,SKU,Quantity Ordered,currency_code,Price_ExVAT,COGS_ExVAT,FBA_Fee_ExVAT\n",
         encoding="utf-8",
@@ -155,7 +276,56 @@ def test_o001_prefers_30_day_velocity_row_when_multiple_windows_exist(tmp_path: 
 
     out_df = build_restock_source_view(root=tmp_path, asof_utc="2026-04-03T11:00:00Z")
     row = out_df.loc[out_df["seller_sku"] == "SKU-001"].iloc[0]
-    assert row["velocity_30d"] == "1.1"
+    assert row["profit_confidence"] == "profit_missing"
+    assert row["sales_truth_state"] == "velocity_only"
+    assert row["stock_signal"] == "yes"
+    assert row["restock_business_ready"] == "no"
+    assert row["restock_decision_state"] == "blocked_missing_roi"
+    assert row["restock_missing_proof"] == "missing_roi;velocity_only_sales_truth"
+    assert row["missing_roi_reason"] == "velocity_only_sales_truth"
+    assert row["missing_roi_reason_detail"] == "velocity_only_sales_truth"
+
+
+def test_o001_labels_missing_inbound_cost_confidence_without_zero_cost(tmp_path: Path) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "product_db_preview.csv").write_text(
+        "seller_sku,asin,supplier_code,supplier_name,supplier_pack_size,moq,supplier_catalog_price,last_purchase_price,sale_status,vat_rate\n"
+        "SKU-001,ASIN001,SUP-A,Alpha,1,1,5.0,4.8,active,20\n",
+        encoding="utf-8",
+    )
+    (out_dir / "inventory_summaries.csv").write_text(
+        "seller_sku,asin,total_quantity,available,inbound_working,inbound_shipped,inbound_receiving,last_updated_time\n"
+        "SKU-001,ASIN001,5,2,0,0,0,2026-04-03T09:00:00Z\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_sales_velocity.csv").write_text(
+        "sku,v7,v30,v90,available,total_quantity,asof_date\n"
+        "SKU-001,1.1,1.0,0.9,2,5,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "sku_performance_summary.csv").write_text(
+        "sku,expected_refund_cost_per_unit_gbp,refund_unit_rate_30d,refund_unit_rate_90d,refund_units_30d,sales_units_30d,refund_cost_basis,refund_proof_state,refund_sample_confidence,roi_at_our_price_pct,roi_at_buy_box_price_pct,break_even_price_gbp,current_token_cost_gbp,asof_date\n"
+        "SKU-001,0.6,0.1,0.08,1,10,sale_cohort_90d,api_proved_or_not_applicable,high,20,21,6.0,5.0,2026-04-03\n",
+        encoding="utf-8",
+    )
+    (out_dir / "listing_offer_snapshot_latest.csv").write_text(
+        "timestamp_utc,asof_date,sku,asin,our_price,buy_box_price,buy_box_present_flag,lowest_fba_price\n"
+        "2026-04-03T09:00:00Z,2026-04-03,SKU-001,ASIN001,9.0,9.2,1,9.1\n",
+        encoding="utf-8",
+    )
+    (out_dir / "order_master.csv").write_text(
+        "Date,Order ID,country_code,SKU,Quantity Ordered,currency_code,Price_ExVAT,COGS_ExVAT,FBA_Fee_ExVAT\n",
+        encoding="utf-8",
+    )
+
+    out_df = build_restock_source_view(root=tmp_path, asof_utc="2026-04-03T11:00:00Z")
+    row = out_df.loc[out_df["seller_sku"] == "SKU-001"].iloc[0]
+    assert row["expected_inbound_cost_per_unit_gbp"] == ""
+    assert row["inbound_cost_confidence"] == "missing"
+    assert row["profit_input_confidence"] == "missing_profit_inputs"
+    assert "missing_inbound_cost_confidence" in row["profit_input_blockers"]
+    assert "INBOUND_COST_CONFIDENCE_MISSING" in row["source_notes"]
 
 
 def test_o001_builds_coverage_classification_and_market_fallback_from_product_db(tmp_path: Path) -> None:

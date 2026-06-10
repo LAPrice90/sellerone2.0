@@ -1,0 +1,65 @@
+{
+  "id": "FPM126_update_memory_from_f061_results",
+  "display_name": "FPM126 Update Memory From F061 Results",
+  "flow": "F",
+  "purpose": "Register live F061 memory updates so the manager can inspect memory proof without applying scan-result memory changes.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM126_update_memory_from_f061_results.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM126_update_memory_from_f061_results.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "f061_recovery_progress",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_recovery_progress.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "f_screening_row_state_live",
+      "path": "out/systems/F/live/f_screening_row_state_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "barcode_scan_memory",
+      "path": "out/systems/F/price_list_manager/test_mode/barcode_scan_memory.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "f061_memory_update_warn_after_10080_minutes",
+    "memory_update_from_f061_results_is_worker_action"
+  ],
+  "needs_user_signals": [
+    "f061_memory_update_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "update_scan_memory",
+    "merge_recovered_rows",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may read F061 memory evidence but must not update memory, merge rows, or run F061."
+}

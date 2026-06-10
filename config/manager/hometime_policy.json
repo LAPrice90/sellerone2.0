@@ -1,0 +1,44 @@
+{
+  "policy_id": "hometime_mode_manager_v1",
+  "status": "active",
+  "mode": "hometime",
+  "pulse_minutes": 30,
+  "finish_rule": "jobs_settled",
+  "autonomy_level": "maximum_safe",
+  "notification_email": "laprice90@gmail.com",
+  "current_weekend_plan": "sellerone_manager/HOMETIME_PLAN_20260606_WEEKEND.md",
+  "weekend_mode_active": true,
+  "primary_weekend_goal": "F Seller Central login and Dashboard Yes/No proof ready for Monday",
+  "f_child_pulse_minutes": 10,
+  "f_child_drop_to_minutes_after_proof": 30,
+  "email_real_blockers_only": true,
+  "preflight_permissions_before_leaving": true,
+  "email_surprise_blockers_only": true,
+  "duplicate_email_cooldown_minutes": 240,
+  "business_decisions_delegated": false,
+  "allowed_plain_english": [
+    "manager MOT refreshes",
+    "manager-approved safe code work",
+    "read-only proof checks",
+    "approved proof windows when the task packet already allows them",
+    "controlled technical pause and resume only when restore proof is built into the packet"
+  ],
+  "blocked_plain_english": [
+    "price changes",
+    "queue edits",
+    "Google Sheets writes",
+    "publishing",
+    "Product DB or local DB alignment",
+    "output deletion",
+    "worker restart without approval",
+    "live worker run without approved proof",
+    "business judgement"
+  ],
+  "first_job_focus": [
+    "F login/code-source proof and Dashboard Yes/No proof",
+    "F scanner forward-progress proof once login is stable",
+    "B order/token proof checks for Monday restocking readiness",
+    "O restock view readiness checks",
+    "E/H read-only confidence and safety checks only"
+  ]
+}

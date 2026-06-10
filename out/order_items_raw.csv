@@ -1,1 +1,4 @@
-
+amazon_order_id,asin,seller_sku,order_item_id,title,quantity_ordered,quantity_shipped,item_price_amount,item_price_currency,item_tax_amount,item_tax_currency,shipping_price_amount,shipping_price_currency,shipping_tax_amount,shipping_tax_currency,giftwrap_price_amount,giftwrap_price_currency,giftwrap_tax_amount,giftwrap_tax_currency,promotion_discount_amount,promotion_discount_currency,promotion_discount_tax_amount,promotion_discount_tax_currency,is_gift,is_transparency,condition_id,condition_subtype_id
+205-5755123-2081148,B06WW79DX5,6V-EEC1-2S9Z,64184292505802,3 X Everbuild CYN20 20g General Purpose Industrial Superglue,1,0,,,,,,,,,,,,,,,,,false,False,,
+205-7446965-8587568,B06WW79DX5,6V-EEC1-2S9Z,64181751676402,3 X Everbuild CYN20 20g General Purpose Industrial Superglue,1,0,,,,,,,,,,,,,,,,,false,False,,
+206-0671175-8018749,B06WW79DX5,6V-EEC1-2S9Z,64181751231922,3 X Everbuild CYN20 20g General Purpose Industrial Superglue,1,0,,,,,,,,,,,,,,,,,false,False,,

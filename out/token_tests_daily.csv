@@ -1,6 +1,0 @@
-timestamp,check,status,detail
-2026-01-28T11:23:23.513759+00:00,ledger_freshness,PASS,ledger latest: 2026-01-27T00:00:00+00:00
-2026-01-28T11:23:23.513759+00:00,adjustment_partials,WARN,"partial adjustments: 4; top_skus={'VF-3T0K-DR5O': 1, 'MY-KL21-NMV5': 1, 'XH-0LAE-FQO5': 1, '6V-EEC1-2S9Z': 1}"
-2026-01-28T11:23:23.513759+00:00,token_recon_mismatches,WARN,"mismatches: 70; top_skus={'0H-5V53-GPG4': 1, '1U-1W76-M840': 1, '3B-3H3V-Z93T': 1, '3X-EXDD-TD2K': 1, '4U-9ZL6-9G0Y': 1}"
-2026-01-28T11:23:23.513759+00:00,duplicate_token_ids,PASS,no duplicate token_id
-2026-01-28T11:23:23.513759+00:00,tokens_vs_nov_demand,FAIL,"nov demand/token mismatches: 29; top=3B-3H3V-Z93T:tgt=39,tok=41; 4U-9ZL6-9G0Y:tgt=0,tok=1; 4W-VS57-BV6A:tgt=27,tok=25; 6V-EEC1-2S9Z:tgt=1543,tok=1544; 86-1VHQ-ABNK:tgt=38,tok=39"

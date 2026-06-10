@@ -92,6 +92,32 @@ def test_storage_drift_apply_updates_sql_and_clears_mismatch(tmp_path: Path, mon
     assert sql_rows == 3
 
 
+def test_storage_drift_apply_blocks_when_sql_is_newer_than_csv(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SELLERONE_STORAGE_MODE", "sql_primary_csv_export")
+    monkeypatch.setenv("SELLERONE_SQLITE_PATH", str(tmp_path / "sellerone.sqlite3"))
+    root = tmp_path / "repo"
+    sql_rows = _active_rows(3)
+    sql_rows.loc[1:, "source_seen_at_utc"] = "2026-05-25T12:00:00Z"
+    write_f_contract_df(root, "supplier_price_list_active_run", sql_rows)
+    _overwrite_active_csv(root, 1, updated="2026-05-21T12:00:00Z")
+
+    summary = run_storage_drift_check(
+        root=root,
+        contracts=["supplier_price_list_active_run"],
+        observed_utc="2026-05-26T12:00:00Z",
+        apply=True,
+        require_sql_mode=True,
+        backup=True,
+    )
+
+    assert summary["status"] == "blocked_storage_drift"
+    assert summary["blocked_rows"] == 1
+    assert summary["rows"][0]["status_before"] == "unsafe_sql_newer_drift"
+    assert summary["rows"][0]["action"] == "blocked"
+    csv_path = root / "out" / "systems" / "F" / "inbox" / "supplier_price_list_active_run.csv"
+    assert len(pd.read_csv(csv_path, dtype=str).fillna("").index) == 1
+
+
 def test_storage_drift_ok_check_does_not_create_full_backup(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SELLERONE_STORAGE_MODE", "sql_primary_csv_export")
     monkeypatch.setenv("SELLERONE_SQLITE_PATH", str(tmp_path / "sellerone.sqlite3"))

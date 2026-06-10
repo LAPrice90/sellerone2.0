@@ -317,16 +317,28 @@ def _reconcile_token_ledger_with_allocations(token_df: pd.DataFrame, alloc_df: p
     if not mask.any():
         return updated, 0
 
-    updated.loc[mask, "status"] = "allocated"
-    blank_order_mask = mask & updated["allocated_order_id"].str.strip().eq("")
-    blank_date_mask = mask & updated["allocated_date"].str.strip().eq("")
+    protected_return_statuses = {
+        "returned_pending",
+        "returned_complete",
+        "research_pending",
+        "unsellable",
+        "disposed",
+    }
+    status_norm = updated["status"].astype(str).str.strip().str.lower()
+    allocatable_mask = mask & ~status_norm.isin(protected_return_statuses)
+    if not allocatable_mask.any():
+        return updated, 0
+
+    updated.loc[allocatable_mask, "status"] = "allocated"
+    blank_order_mask = allocatable_mask & updated["allocated_order_id"].str.strip().eq("")
+    blank_date_mask = allocatable_mask & updated["allocated_date"].str.strip().eq("")
     updated.loc[blank_order_mask, "allocated_order_id"] = updated.loc[blank_order_mask, "token_id"].map(
         lambda token_id: alloc_map.get(token_id, {}).get("order_id", "")
     )
     updated.loc[blank_date_mask, "allocated_date"] = updated.loc[blank_date_mask, "token_id"].map(
         lambda token_id: alloc_map.get(token_id, {}).get("order_date", "")
     )
-    return updated, int(mask.sum())
+    return updated, int(allocatable_mask.sum())
 
 
 def _build_shortage_by_sku(

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
+from scripts.core.safe_file_writes import safe_to_csv
 try:
     import gspread
     from gspread.exceptions import APIError
@@ -45,9 +46,11 @@ PNL_SUMMARY_TAB = os.environ.get("PNL_SUMMARY_TAB", "P&L_Summary")
 PNL_FORMAT_SHEETS = os.environ.get("PNL_FORMAT_SHEETS", "1").strip() == "1"
 PNL_SUMMARY_ONLY = os.environ.get("PNL_SUMMARY_ONLY", "0").strip() == "1"
 PNL_PUBLISH = os.environ.get("PNL_PUBLISH", "0").strip() == "1"
+PNL_WRITE_SHEETS = os.environ.get("PNL_WRITE_SHEETS", "1").strip() == "1"
 if os.environ.get("B_CYCLE_QUIET", "0").strip() == "1" and not PNL_PUBLISH:
     PNL_WRITE_DAILY = False
     PNL_MONTHLY_TABS = False
+    PNL_WRITE_SHEETS = False
 
 SHEETS_MAX_RETRIES = int(os.environ.get("PNL_SHEETS_MAX_RETRIES", "8"))
 SHEETS_BACKOFF = float(os.environ.get("PNL_SHEETS_BACKOFF", "5.0"))
@@ -55,6 +58,11 @@ SHEETS_BACKOFF = float(os.environ.get("PNL_SHEETS_BACKOFF", "5.0"))
 ROWS = [
     "Quantity Ordered",
     "Cancelled_Orders_Seen",
+    "Gross_Units_Sold",
+    "Refund_Units",
+    "Net_Units_Sold",
+    "Refund_Unit_Rate",
+    "Refunded_Order_Count",
     "Price_Total",
     "Price_VAT",
     "Price_ExVAT",
@@ -270,6 +278,7 @@ def _apply_sheet_formatting(sheet: gspread.Spreadsheet, tab_name: str, df: pd.Da
         ("Storage_Charges", "Storage_Charges"),
         ("Subscription_Fee_Total", "Subscription_Fee_ExVAT"),
         ("Service_Fee_VAT", "Service_Fee_VAT"),
+        ("Gross_Units_Sold", "Refunded_Order_Count"),
         ("Gross_Profit_ExVAT", "Contribution_Profit_ExVAT"),
         ("Payout_Estimate", "VAT_Difference"),
     ]
@@ -635,12 +644,15 @@ def main() -> None:
         data_map[row_name][date_str] = data_map[row_name].get(date_str, 0.0) + value
 
     # Add refunds from Level 3 official refunds (source of truth) to avoid window gaps.
+    official_refunds_loaded = False
     if REFUNDS_OFFICIAL.exists():
         ref = pd.read_csv(REFUNDS_OFFICIAL, dtype=str).fillna("")
         if not ref.empty:
+            official_refunds_loaded = True
             ref["date"] = _date_key(ref["Date"])
             ref = ref[ref["date"].astype(str) >= PNL_START_DATE]
             for col in [
+                "Quantity Ordered",
                 "Price_Total",
                 "Shipping_Total",
                 "Gift_Total",
@@ -671,6 +683,14 @@ def main() -> None:
             if "Commission_Total" in ref.columns:
                 for date_str, val in ref["Commission_Total"].groupby(ref["date"]).sum().items():
                     _add_to_map("Refund_Commission", date_str, float(val))
+            if "Quantity Ordered" in ref.columns:
+                ref["Refund_Units"] = pd.to_numeric(ref.get("Quantity Ordered"), errors="coerce").fillna(0.0).abs()
+                ref.loc[ref["Refund_Units"] <= 0, "Refund_Units"] = 1.0
+                for date_str, val in ref["Refund_Units"].groupby(ref["date"]).sum().items():
+                    _add_to_map("Refund_Units", date_str, float(val))
+                if "Order ID" in ref.columns:
+                    for date_str, val in ref.groupby("date")["Order ID"].nunique().items():
+                        _add_to_map("Refunded_Order_Count", date_str, float(val))
 
     # Add transaction-level expenses from normalized category ledger when available.
     cash_total_by_date: Dict[str, float] = {}
@@ -740,6 +760,8 @@ def main() -> None:
                 if ttype == "Shipment":
                     continue
                 if ttype == "Refund":
+                    if official_refunds_loaded:
+                        continue
                     if btype == "Refunded Sales":
                         _add_to_map("Refund_Sales_Total", date_str, amt)
                     elif btype == "Refunded Expenses":
@@ -774,6 +796,12 @@ def main() -> None:
     for row in data_map.values():
         all_dates.update(row.keys())
     date_cols = sorted(all_dates)
+    for d in date_cols:
+        gross_units = float(data_map.get("Quantity Ordered", {}).get(d, 0.0))
+        refund_units = float(data_map.get("Refund_Units", {}).get(d, 0.0))
+        data_map.setdefault("Gross_Units_Sold", {})[d] = gross_units
+        data_map.setdefault("Net_Units_Sold", {})[d] = gross_units - refund_units
+        data_map.setdefault("Refund_Unit_Rate", {})[d] = (refund_units / gross_units) if gross_units > 0 else 0.0
 
     rows: List[Dict[str, object]] = []
     for name in ROWS:
@@ -781,9 +809,14 @@ def main() -> None:
         total = 0.0
         for d in date_cols:
             val = data_map.get(name, {}).get(d, 0.0)
-            row[d] = round(val, 2)
+            row[d] = round(val, 6) if name == "Refund_Unit_Rate" else round(val, 2)
             total += val
-        row["Total"] = round(total, 2)
+        if name == "Refund_Unit_Rate":
+            total_refund_units = sum(float(data_map.get("Refund_Units", {}).get(d, 0.0)) for d in date_cols)
+            total_gross_units = sum(float(data_map.get("Gross_Units_Sold", {}).get(d, 0.0)) for d in date_cols)
+            row["Total"] = round((total_refund_units / total_gross_units) if total_gross_units > 0 else 0.0, 6)
+        else:
+            row["Total"] = round(total, 2)
         rows.append(row)
 
     profit_row = {"Parameter/Date": "Net_Profit_ExVAT"}
@@ -875,32 +908,33 @@ def main() -> None:
     out_cols = ["Parameter/Date"] + date_cols + ["Total"]
     df_out = pd.DataFrame(rows, columns=out_cols)
     OUT_PNL.parent.mkdir(parents=True, exist_ok=True)
-    df_out.to_csv(OUT_PNL, index=False)
+    safe_to_csv(df_out, OUT_PNL, index=False)
 
-    try:
-        if gspread is None:
-            raise RuntimeError("gspread not available")
-        client = get_gspread_client()
-        sheet = client.open_by_key(PNL_SHEET_ID)
-        if PNL_WRITE_DAILY and not PNL_SUMMARY_ONLY:
-            write_tab_with_retry(sheet, PNL_TAB, df_out)
-            if PNL_FORMAT_SHEETS:
-                _apply_sheet_formatting(sheet, PNL_TAB, df_out)
-        if PNL_MONTHLY_TABS and not PNL_SUMMARY_ONLY:
-            monthly_tabs = _build_monthly_tabs(df_out)
-            for tab_name, tab_df in monthly_tabs.items():
-                write_tab_with_retry(sheet, tab_name, tab_df)
+    if PNL_WRITE_SHEETS:
+        try:
+            if gspread is None:
+                raise RuntimeError("gspread not available")
+            client = get_gspread_client()
+            sheet = client.open_by_key(PNL_SHEET_ID)
+            if PNL_WRITE_DAILY and not PNL_SUMMARY_ONLY:
+                write_tab_with_retry(sheet, PNL_TAB, df_out)
                 if PNL_FORMAT_SHEETS:
-                    _apply_sheet_formatting(sheet, tab_name, tab_df)
-        summary_df = _build_summary_tab(df_out)
-        if not summary_df.empty:
-            write_tab_with_retry(sheet, PNL_SUMMARY_TAB, summary_df)
-            if PNL_FORMAT_SHEETS:
-                _apply_sheet_formatting(sheet, PNL_SUMMARY_TAB, summary_df)
-    except Exception as exc:
-        print({"status": "warning", "alert": "sheets_error", "error": str(exc)})
+                    _apply_sheet_formatting(sheet, PNL_TAB, df_out)
+            if PNL_MONTHLY_TABS and not PNL_SUMMARY_ONLY:
+                monthly_tabs = _build_monthly_tabs(df_out)
+                for tab_name, tab_df in monthly_tabs.items():
+                    write_tab_with_retry(sheet, tab_name, tab_df)
+                    if PNL_FORMAT_SHEETS:
+                        _apply_sheet_formatting(sheet, tab_name, tab_df)
+            summary_df = _build_summary_tab(df_out)
+            if not summary_df.empty:
+                write_tab_with_retry(sheet, PNL_SUMMARY_TAB, summary_df)
+                if PNL_FORMAT_SHEETS:
+                    _apply_sheet_formatting(sheet, PNL_SUMMARY_TAB, summary_df)
+        except Exception as exc:
+            print({"status": "warning", "alert": "sheets_error", "error": str(exc)})
 
-    print({"status": "success", "rows": len(df_out), "snapshot": str(OUT_PNL), "start_date": PNL_START_DATE})
+    print({"status": "success", "rows": len(df_out), "snapshot": str(OUT_PNL), "start_date": PNL_START_DATE, "write_sheets": PNL_WRITE_SHEETS})
 
 
 if __name__ == "__main__":

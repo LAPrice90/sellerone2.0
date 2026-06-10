@@ -6,15 +6,15 @@ The E cycle is the analytics layer that converts core operational data into deci
 ## SECTION 1 - Completion Definition
 | Feature | Description | Status | Notes |
 |---|---|---|---|
-| E cycle runner | E cycle executes defined analytics sequence | In Progress | `run_E_cycle.py` orchestrates E001-E005 |
-| Sales velocity output | Velocity metrics are produced | In Progress | Implemented in E001 |
-| ROI snapshot output | ROI snapshots are produced | In Progress | Implemented in E002 |
-| Restock signal output | Restock signal table is produced | In Progress | Implemented in E003 |
-| Performance summary output | Consolidated performance table is produced | In Progress | Implemented in E004 |
-| Study report output | Study-style ranking report is produced | In Progress | Implemented in E005 |
-| Cadence control | E cadence skip/run behavior works as designed | In Progress | Cadence guard exists in orchestrator |
-| Optional publishing path | E outputs can be published when enabled | In Progress | E010 exists with gated sheet writes |
-| Health profile evidence | E reliability evidence path is defined | In Progress | Profile/split checklist path exists but baseline still maturing |
+| E cycle runner | E cycle executes defined analytics sequence | Manager-Proved | Latest independent E MOT proves the manifest completed E001-E007 plus E-scoped health/profile proof. Last 10 completed E manifests all completed 8/8 steps with 0 step failures. |
+| Sales velocity output | Velocity metrics are produced | Manager-Proved | E MOT proves the velocity output is fresh, populated, and schema-checked. |
+| ROI snapshot output | ROI snapshots are produced | Warning-Labelled | E MOT proves ROI output exists and is fresh, but coverage is only 41 of 161 SKUs, so missing ROI remains a confidence warning. |
+| Restock signal output | Restock signal table is produced | Manager-Proved | E MOT proves restock signals are fresh, populated, and separated from business-ready reorder proof. |
+| Performance summary output | Consolidated performance table is produced | Manager-Proved | E MOT proves the performance summary is fresh, row-count believable, schema-checked, and carries confidence/missing-proof labels. |
+| Study report output | Study-style ranking report is produced | Manager-Proved | E MOT proves the study report is fresh, aligned with performance output, and explains blank or missing truth states. |
+| Cadence control | E cadence skip/run behavior works as designed | Manager-Proved | E MOT proves recent successful cadence evidence and preserved skip/run decisions. |
+| Optional publishing path | E outputs can be published when enabled | Not Verified | Optional publishing remains not_verified until Luke explicitly approves publishing proof. This is not required for E evidence support. |
+| Health profile evidence | E reliability evidence path is defined | Manager-Proved | E scoped health/profile proof is current and tied to the latest E run; the 10-run baseline is now proved from existing manifests. |
 
 ## SECTION 2 - Reliability Measurement
 Measure reliability over the last 10 completed E runs:
@@ -26,7 +26,7 @@ Suggested scoring baseline:
 - Start at 100.
 - Subtract 20 if any fail exists in window.
 - Subtract 5 per warned run, up to 30.
-- Reliability is "To Baseline" until 10 comparable runs are available.
+- Reliability is "To Baseline" until 10 comparable runs are available. As of the 2026-06-04 manager review, 10 comparable completed E manifests are available and all 10 completed cleanly from the E run side.
 
 ## SECTION 3 - Acceptance Criteria
 - Replacement Complete:
@@ -36,9 +36,11 @@ Suggested scoring baseline:
 - No fail in last 10 runs.
 - At least 8 of last 10 runs are clean.
 - No persistent stale-evidence condition.
+- Current manager status: Stable as an evidence layer, with warnings still visible for ROI coverage and remaining upstream B money proof gaps. B067 now proves refund money, commission, FBA fee, and shipping income, but Sellerboard return-gap evidence is still bridge-only and shipping cost/chargeback is not yet proven.
 - Ready for expansion:
 - Stable across 2 review windows.
 - Additional analytics can be added without breaking core outputs.
+- Current manager status: Not yet proven for buying authority. E remains evidence support only until ROI coverage and the remaining upstream B money proof gaps are clean enough.
 
 ## SECTION 4 - Improvement Backlog
 These do not affect Completion Score:

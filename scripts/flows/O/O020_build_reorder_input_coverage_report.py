@@ -32,6 +32,10 @@ NET_FEE_AUDIT_FIELDS: tuple[str, ...] = (
     "market_price_ex_vat_gbp",
     "market_price_vat_rate_pct",
     "current_token_cost_gbp",
+    "token_cost_trust_state",
+    "token_cost_trust_basis",
+    "token_cost_trust_source",
+    "token_cost_trust_blockers",
     "break_even_price_gbp",
     "net_fee_drag_per_unit_gbp",
     "net_fee_model_status",
@@ -42,6 +46,46 @@ NET_FEE_AUDIT_FIELDS: tuple[str, ...] = (
     "gross_forward_roi_pct",
     "gross_forward_profit_per_unit_gbp",
 )
+PROFIT_INPUT_FIELDS: tuple[str, ...] = (
+    "expected_refund_cost_per_unit_gbp",
+    "refund_proof_state",
+    "refund_sample_confidence",
+    "expected_inbound_cost_per_unit_gbp",
+    "inbound_cost_basis",
+    "inbound_cost_confidence",
+    "profit_input_confidence",
+    "profit_input_blockers",
+    "token_cost_trust_state",
+    "token_cost_trust_basis",
+    "token_cost_trust_source",
+    "token_cost_trust_blockers",
+)
+WEAK_REFUND_PROOF_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "sellerboard_bridge_only",
+    "bridge_labelled_only",
+}
+WEAK_REFUND_CONFIDENCE_STATES = {"", "missing", "unknown", "weak", "not_yet_proven"}
+WEAK_INBOUND_COST_CONFIDENCE_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "missing_inbound_cost_confidence",
+    "unsupported_currency",
+}
+WEAK_PROFIT_INPUT_CONFIDENCE_STATES = {
+    "",
+    "missing_profit_inputs",
+    "weak_profit_inputs",
+    "unknown",
+    "not_yet_proven",
+}
 
 
 def _utc_now_iso() -> str:
@@ -165,6 +209,32 @@ def _net_fee_block_reason(source_row: pd.Series | None, rec_row: pd.Series | Non
     if status == "invalid":
         return "invalid_net_fee_truth"
     return "missing_net_fee_truth"
+
+
+def _profit_input_block_reasons(source_row: pd.Series | None, rec_row: pd.Series | None, queue_row: pd.Series | None) -> list[str]:
+    refund_proof = _first_row_value("refund_proof_state", source_row, rec_row, queue_row).lower()
+    refund_confidence = _first_row_value("refund_sample_confidence", source_row, rec_row, queue_row).lower()
+    inbound_confidence = _first_row_value("inbound_cost_confidence", source_row, rec_row, queue_row).lower()
+    profit_confidence = _first_row_value("profit_input_confidence", source_row, rec_row, queue_row).lower()
+    profit_blockers = _first_row_value("profit_input_blockers", source_row, rec_row, queue_row)
+    token_cost_trust_state = _first_row_value("token_cost_trust_state", source_row, rec_row, queue_row).lower()
+    token_cost_blockers = _first_row_value("token_cost_trust_blockers", source_row, rec_row, queue_row)
+
+    blockers: list[str] = []
+    if refund_proof in WEAK_REFUND_PROOF_STATES or refund_confidence in WEAK_REFUND_CONFIDENCE_STATES:
+        blockers.append("missing_refund_confidence")
+    if inbound_confidence in WEAK_INBOUND_COST_CONFIDENCE_STATES:
+        blockers.append("missing_inbound_cost_confidence")
+    if profit_confidence in WEAK_PROFIT_INPUT_CONFIDENCE_STATES:
+        if profit_blockers:
+            blockers.extend(part.strip() for part in profit_blockers.split("|") if part.strip())
+        else:
+            blockers.append("missing_profit_input_confidence")
+    if token_cost_trust_state != "trusted":
+        if token_cost_blockers:
+            blockers.extend(part.strip() for part in token_cost_blockers.split("|") if part.strip())
+        blockers.append("token_cost_not_trusted" if token_cost_trust_state else "token_cost_not_verified")
+    return _dedupe_keep_order(blockers)
 
 
 def _build_summary_markdown(
@@ -377,8 +447,13 @@ def build_reorder_input_coverage_report(root: Path | None = None, *, report_utc:
             field: _first_row_value(field, source_row, rec_row, queue_row)
             for field in NET_FEE_AUDIT_FIELDS
         }
+        profit_input_fields = {
+            field: _first_row_value(field, source_row, rec_row, queue_row)
+            for field in PROFIT_INPUT_FIELDS
+        }
         pack_block_reasons = _pack_block_reasons(source_row, rec_row, queue_row)
         net_fee_block_reason = _net_fee_block_reason(source_row, rec_row, queue_row)
+        profit_input_block_reasons = _profit_input_block_reasons(source_row, rec_row, queue_row)
 
         is_active_candidate = _truthy(source_row.get("is_active_candidate", "") if source_row is not None else "")
         has_current_cost_input = _truthy(source_row.get("has_current_cost_input", "") if source_row is not None else "")
@@ -412,6 +487,7 @@ def build_reorder_input_coverage_report(root: Path | None = None, *, report_utc:
             and (not user_price_check_required)
             and (not pack_block_reasons)
             and (net_fee_block_reason == "")
+            and (not profit_input_block_reasons)
         )
         action_ready_now = actionable_gate_ok
 
@@ -457,6 +533,8 @@ def build_reorder_input_coverage_report(root: Path | None = None, *, report_utc:
         block_reasons.extend(pack_block_reasons)
         if net_fee_block_reason and action_candidate:
             block_reasons.append(net_fee_block_reason)
+        if action_candidate:
+            block_reasons.extend(profit_input_block_reasons)
 
         block_reason_codes = "|".join(_dedupe_keep_order(block_reasons))
         missing_flags = [
@@ -523,6 +601,7 @@ def build_reorder_input_coverage_report(root: Path | None = None, *, report_utc:
                 "target_roi_pct": target_roi_pct,
                 "purchase_price_safety_status": purchase_price_safety_status,
                 **net_fee_fields,
+                **profit_input_fields,
                 **pack_fields,
             }
         )

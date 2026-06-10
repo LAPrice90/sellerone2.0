@@ -1,0 +1,61 @@
+{
+  "id": "H_cycle",
+  "display_name": "H Repricing Runtime",
+  "flow": "H",
+  "purpose": "Register the H repricing runtime so the manager can package high-risk repairs without changing prices or overlapping live ownership.",
+  "owner_entrypoint": "scripts/cycles/run_H_pricing_cycle_guarded.py",
+  "worker_entrypoint": "scripts/cycles/run_H_pricing_cycle.py",
+  "health_sources": [
+    {
+      "name": "checklist_H",
+      "path": "out/cycle_alerts/checklist_H.csv",
+      "required": false,
+      "max_age_minutes": 180
+    },
+    {
+      "name": "expectations_H",
+      "path": "project_control/EXPECTATIONS/H_cycle_expectations.md",
+      "required": true,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "H_terminal_info",
+      "path": "out/systems/H/live/H_cycle_last_terminal_info.txt",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "outputs": [
+    {
+      "name": "H_manager_state",
+      "path": "out/systems/M/flow_maintenance_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "H_terminal_warn_after_180_minutes",
+    "H_proof_requires_terminal_and_publish_truth"
+  ],
+  "needs_user_signals": [
+    "business_decision_required",
+    "price_policy_decision_required",
+    "proof_window_approval_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "create_manager_task"
+  ],
+  "forbidden_actions": [
+    "run_worker_cycle",
+    "overlap_H_owner",
+    "change_pricing",
+    "write_legacy_sheets",
+    "change_queue_state",
+    "align_local_db",
+    "delete_outputs"
+  ],
+  "manager_notes": "Manager registration only. H is high-risk until stable terminal and publish proof exists."
+}

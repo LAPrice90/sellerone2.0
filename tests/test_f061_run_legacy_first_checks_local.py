@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -17,6 +18,7 @@ from scripts.flows.F.F061_run_legacy_first_checks_local import (
     F061_BBP_PROFILE_DIR,
     F061_BBP_USER_DATA_DIR,
     F061_BROWSER_STAGE_READY_REASON,
+    F061_BBP_IFRAME_PLUGIN_BLOCK_REASON,
     F061_KILL_SPECIALIST_CHROME_BEFORE_START_ENV,
     F061_STAGE_MODE_API_ONLY,
     F061_STAGE_MODE_BROWSER_ONLY,
@@ -35,6 +37,7 @@ from scripts.flows.F.F061_run_legacy_first_checks_local import (
     _minimized_chrome_startup_kwargs,
     _place_date_browser_window,
     _scrape_evidence_is_blocked,
+    _scrape_evidence_has_bbp_iframe_plugin_block,
     _scrape_evidence_needs_login_backtrack,
     _place_browser_window,
     _pre_review_gate_health_row,
@@ -45,6 +48,14 @@ from scripts.flows.F.F061_run_legacy_first_checks_local import (
 )
 from scripts.flows.F import F061_run_legacy_first_checks_local as f061_module
 from scripts.flows.F._schemas import get_f_output_contract
+
+
+@pytest.fixture(autouse=True)
+def _isolate_seller_central_login_proof(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv(
+        "F061_SELLER_CENTRAL_LOGIN_PROOF_PATH",
+        str(tmp_path / "seller_central_login_recovery_proof.csv"),
+    )
 
 
 def _complete_scraped_payload(*, break_even_price: float, title: str, monthly_sold: str, rating: str, product_info: str, variant_reviews: str, reviews_text: str) -> dict[str, str]:
@@ -91,9 +102,15 @@ def test_f061_normal_mode_prioritises_rescan_retry_before_fresh_pending() -> Non
     assert _f061_row_queue_priority(login_retry, login_mode_active=False) == 2
 
 
-def test_f061_marks_bbp_login_and_iframe_failures_as_browser_blocked() -> None:
+def test_f061_marks_bbp_login_and_iframe_failures_without_false_login_backtrack() -> None:
     assert _scrape_evidence_is_blocked({"scrape_error": "BBP_LOGIN_REQUIRED"})
     assert _scrape_evidence_is_blocked({"scrape_error": "No BBP iframe"})
+    assert _scrape_evidence_needs_login_backtrack({"scrape_error": "BBP_LOGIN_REQUIRED"})
+    assert not _scrape_evidence_needs_login_backtrack({"scrape_error": "No BBP iframe"})
+    assert _scrape_evidence_has_bbp_iframe_plugin_block({"scrape_error": "No BBP iframe"})
+    assert _scrape_evidence_has_bbp_iframe_plugin_block(
+        {"scrape_error": "BBP_IFRAME_PLUGIN_UNAVAILABLE:bbp_profile_extension_missing"}
+    )
     assert _scrape_evidence_is_blocked(
         {"scrape_error": "The extension failed to load properly. It might not be able to intercept network requests."}
     )
@@ -237,14 +254,14 @@ def test_f061_bbp_profile_health_blocks_profile_without_buybotpro(tmp_path: Path
     assert health["reason"] == "buybotpro_extension_missing"
 
 
-def test_f061_bbp_profile_failure_is_treated_as_login_required(tmp_path: Path) -> None:
+def test_f061_bbp_profile_failure_is_treated_as_plugin_unavailable(tmp_path: Path) -> None:
     adapter = LegacyCompatibleAmazonAdapter(legacy_scanner_root=None, root_path=tmp_path)
     adapter._driver_init_error = "bbp_profile_extension_missing:user_data_dir=x;profile_dir=y;reason=z"
 
     response = adapter._driver_start_failure_response()
 
     assert response["success"] is False
-    assert str(response["error"]).startswith("BBP_LOGIN_REQUIRED:bbp_profile_extension_missing")
+    assert str(response["error"]).startswith("BBP_IFRAME_PLUGIN_UNAVAILABLE:bbp_profile_extension_missing")
 
 
 def test_f061_specialist_cleanup_default_preserves_profile_session(monkeypatch) -> None:
@@ -544,6 +561,41 @@ def test_background_browser_mode_defaults_to_minimized(monkeypatch) -> None:
     assert "--window-position=-32000,-32000" in options.arguments
 
 
+def test_background_browser_mode_self_promotes_for_exhausted_email_continue(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("F061_BACKGROUND_BROWSER_MODE", "minimized")
+    proof_path = tmp_path / "seller_central_login_recovery_proof.csv"
+    monkeypatch.setenv("F061_SELLER_CENTRAL_LOGIN_PROOF_PATH", str(proof_path))
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-07T21:29:30Z",
+                "context": "dashboard_yes_no_login",
+                "status": "failed",
+                "reason": "email_continue_not_advanced",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+                "notes": (
+                    "page_hint=sellercentral_url|signin_url|email_field|continue_button;"
+                    "email_finalize=1;click=1;js_click=1;enter=0;js_enter=1;"
+                    "form_submit=1;email_value=present"
+                ),
+            }
+        ]
+    ).to_csv(proof_path, index=False)
+
+    options = _FakeChromeOptions()
+    driver = _FakeDriver()
+    _apply_background_browser_options(options)
+    _place_browser_window(driver, visible_x=10, visible_y=20)
+
+    assert _background_browser_mode() == "visible"
+    assert options.arguments == ["--window-size=1400,900", "--window-position=80,80"]
+    assert driver.rects == [(10, 20, 1400, 900)]
+
+
 def test_background_browser_visible_mode_keeps_requested_window(monkeypatch) -> None:
     monkeypatch.setenv("F061_BACKGROUND_BROWSER_MODE", "visible")
 
@@ -635,6 +687,47 @@ def test_minimized_specialist_chrome_strips_maximized_launch(monkeypatch) -> Non
     assert startupinfo is not None
     assert startupinfo.dwFlags & f061_module.subprocess.STARTF_USESHOWWINDOW
     assert startupinfo.wShowWindow == 6
+
+
+def test_email_continue_exhaustion_promotes_child_env_and_stops_hider(monkeypatch, tmp_path: Path) -> None:
+    proof_path = tmp_path / "seller_central_login_recovery_proof.csv"
+    pd.DataFrame(
+        [
+            {
+                "observed_utc": "2026-06-07T22:07:06Z",
+                "context": "dashboard_yes_no_login",
+                "status": "failed",
+                "reason": "email_continue_not_advanced",
+                "seller_central_signin_detected": "1",
+                "seller_central_otp_detected": "0",
+                "notes": (
+                    "page_hint=sellercentral_url|signin_url|email_field|continue_button;"
+                    "email_finalize=1;click=1;js_click=1;enter=0;js_enter=1;"
+                    "form_submit=1;email_value=present"
+                ),
+            }
+        ]
+    ).to_csv(proof_path, index=False)
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        del kwargs
+        calls.append(command)
+
+    monkeypatch.setenv("F061_SELLER_CENTRAL_LOGIN_PROOF_PATH", str(proof_path))
+    monkeypatch.setenv("F061_BACKGROUND_BROWSER_MODE", "minimized")
+    monkeypatch.setenv("F061_SHOW_WINDOWS", "0")
+    monkeypatch.setenv("FPM_LIVE_HIDE_SCRAPER_WINDOWS", "1")
+    monkeypatch.setattr(f061_module.os, "name", "nt")
+    monkeypatch.setattr(f061_module, "_F061_VISIBLE_LOGIN_HIDER_STOP_ATTEMPTED", False)
+    monkeypatch.setattr(f061_module.subprocess, "run", fake_run)
+
+    assert _background_browser_mode() == "visible"
+    assert f061_module.os.environ["F061_BACKGROUND_BROWSER_MODE"] == "visible"
+    assert f061_module.os.environ["F061_SHOW_WINDOWS"] == "1"
+    assert f061_module.os.environ["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] == "0"
+    assert calls
+    assert "f_hide_scraper_windows.ps1" in " ".join(str(part) for part in calls[0])
 
 
 def test_visible_login_mode_preserves_specialist_chrome_by_default(monkeypatch) -> None:
@@ -1381,6 +1474,8 @@ def test_f061_login_rows_stay_in_original_queue_with_backtrack_ledger(tmp_path: 
     assert summary["processed_rows"] == 1
     assert summary["pending_rows"] == 1
     assert summary["login_backtrack_pending_rows"] == 1
+    assert summary["bbp_iframe_plugin_blocked_rows"] == 0
+    assert summary["login_mode_runtime_status"] == "inactive"
 
     active = pd.read_csv(tmp_path / get_f_output_contract("supplier_price_list_active_run").rel_path, dtype=str).fillna("")
     assert len(active) == 1
@@ -1564,18 +1659,19 @@ def test_f061_bbp_extension_unavailable_rows_stay_pending_for_backtrack(tmp_path
     assert summary["processed_rows"] == 1
     assert summary["pending_rows"] == 1
     assert summary["login_backtrack_pending_rows"] == 1
+    assert summary["bbp_iframe_plugin_blocked_rows"] == 1
 
     active = pd.read_csv(tmp_path / get_f_output_contract("supplier_price_list_active_run").rel_path, dtype=str).fillna("")
     assert len(active) == 1
     assert active.iloc[0]["row_key"] == "cand-extension-1"
     assert active.iloc[0]["scan_status"] == "login_backtrack_pending"
     assert active.iloc[0]["scan_reason"] == "login_backtrack_required"
-    assert active.iloc[0]["completion_block_reason"] == "bbp_login_required"
+    assert active.iloc[0]["completion_block_reason"] == F061_BBP_IFRAME_PLUGIN_BLOCK_REASON
 
     ledger = pd.read_csv(tmp_path / get_f_output_contract("f_login_backtrack_evidence_live").rel_path, dtype=str).fillna("")
     assert len(ledger) == 1
     assert ledger.iloc[0]["candidate_id"] == "cand-extension-1"
-    assert ledger.iloc[0]["backtrack_status"] == "blocked_login"
+    assert ledger.iloc[0]["backtrack_status"] == "blocked_bbp_iframe_plugin"
     assert ledger.iloc[0]["merged_into_candidate_flag"] == "0"
 
 
@@ -3069,9 +3165,73 @@ def test_f061_incomplete_price_history_capture_maps_to_rescan(tmp_path: Path, mo
     state_path = tmp_path / get_f_output_contract("f_screening_row_state_live").rel_path
     state_df = pd.read_csv(state_path, dtype=str).fillna("")
     state_row = state_df.iloc[0]
-    assert state_row["row_status"] == "timeout"
+    assert state_row["row_status"] == "retry"
     assert state_row["fail_code"] == "RESCAN"
-    assert state_row["timeout_until_utc"].endswith("Z")
+    assert state_row["status_reason"] == "RESCAN|retry_pending"
+    assert state_row["timeout_until_utc"] == ""
+
+
+def test_f061_rescan_retry_allows_configured_second_active_attempt(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("F061_RESCAN_MAX_ACTIVE_ATTEMPTS", "2")
+    _write_contract(
+        tmp_path,
+        "supplier_price_list_active_run",
+        [
+            {
+                "run_id": "run_1",
+                "supplier_id": "shure_cosmetics",
+                "supplier_name": "Shure Cosmetics",
+                "row_key": "rk_retry_second_attempt",
+                "supplier_sku": "S_RETRY_SECOND",
+                "barcode": "4444444444444",
+                "supplier_title": "Retry Second Attempt Product",
+                "unit_cost": "5.00",
+                "currency": "GBP",
+                "vat_rate": "20",
+                "scan_status": "pending",
+                "scan_reason": "rescan_retry_required",
+                "attempt_count": "1",
+                "last_attempt_utc": "2026-04-07T12:00:00Z",
+                "finished_utc": "",
+                "source_seen_at_utc": "2026-04-07T10:00:00Z",
+            },
+        ],
+    )
+    _write_contract(tmp_path, "feeder_legacy_first_checks_live", [])
+
+    class _CatalogRescanAdapter(_FakeAdapter):
+        def get_catalog_details(self, barcode: str, access_token: str):
+            return {"error": "http_429"}
+
+    summary = run_legacy_first_checks_local(
+        root=tmp_path,
+        supplier_id="shure_cosmetics",
+        max_rows=1,
+        scan_utc="2026-04-07T12:30:00Z",
+        adapter=_CatalogRescanAdapter(),
+    )
+
+    assert summary["retry_rows"] == 1
+    assert summary["rescan_retry_pending_rows"] == 1
+    assert summary["rescan_retry_exhausted_rows"] == 0
+    assert summary["pending_rows"] == 1
+
+    active_path = tmp_path / get_f_output_contract("supplier_price_list_active_run").rel_path
+    active_df = pd.read_csv(active_path, dtype=str).fillna("")
+    assert len(active_df.index) == 1
+    active_row = active_df.iloc[0]
+    assert active_row["scan_status"] == "pending"
+    assert active_row["scan_reason"] == "rescan_retry_required"
+    assert active_row["completion_block_reason"] == "rescan_retry_pending"
+    assert active_row["attempt_count"] == "2"
+
+    state_path = tmp_path / get_f_output_contract("f_screening_row_state_live").rel_path
+    state_df = pd.read_csv(state_path, dtype=str).fillna("")
+    state_row = state_df.iloc[0]
+    assert state_row["row_status"] == "retry"
+    assert state_row["fail_code"] == "RESCAN"
+    assert state_row["status_reason"] == "RESCAN|retry_pending"
+    assert state_row["timeout_until_utc"] == ""
 
 
 def test_f061_rescan_retry_exhausts_after_configured_active_attempts(tmp_path: Path, monkeypatch) -> None:
@@ -3093,7 +3253,7 @@ def test_f061_rescan_retry_exhausts_after_configured_active_attempts(tmp_path: P
                 "vat_rate": "20",
                 "scan_status": "pending",
                 "scan_reason": "rescan_retry_required",
-                "attempt_count": "1",
+                "attempt_count": "2",
                 "last_attempt_utc": "2026-04-07T12:00:00Z",
                 "finished_utc": "",
                 "source_seen_at_utc": "2026-04-07T10:00:00Z",
@@ -3122,6 +3282,14 @@ def test_f061_rescan_retry_exhausts_after_configured_active_attempts(tmp_path: P
     active_path = tmp_path / get_f_output_contract("supplier_price_list_active_run").rel_path
     active_df = pd.read_csv(active_path, dtype=str).fillna("")
     assert active_df.empty
+
+    state_path = tmp_path / get_f_output_contract("f_screening_row_state_live").rel_path
+    state_df = pd.read_csv(state_path, dtype=str).fillna("")
+    state_row = state_df.iloc[0]
+    assert state_row["row_status"] == "timeout"
+    assert state_row["fail_code"] == "RESCAN"
+    assert state_row["status_reason"] == "RESCAN|retry_exhausted"
+    assert state_row["timeout_until_utc"] == ""
 
 
 def test_f061_writes_explicit_price_source_columns_on_scrape_success(tmp_path: Path) -> None:

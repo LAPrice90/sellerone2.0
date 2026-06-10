@@ -1,0 +1,59 @@
+{
+  "id": "run_F_price_list_manager_cycle",
+  "display_name": "Run F Price List Manager Cycle",
+  "flow": "F",
+  "purpose": "Classify the F cycle batch runner so the manager can see the launcher without starting or restarting the F live owner.",
+  "owner_entrypoint": "run_F_price_list_manager_cycle.bat",
+  "worker_entrypoint": "run_F_price_list_manager_cycle.bat",
+  "health_sources": [
+    {
+      "name": "live_cycle_status",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_status.csv",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "fpm_live_supervisor_state",
+      "path": "out/systems/F/price_list_manager/live/fpm_live_supervisor_state.txt",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "outputs": [
+    {
+      "name": "live_cycle_status",
+      "path": "out/systems/F/price_list_manager/live/live_cycle_status.csv",
+      "required": false,
+      "max_age_minutes": 180
+    }
+  ],
+  "freshness_rules": [
+    "batch_runner_is_not_safe_dispatch",
+    "worker_restart_requires_separate_approval"
+  ],
+  "needs_user_signals": [
+    "worker_restart_requested",
+    "live_cycle_requested"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "start_f_cycle",
+    "kill_process",
+    "align_local_db"
+  ],
+  "manager_notes": "Launcher classification only. MOT must not start, restart, or kill the F price-list manager cycle."
+}

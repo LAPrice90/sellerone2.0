@@ -4,13 +4,16 @@ from typing import Mapping
 
 
 AUTH_STATE_LOGGED_IN = "LOGGED_IN"
+AUTH_STATE_BBP_AUTHENTICATED = "BBP_AUTHENTICATED"
 AUTH_STATE_LOGIN_REQUIRED = "LOGIN_REQUIRED"
 AUTH_STATE_BBP_LOGIN_REQUIRED = "BBP_LOGIN_REQUIRED"
 AUTH_STATE_DASHBOARD_LOGIN_REQUIRED = "AMAZON_DASHBOARD_LOGIN_REQUIRED"
+AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED = "SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED"
 AUTH_STATES_REQUIRING_VISIBLE = {
     AUTH_STATE_LOGIN_REQUIRED,
     AUTH_STATE_BBP_LOGIN_REQUIRED,
     AUTH_STATE_DASHBOARD_LOGIN_REQUIRED,
+    AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED,
 }
 
 BROWSER_STATE_HIDDEN = "HIDDEN"
@@ -47,7 +50,6 @@ BBP_AUTH_REQUIRED_TOKENS = (
     "manual login required",
     "bbp_login_required",
     "login_required",
-    "no bbp iframe",
     "blocked_or_signin",
     "captcha",
 )
@@ -56,6 +58,14 @@ DASHBOARD_AUTH_REQUIRED_TOKENS = (
     "dashboard yes/no raw login ignored after authenticated cost field",
     "dashboard yes/no ignored non yes/no value => login",
     "dashboard yes/no ignored non yes/no/likely value => login",
+)
+
+SELLER_CENTRAL_AUTH_REQUIRED_TOKENS = (
+    "seller_central_eligibility_login_required",
+    "seller central eligibility login required",
+    "seller_central_login_recovery status=disabled",
+    "seller_central_login_recovery status=waiting_for_code",
+    "seller_central_login_recovery status=blocked",
 )
 
 
@@ -72,16 +82,18 @@ def auth_state_from_log_text(text: object) -> str:
     for line in str(text or "").splitlines():
         lower = line.lower()
         if any(token in lower for token in AUTH_CONFIRMED_TOKENS):
-            state = AUTH_STATE_LOGGED_IN
+            state = AUTH_STATE_BBP_AUTHENTICATED
         if any(token in lower for token in DASHBOARD_AUTH_REQUIRED_TOKENS):
             state = AUTH_STATE_DASHBOARD_LOGIN_REQUIRED
         if any(token in lower for token in BBP_AUTH_REQUIRED_TOKENS):
             state = AUTH_STATE_BBP_LOGIN_REQUIRED
+        if any(token in lower for token in SELLER_CENTRAL_AUTH_REQUIRED_TOKENS):
+            state = AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED
     return state
 
 
 def browser_state_for_auth_state(auth_state: str) -> str:
-    if auth_state == AUTH_STATE_LOGGED_IN:
+    if auth_state in {AUTH_STATE_LOGGED_IN, AUTH_STATE_BBP_AUTHENTICATED}:
         return BROWSER_STATE_HIDDEN
     if auth_state in AUTH_STATES_REQUIRING_VISIBLE:
         return BROWSER_STATE_VISIBLE
@@ -99,7 +111,7 @@ def browser_visibility_value(browser_state: str) -> str:
 def auth_state_for_browser_visibility(visibility: str) -> str:
     normalized = _lower(visibility)
     if normalized == "hidden":
-        return AUTH_STATE_LOGGED_IN
+        return AUTH_STATE_BBP_AUTHENTICATED
     if normalized == "visible":
         return AUTH_STATE_LOGIN_REQUIRED
     return ""
@@ -147,6 +159,8 @@ def active_row_queue_state(row: Mapping[str, object]) -> str:
     if scan_status in {"completed", "done"}:
         return ROW_QUEUE_DONE
     if scan_status in {"login_backtrack_pending", "login_backtrack_running"}:
+        if "seller_central_eligibility_login" in block_reason:
+            return ROW_QUEUE_NEEDS_LOGIN_RESCAN
         if "dashboard_yes_no" in block_reason:
             return ROW_QUEUE_NEEDS_YESNO_RESCAN
         if block_reason in {"bbp_login_required", "login_required"} or "bbp_login_required" in block_reason:

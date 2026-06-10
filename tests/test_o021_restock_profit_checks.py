@@ -54,6 +54,14 @@ def _rec_row(
         "current_supplier_cost_source": "supplier_catalog_price",
         "market_price_gbp": market,
         "market_price_basis_used": price_basis,
+        "expected_refund_cost_per_unit_gbp": "0.1",
+        "refund_proof_state": "api_proved_or_not_applicable",
+        "refund_sample_confidence": "high",
+        "expected_inbound_cost_per_unit_gbp": "0.2",
+        "inbound_cost_basis": "allocated_inbound_cost_per_received_unit",
+        "inbound_cost_confidence": "sku_allocated",
+        "profit_input_confidence": "profit_inputs_verified",
+        "profit_input_blockers": "",
         "forward_roi_pct": roi,
         "forward_profit_per_unit_gbp": profit,
         "cost_mode": "live",
@@ -197,6 +205,67 @@ def test_o021_builds_profit_verdicts_and_temporary_sale_guardrails(tmp_path: Pat
     health = health_df.set_index("check_name")
     assert health.loc["drop_review_requires_repeated_bad_economics", "status"] == "ok"
     assert health.loc["verdict::temporary_market_risk", "value"] == "1"
+
+
+def test_o021_blocks_clean_profit_when_inbound_cost_confidence_is_missing(tmp_path: Path) -> None:
+    weak_rec = _rec_row("SKU-WEAK-INBOUND", status="full_restock", roi="20", profit="2")
+    weak_rec.update(
+        {
+            "expected_inbound_cost_per_unit_gbp": "",
+            "inbound_cost_basis": "missing_sku_inbound_cost_allocation",
+            "inbound_cost_confidence": "missing",
+            "profit_input_confidence": "missing_profit_inputs",
+            "profit_input_blockers": "missing_inbound_cost_confidence",
+        }
+    )
+    _write_contract_rows(tmp_path, "restock_recommendations_live", [weak_rec])
+    _write_contract_rows(
+        tmp_path,
+        "restock_source_view",
+        [
+            {
+                "asof_utc": "2026-05-22T08:00:00Z",
+                "seller_sku": "SKU-WEAK-INBOUND",
+                "asin": "ASIN-SKU-WEAK-INBOUND",
+                "supplier_code": "SUP",
+                "supplier_name": "Supplier",
+                "sale_status": "active",
+                "sale_status_normalized": "active",
+                "available_now": "0",
+                "total_quantity_now": "0",
+                "amazon_inbound_working": "0",
+                "amazon_inbound_shipped": "0",
+                "amazon_inbound_receiving": "0",
+                "velocity_30d": "1",
+                "current_supplier_buy_cost_gbp": "10",
+                "market_price_gbp": "13",
+                "market_price_basis_used": "BUY_BOX_PRICE",
+                "has_current_cost_input": "1",
+                "has_current_market_price_input": "1",
+                "has_demand_input": "1",
+                "cost_mode": "live",
+                "expected_refund_cost_per_unit_gbp": "0.1",
+                "refund_proof_state": "api_proved_or_not_applicable",
+                "refund_sample_confidence": "high",
+                "expected_inbound_cost_per_unit_gbp": "",
+                "inbound_cost_basis": "missing_sku_inbound_cost_allocation",
+                "inbound_cost_confidence": "missing",
+                "profit_input_confidence": "missing_profit_inputs",
+                "profit_input_blockers": "missing_inbound_cost_confidence",
+            }
+        ],
+    )
+
+    checks_df, _health_df = build_restock_profit_checks(
+        root=tmp_path,
+        check_utc="2026-05-22T08:00:00Z",
+        append_history=False,
+    )
+    row = checks_df.iloc[0]
+
+    assert row["profit_verdict"] == "missing_profit_inputs"
+    assert "missing_inbound_cost_confidence" in row["missing_input_reasons"]
+    assert row["inbound_cost_drag_gbp"] == ""
 
 
 def test_o021_labels_legacy_sheet_profit_hints_no_data_and_drop_rows(tmp_path: Path) -> None:

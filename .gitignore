@@ -17,6 +17,11 @@ __pycache__/
 
 # Local Codex/app state
 .codex/
+$CODEX_HOME/
+
+# Local backup files that can contain credentials
+*.env.before
+backups/**/*.env*
 
 # Runtime outputs and generated working files
 out/

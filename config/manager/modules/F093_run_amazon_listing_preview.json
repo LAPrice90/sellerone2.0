@@ -1,0 +1,76 @@
+{
+  "id": "F093_run_amazon_listing_preview",
+  "display_name": "F093 Amazon Listing Preview",
+  "flow": "F",
+  "purpose": "Register Amazon listing preview proof so the manager can inspect validation issues without calling Amazon preview APIs.",
+  "owner_entrypoint": "scripts/flows/F/F093_run_amazon_listing_preview.py",
+  "worker_entrypoint": "scripts/flows/F/F093_run_amazon_listing_preview.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_health",
+      "path": "out/systems/F/health/amazon_listing_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "amazon_listing_drafts_live",
+      "path": "out/systems/F/live/amazon_listing_drafts_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_preview_issues_live",
+      "path": "out/systems/F/live/amazon_listing_preview_issues_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "amazon_listing_preview_issues_live",
+      "path": "out/systems/F/live/amazon_listing_preview_issues_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_preview_events",
+      "path": "out/systems/F/history/amazon_listing_preview_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "listing_preview_proof_warn_after_43200_minutes",
+    "preview_is_not_submit_permission"
+  ],
+  "needs_user_signals": [
+    "preview_api_requested",
+    "preview_issue_rows_visible",
+    "listing_submit_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "run_amazon_listing_preview",
+    "submit_amazon_listing",
+    "call_amazon_api",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read preview proof but must not call Amazon APIs or submit listings."
+}

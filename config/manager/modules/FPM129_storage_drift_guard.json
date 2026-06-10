@@ -1,0 +1,60 @@
+{
+  "id": "FPM129_storage_drift_guard",
+  "display_name": "FPM129 Storage Drift Guard",
+  "flow": "F",
+  "purpose": "Describe the F storage drift preflight evidence so the manager can tell whether storage contracts are aligned before live scanner work continues.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM129_storage_drift_guard.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM129_storage_drift_guard.py",
+  "health_sources": [
+    {
+      "name": "storage_drift_report",
+      "path": "out/systems/F/price_list_manager/live/storage_drift_report.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "runtime_owner_contract",
+      "path": "config/runtime_owner_contract.json",
+      "required": false,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "storage_drift_report",
+      "path": "out/systems/F/price_list_manager/live/storage_drift_report.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "storage_drift_report",
+      "path": "out/systems/F/price_list_manager/live/storage_drift_report.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "storage_drift_report_warn_after_1440_minutes",
+    "blocked_rows_must_be_zero_for_clear_f_operation"
+  ],
+  "needs_user_signals": [
+    "unsafe_mixed_storage_drift",
+    "unknown_contract"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "apply_storage_reconcile",
+    "align_local_db"
+  ],
+  "manager_notes": "V1.3 registration only. The manager may read storage drift evidence but must not run the guard, reconcile storage, or edit CSV or SQL data."
+}

@@ -1,0 +1,663 @@
+# Plan Status
+
+## Summary
+- Plan slug:
+  - `b-e-f-sales-feedback-loop-v1`
+- Current stage:
+  - execution in progress
+- Current phase:
+  - Phase 20 complete (pass-gate decomposition and false-red recovery pack emitted)
+- Current batch:
+  - `EXECUTION_BATCH_016` (executed)
+- Overall status:
+  - `Batch 016 is now executed: staged pass checks are live, profitable false-red rows are separated into promote vs review-only lanes, and the next decision is whether to accept the promoted lanes into live testing`
+- Execution readiness score:
+  - `99/100` (ready_with_warnings)
+
+## What is already proven
+- B and E already hold real sales truth inputs.
+- `sku_daily_sales_truth_latest.csv` already separates finalized and provisional states.
+- `sales_truth_reconciliation_latest.csv` currently shows `0` mismatch rows inside its own run window.
+- The BBP completed-month cleanup work exists in F.
+- sold-universe analysis base is large enough to use for planning:
+  - `sold_rows_total=57`
+  - `pass_rows=10`
+  - `fail_rows=47`
+  - `near_floor_rows=5`
+- sold replay capture has already succeeded on a material subset:
+  - `sold_capture_rows=38`
+  - `sold_capture_success_rows=38`
+  - `sold_capture_failed_rows=0`
+- commercial sufficiency gate is now emitted as machine-readable truth:
+  - `sales_band_data_state=ready_now`
+  - `decision_replay_state=ready_now`
+  - `starter_qty_input_state=ready_now`
+  - `rank_window_state=ready_now`
+  - `sample_mix_state=ready_now`
+- fixed validation panel is now materialized and complete:
+  - `panel_rows_total=15`
+  - `panel_missing_rows=0`
+  - `big_pass_rows=5`
+  - `big_fail_rows=5`
+  - `on_the_line_rows=5`
+- sold decision replay bridge is now live and consumed by sold-truth scoring:
+  - `sold_decision_replay_coverage_rows=57`
+  - `sold_rows_with_full_model_evidence=57`
+  - `decision_judged_rows=57`
+  - `rows_with_demand_bucket=57`
+  - `rows_with_recommended_test_qty=57`
+  - `rows_with_recommendation_status=57`
+  - `bucket::missing_model_decision=0`
+- commercial decision-band outputs are now emitted on sold rows:
+  - `commercial_rows_total=57`
+  - `commercial_judged_rows=57`
+  - `false_green_rows=0`
+  - `false_red_rows=8`
+  - `negative_mode_miss_rows=0`
+  - `starter_qty_too_high_rows=0`
+  - `starter_qty_too_low_rows=8`
+  - `band_hit_rows=23`
+  - `live_test_ready_rows=2`
+  - `rank_gap_rows=0`
+  - `rows_using_full_capture_rank_window=57`
+  - `rows_missing_rank_window=0`
+- fixed 15-SKU panel now has explicit commercial state on every row:
+  - `panel_rows_total=15`
+  - `panel_rows_with_blank_commercial_state=0`
+- stocked-SKU vetting report is now emitted from live sold-truth outputs:
+  - `rows_total=58`
+  - `current_test_buy_rows=1`
+  - `current_watch_rows=3`
+  - `current_reject_rows=54`
+  - `current_ready_for_live_test_rows=1`
+  - `prior_test_buy_rows=0`
+  - `prior_watch_rows=0`
+  - `prior_reject_rows=58`
+  - `prior_nonzero_units_rows=0`
+  - `prior_nonzero_profit_rows=0`
+  - `prior_missed_winner_rows=14`
+  - `prior_avoided_loser_rows=44`
+- refreshed pass-structure rerun is now proven:
+  - `commercial_rows_total=58`
+  - `commercial_judged_rows=58`
+  - `false_green_rows=0`
+  - `false_red_rows=12`
+  - `starter_qty_too_high_rows=3`
+  - `starter_qty_too_low_rows=12`
+  - `live_test_ready_rows=1`
+- pass-gate decomposition is now emitted:
+  - `profitable_reject_rows=12`
+  - `false_red_candidate_rows=6`
+  - `promote_to_test_buy_rows=2`
+  - `promote_to_watch_rows=4`
+  - `review_only_profitable_reject_rows=6`
+  - `tier_a_rows=3`
+  - `tier_b_rows=7`
+  - `tier_c_rows=6`
+  - `expanded_panel_rows_total=18`
+- explicit order-alignment defect is now proven:
+  - `B07L6H9GZ2` Sellerboard order items show `20` units for `2026-03-23` to `2026-04-21`
+  - our sold-truth report shows `4`
+  - our `sku_daily_sales_truth_latest.csv` shows `4`
+
+## What is not yet proven
+- bounded shadow live test outcomes are not yet proven:
+  - we now have only `1` `ready_for_live_test` row, and we have not yet measured shadow-run pass/fail behavior against this refreshed structure
+- strong older-window stocked learning is not yet proven:
+  - the current sold sample has no nonzero prior 30-day movement in the operational-baseline rows, so the "30 days ago" section is a valid reconstruction but a thin learning base
+- full local order alignment to Sellerboard is not yet proven:
+  - at least one SKU has a material unit undercount in our truth layer versus Sellerboard order-item evidence
+- the staged pass-check structure is not yet proven:
+  - profitable rejects are now classified, but the promoted rows have not yet been accepted into live testing
+- User-free closed-loop learning.
+- stable native summary overlap above `0` for the current F decision universe remains unresolved, but it is no longer the main gate for commercial live-test readiness.
+- direct bridge overlap threshold remains unresolved:
+  - `actuals_summary_direct_bridge_rows > 0`
+
+## Current blockers
+- No blocker to planning.
+- Implementation risks to solve first:
+  - direct bridge overlap remains `0`, and feasibility is currently `0` with present identity/sold-baseline universes, but that is now a secondary structural gap for this phase.
+  - sold ASIN overlap with summary/native decision universe is currently `0`, so unsold scope expansion remains non-causal for commercial live-test readiness.
+  - commercial ready rows are currently limited:
+    - `live_test_ready_rows=2` out of `57` judged rows
+  - prior stocked-window learning is currently limited:
+    - `prior_nonzero_units_rows=0`
+    - `prior_nonzero_profit_rows=0`
+  - sales-truth order alignment is currently a real blocker for decision trust:
+    - `B07L6H9GZ2` undercount proof is active
+  - pass structure is still too restrictive after rerun:
+    - `false_red_rows=12`
+    - `profitable_reject_rows_gbp20_plus=12`
+  - staged recovery still needs user sign-off or next-batch promotion logic:
+    - `promote_to_test_buy_rows=2`
+    - `promote_to_watch_rows=4`
+
+## Latest evidence snapshot
+- Batch 000 isolated proof:
+  - `python -m py_compile scripts/one_off/BEF000_build_sales_truth_foundation.py scripts/one_off/BEF001_build_operational_feedback_seed.py tests/test_bef000_build_sales_truth_foundation.py tests/test_bef001_build_operational_feedback_seed.py` -> pass
+  - `pytest tests/test_bef000_build_sales_truth_foundation.py tests/test_bef001_build_operational_feedback_seed.py -q` -> pass (`4`)
+- Batch 000 runtime artifacts:
+  - `out/analysis_reports/bef_sales_truth_foundation_latest.csv` -> `161` rows
+  - `out/analysis_reports/bef_sales_feedback_health_latest.csv` -> `11` rows
+  - `out/analysis_reports/bef_operational_feedback_seed_latest.csv` -> `161` rows
+- Freshness truth on latest Batch 000 run:
+  - `order_master_latest_utc=2026-04-20T13:58:32Z`
+  - `order_ledger_fx_latest_utc=2026-04-20T00:00:00Z`
+  - `lag_minutes=838.53`
+  - `freshness_status=fail`
+- Bridge truth on latest Batch 000 run:
+  - `resolved=95`
+  - `ambiguous=0`
+  - `unresolved=66`
+- Batch 001 isolated proof:
+  - `python -m py_compile scripts/one_off/BEF002_build_sales_feedback_actuals.py scripts/one_off/F012_build_sales_history_learning_pack.py tests/test_bef002_build_sales_feedback_actuals.py tests/test_f012_build_sales_history_learning_pack.py` -> pass
+  - `pytest tests/test_bef002_build_sales_feedback_actuals.py tests/test_f012_build_sales_history_learning_pack.py -q` -> pass (`5`)
+- Batch 001 runtime artifacts:
+  - `out/analysis_reports/f_sales_history_learning_actuals_latest.csv` -> `114` rows
+  - `out/analysis_reports/f_sales_history_learning_review_latest.csv` -> `323` rows
+  - `out/analysis_reports/f_sales_history_learning_health_latest.csv` -> `15` rows
+- Batch 001 runtime truth:
+  - automated actuals rows exist and refresh correctly
+  - summary-ASIN overlap currently `0`:
+    - `summary_rows_total=2426`
+    - `summary_rows_matched=0`
+    - `seed_replay_rows_matched=38`
+    - `alignment_rows_matched=19`
+    - `operational_baseline_rows=57`
+- Batch 002 isolated proof:
+  - `python -m py_compile scripts/one_off/BEF003_build_sales_feedback_examples.py tests/test_bef003_build_sales_feedback_examples.py` -> pass
+  - `pytest tests/test_bef003_build_sales_feedback_examples.py -q` -> pass (`2`)
+- Batch 002 runtime artifacts:
+  - `out/analysis_reports/bef_sales_feedback_examples_latest.csv` -> `323` rows
+- Batch 002 runtime truth:
+  - example builder produces required fields:
+    - `expected_result`
+    - `actual_result`
+    - `example_class`
+    - `evidence_notes`
+  - class distribution is currently:
+    - `no_operational_truth_coverage=266`
+    - `overlap_gap_no_summary_match=38`
+    - `model_error_demand_too_high=19`
+- Batch 003 isolated proof:
+  - `python -m py_compile scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+  - `pytest tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> pass (`3`)
+- Batch 003 runtime artifacts:
+  - `out/analysis_reports/bef_sales_feedback_guarded_run_latest.json` -> exists
+- Batch 003 runtime truth:
+  - guarded one-off sequence runs end-to-end and emits deterministic gate output
+  - latest guard decision:
+    - `guard_status=blocked`
+    - `hard_block_reasons=["freshness_fail_active"]`
+    - `next_action=refresh_ledger_then_rerun_guarded_once`
+  - warning context:
+    - `summary_asin_overlap_zero`
+    - `all_review_rows_pending_outcome`
+    - `all_examples_no_operational_truth_coverage`
+- Batch 004 boundary planner evidence:
+  - `python scripts/one_off/P002_plan_forced_proof_window.py --flow b --format json` -> pass
+  - proof window status:
+    - `boundary_or_pause_required`
+  - current blocker evidence:
+    - active B owner at `out/systems/B/live/B_cycle.lock` with live heartbeat
+- Batch 004 runtime follow-through:
+  - maintenance handoff request issued and `maintenance.ready` observed for request ID:
+    - `BEF004_20260420T151131Z`
+  - marker side effect recovered:
+    - restart-drain exit loop stopped after maintenance markers were cleared
+  - B resumed normal operation and completed full cycles:
+    - `B_FINALIZE ran rc=0 wrote_health=true reason=cycle_complete`
+  - 5-minute monitored window:
+    - `B_FINALIZE` increased (`23 -> 24`)
+    - `order_ledger_fx` max `Date` did not move (`2026-04-20T00:56:19Z` remained unchanged)
+- Batch 004 code correction:
+  - `BEF000` now reads ledger freshness timestamp from `Date` before day-only `date`
+  - isolated proof:
+    - `python -m py_compile scripts/one_off/BEF000_build_sales_truth_foundation.py tests/test_bef000_build_sales_truth_foundation.py` -> pass
+    - `pytest tests/test_bef000_build_sales_truth_foundation.py -q` -> pass (`3`)
+  - guard rerun after correction:
+    - `guard_status=blocked`
+    - `hard_block_reasons=["freshness_fail_active"]`
+    - `freshness_lag_minutes=873.93`
+- Batch 005 completion evidence:
+  - compile:
+    - BEF000/BEF003/BEF004 scripts + tests -> pass
+    - `scripts/cycles/run_B_cycle.py` and `tests/test_flow_health_gate.py` -> pass
+  - pytest:
+    - BEF suites (`bef000/bef003/bef004`) -> `8 passed`
+    - B-cycle scoped suites (`flow_health_gate`, `b_cycle_signal_policy`, `b_split_health_modes`) -> `13 passed`
+  - live runtime proof:
+    - B worker restarted on patched runtime:
+      - `B_cycle.lock pid 9456 -> 25448`
+    - patched cycle wrote B006 steps:
+      - `run B006_build_fx_ledgers.py` -> `ok`
+      - `publish Order_Ledger_FX`
+      - second `run B006_build_fx_ledgers.py` -> `ok`
+    - cycle finalized clean:
+      - `B_FINALIZE ran rc=0 wrote_health=true reason=cycle_complete` at `2026-04-20T16:37:16Z`
+    - freshness alignment now true:
+      - `order_master max Date = 2026-04-20T16:07:29Z`
+      - `order_ledger_fx max Date = 2026-04-20T16:07:29Z`
+  - guarded rerun after fix:
+    - `guard_status=ready`
+    - `freshness_lag_minutes=0.00`
+    - `hard_block_reasons=[]`
+    - warnings only:
+      - `summary_asin_overlap_recovered_by_seed_replay`
+  - overlap recovery continuation:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF002_build_sales_feedback_actuals.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `7 passed`
+    - guarded rerun:
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py` -> pass
+    - actuals basis distribution:
+      - `operational_baseline=58`
+      - `operational_seed_replay=57`
+    - recovered overlap metric:
+      - `actuals_recovered_overlap_rows=57`
+    - guard next action:
+      - `monitor_seed_replay_and_expand_true_overlap`
+  - Phase 6 operational-truth review-lane continuation:
+    - compile:
+      - `python -m py_compile scripts/one_off/F012_build_sales_history_learning_pack.py scripts/one_off/BEF003_build_sales_feedback_examples.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f012_build_sales_history_learning_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_f012_build_sales_history_learning_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `10 passed`
+    - guarded rerun (`2026-04-20T20:43:46Z`) -> pass
+    - monitored follow-up rerun (`2026-04-20T20:49:22Z`) -> pass
+    - runtime truth:
+      - `review_rows_total=324`
+      - `rows_operational_truth_only=58`
+      - warning removed: `all_examples_no_operational_truth_coverage`
+      - warnings remaining:
+        - `summary_asin_overlap_recovered_by_seed_replay`
+        - `all_review_rows_pending_outcome`
+  - Phase 7 operational expected-baseline enrichment:
+    - compile:
+      - `python -m py_compile scripts/one_off/F012_build_sales_history_learning_pack.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f012_build_sales_history_learning_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_f012_build_sales_history_learning_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `10 passed`
+    - guarded rerun (`2026-04-21T08:49:02Z`) -> pass
+    - monitored follow-up rerun (`2026-04-21T08:54:23Z`) -> pass
+    - runtime truth:
+      - `review_rows_total=323`
+      - `review_pending_outcome_rows=304`
+      - `rows_with_outcome=19`
+      - `rows_operational_truth_only=57`
+      - `rows_operational_truth_with_expected=19`
+      - warning removed: `all_review_rows_pending_outcome`
+      - warnings remaining:
+        - `summary_asin_overlap_recovered_by_seed_replay`
+  - Phase 8 native overlap expansion via alignment map:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF002_build_sales_feedback_actuals.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `9 passed`
+    - guarded rerun (`2026-04-21T09:01:45Z`) -> pass
+    - monitored follow-up rerun (`2026-04-21T09:07:06Z`) -> pass
+    - runtime truth:
+      - `actuals_summary_asin_rows=0`
+      - `actuals_alignment_map_rows=19`
+      - `actuals_native_overlap_rows=19`
+      - `actuals_seed_replay_rows=38`
+      - `actuals_recovered_overlap_rows=57`
+      - warning now: `summary_asin_overlap_recovered_by_alignment_map`
+      - warning removed: `summary_asin_overlap_recovered_by_seed_replay`
+  - Phase 9 direct identity bridge overlap:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF002_build_sales_feedback_actuals.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef002_build_sales_feedback_actuals.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `10 passed`
+    - guarded rerun (`2026-04-21T09:35:46Z`) -> pass
+    - monitored follow-up rerun (`2026-04-21T09:41:06Z`) -> pass
+    - runtime truth:
+      - `guard_status=ready`
+      - `actuals_summary_direct_bridge_rows=0`
+      - `actuals_summary_asin_rows=0`
+      - `actuals_alignment_map_rows=19`
+      - `actuals_native_overlap_rows=19`
+      - `actuals_seed_replay_rows=38`
+      - `actuals_recovered_overlap_rows=57`
+      - warnings now:
+        - `summary_asin_overlap_recovered_by_alignment_map`
+        - `summary_direct_bridge_overlap_zero`
+      - phase threshold status:
+        - `not yet proven` (`actuals_summary_direct_bridge_rows > 0` unmet)
+  - Phase 9 follow-through automated scope expansion:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef004_run_sales_feedback_guarded_once.py tests/test_bef002_build_sales_feedback_actuals.py -q` -> `12 passed`
+    - guarded rerun (`2026-04-21T10:27:18Z`) -> pass
+    - monitored follow-up rerun (`2026-04-21T10:32:32Z`) -> pass
+    - runtime truth:
+      - `scope_expansion_candidate_rows=52362`
+      - `scope_expansion_outside_h_scope_rows=6979`
+      - `scope_expansion_no_asin_rows=35831`
+      - `scope_expansion_stale_source_rows=9552`
+      - warning added:
+        - `scope_expansion_candidates_ready`
+      - next action now:
+        - `run_scope_expansion_capture_path`
+  - Capture-route smoke run (first execution):
+    - targeted subset prepare dry-run (`2026-04-21T10:34:08Z`) -> pass
+    - targeted subset apply (`2026-04-21T10:34:51Z`) -> pass
+      - `active_supplier_rows_before=40488`
+      - `active_supplier_rows_after=2207`
+      - subset artifact:
+        - `out/analysis_reports/f_targeted_rescrape_subset_latest.csv`
+    - F061 sample run:
+      - `python scripts/flows/F/F061_run_legacy_first_checks_local.py --supplier-id stocklist_supplier --max-rows 10 --scrape-mode legacy_module` -> pass
+      - runtime truth:
+        - `processed_rows=10`
+        - `pending_rows=2197`
+        - `status_counts={"ROIFAIL":8,"RESCAN":2}`
+      - `scrape_attempted_rows=2`
+      - `scrape_success_rows=0`
+      - `scrape_failed_rows=2`
+  - Capture-route continuation (expanded execution):
+    - F061 expanded run:
+      - `python scripts/flows/F/F061_run_legacy_first_checks_local.py --supplier-id stocklist_supplier --max-rows 30 --scrape-mode legacy_module` -> pass
+      - runtime truth:
+        - `processed_rows=30`
+        - `pending_rows=2167`
+        - `status_counts={"ROIFAIL":20,"RESCAN":9,"OVER50K":1,"FAIL":2}`
+        - `scrape_attempted_rows=11`
+        - `scrape_success_rows=2`
+        - `scrape_failed_rows=9`
+        - `chart_daily_rows_captured=731`
+    - HF refresh after expanded capture:
+      - `python scripts/one_off/HF000_build_learning_foundation.py` -> pass
+      - `python scripts/one_off/HF001_build_learning_baseline.py` -> pass
+      - `python scripts/one_off/HF002_build_learning_alignment.py` -> pass
+      - key refresh truth:
+        - `hf_identity_rows=52406`
+        - `hf_identity_resolved_sku_rows=0`
+        - `hf_alignment_rows=95`
+    - guarded rerun after HF refresh:
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py` at `2026-04-21T11:39:28Z` -> pass
+      - monitored follow-up at `2026-04-21T11:44:50Z` -> pass
+      - runtime truth:
+        - `actuals_summary_direct_bridge_rows=0` (still zero)
+        - `scope_expansion_candidate_rows=52406`
+        - `scope_expansion_outside_h_scope_rows=8828`
+        - `scope_expansion_no_asin_rows=33793`
+        - `scope_expansion_stale_source_rows=9785`
+        - `next_action=run_scope_expansion_capture_path`
+  - Capture-route continuation (background run active):
+    - launched:
+      - `python scripts/flows/F/F061_run_legacy_first_checks_local.py --supplier-id stocklist_supplier --max-rows 200 --scrape-mode legacy_module`
+    - process truth:
+      - `python pid=27348` running
+      - stdout log:
+        - `out/analysis_reports/f061_capture_continue_20260421T114555Z.out.log`
+      - stderr log:
+        - `out/analysis_reports/f061_capture_continue_20260421T114555Z.err.log`
+  - Phase 10 sold-product truth-first accuracy execution:
+    - compile:
+      - `python -m py_compile scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF003_build_sales_feedback_examples.py scripts/one_off/F012_build_sales_history_learning_pack.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_f012_build_sales_history_learning_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_f012_build_sales_history_learning_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `18 passed`
+    - runtime proof:
+      - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` at `2026-04-21T12:24:43Z` -> pass
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py` at `2026-04-21T12:24:51Z` -> pass
+      - guard truth:
+        - `guard_status=ready`
+        - `readiness_label=ready_with_warnings`
+    - sold-product accuracy truth:
+      - `sold_rows_total=57`
+      - `sold_rows_with_model_side_evidence=19`
+      - `sold_rows_missing_model_side_evidence=38`
+      - `judged_accuracy_rows=19`
+      - `false_pass_rows=0`
+      - `false_fail_rows=0`
+      - `demand_overestimate_rows=13`
+      - `demand_underestimate_rows=3`
+      - `profit_overestimate_rows=1`
+      - `profit_underestimate_rows=16`
+      - top buckets:
+        - `missing_model_decision:57`
+        - `missing_model_estimate:38`
+        - `missing_model_side_evidence:38`
+        - `profit_underestimate:16`
+        - `profit_underestimate_severe:15`
+    - phase status:
+      - threshold met for sold-truth-first reporting and explicit error metrics
+      - parked per timeout rule:
+        - `parked pending sold-truth replay coverage expansion`
+  - Phase 11 sold-truth replay queue and guard routing execution:
+    - compile:
+      - `python -m py_compile scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `11 passed`
+    - runtime proof:
+      - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` at `2026-04-21T12:43:24Z` -> pass
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py` at `2026-04-21T12:43:30Z` -> pass
+    - queue and guard truth:
+      - `sold_rows_total=57`
+      - `sold_rows_missing_model_side_evidence=38`
+      - `sold_truth_replay_queue_rows=38`
+      - `guard_status=ready`
+      - warning present:
+        - `sold_truth_replay_capture_required`
+      - guarded next action:
+        - `run_sold_truth_replay_capture_path`
+    - phase status:
+      - queue and guard routing implemented and proven
+      - parked per timeout rule:
+        - `parked pending sold-truth replay capture execution`
+  - Phase 12 sold-truth replay capture execution:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF005_run_sold_truth_replay_capture_path.py tests/test_bef005_run_sold_truth_replay_capture_path.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef005_run_sold_truth_replay_capture_path.py -q` -> `2 passed`
+    - runtime proof:
+      - `python scripts/one_off/BEF005_run_sold_truth_replay_capture_path.py --passes 1` at `2026-04-21T12:53:18Z` -> pass
+    - capture and rescore truth:
+      - `queue_rows_before=38`
+      - `capture_pack_rows=38`
+      - `capture_success_rows=38`
+      - `capture_failed_rows=0`
+      - `queue_rows_after=0`
+      - `queue_rows_reduced=38`
+      - `queue_reduction_rate=1.0`
+      - `sold_rows_total=57`
+      - `sold_rows_with_model_side_evidence=57`
+      - `sold_rows_missing_model_side_evidence=0`
+      - `sold_truth_replay_queue_rows=0`
+    - guard truth:
+      - `guard_status=ready`
+      - `readiness_label=ready_with_warnings`
+      - warning removed:
+        - `sold_truth_replay_capture_required`
+      - guarded next action:
+        - `run_scope_expansion_capture_path`
+    - phase status:
+      - threshold met and proven
+      - complete (`ready_with_warnings`)
+  - Phase 13 scope-expansion capture execution:
+    - runtime proof:
+      - `python scripts/one_off/HF007_run_alignment_coverage_recovery.py --max-rounds 1 --batch-size 20 --passes 1 --webscrape-mode data --skip-date-scraping --only-not-in-scrape --target-coverage 0.95 --target-no-source 0` -> pass
+    - round truth:
+      - `pack_rows=20`
+      - `capture_success_rows=20`
+      - `capture_failed_rows=0`
+      - `alignment_total_rows=95`
+      - `no_source_rows: 27 -> 7`
+      - `expected_coverage_rate: 0.7158 -> 0.9263`
+    - post-round rescore:
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` -> pass
+      - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` -> pass
+    - guard truth:
+      - `guard_status=ready`
+      - `readiness_label=ready_with_warnings`
+      - `actuals_summary_direct_bridge_rows=0` (unchanged)
+      - `sold_truth_replay_queue_rows=0`
+      - `next_action=run_scope_expansion_capture_path`
+    - phase status:
+      - bounded scope-expansion capture proved
+      - direct-bridge threshold still not met
+  - Phase 14 direct-bridge feasibility guard correction:
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `9 passed`
+    - runtime proof:
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` at `2026-04-21T14:15:03Z` -> pass
+    - guard truth:
+      - `guard_status=ready`
+      - `readiness_label=ready_with_warnings`
+      - `actuals_summary_direct_bridge_rows=0`
+      - `direct_bridge_baseline_asin_rows=57`
+      - `direct_bridge_summary_identity_pair_overlap_rows=2358`
+      - `direct_bridge_feasible_pair_rows=0`
+      - warnings include:
+        - `summary_direct_bridge_no_feasible_overlap`
+      - `next_action=expand_identity_bridge_resolution`
+    - phase status:
+      - scope-capture loop condition removed for infeasible state
+      - identity-resolution expansion is now the correct next path
+  - Phase 15 planning pivot evidence:
+    - latest sold accuracy summary (`2026-04-21T14:02:43Z`):
+      - `sold_rows_total=57`
+      - `sold_rows_with_model_side_evidence=57`
+      - `sold_rows_with_full_model_evidence=0`
+      - `decision_judged_rows=0`
+      - `bucket::missing_model_decision=57`
+    - structural overlap check (`2026-04-21` planning audit):
+      - `summary_row_count=2358`
+      - `summary_decision_state_rows=2358`
+      - `summary_asin_overlap_with_sold=0`
+      - `summary_identity_pair_overlap=2358`
+      - `summary_identity_pair_overlap_with_sold_asin=0`
+    - commercial reuse check (`2026-04-21` planning audit):
+      - feeder already emits `estimated_demand`
+      - feeder already emits `recommended_test_qty`
+      - restock blueprint already frames v1 as starter settings and banded recommendation logic
+    - interpretation:
+      - sold-row decision coverage cannot recover from additional unsold scope capture alone.
+      - the next valid step is sold decision replay-source recovery.
+      - commercial scoring should use lower/upper sales and rank bands, not a single exact forecast.
+  - Phase 15 gate pre-check evidence (`2026-04-21` planning audit):
+    - sold sample mix:
+      - `pass_rows=10`
+      - `fail_rows=47`
+      - `near_floor_rows=5`
+    - sold capture truth:
+      - `sold_capture_rows=38`
+      - `sold_capture_success_rows=38`
+      - `sold_capture_failed_rows=0`
+    - sufficiency interpretation:
+      - enough sold truth and sales-side evidence exists to proceed with replay-bridge coding.
+      - sold decision-state evidence is still missing.
+      - sold-universe rank-window overlap with backtest BSR views is still `0`.
+      - live-test rank bands therefore need an explicit acquisition path, not an assumption.
+  - Phase 15 gate execution evidence (`2026-04-21T15:27:50Z`):
+    - compile:
+      - `python -m py_compile scripts/one_off/F014_build_live_test_data_sufficiency_gate.py scripts/one_off/F015_build_commercial_validation_panel.py tests/test_f014_build_live_test_data_sufficiency_gate.py tests/test_f015_build_commercial_validation_panel.py` -> pass
+    - pytest:
+      - `pytest tests/test_f014_build_live_test_data_sufficiency_gate.py tests/test_f015_build_commercial_validation_panel.py -q` -> `4 passed`
+    - runtime proof:
+      - `python scripts/one_off/F014_build_live_test_data_sufficiency_gate.py` -> pass
+      - `python scripts/one_off/F015_build_commercial_validation_panel.py` -> pass
+    - sufficiency state truth:
+      - `sold_truth_state=ready_now`
+      - `model_side_evidence_state=ready_now`
+      - `decision_replay_state=ready_after_replay_bridge`
+      - `sales_band_data_state=ready_now`
+      - `starter_qty_input_state=ready_after_replay_bridge`
+      - `rank_window_state=needs_rank_window_capture`
+      - `sample_mix_state=ready_now`
+    - validation panel truth:
+      - `panel_rows_total=15`
+      - `panel_missing_rows=0`
+      - `big_pass_rows=5`
+      - `big_fail_rows=5`
+      - `on_the_line_rows=5`
+    - gap-plan truth:
+      - blockers now explicitly mapped to owning batches:
+        - `decision_replay_state -> EXECUTION_BATCH_012`
+        - `starter_qty_input_state -> EXECUTION_BATCH_012`
+        - `rank_window_state -> EXECUTION_BATCH_013`
+  - Phase 16 sold decision replay execution evidence (`2026-04-21T15:45:45Z`):
+    - compile:
+      - `python -m py_compile scripts/one_off/BEF006_build_sold_decision_replay_bridge.py scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_bef006_build_sold_decision_replay_bridge.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+    - pytest:
+      - `pytest tests/test_bef006_build_sold_decision_replay_bridge.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `16 passed`
+    - runtime proof:
+      - `python scripts/one_off/BEF006_build_sold_decision_replay_bridge.py` -> pass
+      - `python scripts/one_off/F011_build_sales_history_accuracy_pack.py` -> pass
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` -> pass
+    - runtime truth:
+      - `sold_rows_total=57`
+      - `sold_decision_replay_coverage_rows=57`
+      - `sold_rows_with_full_model_evidence=57`
+      - `decision_judged_rows=57`
+      - `rows_with_demand_bucket=57`
+      - `rows_with_recommended_test_qty=57`
+      - `rows_with_recommendation_status=57`
+      - `bucket::missing_model_decision=0`
+      - guard:
+        - `guard_status=ready`
+        - `readiness_label=ready_with_warnings`
+        - `next_action=expand_identity_bridge_resolution`
+  - Phase 17 commercial decision bands rerun with rank-window source recovery (`2026-04-21T20:49:30Z`):
+    - compile:
+      - `python -m py_compile scripts/one_off/F013_build_live_test_readiness_pack.py scripts/one_off/F011_build_sales_history_accuracy_pack.py scripts/one_off/BEF003_build_sales_feedback_examples.py scripts/one_off/BEF004_run_sales_feedback_guarded_once.py tests/test_f013_build_live_test_readiness_pack.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py` -> pass
+      - `python -m py_compile scripts/one_off/F014_build_live_test_data_sufficiency_gate.py tests/test_f014_build_live_test_data_sufficiency_gate.py` -> pass
+    - pytest:
+      - `pytest tests/test_f013_build_live_test_readiness_pack.py tests/test_f011_build_sales_history_accuracy_pack.py tests/test_bef003_build_sales_feedback_examples.py tests/test_bef004_run_sales_feedback_guarded_once.py -q` -> `19 passed`
+      - `pytest tests/test_f014_build_live_test_data_sufficiency_gate.py -q` -> `3 passed`
+    - runtime proof:
+      - `python scripts/one_off/F013_build_live_test_readiness_pack.py` -> pass
+      - `python scripts/one_off/F014_build_live_test_data_sufficiency_gate.py` -> pass
+      - `python scripts/one_off/BEF004_run_sales_feedback_guarded_once.py --skip-builders` -> pass
+    - commercial summary truth:
+      - `commercial_rows_total=57`
+      - `commercial_judged_rows=57`
+      - `false_green_rows=0`
+      - `false_red_rows=8`
+      - `negative_mode_miss_rows=0`
+      - `starter_qty_too_high_rows=0`
+      - `starter_qty_too_low_rows=8`
+      - `band_hit_rows=23`
+      - `live_test_ready_rows=2`
+      - `rank_gap_rows=0`
+      - `rows_using_backtest_rank_window=0`
+      - `rows_using_full_capture_rank_window=57`
+      - `rows_missing_rank_window=0`
+    - sufficiency gate truth:
+      - `sold_truth_state=ready_now`
+      - `model_side_evidence_state=ready_now`
+      - `decision_replay_state=ready_now`
+      - `sales_band_data_state=ready_now`
+      - `starter_qty_input_state=ready_now`
+      - `rank_window_state=ready_now`
+      - `sample_mix_state=ready_now`
+    - fixed panel truth:
+      - `panel_rows_total=15`
+      - `panel_rows_with_blank_commercial_state=0`
+      - `panel_big_pass_test_buy_rows=1`
+      - `panel_big_pass_watch_rows=0`
+      - `panel_big_pass_reject_rows=4`
+      - `panel_big_fail_test_buy_rows=0`
+      - `panel_big_fail_watch_rows=0`
+      - `panel_big_fail_reject_rows=5`
+      - `panel_on_the_line_test_buy_rows=1`
+      - `panel_on_the_line_watch_rows=0`
+      - `panel_on_the_line_reject_rows=4`
+    - guard truth:
+      - `guard_status=ready`
+      - `readiness_label=ready_with_warnings`
+      - `next_action=expand_identity_bridge_resolution`
+
+## Required next action
+- Start bounded shadow live testing on ready rows, and keep structural identity work in parallel:
+  - use `out/analysis_reports/f_live_test_readiness_pack_latest.csv` where `live_test_readiness_state=ready_for_live_test` as the first shadow scope (`2` rows currently).
+  - measure first-run shadow outcomes versus:
+    - `commercial_decision_state`
+    - `starter_test_qty_recommended`
+    - realized short-window sales/profit behavior
+  - continue structural identity work per guard in parallel:
+    - `next_action=expand_identity_bridge_resolution`

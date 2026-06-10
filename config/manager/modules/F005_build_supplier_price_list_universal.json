@@ -1,0 +1,72 @@
+{
+  "id": "F005_build_supplier_price_list_universal",
+  "display_name": "F005 Supplier Price List Universal Builder",
+  "flow": "F",
+  "purpose": "Classify the supplier universal price-list builder as a bridge/worker-output script so the manager can inspect its existing output contracts without fetching supplier files or resetting scanner workspaces.",
+  "owner_entrypoint": "scripts/flows/F/F005_build_supplier_price_list_universal.py",
+  "worker_entrypoint": "scripts/flows/F/F005_build_supplier_price_list_universal.py",
+  "health_sources": [
+    {
+      "name": "supplier_price_list_health",
+      "path": "out/systems/F/inbox/supplier_price_list_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_price_list_run_state",
+      "path": "out/systems/F/inbox/supplier_price_list_run_state.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "supplier_price_list_queue_state",
+      "path": "out/systems/F/inbox/supplier_price_list_queue_state.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "supplier_price_list_universal_live",
+      "path": "out/systems/F/inbox/supplier_price_list_universal_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "supplier_price_list_active_run",
+      "path": "out/systems/F/inbox/supplier_price_list_active_run.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "universal_price_list_output_warn_after_10080_minutes",
+    "source_fetch_and_workspace_reset_are_worker_actions"
+  ],
+  "needs_user_signals": [
+    "manual_supplier_file_needed",
+    "supplier_conversion_failure"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "fetch_supplier_file",
+    "reset_supplier_scan_workspace",
+    "align_local_db"
+  ],
+  "manager_notes": "Bridge classification only. MOT may inspect existing F005 output contracts but must not fetch files, rebuild universal rows, reset workspaces, or run scanner work."
+}

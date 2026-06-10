@@ -378,6 +378,8 @@ def _existing_daily_sidecar(path: Path) -> Dict[Tuple[str, str, str], Dict[str, 
 
 def _rebuild_daily_rows(outcome_rows: List[Dict[str, str]], sidecar: Dict[Tuple[str, str, str], Dict[str, str]]) -> List[Dict[str, str]]:
     agg: Dict[Tuple[str, str, str], Dict[str, float]] = {}
+    keyed_rows: Dict[Tuple[str, str, str, str], Dict[str, str]] = {}
+    unkeyed_rows: List[Dict[str, str]] = []
     for row in outcome_rows:
         event_ts = _clean(row.get("event_ts_utc", ""))
         if len(event_ts) < 10:
@@ -387,6 +389,17 @@ def _rebuild_daily_rows(outcome_rows: List[Dict[str, str]], sidecar: Dict[Tuple[
         tactic = _clean(row.get("chosen_tactic", ""))
         if not scenario or not tactic:
             continue
+        tactic_case_id = _clean(row.get("tactic_case_id", ""))
+        if tactic_case_id:
+            keyed_rows[(asof_date, scenario, tactic, tactic_case_id)] = row
+        else:
+            unkeyed_rows.append(row)
+
+    for row in list(keyed_rows.values()) + unkeyed_rows:
+        event_ts = _clean(row.get("event_ts_utc", ""))
+        asof_date = event_ts[:10]
+        scenario = _clean(row.get("scenario_type", ""))
+        tactic = _clean(row.get("chosen_tactic", ""))
         key = (asof_date, scenario, tactic)
         if key not in agg:
             agg[key] = {
@@ -470,6 +483,11 @@ def main() -> int:
         description="Rebuild h_strategy_outcome_daily.csv and normalize timeout/non-action outcome truth."
     )
     parser.add_argument("--dry-run", action="store_true", help="Show counts only. Do not write files.")
+    parser.add_argument(
+        "--daily-only",
+        action="store_true",
+        help="Rebuild h_strategy_outcome_daily.csv only. Do not normalize or write h_strategy_outcome_log.csv.",
+    )
     args = parser.parse_args()
 
     log_fields, log_rows = _read_csv_rows(OUTCOME_LOG_PATH)
@@ -477,15 +495,22 @@ def main() -> int:
         print(f"{OUTCOME_LOG_PATH}: missing_or_empty")
         return 0
 
-    converted = _convert_failed_timeouts_to_expired(log_rows)
-    converted_non_action = _convert_non_action_expired_to_aborted(log_rows)
-    converted_non_action_failed = _convert_non_action_failed_to_aborted(log_rows)
-    converted_floor_bound_failed = _convert_floor_bound_failed_to_aborted(log_rows)
+    rebuild_source_rows = [dict(row) for row in log_rows]
+    converted = 0
+    converted_non_action = 0
+    converted_non_action_failed = 0
+    converted_floor_bound_failed = 0
+    if not args.daily_only:
+        converted = _convert_failed_timeouts_to_expired(rebuild_source_rows)
+        converted_non_action = _convert_non_action_expired_to_aborted(rebuild_source_rows)
+        converted_non_action_failed = _convert_non_action_failed_to_aborted(rebuild_source_rows)
+        converted_floor_bound_failed = _convert_floor_bound_failed_to_aborted(rebuild_source_rows)
     sidecar = _existing_daily_sidecar(OUTCOME_DAILY_PATH)
-    rebuilt_daily_rows = _rebuild_daily_rows(log_rows, sidecar)
+    rebuilt_daily_rows = _rebuild_daily_rows(rebuild_source_rows, sidecar)
 
     if not args.dry_run:
-        _write_csv_rows(OUTCOME_LOG_PATH, log_fields, log_rows)
+        if not args.daily_only:
+            _write_csv_rows(OUTCOME_LOG_PATH, log_fields, rebuild_source_rows)
         _write_csv_rows(OUTCOME_DAILY_PATH, OUTCOME_DAILY_SCHEMA, rebuilt_daily_rows)
 
     print(
@@ -493,10 +518,11 @@ def main() -> int:
         f"converted_non_action_expired_to_aborted={converted_non_action} "
         f"converted_non_action_failed_to_aborted={converted_non_action_failed} "
         f"converted_floor_bound_failed_to_aborted={converted_floor_bound_failed} "
-        f"dry_run={1 if args.dry_run else 0}"
+        f"daily_only={1 if args.daily_only else 0} dry_run={1 if args.dry_run else 0}"
     )
     print(
-        f"daily_rows={len(rebuilt_daily_rows)} schema_cols={len(OUTCOME_DAILY_SCHEMA)} dry_run={1 if args.dry_run else 0}"
+        f"daily_rows={len(rebuilt_daily_rows)} schema_cols={len(OUTCOME_DAILY_SCHEMA)} "
+        f"daily_only={1 if args.daily_only else 0} dry_run={1 if args.dry_run else 0}"
     )
     return 0
 

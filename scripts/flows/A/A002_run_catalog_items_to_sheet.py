@@ -1,12 +1,12 @@
 ﻿"""
-Fetch Catalog Items (2022-04-01) for a set of ASINs and write a flattened view to Google Sheets.
+Fetch Catalog Items (2022-04-01) for a set of ASINs and write a flattened local proof view.
 
 What it does:
 - Reads ASINs from a CSV (default: out/merchant_listings_latest.csv), using asin1 or product-id where product-id-type == 1 (ASIN).
 - Calls Catalog Items with includedData=images,attributes,summaries,productTypes,identifiers,relationships.
 - Flattens richer fields: asin, status, item_name, brand_name, product_type, main_image, upc, ean, gtin, parent_asin, color, size, manufacturer, part_number, model_number, package_weight/value/unit, package_dimensions, item_dimensions, bullet_points, keywords, error.
-- Writes to a sheet tab "CatalogItems_raw" (overwrites) and updates Run_Status.
 - Saves a CSV snapshot to out/catalog_items_flat.csv.
+- A002_WRITE_LEGACY_SHEETS=1 opts in to the old Google Sheets update path.
 
 No summariesâ€”just a tabular view for inspection.
 """
@@ -110,6 +110,14 @@ def summarize_focus(df: pd.DataFrame, prev_counts: dict) -> list[list[str]]:
     return rows
 # Default on so you donâ€™t have to set anything; toggle via env if needed.
 DEBUG_ATTRS = os.environ.get("DEBUG_ATTRS", "true").lower() == "true"
+
+
+def env_flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def write_legacy_sheets_enabled() -> bool:
+    return env_flag("A002_WRITE_LEGACY_SHEETS", "0")
 
 
 def _sheet_status_code(exc: Exception) -> int | None:
@@ -670,9 +678,12 @@ def main() -> None:
     attempts_used = 0
     row_count = 0
     col_count = 0
+    write_legacy_sheets = write_legacy_sheets_enabled()
 
-    client = get_gspread_client()
-    sheet = _run_sheet_op("open_by_key_main", lambda: client.open_by_key(SHEET_ID))
+    sheet = None
+    if write_legacy_sheets:
+        client = get_gspread_client()
+        sheet = _run_sheet_op("open_by_key_main", lambda: client.open_by_key(SHEET_ID))
 
     try:
         asins = load_asins(Path(args.input_csv), args.limit)
@@ -745,9 +756,10 @@ def main() -> None:
         snapshot_path = str(out_path)
         print(f"Saved flattened catalog data to {out_path}")
 
-        _run_sheet_op("write_raw_and_summary", lambda: write_raw_and_summary(df))
-        sheet_tabs_written = [TAB_NAME, SUMMARY_TAB]
-        print(f"Wrote {len(df)} rows to sheet tabs {TAB_NAME} and {SUMMARY_TAB}")
+        if write_legacy_sheets:
+            _run_sheet_op("write_raw_and_summary", lambda: write_raw_and_summary(df))
+            sheet_tabs_written = [TAB_NAME, SUMMARY_TAB]
+            print(f"Wrote {len(df)} rows to sheet tabs {TAB_NAME} and {SUMMARY_TAB}")
     except Exception as exc:
         status = "error"
         alert = "error"
@@ -760,16 +772,19 @@ def main() -> None:
     # consecutive counters
     consecutive_failures = 0
     consecutive_successes = 0
-    try:
-        ws_status = _run_sheet_op("run_status_worksheet", lambda: sheet.worksheet(RUN_STATUS_TAB))
-        existing = _run_sheet_op("run_status_get_all_values", ws_status.get_all_values)
-    except gspread.WorksheetNotFound:
-        existing = []
-        ws_status = None
-    except Exception as exc:
-        print(f"[A002] WARN run status read skipped: {exc}")
-        existing = []
-        ws_status = None
+    existing = []
+    ws_status = None
+    if write_legacy_sheets and sheet is not None:
+        try:
+            ws_status = _run_sheet_op("run_status_worksheet", lambda: sheet.worksheet(RUN_STATUS_TAB))
+            existing = _run_sheet_op("run_status_get_all_values", ws_status.get_all_values)
+        except gspread.WorksheetNotFound:
+            existing = []
+            ws_status = None
+        except Exception as exc:
+            print(f"[A002] WARN run status read skipped: {exc}")
+            existing = []
+            ws_status = None
     headers = [
         "script",
         "mode",
@@ -837,10 +852,20 @@ def main() -> None:
         git_version,
         last_error,
     ]
-    try:
-        _run_sheet_op("append_run_status", lambda: append_run_status(sheet, status_row))
-    except Exception as exc:
-        print(f"[A002] WARN append_run_status skipped: {exc}")
+    if write_legacy_sheets and sheet is not None:
+        try:
+            _run_sheet_op("append_run_status", lambda: append_run_status(sheet, status_row))
+        except Exception as exc:
+            print(f"[A002] WARN append_run_status skipped: {exc}")
+    print(
+        {
+            "status": status,
+            "rows": row_count,
+            "snapshot": snapshot_path,
+            "legacy_sheet_writes": write_legacy_sheets,
+            "error": last_error,
+        }
+    )
 
 
 if __name__ == "__main__":

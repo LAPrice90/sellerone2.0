@@ -13,6 +13,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 TXN_BREAKDOWNS = Path("out/financial_transactions_v2024_breakdowns.csv")
 OUT_LEDGER = Path("out/transaction_ledger.csv")
@@ -52,7 +54,7 @@ def main() -> None:
     ledger = ledger.sort_values(by=["posted_date", "transaction_type", "breakdown_type", "transaction_id"])
 
     OUT_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-    ledger.to_csv(OUT_LEDGER, index=False)
+    safe_to_csv(ledger, OUT_LEDGER, index=False)
 
     summary = (
         ledger.groupby(["transaction_type", "breakdown_type", "currency"], dropna=False)
@@ -61,7 +63,7 @@ def main() -> None:
         .sort_values(by=["transaction_type", "breakdown_type"])
     )
     OUT_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUT_SUMMARY, index=False)
+    safe_to_csv(summary, OUT_SUMMARY, index=False)
 
     print(
         {

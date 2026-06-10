@@ -1,0 +1,96 @@
+{
+  "id": "FPM013_download_ready_url_sources",
+  "display_name": "FPM013 URL Source Download",
+  "flow": "F",
+  "purpose": "Describe the URL price-list downloader so the manager can inspect URL source readiness, prior download/import proof, and failures without calling supplier links or downloading files.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM013_download_ready_url_sources.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM013_download_ready_url_sources.py",
+  "health_sources": [
+    {
+      "name": "url_source_download_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_registry_config",
+      "path": "config/feeder/price_list_manager/suppliers.csv",
+      "required": true,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "price_list_batches",
+      "path": "out/systems/F/price_list_manager/test_mode/price_list_batches.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "downloaded_sources_folder",
+      "path": "out/systems/F/price_list_manager/test_mode/downloaded_sources",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "price_list_batches",
+      "path": "out/systems/F/price_list_manager/test_mode/price_list_batches.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "url_source_status_warn_after_10080_minutes",
+    "url_supplier_rows_must_keep_source_url_visible",
+    "download_ready_state_is_classified_not_downloaded_by_mot",
+    "download_failures_must_create_manager_task"
+  ],
+  "needs_user_signals": [
+    "url_auth_required",
+    "supplier_link_failed",
+    "downloaded_file_missing",
+    "url_source_config_needed"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "check_remote_source",
+    "download_price_file",
+    "write_supplier_inbox_file",
+    "delete_local_price_file",
+    "delete_downloaded_source_file",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "align_local_db",
+    "run_f061"
+  ],
+  "manager_notes": "Manager proof registration only. The manager may read URL source status and prior import proof, but must not call supplier URLs, download files, delete files, run F061, or change queue/pricing state in this phase."
+}

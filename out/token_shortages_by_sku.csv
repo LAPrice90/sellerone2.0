@@ -1,1 +1,4 @@
-timestamp,seller_sku,missing_qty
+timestamp,seller_sku,missing_qty,shortage_class,evidence_note,next_action
+2026-06-10T08:24:27Z,0G-JB6S-PN34,1,runtime_adjustment_pending,missing_qty=1;open_rows=1;levels=1.0;stock_events_raw_exists=1;status=partial;note=insufficient_returned_pending;base_event_id=FBA15L309F94;required=58;applied=0,rerun_b009_when_stock_events_raw_available
+2026-06-10T08:24:27Z,AK-OB6V-HIYD,3,true_live_shortage,missing_qty=3;open_rows=3;levels=2.0;available_tokens=0;research_pending_tokens=0,wait_for_receipt_or_approved_stock_correction
+2026-06-10T08:24:27Z,SE-UITZ-7CPY,1,true_live_shortage,missing_qty=1;open_rows=1;levels=1.0;available_tokens=0;research_pending_tokens=0,wait_for_receipt_or_approved_stock_correction

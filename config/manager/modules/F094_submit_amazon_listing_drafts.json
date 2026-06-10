@@ -1,0 +1,76 @@
+{
+  "id": "F094_submit_amazon_listing_drafts",
+  "display_name": "F094 Submit Amazon Listing Drafts",
+  "flow": "F",
+  "purpose": "Register Amazon listing submit proof as protected so the manager can inspect submit readiness without submitting drafts.",
+  "owner_entrypoint": "scripts/flows/F/F094_submit_amazon_listing_drafts.py",
+  "worker_entrypoint": "scripts/flows/F/F094_submit_amazon_listing_drafts.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_health",
+      "path": "out/systems/F/health/amazon_listing_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "amazon_listing_drafts_live",
+      "path": "out/systems/F/live/amazon_listing_drafts_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_preview_issues_live",
+      "path": "out/systems/F/live/amazon_listing_preview_issues_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "amazon_listing_submission_events",
+      "path": "out/systems/F/history/amazon_listing_submission_events.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_holds_live",
+      "path": "out/systems/F/live/amazon_listing_holds_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "listing_submit_events_are_read_only_manager_evidence",
+    "submit_requires_separate_explicit_approval"
+  ],
+  "needs_user_signals": [
+    "listing_submit_requested",
+    "live_amazon_write_requested",
+    "preview_blockers_visible"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "submit_amazon_listing",
+    "publish_listing",
+    "call_amazon_api",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Protected submit label only. MOT may read submit evidence, but submitting Amazon listings is never allowed from this manager label."
+}

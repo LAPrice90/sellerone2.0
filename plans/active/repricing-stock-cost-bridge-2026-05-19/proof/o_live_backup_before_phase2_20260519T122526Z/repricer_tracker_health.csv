@@ -1,0 +1,13 @@
+check,status,value,notes,observed_utc,source_path
+repricer_tracker_runtime_source_present,ok,89,runtime floor snapshot rows available,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_required_columns,ok,,required columns present,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_blank_execution_write_status,ok,,no blank execution_write_status rows,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_invalid_execution_write_status,ok,,all nonblank write statuses are allowed,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_latest_terminal_state,ok,finalized,latest terminal run id: 20260502T113610Z,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_latest_terminal_run_rows,ok,49,latest terminal run id: 20260502T113610Z,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_newer_runtime_than_terminal,ok,,no newer runtime run than latest terminal marker,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_publish_marker,ok,50,publish_status=ok,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_terminal_rows_vs_publish_rows,ok,49/50,terminal runtime rows are raw processed SKUs; publish rows are filtered dashboard-visible rows,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\phase1_runtime_floor_snapshot_latest.csv
+repricer_tracker_publish_rows_vs_dashboard_view_rows,ok,50/50,publish marker rows match the filtered H130 dashboard view rows,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\analysis_reports\phase1_observation_view_2026-05-02.csv
+repricer_tracker_pricing_output_freshness,warn,pricing_output_older_than_runtime_and_missing_latest_runtime_run,"out/pricing_output.csv is stale audit evidence, not the latest H runtime source",2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\pricing_output.csv
+repricer_tracker_pricing_output_blank_execution_write_status,warn,20,stale audit pricing_output has blank execution_write_status rows,2026-05-02T11:58:18Z,C:\Users\Luke\Desktop\SellerOne 2.0\out\pricing_output.csv

@@ -8,9 +8,10 @@ import os
 import sys
 import time
 import csv
+import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from decimal import Decimal, ROUND_HALF_UP
 try:
@@ -63,6 +64,8 @@ ORDERS_ALL_PATH = Path("out/orders_all.csv")
 ITEMS_ALL_PATH = Path("out/order_items_all.csv")
 SQL_TABLE_ORDERS_ALL = "b_orders_all"
 SQL_TABLE_ORDER_ITEMS_ALL = "b_order_items_all"
+RECOVERY_QUARANTINE_PATH = Path("out/systems/B/recovery_quarantine/b_order_recovery_quarantine.csv")
+ORDER_PROMOTION_MANIFEST_PATH = Path("out/systems/B/order_promotion/b_order_promotion_manifest.json")
 FX_RATES_PATH = Path("out/fx_rates_daily.csv")
 FEE_MODEL_PATH = Path("out/fee_country_model.csv")
 FEE_RULES_PATH = Path("reference/fee_vat_rules.csv")
@@ -351,7 +354,24 @@ def save_marker(latest_iso: str) -> None:
     except Exception:
         pass
     MARKER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MARKER_PATH.write_text(latest_iso)
+    tmp_path = MARKER_PATH.with_name(f".{MARKER_PATH.name}.{os.getpid()}.tmp")
+    last_error: OSError | None = None
+    for attempt in range(1, 4):
+        try:
+            tmp_path.write_text(latest_iso, encoding="utf-8")
+            os.replace(tmp_path, MARKER_PATH)
+            return
+        except OSError as exc:
+            last_error = exc
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if attempt == 3:
+                raise
+            time.sleep(0.25 * attempt)
+    if last_error is not None:
+        raise last_error
 
 
 def _parse_iso(val: str) -> Optional[datetime]:
@@ -379,6 +399,186 @@ def _read_csv_if_exists(path: Path) -> pd.DataFrame:
             return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
+
+
+def _text(value: object) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value).strip()
+
+
+def _json_obj(value: object) -> dict[str, Any]:
+    try:
+        payload = json.loads(str(value or ""))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _json_list(value: object) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(str(value or ""))
+    except Exception:
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _fallback_recovery_order_payload(row: dict[str, object]) -> dict[str, Any]:
+    order_id = _text(row.get("amazon_order_id"))
+    if not order_id:
+        return {}
+    return {
+        "AmazonOrderId": order_id,
+        "PurchaseDate": _text(row.get("purchase_utc")),
+        "LastUpdateDate": _text(row.get("last_update_utc") or row.get("purchase_utc")),
+        "OrderStatus": _text(row.get("order_status")),
+        "MarketplaceId": _text(row.get("marketplace_id")),
+        "SalesChannel": _text(row.get("sales_channel")),
+        "FulfillmentChannel": _text(row.get("fulfillment_channel")),
+        "OrderTotal": {"Amount": _text(row.get("order_total")), "CurrencyCode": _text(row.get("currency"))},
+        "NumberOfItemsShipped": _text(row.get("quantity")),
+        "NumberOfItemsUnshipped": "0",
+    }
+
+
+def _fallback_recovery_item_payload(row: dict[str, object]) -> dict[str, Any]:
+    item_ids = [part.strip() for part in _text(row.get("order_item_ids")).split(";") if part.strip()]
+    sku = _text(row.get("sku")).split(";")[0].strip()
+    asin = _text(row.get("asin")).split(";")[0].strip()
+    if not item_ids or not sku or not asin:
+        return {}
+    return {
+        "AmazonOrderId": _text(row.get("amazon_order_id")),
+        "OrderItemId": item_ids[0],
+        "ASIN": asin,
+        "SellerSKU": sku,
+        "QuantityOrdered": _text(row.get("quantity") or "1"),
+        "QuantityShipped": _text(row.get("quantity") or "1") if _text(row.get("order_status")).lower() == "shipped" else "",
+        "ItemPrice": {"Amount": _text(row.get("order_total")), "CurrencyCode": _text(row.get("currency"))},
+    }
+
+
+def _load_promoted_recovery_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not ORDER_PROMOTION_MANIFEST_PATH.exists() or not RECOVERY_QUARANTINE_PATH.exists():
+        return pd.DataFrame(), pd.DataFrame()
+    try:
+        manifest = json.loads(ORDER_PROMOTION_MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame()
+    if _text(manifest.get("status")) != "promoted":
+        return pd.DataFrame(), pd.DataFrame()
+    promoted_orders = {
+        _text(order_id)
+        for order_id in manifest.get("promoted_orders", [])
+        if _text(order_id)
+    }
+    if not promoted_orders:
+        return pd.DataFrame(), pd.DataFrame()
+    try:
+        quarantine = pd.read_csv(RECOVERY_QUARANTINE_PATH, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame()
+    if quarantine.empty or "amazon_order_id" not in quarantine.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    order_payloads: list[dict[str, Any]] = []
+    item_payloads: list[dict[str, Any]] = []
+    for _, series in quarantine.iterrows():
+        row = series.to_dict()
+        order_id = _text(row.get("amazon_order_id"))
+        if order_id not in promoted_orders or _text(row.get("proof_label")) != "API proved":
+            continue
+        order_payload = _json_obj(row.get("order_payload_json")) or _fallback_recovery_order_payload(row)
+        items_payload = _json_list(row.get("items_payload_json"))
+        if not items_payload:
+            fallback_item = _fallback_recovery_item_payload(row)
+            items_payload = [fallback_item] if fallback_item else []
+        if order_payload:
+            order_payloads.append(order_payload)
+        for item in items_payload:
+            if not _text(item.get("AmazonOrderId")):
+                item["AmazonOrderId"] = order_id
+            item_payloads.append(item)
+
+    recovery_orders = flatten_orders(order_payloads).fillna("").astype(str) if order_payloads else pd.DataFrame()
+    recovery_items = flatten_items(item_payloads).fillna("").astype(str) if item_payloads else pd.DataFrame()
+    return recovery_orders, recovery_items
+
+
+def _concat_nonempty(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    nonempty = [frame for frame in frames if frame is not None and not frame.empty]
+    if not nonempty:
+        return pd.DataFrame()
+    return pd.concat(nonempty, ignore_index=True).fillna("").astype(str)
+
+
+def _merge_level1_unique(existing: pd.DataFrame, incoming: pd.DataFrame) -> pd.DataFrame:
+    if incoming is None or incoming.empty:
+        return existing
+    if existing is None or existing.empty:
+        out = incoming.copy()
+    else:
+        all_cols = list(dict.fromkeys(list(existing.columns) + list(incoming.columns)))
+        for col in all_cols:
+            if col not in existing.columns:
+                existing[col] = ""
+            if col not in incoming.columns:
+                incoming[col] = ""
+        out = pd.concat([existing[all_cols], incoming[all_cols]], ignore_index=True)
+    for col in ["Order ID", "SKU"]:
+        if col not in out.columns:
+            out[col] = ""
+    out = out.drop_duplicates(subset=["Order ID", "SKU"], keep="last")
+    return out.fillna("").astype(str)
+
+
+def _merge_promoted_recovery_into_compiled(
+    recovery_orders: pd.DataFrame | None = None,
+    recovery_items: pd.DataFrame | None = None,
+) -> dict[str, int]:
+    if recovery_orders is None or recovery_items is None:
+        recovery_orders, recovery_items = _load_promoted_recovery_frames()
+    counts = {
+        "orders": int(len(recovery_orders.index)) if recovery_orders is not None else 0,
+        "items": int(len(recovery_items.index)) if recovery_items is not None else 0,
+    }
+    if recovery_orders is not None and not recovery_orders.empty:
+        existing_orders = _read_csv_if_exists(ORDERS_ALL_PATH)
+        _write_compiled_unique(
+            ORDERS_ALL_PATH,
+            existing_orders,
+            recovery_orders.copy().fillna("").astype(str),
+            dedupe_key_cols=["amazon_order_id"],
+            sort_cols=["purchase_date", "amazon_order_id"],
+        )
+    if recovery_items is not None and not recovery_items.empty:
+        incoming_items = recovery_items.copy().fillna("").astype(str)
+        incoming_items["_dedupe_key"] = _compiled_items_dedupe_key(incoming_items)
+        existing_items = _read_csv_if_exists(ITEMS_ALL_PATH)
+        if not existing_items.empty:
+            existing_items = existing_items.copy()
+            existing_items["_dedupe_key"] = _compiled_items_dedupe_key(existing_items)
+        _write_compiled_unique(
+            ITEMS_ALL_PATH,
+            existing_items,
+            incoming_items,
+            dedupe_key_cols=["_dedupe_key"],
+        )
+        try:
+            items_all = read_finance_frame(ITEMS_ALL_PATH, dtype=str).fillna("")
+            if "_dedupe_key" in items_all.columns:
+                items_all = items_all.drop(columns=["_dedupe_key"])
+                write_dataframe_with_sql_compat(items_all, ITEMS_ALL_PATH, SQL_TABLE_ORDER_ITEMS_ALL)
+        except Exception:
+            pass
+    return counts
 
 
 def _load_existing_item_order_ids() -> set[str]:
@@ -1657,6 +1857,13 @@ def main() -> None:
                         price_lookup[sku] = entry
             except Exception as exc:
                 print({"status": "warning", "alert": "live_price_lookup_failed", "error": str(exc)})
+        promoted_recovery_orders, promoted_recovery_items = _load_promoted_recovery_frames()
+        if not promoted_recovery_orders.empty or not promoted_recovery_items.empty:
+            recovery_counts = _merge_promoted_recovery_into_compiled(promoted_recovery_orders, promoted_recovery_items)
+            log(
+                "promoted recovery overlay merged "
+                f"orders={recovery_counts.get('orders', 0)} items={recovery_counts.get('items', 0)}"
+            )
         # Build Level 1 from compiled history (full DB) when available.
         try:
             orders_all_df = read_finance_frame(ORDERS_ALL_PATH, dtype=str).fillna("")
@@ -1668,6 +1875,9 @@ def main() -> None:
             df_level1 = _read_csv_if_exists(Path("out/financial_events_level1.csv"))
             if df_level1.empty:
                 df_level1 = build_level1(df_orders, df_items, price_lookup)
+        if not promoted_recovery_orders.empty and not promoted_recovery_items.empty:
+            recovery_level1 = build_level1(promoted_recovery_orders, promoted_recovery_items, price_lookup)
+            df_level1 = _merge_level1_unique(df_level1, recovery_level1)
         if not df_level1.empty:
             # Drop any blank keys to avoid poisoning L1 -> Order_Master joins.
             df_level1 = df_level1[
@@ -1697,8 +1907,8 @@ def main() -> None:
         existing_orders_all = _read_csv_if_exists(ORDERS_ALL_PATH)
         existing_items_all = _read_csv_if_exists(ITEMS_ALL_PATH)
 
-        df_orders_all_in = df_orders.copy().fillna("").astype(str)
-        df_items_all_in = df_items.copy().fillna("").astype(str)
+        df_orders_all_in = _concat_nonempty([df_orders, promoted_recovery_orders]).fillna("").astype(str)
+        df_items_all_in = _concat_nonempty([df_items, promoted_recovery_items]).fillna("").astype(str)
 
         orders_all_count = _write_compiled_unique(
             ORDERS_ALL_PATH,

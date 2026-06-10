@@ -1,2 +1,8 @@
-seller_sku,available,reserved_transfers,reserved_processing,inbound_shipped,inbound_receiving,researching,unsellable,inventory_total,sold_qty,refunded_qty,net_sold_qty,required_qty
-XH-0LAE-FQO5,22,0,1,0,0,0,0,23,301,4,297,320
+seller_sku,available,reserved_transfers,reserved_processing,inbound_shipped,inbound_receiving,researching,unsellable,inventory_total,sold_qty,refunded_qty,net_sold_qty,buffer_qty,required_qty
+7L-OT45-7LYB,18,0,0,0,13,0,0,31,95,0,95,0,126
+XH-0LAE-FQO5,11,49,1,0,0,0,0,61,387,0,387,0,448
+RW-AZK6-O4M2,0,0,0,0,0,0,0,0,42,0,42,0,42
+LR-7GM6-1RCH,0,0,0,0,0,0,0,0,20,0,20,0,20
+X7-MY4W-H2I4,1,0,0,0,0,0,0,1,13,0,13,0,14
+AF-KIHX-ANYY,0,0,0,0,0,1,0,1,87,0,87,0,88
+R4-0AXZ-ZZ9D,0,0,0,0,0,0,0,0,16,0,16,0,16

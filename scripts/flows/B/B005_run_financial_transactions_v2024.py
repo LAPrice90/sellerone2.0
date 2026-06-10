@@ -75,7 +75,24 @@ def _save_marker(latest_iso: str) -> None:
     except Exception:
         pass
     MARKER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MARKER_PATH.write_text(latest_iso)
+    tmp_path = MARKER_PATH.with_name(f".{MARKER_PATH.name}.{os.getpid()}.tmp")
+    last_error: OSError | None = None
+    for attempt in range(1, 4):
+        try:
+            tmp_path.write_text(latest_iso, encoding="utf-8")
+            os.replace(tmp_path, MARKER_PATH)
+            return
+        except OSError as exc:
+            last_error = exc
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if attempt == 3:
+                raise
+            time.sleep(0.25 * attempt)
+    if last_error is not None:
+        raise last_error
 
 
 def _statement_window(path: Path) -> Tuple[Optional[str], Optional[str]]:

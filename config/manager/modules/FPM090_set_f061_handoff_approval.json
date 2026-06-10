@@ -1,0 +1,65 @@
+{
+  "id": "FPM090_set_f061_handoff_approval",
+  "display_name": "FPM090 F061 Handoff Approval Setter",
+  "flow": "F",
+  "purpose": "Register the handoff approval writer so the manager can inspect existing approval evidence without approving or applying live scanner handoff.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM090_set_f061_handoff_approval.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM090_set_f061_handoff_approval.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "f061_handoff_approvals",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_approvals.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "f061_handoff_preview",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_preview.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "f061_handoff_approvals",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_handoff_approvals.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "approval_rows_are_evidence_not_permission",
+    "handoff_apply_needs_separate_approved_packet"
+  ],
+  "needs_user_signals": [
+    "handoff_approval_requested",
+    "manual_handoff_exception_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "apply_live_handoff",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. Existing approval history may be read, but MOT must not create approvals, apply handoff, or run F061."
+}

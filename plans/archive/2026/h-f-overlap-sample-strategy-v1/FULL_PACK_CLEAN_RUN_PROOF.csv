@@ -1,0 +1,4 @@
+run,scope_rows,scope_outside,scope_no_asin,scope_stale_source,score_rows,score_mature_rows,score_blocked_rows,review_rows,review_alignment_rows,review_tactic_rows,queue_rows,queue_fail_rows,queue_review_rows,queue_pass_rows,queue_shadow_only_all
+1,52362,6979,35831,9552,6,3,3,12,5,6,6,6,0,0,1
+2,52362,6979,35831,9552,6,3,3,12,5,6,6,6,0,0,1
+3,52362,6979,35831,9552,6,3,3,12,5,6,6,6,0,0,1

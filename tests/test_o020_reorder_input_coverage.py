@@ -51,6 +51,13 @@ def _write_contract_rows(tmp_path: Path, contract_name: str, rows: list[dict[str
             work.setdefault("net_fee_model_age_hours", "12")
             work.setdefault("net_fee_model_source", "sku_performance_summary")
             work.setdefault("net_fee_model_notes", "fresh")
+            work.setdefault("refund_proof_state", "api_proved_or_not_applicable")
+            work.setdefault("refund_sample_confidence", "high")
+            work.setdefault("expected_inbound_cost_per_unit_gbp", "0.2")
+            work.setdefault("inbound_cost_basis", "allocated_inbound_cost_per_received_unit")
+            work.setdefault("inbound_cost_confidence", "sku_allocated")
+            work.setdefault("profit_input_confidence", "profit_inputs_verified")
+            work.setdefault("profit_input_blockers", "")
             work.setdefault("gross_forward_roi_pct", str(work.get("forward_roi_pct", "") or work.get("expected_forward_roi_pct", "") or ""))
             work.setdefault(
                 "gross_forward_profit_per_unit_gbp",
@@ -191,6 +198,10 @@ def test_o020_builds_row_and_supplier_coverage_outputs(tmp_path: Path) -> None:
                 "has_minimum_restock_inputs": "1",
                 "coverage_block_reason": "ready_minimum_inputs",
                 "cost_mode": "live",
+                "token_cost_trust_state": "trusted",
+                "token_cost_trust_basis": "no_b_fallback_cost_risk_for_sku",
+                "token_cost_trust_source": "out/systems/B/refunds/b_fallback_token_cost_audit.csv",
+                "token_cost_trust_blockers": "",
             },
             {
                 "asof_utc": "2026-04-04T00:00:00Z",
@@ -556,6 +567,107 @@ def test_o020_blocks_action_ready_when_supplier_cost_confirmation_is_required(tm
     assert row["user_price_check_required"] == "1"
     assert "supplier_cost_confirmation_required" in row["block_reason_codes"]
     assert block_df[block_df["block_reason"] == "supplier_cost_confirmation_required"].iloc[0]["rows_count"] == "1"
+
+
+def test_o020_blocks_action_ready_when_profit_input_confidence_is_missing(tmp_path: Path) -> None:
+    weak_profit_fields = {
+        "expected_inbound_cost_per_unit_gbp": "",
+        "inbound_cost_basis": "missing_sku_inbound_cost_allocation",
+        "inbound_cost_confidence": "missing",
+        "profit_input_confidence": "missing_profit_inputs",
+        "profit_input_blockers": "missing_inbound_cost_confidence",
+    }
+    base_fields = {
+        "seller_sku": "SKU-PROFIT-WEAK",
+        "asin": "ASIN-PROFIT-WEAK",
+        "supplier_code": "SUP-A",
+        "supplier_name": "Alpha",
+        "current_supplier_buy_cost_gbp": "2.25",
+        "market_price_gbp": "3.00",
+        "market_price_basis_used": "BUY_BOX_PRICE",
+        "expected_refund_cost_per_unit_gbp": "0.10",
+        "refund_proof_state": "api_proved_or_not_applicable",
+        "refund_sample_confidence": "high",
+        **weak_profit_fields,
+    }
+    _write_contract_rows(
+        tmp_path,
+        "restock_source_view",
+        [
+            {
+                "asof_utc": "2026-05-19T12:10:00Z",
+                **base_fields,
+                "sale_status": "active",
+                "available_now": "0",
+                "total_quantity_now": "0",
+                "amazon_inbound_working": "0",
+                "amazon_inbound_shipped": "0",
+                "amazon_inbound_receiving": "0",
+                "velocity_7d": "1",
+                "velocity_30d": "1",
+                "velocity_90d": "1",
+                "current_supplier_cost_source": "supplier_buy_cost_truth",
+                "is_active_candidate": "1",
+                "has_current_cost_input": "1",
+                "has_current_market_price_input": "1",
+                "has_demand_input": "1",
+                "has_minimum_restock_inputs": "1",
+                "coverage_block_reason": "ready_minimum_inputs",
+                "cost_mode": "live",
+            }
+        ],
+    )
+    _write_contract_rows(
+        tmp_path,
+        "restock_recommendations_live",
+        [
+            {
+                "asof_utc": "2026-05-19T12:20:00Z",
+                **base_fields,
+                "recommendation_status": "full_restock",
+                "reason_codes": "ROI_OK",
+                "recommended_qty_raw": "30",
+                "recommended_qty_rounded": "30",
+                "target_days_cover": "30",
+                "days_cover_available_only": "0",
+                "days_cover_total_pipeline": "0",
+                "forward_roi_pct": "28.888889",
+                "forward_profit_per_unit_gbp": "0.65",
+                "cost_mode": "live",
+                "recommendation_basis": "live_cost_inputs",
+            }
+        ],
+    )
+    _write_contract_rows(
+        tmp_path,
+        "restock_review_queue",
+        [
+            {
+                "queue_utc": "2026-05-19T12:30:00Z",
+                **base_fields,
+                "recommendation_status": "full_restock",
+                "suggested_qty": "30",
+                "suggested_unit_cost_gbp": "2.25",
+                "suggested_market_price_gbp": "3.00",
+                "expected_forward_roi_pct": "28.888889",
+                "expected_forward_profit_per_unit_gbp": "0.65",
+                "queue_status": "needs_review",
+                "cost_mode": "live",
+                "recommendation_basis": "live_cost_inputs",
+            }
+        ],
+    )
+
+    detail_df, _supplier_df, block_df = build_reorder_input_coverage_report(
+        root=tmp_path,
+        report_utc="2026-05-19T12:35:00Z",
+    )
+    row = detail_df.iloc[0]
+
+    assert row["action_candidate"] == "1"
+    assert row["action_ready_now"] == "0"
+    assert "missing_inbound_cost_confidence" in row["block_reason_codes"]
+    assert block_df[block_df["block_reason"] == "missing_inbound_cost_confidence"].iloc[0]["rows_count"] == "1"
 
 
 def test_o020_blocks_action_ready_when_net_fee_truth_is_stale(tmp_path: Path) -> None:

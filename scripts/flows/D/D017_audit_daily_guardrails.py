@@ -14,6 +14,8 @@ from typing import Dict, List
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 OUT_PATH = Path("out/audit_daily_guardrails.csv")
 STATE_PATH = Path("out/audit_daily_guardrails_state.csv")
@@ -141,8 +143,10 @@ def _apply_alert_aging(df: pd.DataFrame) -> pd.DataFrame:
     df["alert_last_seen_utc"] = last_seen_vals
     df["alert_consecutive_runs"] = streak_vals
     df["alert_age_hours"] = age_hours_vals
-    pd.DataFrame(next_state_rows, columns=["check", "status", "first_seen_utc", "last_seen_utc", "consecutive_runs"]).to_csv(
-        STATE_PATH, index=False
+    safe_to_csv(
+        pd.DataFrame(next_state_rows, columns=["check", "status", "first_seen_utc", "last_seen_utc", "consecutive_runs"]),
+        STATE_PATH,
+        index=False,
     )
     return df
 
@@ -188,7 +192,7 @@ def main() -> None:
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     out_df = pd.DataFrame(rows)
     out_df = _apply_alert_aging(out_df)
-    pd.DataFrame(out_df).to_csv(OUT_PATH, index=False)
+    safe_to_csv(pd.DataFrame(out_df), OUT_PATH, index=False)
     print({"status": "success", "rows": len(rows), "report": str(OUT_PATH)})
 
 

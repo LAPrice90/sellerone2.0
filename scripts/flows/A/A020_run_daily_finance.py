@@ -48,8 +48,28 @@ RUN_ORDER = [
 ]
 
 
+NO_SHEET_DEFAULTS = {
+    "FIN_L3_SKIP_SHEETS": "1",
+    "STOCK_EVENTS_WRITE_SHEETS": "0",
+    "REFUND_EVENTS_WRITE_SHEETS": "0",
+    "TOKEN_EVENTS_WRITE_SHEETS": "0",
+    "TOKEN_OPS_WRITE_SHEETS": "0",
+    "TOKEN_WEEKLY_WRITE_SHEETS": "0",
+    "TOKEN_DAILY_CHECKLIST_WRITE_SHEETS": "0",
+    "TOKEN_PROOF_PACK_WRITE_SHEETS": "0",
+    "VAT_REPORT_WRITE_SHEETS": "0",
+    "PNL_WRITE_SHEETS": "0",
+}
+
+
+def apply_no_sheet_defaults(env: dict[str, str]) -> dict[str, str]:
+    for key, value in NO_SHEET_DEFAULTS.items():
+        env.setdefault(key, value)
+    return env
+
+
 def main() -> int:
-    env = os.environ.copy()
+    env = apply_no_sheet_defaults(os.environ.copy())
     root_str = str(ROOT)
     existing_pythonpath = str(env.get("PYTHONPATH", "")).strip()
     env["PYTHONPATH"] = root_str if not existing_pythonpath else f"{root_str};{existing_pythonpath}"

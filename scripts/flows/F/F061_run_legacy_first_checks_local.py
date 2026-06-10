@@ -73,6 +73,7 @@ F061_BACKGROUND_BROWSER_MODE_ENV = "F061_BACKGROUND_BROWSER_MODE"
 F061_LOGIN_MODE_ENV = "F061_LOGIN_MODE"
 F061_LOGIN_HOLD_SECONDS_ENV = "F061_LOGIN_HOLD_SECONDS"
 F061_LOGIN_MODE_REQUEST_PATH_ENV = "F061_LOGIN_MODE_REQUEST_PATH"
+F061_LOGIN_PRE_BROWSER_HOLD_ENABLED_ENV = "F061_LOGIN_PRE_BROWSER_HOLD_ENABLED"
 F061_ALLOWLIST_PATH_ENV = "F061_ALLOWLIST_PATH"
 F061_STAGE_MODE_ENV = "F061_STAGE_MODE"
 F061_STAGE_MODE_LEGACY_FULL = "legacy_full"
@@ -92,6 +93,8 @@ F061_LOGIN_BACKTRACK_REASON = "LOGIN_BACKTRACK_PENDING"
 F061_LOGIN_BACKTRACK_SCAN_REASON = "login_backtrack_required"
 F061_DASHBOARD_YES_NO_UNRESOLVED_SCAN_REASON = "dashboard_yes_no_backtrack_unresolved"
 F061_DASHBOARD_YES_NO_MAX_BACKTRACK_ATTEMPTS = 3
+F061_SELLER_CENTRAL_LOGIN_BLOCK_REASON = "seller_central_eligibility_login_required"
+F061_BBP_IFRAME_PLUGIN_BLOCK_REASON = "bbp_iframe_plugin_unavailable"
 F061_RESCAN_MAX_ACTIVE_ATTEMPTS_ENV = "F061_RESCAN_MAX_ACTIVE_ATTEMPTS"
 F061_RESCAN_RETRY_SCAN_REASON = "rescan_retry_required"
 F061_RESCAN_RETRY_BLOCK_REASON = "rescan_retry_pending"
@@ -325,6 +328,9 @@ F061_BBP_PROFILE_DIR = str(os.environ.get("F061_BBP_PROFILE_DIR", "Profile 2") o
 F061_DATE_USER_DATA_DIR = str(
     os.environ.get("F061_DATE_USER_DATA_DIR", r"C:\Users\Luke\AppData\Local\Chrome_91_F061") or ""
 ).strip()
+F061_SELLER_CENTRAL_LOGIN_PROOF_PATH_ENV = "F061_SELLER_CENTRAL_LOGIN_PROOF_PATH"
+F061_SELLER_CENTRAL_LOGIN_PROOF_NAME = "seller_central_login_recovery_proof.csv"
+_F061_VISIBLE_LOGIN_HIDER_STOP_ATTEMPTED = False
 
 SPECIALIST_CHROME_MATCH_TOKENS: tuple[str, ...] = (
     r"C:\Chrome_UC136\bin\chrome.exe",
@@ -525,9 +531,85 @@ def _bbp_profile_extension_health(
 
 def _background_browser_mode() -> str:
     mode = _normalize_lower(os.environ.get(F061_BACKGROUND_BROWSER_MODE_ENV, "minimized"))
+    if mode == "minimized" and _seller_central_email_continue_hidden_retry_exhausted():
+        _promote_background_browser_env_to_visible()
+        return "visible"
     if mode in {"visible", "minimized"}:
         return mode
+    if _seller_central_email_continue_hidden_retry_exhausted():
+        _promote_background_browser_env_to_visible()
+        return "visible"
     return "minimized"
+
+
+def _promote_background_browser_env_to_visible() -> None:
+    os.environ[F061_BACKGROUND_BROWSER_MODE_ENV] = "visible"
+    os.environ["F061_SHOW_WINDOWS"] = "1"
+    os.environ["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] = "0"
+    _stop_fpm_window_hider_for_visible_login()
+
+
+def _stop_fpm_window_hider_for_visible_login() -> None:
+    global _F061_VISIBLE_LOGIN_HIDER_STOP_ATTEMPTED
+    if _F061_VISIBLE_LOGIN_HIDER_STOP_ATTEMPTED:
+        return
+    _F061_VISIBLE_LOGIN_HIDER_STOP_ATTEMPTED = True
+    if os.name != "nt":
+        return
+    script = (
+        "$self=$PID; "
+        "Get-CimInstance Win32_Process | "
+        "Where-Object { $_.ProcessId -ne $self -and $_.CommandLine -like '*f_hide_scraper_windows.ps1*' } | "
+        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            timeout=10,
+        )
+    except Exception:
+        return
+
+
+def _seller_central_login_proof_path(root_path: Path | None = None) -> Path:
+    override = _normalize_text(os.environ.get(F061_SELLER_CENTRAL_LOGIN_PROOF_PATH_ENV, ""))
+    if override:
+        return Path(override)
+    root = root_path or ROOT
+    return root / "out" / "systems" / "F" / "price_list_manager" / "live" / F061_SELLER_CENTRAL_LOGIN_PROOF_NAME
+
+
+def _seller_central_email_continue_hidden_retry_exhausted(root_path: Path | None = None) -> bool:
+    path = _seller_central_login_proof_path(root_path)
+    if not path.exists():
+        return False
+    try:
+        frame = pd.read_csv(path, dtype=str).fillna("")
+    except Exception:
+        return False
+    if frame.empty:
+        return False
+    latest = {str(key): _normalize_text(value) for key, value in frame.iloc[-1].to_dict().items()}
+    if _normalize_lower(latest.get("reason", "")) != "email_continue_not_advanced":
+        return False
+    if _normalize_lower(latest.get("seller_central_signin_detected", "")) not in {"1", "true", "yes", "y", "on"}:
+        return False
+    if _normalize_lower(latest.get("seller_central_otp_detected", "")) in {"1", "true", "yes", "y", "on"}:
+        return False
+    notes = _normalize_lower(latest.get("notes", ""))
+    required_notes = {
+        "email_finalize=1",
+        "click=1",
+        "js_click=1",
+        "js_enter=1",
+        "form_submit=1",
+        "email_value=present",
+    }
+    return all(token in notes for token in required_notes)
 
 
 def _apply_background_browser_options(options: Any) -> None:
@@ -848,7 +930,7 @@ def _row_is_browser_stage_ready(row: dict[str, object] | pd.Series) -> bool:
 
 def _rescan_retry_allowed(active_row: dict[str, object] | pd.Series) -> bool:
     next_attempt_count = _parse_nonnegative_int(active_row.get("attempt_count", "0"), default=0) + 1
-    return next_attempt_count < _max_active_rescan_attempts()
+    return next_attempt_count <= _max_active_rescan_attempts()
 
 
 def _parse_positive_float(value: object, default: float) -> float:
@@ -1466,8 +1548,6 @@ def _scrape_evidence_needs_login_backtrack(scrape_evidence_row: dict[str, str] |
             "login_required",
             " login ",
             "login",
-            "no bbp iframe",
-            "bbp iframe preflight failed",
             "bbp unavailable",
             "buybotpro unavailable",
             "buybotpro error",
@@ -1476,8 +1556,55 @@ def _scrape_evidence_needs_login_backtrack(scrape_evidence_row: dict[str, str] |
             "failed to load properly",
             "intercept network requests",
             "bbp extension",
+            F061_SELLER_CENTRAL_LOGIN_BLOCK_REASON,
+            "seller central eligibility login required",
         )
     )
+
+
+def _scrape_evidence_has_bbp_iframe_plugin_block(scrape_evidence_row: dict[str, str] | None) -> bool:
+    if not isinstance(scrape_evidence_row, dict):
+        return False
+    text = _normalize_lower(
+        " ".join(
+            [
+                scrape_evidence_row.get("scrape_error", ""),
+                scrape_evidence_row.get("status_reason", ""),
+                scrape_evidence_row.get("fail_codes", ""),
+                scrape_evidence_row.get("checks_failed", ""),
+            ]
+        )
+    )
+    return any(
+        token in text
+        for token in (
+            "no bbp iframe",
+            "bbp iframe preflight failed",
+            "bbp_profile_extension_missing",
+            "buybotpro_extension_missing",
+            "extension failed",
+            "extension failed to load",
+            "failed to load properly",
+            "intercept network requests",
+            "bbp extension",
+        )
+    )
+
+
+def _scrape_evidence_needs_seller_central_login_backtrack(scrape_evidence_row: dict[str, str] | None) -> bool:
+    if not isinstance(scrape_evidence_row, dict):
+        return False
+    text = _normalize_lower(
+        " ".join(
+            [
+                scrape_evidence_row.get("scrape_error", ""),
+                scrape_evidence_row.get("status_reason", ""),
+                scrape_evidence_row.get("fail_codes", ""),
+                scrape_evidence_row.get("checks_failed", ""),
+            ]
+        )
+    )
+    return F061_SELLER_CENTRAL_LOGIN_BLOCK_REASON in text or "seller central eligibility login required" in text
 
 
 def _scrape_evidence_missing_required_dashboard_yes_no(scrape_evidence_row: dict[str, str] | None) -> bool:
@@ -1935,6 +2062,11 @@ def _row_status_from_processed_row(first_row: dict[str, str]) -> str:
     status_reason = _normalize_text(first_row.get("status_reason", "")).upper()
     if status_reason == F061_LOGIN_BACKTRACK_REASON:
         return F061_SCAN_STATUS_LOGIN_BACKTRACK_PENDING
+    if _normalize_text(first_row.get("pf", "")).upper() == "RESCAN":
+        if "RETRY_PENDING" in status_reason:
+            return "retry"
+        if "RETRY_EXHAUSTED" in status_reason:
+            return "timeout"
     return _row_status_from_pf(_normalize_text(first_row.get("pf", "")))
 
 
@@ -1993,13 +2125,18 @@ def _build_screening_row_state_processed(
     pf_value = _normalize_text(first_row.get("pf", "")).upper()
     status_reason = _normalize_text(first_row.get("status_reason", ""))
     fail_code = _fail_code_from_status_reason(status_reason, pf_value)
-    attempt_count = _parse_nonnegative_int(active_row.get("attempt_count", "0"), default=0) + 1
     row_status = _row_status_from_processed_row(first_row)
-    timeout_until_utc = _timeout_until_utc_for_status(
-        observed_utc=observed_utc,
-        pf_value=pf_value,
-        fail_code=fail_code,
-        timeout_policy_df=timeout_policy_df,
+    active_attempt_count = _parse_nonnegative_int(active_row.get("attempt_count", "0"), default=0)
+    attempt_count = active_attempt_count if pf_value == "RESCAN" and row_status == "retry" else active_attempt_count + 1
+    timeout_until_utc = (
+        ""
+        if pf_value == "RESCAN"
+        else _timeout_until_utc_for_status(
+            observed_utc=observed_utc,
+            pf_value=pf_value,
+            fail_code=fail_code,
+            timeout_policy_df=timeout_policy_df,
+        )
     )
     return {
         "observed_utc": observed_utc,
@@ -2953,7 +3090,7 @@ class LegacyCompatibleAmazonAdapter:
             if self._driver_init_error.startswith("bbp_profile_extension_missing:"):
                 return {
                     "success": False,
-                    "error": f"BBP_LOGIN_REQUIRED:{self._driver_init_error}",
+                    "error": f"BBP_IFRAME_PLUGIN_UNAVAILABLE:{self._driver_init_error}",
                     "driver_error": self._driver_init_error,
                 }
             return {
@@ -4276,7 +4413,11 @@ def run_legacy_first_checks_local(
                 f"hold_seconds={login_mode_hold_seconds:.0f}"
             ),
         )
-        if adapter is None and login_mode_hold_seconds > 0:
+        if (
+            adapter is None
+            and login_mode_hold_seconds > 0
+            and _truthy_env(F061_LOGIN_PRE_BROWSER_HOLD_ENABLED_ENV)
+        ):
             time.sleep(login_mode_hold_seconds)
 
     adapter_local_created = False
@@ -4404,6 +4545,7 @@ def run_legacy_first_checks_local(
     latest_login_backtrack = _latest_login_backtrack_by_candidate(login_backtrack_df)
     processed_candidate_ids: set[str] = set()
     status_counter: dict[str, int] = {}
+    bbp_iframe_plugin_blocked_rows = 0
     processed_rows = 0
     completed_indices: set[int] = set()
     source_failed_rows_delta = 0
@@ -4598,12 +4740,14 @@ def run_legacy_first_checks_local(
                 F061_SCAN_STATUS_LOGIN_BACKTRACK_RUNNING,
             } or _normalize_lower(active_row.get("scan_reason", "")) == F061_LOGIN_BACKTRACK_SCAN_REASON
             needs_auth_backtrack = status_code == F061_LOGIN_BACKTRACK_STATUS_CODE or _scrape_evidence_needs_login_backtrack(scrape_evidence_row)
+            needs_bbp_iframe_plugin_backtrack = _scrape_evidence_has_bbp_iframe_plugin_block(scrape_evidence_row)
+            needs_seller_central_backtrack = _scrape_evidence_needs_seller_central_login_backtrack(scrape_evidence_row)
             hard_fail_missing_dashboard = _scrape_evidence_missing_dashboard_on_hard_fail(scrape_evidence_row, status_code)
             needs_dashboard_yes_no_backtrack = (
                 _scrape_evidence_missing_required_dashboard_yes_no(scrape_evidence_row)
                 and not hard_fail_missing_dashboard
             )
-            needs_login_backtrack = needs_auth_backtrack or needs_dashboard_yes_no_backtrack
+            needs_login_backtrack = needs_auth_backtrack or needs_bbp_iframe_plugin_backtrack or needs_dashboard_yes_no_backtrack
             if not needs_login_backtrack and hard_fail_missing_dashboard:
                 dashboard_missing_on_hard_fail_rows += 1
                 if scrape_evidence_row is not None:
@@ -4675,9 +4819,14 @@ def run_legacy_first_checks_local(
                 )
                 pending_payload["scan_status"] = F061_SCAN_STATUS_LOGIN_BACKTRACK_PENDING
                 pending_payload["scan_reason"] = F061_LOGIN_BACKTRACK_SCAN_REASON
-                pending_payload["completion_block_reason"] = (
-                    "bbp_login_required" if needs_auth_backtrack else "dashboard_yes_no_backtrack_required"
-                )
+                if needs_seller_central_backtrack:
+                    pending_payload["completion_block_reason"] = F061_SELLER_CENTRAL_LOGIN_BLOCK_REASON
+                elif needs_bbp_iframe_plugin_backtrack:
+                    pending_payload["completion_block_reason"] = F061_BBP_IFRAME_PLUGIN_BLOCK_REASON
+                else:
+                    pending_payload["completion_block_reason"] = (
+                        "bbp_login_required" if needs_auth_backtrack else "dashboard_yes_no_backtrack_required"
+                    )
                 if unresolved_dashboard_yes_no:
                     pending_payload["scan_status"] = "dashboard_yes_no_unresolved"
                     pending_payload["scan_reason"] = F061_DASHBOARD_YES_NO_UNRESOLVED_SCAN_REASON
@@ -4690,6 +4839,8 @@ def run_legacy_first_checks_local(
                 if not unresolved_dashboard_yes_no:
                     login_backtrack_active_rows[global_index] = pending_payload
                     login_backtrack_pending_rows += 1
+                    if needs_bbp_iframe_plugin_backtrack:
+                        bbp_iframe_plugin_blocked_rows += 1
                 login_backtrack_new_rows.append(
                     _build_login_backtrack_ledger_row(
                         active_row=active_row,
@@ -4697,12 +4848,16 @@ def run_legacy_first_checks_local(
                         scrape_evidence_row=scrape_evidence_row,
                         observed_utc=observed_utc,
                         status=(
-                            "blocked_login"
-                            if needs_auth_backtrack
+                            "blocked_bbp_iframe_plugin"
+                            if needs_bbp_iframe_plugin_backtrack
                             else (
-                                "dashboard_yes_no_unresolved"
-                                if unresolved_dashboard_yes_no
-                                else "missing_dashboard_yes_no"
+                                "blocked_login"
+                                if needs_auth_backtrack
+                                else (
+                                    "dashboard_yes_no_unresolved"
+                                    if unresolved_dashboard_yes_no
+                                    else "missing_dashboard_yes_no"
+                                )
                             )
                         ),
                         existing_original=latest_login_backtrack.get(candidate_id),
@@ -4713,6 +4868,7 @@ def run_legacy_first_checks_local(
                     dashboard_yes_no_unresolved_rows += 1
             elif status_code in RETRY_STATUS_CODES:
                 if _rescan_retry_allowed(active_row):
+                    first_row["status_reason"] = "RESCAN|retry_pending"
                     if global_index not in rescan_retry_active_rows:
                         pending_payload = _row_dict_from_df_row(active_row)
                         pending_payload["scan_status"] = F061_SCAN_STATUS_PENDING
@@ -4729,6 +4885,7 @@ def run_legacy_first_checks_local(
                     rescan_retry_requeued = True
                     source_requeued_for_rescan = True
                 else:
+                    first_row["status_reason"] = "RESCAN|retry_exhausted"
                     rescan_retry_exhausted_rows += 1
             elif status_code == F061_STATUS_BROWSER_READY:
                 pending_payload = _row_dict_from_df_row(active_row)
@@ -5075,12 +5232,13 @@ def run_legacy_first_checks_local(
             )
         elif F061_LOGIN_BACKTRACK_STATUS_CODE in status_counter or login_backtrack_pending_rows > 0:
             login_mode_runtime_status = "warn"
-            login_mode_runtime_value = "still_required"
+            login_mode_runtime_value = "bbp_iframe_plugin_blocked" if bbp_iframe_plugin_blocked_rows > 0 else "still_required"
             login_mode_runtime_notes = (
                 f"active=1;selected_rows={login_mode_selected_rows};"
                 f"bbp_selected_rows={login_mode_bbp_selected_rows};"
                 f"pending_after={login_backtrack_pending_after};"
-                f"new_pending_rows={login_backtrack_pending_rows}"
+                f"new_pending_rows={login_backtrack_pending_rows};"
+                f"bbp_iframe_plugin_blocked_rows={bbp_iframe_plugin_blocked_rows}"
             )
             _append_price_list_live_event(
                 root_path=root_path,
@@ -5437,6 +5595,7 @@ def run_legacy_first_checks_local(
         "scanner_speed_total_seconds": round(speed_total_seconds, 3),
         "scanner_speed_pricing_wait_ratio": round(pricing_wait_ratio, 4),
         "scanner_speed_browser_blocked_rows": int(speed_browser_blocked_rows),
+        "bbp_iframe_plugin_blocked_rows": int(bbp_iframe_plugin_blocked_rows),
         "login_backtrack_pending_rows": int(login_backtrack_pending_after),
         "login_backtrack_new_pending_rows": int(login_backtrack_pending_rows),
         "login_backtrack_merged_rows": int(login_backtrack_merged_rows),

@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Date>2026-02-17T15:53:35.6658224</Date>
+    <Author>DESKTOP-SG0FU8L\Luke</Author>
+    <URI>\AMZ H Cycle</URI>
+  </RegistrationInfo>
+  <Principals>
+    <Principal id="Author">
+      <UserId>S-1-5-21-779644897-2012231163-3163198453-1003</UserId>
+      <LogonType>Password</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <AllowHardTerminate>false</AllowHardTerminate>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <RestartOnFailure>
+      <Count>3</Count>
+      <Interval>PT10M</Interval>
+    </RestartOnFailure>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>true</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+  </Settings>
+  <Triggers>
+    <BootTrigger>
+      <Repetition>
+        <Interval>PT10M</Interval>
+      </Repetition>
+    </BootTrigger>
+  </Triggers>
+  <Actions Context="Author">
+    <Exec>
+      <Command>cmd.exe</Command>
+      <Arguments>/c "C:\Users\Luke\Desktop\SellerOne 2.0\run_H_cycle.bat"</Arguments>
+      <WorkingDirectory>C:\Users\Luke\Desktop\SellerOne 2.0</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

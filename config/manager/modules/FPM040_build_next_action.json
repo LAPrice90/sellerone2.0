@@ -1,0 +1,76 @@
+{
+  "id": "FPM040_build_next_action",
+  "display_name": "FPM040 Build Next Action",
+  "flow": "F",
+  "purpose": "Register the next-action builder so the manager can inspect queue eligibility, manager decisions, and why a supplier is or is not next without changing queue state.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM040_build_next_action.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM040_build_next_action.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "price_list_batches",
+      "path": "out/systems/F/price_list_manager/test_mode/price_list_batches.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "batch_rows",
+      "path": "out/systems/F/price_list_manager/test_mode/batch_rows.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "queue_controls",
+      "path": "out/systems/F/price_list_manager/test_mode/queue_controls.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "batch_scan_eligibility",
+      "path": "out/systems/F/price_list_manager/test_mode/batch_scan_eligibility.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "manager_decisions",
+      "path": "out/systems/F/price_list_manager/test_mode/manager_decisions.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "next_action_proof_warn_after_10080_minutes",
+    "handoff_must_stay_disabled_until_approved"
+  ],
+  "needs_user_signals": [
+    "manual_file_needed",
+    "unclassified_queue_state"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. The manager may read next-action and queue eligibility evidence but must not rebuild it, change queue controls, approve handoff, or run F061."
+}

@@ -48,6 +48,7 @@ OUT_EVENTS = Path("out/stock_adjustment_token_events.csv")
 OUT_COMPLETENESS = Path("out/ledger_completeness_summary.csv")
 OUT_RETURN_LEDGER = Path("out/token_return_ledger.csv")
 OUT_LEDGER = Path("out/token_ledger_live.csv")
+STOCK_RECEIPTS = Path("out/stock_receipts_latest.csv")
 SQL_TABLE_STOCK_ADJUSTMENT_EVENTS = "b_stock_adjustment_token_events"
 EVENT_COLUMNS = [
     "event_id",
@@ -168,7 +169,40 @@ def _parse_float(value: object) -> float:
         return 0.0
 
 
-def _latest_cost_basis(ledger: pd.DataFrame, sku: str) -> dict[str, str] | None:
+def _first_present(row: pd.Series, names: list[str]) -> str:
+    for name in names:
+        if name in row.index and str(row.get(name, "") or "").strip():
+            return str(row.get(name, "") or "").strip()
+    return ""
+
+
+def _prepare_receipt_costs(receipts: pd.DataFrame | None) -> pd.DataFrame:
+    if receipts is None or receipts.empty:
+        return pd.DataFrame()
+    work = receipts.copy()
+    for column in ["seller_sku", "SKU", "cost_per_unit", "Cost PU", "batch_id", "OrderKey", "order_key", "status"]:
+        if column not in work.columns:
+            work[column] = ""
+    work["sku_norm"] = work.apply(lambda row: _first_present(row, ["seller_sku", "SKU"]).upper(), axis=1)
+    work["cost_text"] = work.apply(lambda row: _first_present(row, ["cost_per_unit", "Cost PU"]), axis=1)
+    work["cost_num"] = work["cost_text"].apply(_parse_float)
+    work["order_key_text"] = work.apply(lambda row: _first_present(row, ["order_key", "OrderKey"]), axis=1)
+    return work
+
+
+def _receipt_cost_match(receipts: pd.DataFrame, sku: str, cost: object) -> pd.DataFrame:
+    if receipts.empty:
+        return receipts
+    target = _parse_float(cost)
+    if target <= 0:
+        return receipts.iloc[0:0].copy()
+    return receipts[
+        (receipts["sku_norm"] == str(sku).strip().upper())
+        & ((receipts["cost_num"] - target).abs() < 0.005)
+    ].copy()
+
+
+def _latest_cost_basis(ledger: pd.DataFrame, sku: str, receipts: pd.DataFrame | None = None) -> dict[str, str] | None:
     if ledger.empty or "seller_sku" not in ledger.columns:
         return None
     sku_rows = ledger[ledger["seller_sku"].astype(str).str.strip() == str(sku).strip()].copy()
@@ -188,13 +222,53 @@ def _latest_cost_basis(ledger: pd.DataFrame, sku: str) -> dict[str, str] | None:
         sku_rows["__created"] = pd.to_datetime(sku_rows["created_at"], errors="coerce", utc=True)
     else:
         sku_rows["__created"] = pd.NaT
+    if "source" not in sku_rows.columns:
+        sku_rows["source"] = ""
+    if "source_batch_id" not in sku_rows.columns:
+        sku_rows["source_batch_id"] = ""
+    if "source_order_key" not in sku_rows.columns:
+        sku_rows["source_order_key"] = ""
+    if "token_id" not in sku_rows.columns:
+        sku_rows["token_id"] = ""
+    if "notes" not in sku_rows.columns:
+        sku_rows["notes"] = ""
+    sku_rows = sku_rows[
+        ~(
+            sku_rows["source"].astype(str).str.strip().eq("stock_adjustment_fallback")
+            | sku_rows["notes"].astype(str).str.contains("adjustment_fallback_create:", na=False)
+            | sku_rows["token_id"].astype(str).str.startswith("ADJ-")
+        )
+    ].copy()
+    if sku_rows.empty:
+        return None
     sku_rows["__row"] = range(len(sku_rows))
     sku_rows = sku_rows.sort_values(by=["__received", "__created", "__row"])
-    latest = sku_rows.iloc[-1]
+    receipts_prepared = _prepare_receipt_costs(receipts)
+    sku_rows["__has_receipt_match"] = sku_rows["cost_per_unit"].map(
+        lambda value: not _receipt_cost_match(receipts_prepared, sku, value).empty
+    )
+    sku_rows["__has_source_proof"] = (
+        sku_rows["source_batch_id"].astype(str).str.strip().ne("")
+        | sku_rows["source_order_key"].astype(str).str.strip().ne("")
+        | sku_rows["source"].astype(str).str.strip().ne("")
+    )
+    proved = sku_rows[sku_rows["__has_receipt_match"] | sku_rows["__has_source_proof"]].copy()
+    if proved.empty:
+        return None
+    latest = proved.iloc[-1]
+    receipt_match = _receipt_cost_match(receipts_prepared, sku, latest["cost_per_unit"])
+    receipt = receipt_match.iloc[0] if not receipt_match.empty else pd.Series(dtype=str)
+    cost_source = "receipt_proved" if not receipt_match.empty else "source_token_proved"
     return {
         "cost_per_unit": f"{float(latest['__cost']):.2f}",
         "currency": str(latest.get("currency", "GBP") or "GBP"),
         "notes": str(latest.get("notes", "") or ""),
+        "cost_source": cost_source,
+        "source_token_id": str(latest.get("token_id", "") or ""),
+        "source_batch_id": str(latest.get("source_batch_id", "") or ""),
+        "source_order_key": str(latest.get("source_order_key", "") or ""),
+        "receipt_batch_id": str(receipt.get("batch_id", "") or ""),
+        "receipt_order_key": str(receipt.get("order_key_text", "") or ""),
     }
 
 
@@ -207,10 +281,11 @@ def _append_adjustment_fallback_tokens(
     disposition: str,
     now_iso: str,
     event_date: str,
+    receipts: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, int]:
     if qty <= 0:
         return ledger, 0
-    basis = _latest_cost_basis(ledger, sku)
+    basis = _latest_cost_basis(ledger, sku, receipts)
     if not basis:
         return ledger, 0
 
@@ -267,7 +342,15 @@ def _append_adjustment_fallback_tokens(
                 "currency": basis["currency"],
                 "status": target_status,
                 "received_date": event_day,
-                "notes": f"adjustment_fallback_create:{event_id}",
+                "notes": (
+                    f"adjustment_fallback_create:{event_id};"
+                    f"cost_source={basis.get('cost_source', '')};"
+                    f"source_token_id={basis.get('source_token_id', '')};"
+                    f"source_batch_id={basis.get('source_batch_id', '')};"
+                    f"source_order_key={basis.get('source_order_key', '')};"
+                    f"receipt_batch_id={basis.get('receipt_batch_id', '')};"
+                    f"receipt_order_key={basis.get('receipt_order_key', '')}"
+                ),
                 "source": "stock_adjustment_fallback",
                 "source_batch_id": event_id,
                 "source_order_key": "",
@@ -324,6 +407,13 @@ def main() -> None:
     if ledger.empty:
         print({"status": "skip", "reason": "empty_token_ledger"})
         return
+    if STOCK_RECEIPTS.exists():
+        try:
+            receipt_costs = pd.read_csv(STOCK_RECEIPTS, dtype=str).fillna("")
+        except Exception:
+            receipt_costs = pd.DataFrame()
+    else:
+        receipt_costs = pd.DataFrame()
 
     if "status" not in ledger.columns:
         ledger["status"] = ""
@@ -505,6 +595,7 @@ def main() -> None:
                         disposition=disposition,
                         now_iso=now_iso,
                         event_date=str(row.get("event_date", "")),
+                        receipts=receipt_costs,
                     )
                     applied += created
                     if created > 0:
@@ -561,6 +652,7 @@ def main() -> None:
                         disposition=disposition,
                         now_iso=now_iso,
                         event_date=str(row.get("event_date", "")),
+                        receipts=receipt_costs,
                     )
                     applied += created
                     if created > 0:
@@ -611,6 +703,7 @@ def main() -> None:
                         disposition=disposition,
                         now_iso=now_iso,
                         event_date=str(row.get("event_date", "")),
+                        receipts=receipt_costs,
                     )
                     applied += created
                     if created > 0:

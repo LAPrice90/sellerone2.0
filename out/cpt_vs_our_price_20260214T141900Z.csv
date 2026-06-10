@@ -1,5 +1,0 @@
-asof_utc,seller_sku,asin,cpt_status,cpt_gbp,our_live_price_gbp,last_sold_price_gbp,price_reference_gbp,price_reference_source,delta_cpt_minus_reference_gbp,group_ab,cpt_error_summary
-2026-02-14T14:19:00Z,6V-EEC1-2S9Z,B06WW79DX5,OK,21.41,7.99,8.18,8.18,avg_sold_price,13.23,A,
-2026-02-14T14:19:00Z,JB-RGB6-LZOJ,B0001P0DLU,OK,6.15,9.99,6.30,6.30,avg_sold_price,-0.15,B,
-2026-02-14T14:19:00Z,XH-0LAE-FQO5,B00AOES9GE,MISSING,,6.90,8.43,8.43,avg_sold_price,,UNKNOWN,
-2026-02-14T14:19:00Z,YC-3L3M-BV48,B0CTD6Q6KY,MISSING,,79.24,130.56,130.56,avg_sold_price,,UNKNOWN,

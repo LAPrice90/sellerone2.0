@@ -1,0 +1,16 @@
+panel_group,panel_rank,asin,seller_sku,truth_decision_state,actual_units_30d,actual_profit_30d_gbp,model_expected_units_next_30d,model_expected_profit_next_30d_gbp,demand_alignment_state,profit_alignment_state,model_side_evidence_state,in_sold_capture_pack,selection_reason
+big_pass,1,B06WW79DX5,OPER::B06WW79DX5,pass,419,420.32,567,0,moderate_model_overestimate,severe_model_underestimate,estimate_only,1,clear commercial win with strong actual profit
+big_pass,2,B08KFFY86W,OPER::B08KFFY86W,pass,345,114.65,2469,0,severe_model_overestimate,severe_model_underestimate,estimate_only,1,clear pass with very large units mismatch
+big_pass,3,B086ZD7MG6,OPER::B086ZD7MG6,pass,48,40.264462,74,0,severe_model_overestimate,severe_model_underestimate,estimate_only,1,solid pass above floor with manageable scale
+big_pass,4,B07QQDMJ6M,OPER::B07QQDMJ6M,pass,25,31.58,104,0,severe_model_overestimate,severe_model_underestimate,estimate_only,1,pass row with healthy profit but inflated demand estimate
+big_pass,5,9188805646,OPER::9188805646,pass,23,39.72,10,35.35,severe_model_underestimate,aligned,estimate_only,0,pass row where profit estimate is closer than demand estimate
+big_fail,1,B07F1MFWV1,OPER::B07F1MFWV1,fail,27,-19.16,4,0,severe_model_underestimate,severe_model_overestimate,estimate_only,1,clear commercial fail with negative realised profit
+big_fail,2,B0CG234KW1,OPER::B0CG234KW1,fail,5,-10.304205,10,0,severe_model_overestimate,severe_model_overestimate,estimate_only,1,negative profit and weak demand
+big_fail,3,B07H2WXMDJ,OPER::B07H2WXMDJ,fail,7,-7.02,30,0,severe_model_overestimate,severe_model_overestimate,estimate_only,1,clear fail with inflated demand expectation
+big_fail,4,B07T9WVBZ2,OPER::B07T9WVBZ2,fail,1,0.29,1062,0,severe_model_overestimate,moderate_model_underestimate,estimate_only,1,extreme lucky-snapshot risk case
+big_fail,5,B072K2PG11,OPER::B072K2PG11,fail,1,0.498855,2356,0,severe_model_overestimate,moderate_model_underestimate,estimate_only,1,extreme demand inflation case
+on_the_line,1,B07L6H9GZ2,OPER::B07L6H9GZ2,fail,4,19.84,35,0,severe_model_overestimate,severe_model_underestimate,estimate_only,1,just below GBP20 floor
+on_the_line,2,B0BNLWBLMV,OPER::B0BNLWBLMV,fail,16,19.08,37,0,severe_model_overestimate,severe_model_underestimate,estimate_only,1,near-floor fail with meaningful units
+on_the_line,3,B07CN7NRF7,OPER::B07CN7NRF7,fail,6,19.01,3,0,moderate_model_underestimate,severe_model_underestimate,estimate_only,1,near-floor row with lower demand estimate than actual
+on_the_line,4,B07W65T6VT,OPER::B07W65T6VT,fail,12,17.94,8,0,moderate_model_underestimate,severe_model_underestimate,estimate_only,1,near-floor row with borderline demand and profit
+on_the_line,5,B0CS3VF4GK,OPER::B0CS3VF4GK,pass,13,25.1,3,39.95,severe_model_underestimate,severe_model_overestimate,estimate_only,1,just over line pass to test conservative starter sizing

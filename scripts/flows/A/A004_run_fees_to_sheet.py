@@ -1,11 +1,12 @@
 ﻿"""
-Fetch fee estimates at fixed price points (Â£10 and Â£100) and update Product_DB with fees.
+Fetch fee estimates at fixed price points and write local fee proof outputs.
 
 What it does:
-- Reads SKUs from Product_DB.
-- Calls SP-API FeesEstimate for each SKU at Â£10 and Â£100 (GBP, FBA).
-- Writes fee_total_10, fee_total_100, last_updated_A004 back to Product_DB.
+- Reads SKUs from local Product DB/O product evidence by default.
+- Calls SP-API FeesEstimate for each SKU at the configured price points.
+- Writes local fee snapshots.
 - Saves a CSV snapshot to out/fees_estimates.csv.
+- A004_WRITE_LEGACY_SHEETS=1 keeps the old Product_DB Sheet update path available only when explicitly enabled.
 """
 
 
@@ -42,6 +43,7 @@ try:
         replace_table_from_dataframe,
         coalesce_duplicate_header_rows,
         write_dataframe_with_sql_compat,
+        load_product_db_products_from_sqlite,
     )
 except ImportError:  # pragma: no cover - direct script fallback
     from core.storage import (
@@ -52,6 +54,7 @@ except ImportError:  # pragma: no cover - direct script fallback
         replace_table_from_dataframe,
         coalesce_duplicate_header_rows,
         write_dataframe_with_sql_compat,
+        load_product_db_products_from_sqlite,
     )
 
 SHEET_ID = "1b7iREy92vF_a1Lw72g0SOGS7t4-IOSBeeoHetLTN43s"
@@ -76,6 +79,7 @@ SQL_TABLE_FEES_LATEST = "a_fees_latest"
 SQL_TABLE_FEES_FAILED = "a_fees_failed"
 SQL_TABLE_PRODUCT_DB_PREVIEW = "sys_product_db_preview"
 SQL_TABLE_PHASE1_SKU_SCOPE = "b_phase1_sku_scope"
+O_PRODUCT_DB_OPERATOR_VIEW = Path("out/systems/O/live/product_db_operator_view.csv")
 
 _throttle_next_allowed = 0.0
 _throttle_last_fail_delay = 0.0
@@ -107,6 +111,14 @@ def load_env(paths: Optional[List[str]] = None) -> None:
             if key and key not in os.environ:
                 os.environ[key] = val
         break
+
+
+def env_flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def write_legacy_sheets_enabled() -> bool:
+    return env_flag("A004_WRITE_LEGACY_SHEETS", "0")
 
 
 def require_env(name: str) -> str:
@@ -388,18 +400,65 @@ def _write_output_frame(df: pd.DataFrame, path: Path, sql_table: str) -> dict[st
     }
 
 
+def _sqlite_path_from_env() -> Path:
+    path = StorageConfig.from_env().sqlite_path
+    return path if path.is_absolute() else ROOT / path
+
+
+def load_local_product_source() -> tuple[list[list[str]], str]:
+    sqlite_path = _sqlite_path_from_env()
+    sql_df = load_product_db_products_from_sqlite(sqlite_path)
+    if not sql_df.empty:
+        return [list(sql_df.columns)] + sql_df.fillna("").astype(str).values.tolist(), f"sql:{sqlite_path}"
+    if O_PRODUCT_DB_OPERATOR_VIEW.exists():
+        df = pd.read_csv(O_PRODUCT_DB_OPERATOR_VIEW, dtype=str).fillna("")
+        if not df.empty:
+            return [list(df.columns)] + df.astype(str).values.tolist(), str(O_PRODUCT_DB_OPERATOR_VIEW)
+    if OUT_PRODUCT_DB_PREVIEW.exists():
+        df = read_dataframe_with_sql_fallback(OUT_PRODUCT_DB_PREVIEW, SQL_TABLE_PRODUCT_DB_PREVIEW, dtype=str).fillna("")
+        if not df.empty:
+            return [list(df.columns)] + df.astype(str).values.tolist(), str(OUT_PRODUCT_DB_PREVIEW)
+    return [], ""
+
+
 def main() -> None:
     load_env()
-    try:
-        client = gspread.service_account(filename=str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json"))
-        sheet = client.open_by_key(SHEET_ID)
-        ws = sheet.worksheet(PRODUCT_DB_TAB)
-    except Exception as exc:
-        print(f"[A004] Sheets access failed: {exc}")
-        return
-    rows = ws.get_all_values()
+    write_legacy_sheets = write_legacy_sheets_enabled()
+    ws = None
+    source_label = ""
+    if write_legacy_sheets:
+        try:
+            client = gspread.service_account(filename=str(Path.cwd() / "secrets" / "sellerone-2-0d3642b951a0.json"))
+            sheet = client.open_by_key(SHEET_ID)
+            ws = sheet.worksheet(PRODUCT_DB_TAB)
+        except Exception as exc:
+            print(f"[A004] Sheets access failed: {exc}")
+            return
+        rows = ws.get_all_values()
+        source_label = "legacy_product_db_sheet"
+    else:
+        rows, source_label = load_local_product_source()
     if not rows:
-        print("Product_DB empty")
+        empty = pd.DataFrame(
+            columns=[
+                "seller_sku",
+                "fba_fee_10",
+                "fba_fee_100",
+                "referral_fee_10",
+                "referral_fee_100",
+                "error_10",
+                "error_100",
+                "attempt_count_10",
+                "attempt_count_100",
+                "requeue_passes_used",
+                "failed_price_points",
+                "failure_recorded_utc",
+            ]
+        )
+        _write_output_frame(empty, OUT_FEES_ESTIMATES, SQL_TABLE_FEES_ESTIMATES)
+        _write_output_frame(empty, OUT_FEES_LATEST, SQL_TABLE_FEES_LATEST)
+        _write_output_frame(empty, OUT_FEES_FAILED, SQL_TABLE_FEES_FAILED)
+        print({"status": "skip", "reason": "product_source_empty", "legacy_sheet_writes": write_legacy_sheets})
         return
     rows, repaired_headers = coalesce_duplicate_header_rows(rows)
     if repaired_headers:
@@ -494,8 +553,8 @@ def main() -> None:
                 moq_idx = idx.get("moq", -1)
                 if moq_idx >= 0:
                     new_row[moq_idx] = "1"
-            rows.append(new_row)
-            sheet_skus.add(sku_val)
+                rows.append(new_row)
+                sheet_skus.add(sku_val)
     except Exception:
         pass
 
@@ -643,18 +702,20 @@ def main() -> None:
     rows_out, repaired_headers = coalesce_duplicate_header_rows([headers] + rows[1:])
     if repaired_headers:
         print("Repaired duplicate Product_DB headers before A004 write: " + ",".join(repaired_headers))
-    ws.clear()
-    ws.update("A1", rows_out)
+    if write_legacy_sheets and ws is not None:
+        ws.clear()
+        ws.update("A1", rows_out)
     Path("out").mkdir(parents=True, exist_ok=True)
     fees_df = pd.DataFrame(out_records)
     _write_output_frame(fees_df, OUT_FEES_ESTIMATES, SQL_TABLE_FEES_ESTIMATES)
     # Compatibility alias expected by A-cycle output verification.
     _write_output_frame(fees_df, OUT_FEES_LATEST, SQL_TABLE_FEES_LATEST)
-    write_dataframe_with_sql_compat(
-        pd.DataFrame(rows_out[1:], columns=rows_out[0]),
-        OUT_PRODUCT_DB_PREVIEW,
-        SQL_TABLE_PRODUCT_DB_PREVIEW,
-    )
+    if write_legacy_sheets:
+        write_dataframe_with_sql_compat(
+            pd.DataFrame(rows_out[1:], columns=rows_out[0]),
+            OUT_PRODUCT_DB_PREVIEW,
+            SQL_TABLE_PRODUCT_DB_PREVIEW,
+        )
     failed_cols = [
         "seller_sku",
         "fba_fee_10",
@@ -684,7 +745,15 @@ def main() -> None:
         for err, cnt in top_reasons:
             print(f"[A004] Reason x{cnt}: {err}")
         print("[A004] Saved failed SKUs to out/fees_failed.csv")
-    print({"updated_rows": updates, "errors": errors, "snapshot": "out/fees_estimates.csv"})
+    print(
+        {
+            "updated_rows": updates,
+            "errors": errors,
+            "snapshot": "out/fees_estimates.csv",
+            "source": source_label,
+            "legacy_sheet_writes": write_legacy_sheets,
+        }
+    )
 
 
 if __name__ == "__main__":

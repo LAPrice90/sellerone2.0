@@ -1,0 +1,58 @@
+{
+  "id": "F062_reset_supplier_test_mode",
+  "display_name": "F062 Reset Supplier Test Mode",
+  "flow": "F",
+  "purpose": "Classify the supplier test-mode reset script as protected test utility so the manager can see it without resetting any supplier state.",
+  "owner_entrypoint": "scripts/flows/F/F062_reset_supplier_test_mode.py",
+  "worker_entrypoint": "scripts/flows/F/F062_reset_supplier_test_mode.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "test_mode_supplier_files",
+      "path": "out/systems/F/price_list_manager/test_mode",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "test_mode_supplier_files",
+      "path": "out/systems/F/price_list_manager/test_mode",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "test_mode_reset_is_not_manager_proof",
+    "reset_requires_separate_approval"
+  ],
+  "needs_user_signals": [
+    "test_mode_reset_requested"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "reset_test_mode",
+    "delete_test_outputs",
+    "align_local_db"
+  ],
+  "manager_notes": "Test utility classification only. MOT must not reset supplier test-mode state or delete outputs."
+}

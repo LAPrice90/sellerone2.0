@@ -1,0 +1,2 @@
+sku,asin,enabled,mode,live_write_enabled,pressure_days,undercut_gbp,after_pressure_action,reset_after_absent_hours,min_margin_guard,notes
+6V-EEC1-2S9Z,B06WW79DX5,1,pressure_then_match,1,30,0.01,match,24,0.00,first protected defensive listing proof - pressure below rival for 30 active rival days then match; equal above or absent stands down to normal H; no daily write cap

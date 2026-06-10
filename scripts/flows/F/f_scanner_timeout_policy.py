@@ -133,10 +133,10 @@ DEFAULT_POLICY_BY_CODE: dict[str, dict[str, str]] = {
         "notes": "Balanced default: missing 365 day price history waits 180 days.",
     },
     "RESCAN": {
-        "timeout_mode": "fixed_days",
-        "timeout_days": "30",
-        "max_timeout_days": "30",
-        "notes": "Balanced default: technical retry rows wait 30 days.",
+        "timeout_mode": "disabled",
+        "timeout_days": "",
+        "max_timeout_days": "0",
+        "notes": "Same-cycle retry only: RESCAN is handled by F061 active retry priority, not a cooldown.",
     },
     "FAIL": {
         "timeout_mode": "fixed_days",
@@ -215,7 +215,7 @@ FAIL_REASON_DETAILS: dict[str, dict[str, str]] = {
     "RESCAN": {
         "meaning": "Technical retry is needed",
         "stage": "retry",
-        "recommendation": "30 days",
+        "recommendation": "same-cycle retry; exhausted retries need a clear failure or blocked reason",
     },
     "FAIL": {
         "meaning": "Generic fail fallback",

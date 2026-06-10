@@ -1,0 +1,42 @@
+flowchart TD
+    A["Start F row check"] --> B["Use approved scanner-owned browser profile"]
+    B --> C["Check Dashboard Yes/No"]
+
+    C -->|YES| D["Logged-in mode"]
+    D --> E["Run Seller Central-required checks"]
+    E --> F["Write redacted proof"]
+    F --> G["Continue normal F flow"]
+
+    C -->|NO| H["Logged-out mode"]
+    H --> I{"Can this row be decided without Seller Central login?"}
+
+    I -->|YES| J{"Does row meet logged-out pass/irrelevant rule?"}
+    J -->|YES| K["Pass/clear row without login"]
+    J -->|NO| L["Save for second check after login"]
+
+    I -->|NO| M{"Is login attempt allowed now?"}
+
+    M -->|NO - cooldown/manual challenge| N["Park row with redacted reason and earliest safe retry"]
+    N --> O["Continue safe logged-out work only"]
+
+    M -->|YES - bounded attempt| P["Click Login in scanner-owned browser"]
+    P --> Q["Enter email"]
+    Q --> R["Enter password"]
+    R --> S{"Amazon challenge shown?"}
+
+    S -->|No challenge| C
+
+    S -->|SMS available and no attempt used| T["Request SMS/code once only"]
+    T --> U{"Fresh code safely available?"}
+    U -->|YES| V["Enter code through approved path"]
+    V --> C
+    U -->|NO| W["Soft cooldown and park login-required rows"]
+
+    S -->|SMS unavailable or blocked| X["Soft cooldown or hard cooldown"]
+    S -->|Captcha/passkey/authenticator-only/account recovery| Y["Manual challenge - Luke decision"]
+    S -->|Too many attempts / try later / 24h wording| Z["Hard cooldown"]
+
+    W --> O
+    X --> O
+    Y --> O
+    Z --> O

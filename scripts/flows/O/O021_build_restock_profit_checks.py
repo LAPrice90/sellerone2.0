@@ -20,6 +20,32 @@ DROP_REVIEW_MIN_BAD_SNAPSHOTS = 3
 DROP_REVIEW_MIN_WINDOW_DAYS = 7
 BAD_ECONOMICS_VERDICTS = {"do_not_buy_now", "temporary_market_risk", "drop_review_only"}
 BUY_ACTIONS = {"full_restock", "test_restock"}
+WEAK_REFUND_PROOF_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "sellerboard_bridge_only",
+    "bridge_labelled_only",
+}
+WEAK_REFUND_CONFIDENCE_STATES = {"", "missing", "unknown", "weak", "not_yet_proven"}
+WEAK_INBOUND_COST_CONFIDENCE_STATES = {
+    "",
+    "missing",
+    "unknown",
+    "weak",
+    "not_yet_proven",
+    "missing_inbound_cost_confidence",
+    "unsupported_currency",
+}
+WEAK_PROFIT_INPUT_CONFIDENCE_STATES = {
+    "",
+    "missing_profit_inputs",
+    "weak_profit_inputs",
+    "unknown",
+    "not_yet_proven",
+}
 
 
 def _utc_now() -> datetime:
@@ -72,6 +98,12 @@ def _first_non_blank(*values: object) -> str:
 def _reason_has(reason_text: object, *tokens: str) -> bool:
     normalized = _normalize_text(reason_text).upper().replace(",", "|")
     return any(token.upper() in normalized for token in tokens)
+
+
+def _extend_unique(target: list[str], values: list[str]) -> None:
+    for value in values:
+        if value and value not in target:
+            target.append(value)
 
 
 def _row_map(df: pd.DataFrame) -> dict[str, pd.Series]:
@@ -356,6 +388,7 @@ def _build_profit_check_row(
     profit = _num(_field(row, rec_row, source_row, coverage_row, "expected_forward_profit_per_unit_gbp", "forward_profit_per_unit_gbp"))
     fee_drag = _num(_field(row, rec_row, source_row, coverage_row, "net_fee_drag_per_unit_gbp"))
     refund_drag = _num(_field(row, rec_row, source_row, coverage_row, "expected_refund_cost_per_unit_gbp"))
+    inbound_drag = _num(_field(row, rec_row, source_row, coverage_row, "expected_inbound_cost_per_unit_gbp", "inbound_cost_drag_gbp"))
     break_even_max = _num(_field(row, rec_row, source_row, coverage_row, "max_break_even_purchase_price_gbp"))
     target_max = _num(_field(row, rec_row, source_row, coverage_row, "max_target_roi_purchase_price_gbp"))
     target_roi = _num(_field(row, rec_row, source_row, coverage_row, "target_roi_pct")) or 10.0
@@ -376,6 +409,11 @@ def _build_profit_check_row(
     price_basis = _field(row, rec_row, source_row, coverage_row, "market_price_basis_used")
     purchase_price_safety = _field(row, rec_row, source_row, coverage_row, "purchase_price_safety_status")
     net_fee_status = _field(row, rec_row, source_row, coverage_row, "net_fee_model_status")
+    refund_proof_state = _field(row, rec_row, source_row, coverage_row, "refund_proof_state").lower()
+    refund_sample_confidence = _field(row, rec_row, source_row, coverage_row, "refund_sample_confidence").lower()
+    inbound_cost_confidence = _field(row, rec_row, source_row, coverage_row, "inbound_cost_confidence").lower()
+    profit_input_confidence = _field(row, rec_row, source_row, coverage_row, "profit_input_confidence").lower()
+    profit_input_blockers = _field(row, rec_row, source_row, coverage_row, "profit_input_blockers")
     user_price_check_required = _truthy(_field(row, rec_row, source_row, coverage_row, "user_price_check_required"))
     price_list_cost_text = _field(row, rec_row, source_row, coverage_row, "price_list_unit_cost_gbp")
     price_list_date = _field(row, rec_row, source_row, coverage_row, "price_list_source_received_at_utc")
@@ -455,9 +493,16 @@ def _build_profit_check_row(
         missing_reasons.append("missing_forward_profit")
     if _is_net_fee_missing(source_type, row, rec_row, source_row):
         missing_reasons.append("missing_net_fee_model")
+    if refund_proof_state in WEAK_REFUND_PROOF_STATES or refund_sample_confidence in WEAK_REFUND_CONFIDENCE_STATES:
+        missing_reasons.append("missing_refund_confidence")
+    if inbound_cost_confidence in WEAK_INBOUND_COST_CONFIDENCE_STATES:
+        missing_reasons.append("missing_inbound_cost_confidence")
+    if profit_input_confidence in WEAK_PROFIT_INPUT_CONFIDENCE_STATES:
+        blockers = [part.strip() for part in profit_input_blockers.split("|") if part.strip()]
+        _extend_unique(missing_reasons, blockers or ["missing_profit_input_confidence"])
 
-    if profit is None and cost is not None and market is not None and fee_drag is not None:
-        profit = market - cost - fee_drag - max(refund_drag or 0.0, 0.0)
+    if profit is None and cost is not None and market is not None and fee_drag is not None and inbound_drag is not None:
+        profit = market - cost - fee_drag - max(refund_drag or 0.0, 0.0) - max(inbound_drag, 0.0)
     if roi is None and profit is not None and cost is not None and cost > 0:
         roi = (profit / cost) * 100.0
 
@@ -564,6 +609,7 @@ def _build_profit_check_row(
         "supplier_cost_gbp": _num_text(cost),
         "fee_drag_gbp": _num_text(fee_drag),
         "refund_drag_gbp": _num_text(refund_drag),
+        "inbound_cost_drag_gbp": _num_text(inbound_drag),
         "forward_profit_per_unit_gbp": _num_text(profit),
         "forward_roi_pct": _num_text(roi),
         "break_even_max_cost_gbp": _num_text(break_even_max),
@@ -617,6 +663,8 @@ def _build_profit_check_row(
         "price_list_vs_actual_paid_delta_gbp": delta_actual_text,
         "price_list_vs_purchase_reference_delta_gbp": delta_reference_text,
         "price_proof_summary": price_proof_summary,
+        "profit_input_confidence": profit_input_confidence,
+        "profit_input_blockers": profit_input_blockers,
     }
 
 

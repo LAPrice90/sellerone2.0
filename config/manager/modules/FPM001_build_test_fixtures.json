@@ -1,0 +1,58 @@
+{
+  "id": "FPM001_build_test_fixtures",
+  "display_name": "FPM001 Test Fixture Builder",
+  "flow": "F",
+  "purpose": "Classify the F test fixture builder as test-only machinery so the manager can see it without generating or overwriting fixture data.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM001_build_test_fixtures.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM001_build_test_fixtures.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "test_mode_dir",
+      "path": "out/systems/F/price_list_manager/test_mode",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "test_mode_fixtures",
+      "path": "out/systems/F/price_list_manager/test_mode",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "test_fixture_builder_is_not_runtime_proof",
+    "fixture_generation_requires_separate_task"
+  ],
+  "needs_user_signals": [
+    "fixture_rebuild_requested"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_test_fixtures",
+    "overwrite_fixtures",
+    "align_local_db"
+  ],
+  "manager_notes": "Test-only classification. MOT may know this script exists but must not build or overwrite fixtures."
+}

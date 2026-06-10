@@ -1,0 +1,75 @@
+{
+  "id": "F074_build_backtest_health",
+  "display_name": "F074 Backtest Health",
+  "flow": "F",
+  "purpose": "Register F backtest health proof so the manager can inspect schema, coverage, confidence, and decision-integrity checks without rebuilding health.",
+  "owner_entrypoint": "scripts/flows/F/F074_build_backtest_health.py",
+  "worker_entrypoint": "scripts/flows/F/F074_build_backtest_health.py",
+  "health_sources": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_input_view_live",
+      "path": "out/systems/F/live/feeder_backtest_input_view_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "feeder_backtest_summary_live",
+      "path": "out/systems/F/live/feeder_backtest_summary_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "backtest_health_warn_after_43200_minutes",
+    "health_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "backtest_health_fail_rows",
+    "backtest_health_warn_rows",
+    "policy_integrity_failure"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_backtest_health",
+    "change_backtest_policy",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read backtest health output but must not rebuild health, change policy, change prices, or alter product facts."
+}

@@ -1,0 +1,154 @@
+# Plan Status
+
+## Summary
+- Plan slug:
+  - `f-cycle-sales-history-truth-v2`
+- Current stage:
+  - Batch 001 complete
+  - Batch 002 complete (Phase 2B hometime proof window executed on `2026-04-18`)
+  - Batch 003 complete (Phase 3 controlled proof window executed on `2026-04-19`)
+  - Batch 004 complete (Phase 4 controlled proof window executed on `2026-04-20`)
+  - Batch 005 complete (Phase 5 controlled proof window executed on `2026-04-20`)
+  - Batch 006 complete (Phase 6 controlled one-off proof window executed on `2026-04-20`)
+  - Batch 007 complete (Phase 7 controlled one-off proof window executed on `2026-04-20`)
+- Current phase:
+  - Phase 2A complete
+  - Phase 2B complete
+  - Phase 3 complete
+  - Phase 4 complete (`2026-04-20` controlled proof window)
+  - Phase 5 complete (`2026-04-20` controlled proof window)
+  - Phase 6 complete (`2026-04-20` controlled one-off proof window)
+  - Phase 7 complete (`2026-04-20` controlled one-off proof window)
+- Current batch:
+  - none - plan implementation complete
+- Overall status:
+  - archived
+  - complete
+  - demand basis, qualification, classifier, and decision-confidence contracts are explicit and health-proven on READY rows
+  - broad scrape collection is intentionally stopped for this ticket
+  - targeted recovery list is prepared separately for later cleanup
+- Monitoring window:
+  - Phase 3 monitored validation completed
+  - Phase 4 monitored validation completed
+  - Phase 5 monitored validation completed
+  - Phase 6 monitored validation completed
+  - Phase 7 monitored validation completed
+  - no active runtime monitor currently open for this ticket
+- Next execution package:
+  - none inside this ticket
+- Next check UTC:
+  - `n/a`
+- Unlock condition:
+  - new active F ticket starts only if:
+    - operator sold-30d checks are filled and calibration review is requested
+    - learning actuals are filled and recalibration is requested
+    - targeted coverage cleanup is explicitly approved as a separate root-cause ticket
+- Timeout action:
+  - none
+
+## Checklist
+- [x] Project brief written
+- [x] Blueprint written
+- [x] Data contracts written
+- [x] Batch 001 ready
+- [x] Batch 001 complete
+- [x] Batch 002 ready
+- [x] Batch 002 complete
+- [x] Batch 003 ready
+- [x] Batch 003 complete
+- [x] Batch 004 ready
+- [x] Batch 004 complete
+- [x] Batch 005 ready
+- [x] Batch 005 complete
+- [x] Batch 006 ready
+- [x] Batch 006 complete
+- [x] Batch 007 ready
+- [x] Batch 007 complete
+- [x] Runbook written
+- [x] Ready to archive
+
+## Open follow-on items
+- Coverage is still incomplete, but it is no longer a blocker for decision-model work:
+  - latest successful ASIN captures: `2342`
+  - latest failed ASIN captures: `2214`
+  - targeted retry subset rows: `2207`
+- Operator sold-30d checks are now formalized via Batch 006 template and accuracy pack, but check rows are not yet filled.
+- Learning loop infrastructure exists, but outcome checkpoints are not yet filled:
+  - learning log rows: `266`
+  - pending outcomes: `266`
+
+## Latest proof snapshot
+- Date:
+  - `2026-04-20` (Phase 7 one-off proof closeout)
+- Evidence:
+  - controlled rebuild refresh:
+    - `F070`: rows `1`
+    - `F071`: rows `2358` (`ready=2149`, `manual_review=209`)
+    - `F072`: rows `769366`
+    - `F073`: rows `2358` (`decision_fail=1883`, `decision_pass=266`, `manual_review=209`)
+    - `F074`: rows `21` (`ok=21`, `warn=0`, `fail=0`)
+    - `F005`: rows `28668`, trusted rows `2262`, qualified-delta rows `28418`
+  - health truth:
+    - `f_backtest_demand_basis_integrity`: `ok`
+    - `f_backtest_price_qualified_demand_integrity`: `ok`
+    - `f_backtest_qualification_source_alignment`: `ok`
+    - `f_backtest_health_staleness`: `ok`
+    - `f_backtest_seasonality_classifier_integrity`: `ok`
+    - `f_backtest_stability_classifier_integrity`: `ok`
+    - `f_backtest_recent_vs_baseline_integrity`: `ok`
+    - `f_backtest_decision_floor_integrity`: `ok`
+    - `f_backtest_decision_confidence_integrity`: `ok`
+    - `f_backtest_manual_review_share`: `ok` (`0.088634`)
+  - source-alignment truth:
+    - READY summary rows: `2149`
+    - READY expected units source `input_qualified`: `2149`
+    - READY expected profit source `input_qualified`: `2149`
+    - READY rows with blank qualification components: `0`
+    - READY rows with blank classifier state: `0`
+    - READY rows with blank classifier reason path: `0`
+    - READY rows with blank decision confidence: `0`
+    - READY rows with blank decision confidence reason path: `0`
+    - READY `pass` rows with low confidence: `0`
+  - decision confidence distribution:
+    - `medium`: `1251`
+    - `low`: `1107`
+  - decision distribution:
+    - `fail`: `1883`
+    - `pass`: `266`
+    - `manual_review`: `209`
+  - validation export confidence coverage:
+    - `rows_with_decision_confidence=28541`
+    - `rows_with_decision_confidence_reason=28541`
+  - one-off accuracy pack:
+    - `f_sales_history_accuracy_pack_latest.csv`: rows `18`
+    - `f_sales_history_accuracy_summary_latest.csv`: rows `11`
+    - `f_operator_sales_checks_template_latest.csv`: rows `18`
+    - latest observed UTC: `2026-04-20T12:53:00Z`
+    - mismatch rows: `0`
+    - needs operator input rows: `18`
+    - bucket counts:
+      - `missing_operator_check=18`
+      - `missing_operator_units=18`
+      - `missing_operator_decision=18`
+  - one-off learning pack:
+    - `feeder_sales_history_learning_live.csv`: rows `266`
+    - `f_sales_history_learning_review_latest.csv`: rows `266`
+    - `f_sales_history_learning_health_latest.csv`: rows `14`
+    - `f_sales_history_learning_actuals_template_latest.csv`: rows `266`
+    - latest observed UTC: `2026-04-20T13:02:00Z`
+    - rows with outcomes: `0`
+    - pending outcomes: `266`
+    - outcome distribution:
+      - `pending_outcome=266`
+  - owner-state truth:
+    - no broad scrape owner is running by decision
+    - this ticket is now back in build lane on a frozen dataset
+
+## Notes
+- Phase 3 proof remains complete and recorded.
+- Batch 004 proof is now complete and recorded.
+- Batch 005 proof is now complete and recorded.
+- Batch 006 proof is now complete and recorded.
+- Batch 007 proof is now complete and recorded.
+- No direct active successor plan is required until new operator evidence or a separately approved cleanup ticket exists.
+- Coverage cleanup remains a one-off support lane, not the main task.

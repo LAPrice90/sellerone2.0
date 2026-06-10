@@ -1,0 +1,73 @@
+{
+  "id": "FPM150_build_completed_review_pack",
+  "display_name": "FPM150 Completed Review Pack Builder",
+  "flow": "F",
+  "purpose": "Register the completed review pack builder so the manager can inspect completed-pack proof without building, publishing, or approving review rows.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM150_build_completed_review_pack.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM150_build_completed_review_pack.py",
+  "health_sources": [
+    {
+      "name": "review_pack_build_health",
+      "path": "out/systems/F/price_list_manager/live/review_pack_build_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "review_handoff_manifest",
+      "path": "out/systems/F/price_list_manager/live/review_handoff_manifest.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "review_handoff_status",
+      "path": "out/systems/F/price_list_manager/live/review_handoff_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "review_pack_build_health",
+      "path": "out/systems/F/price_list_manager/live/review_pack_build_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "review_candidate_manifest",
+      "path": "out/systems/F/price_list_manager/review_handoffs",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "review_pack_build_health_warn_after_10080_minutes",
+    "operator_ready_rows_need_ai_gate_proof"
+  ],
+  "needs_user_signals": [
+    "operator_review_requested",
+    "manual_review_exception_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "publish_review_rows",
+    "build_review_pack",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may inspect completed review pack evidence but must not build packs, publish rows, or approve review output."
+}

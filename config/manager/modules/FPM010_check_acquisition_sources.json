@@ -1,0 +1,81 @@
+{
+  "id": "FPM010_check_acquisition_sources",
+  "display_name": "FPM010 Source Acquisition Check",
+  "flow": "F",
+  "purpose": "Describe the source acquisition checker so the manager can inspect which active supplier price-list sources are ready, waiting, missing, or blocked without checking remote links or changing files.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM010_check_acquisition_sources.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM010_check_acquisition_sources.py",
+  "health_sources": [
+    {
+      "name": "source_acquisition_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "supplier_registry_config",
+      "path": "config/feeder/price_list_manager/suppliers.csv",
+      "required": true,
+      "max_age_minutes": 100000
+    },
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "test_mode_supplier_registry",
+      "path": "out/systems/F/price_list_manager/test_mode/supplier_registry.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "source_acquisition_status",
+      "path": "out/systems/F/price_list_manager/test_mode/source_acquisition_status.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "test_mode_supplier_registry",
+      "path": "out/systems/F/price_list_manager/test_mode/supplier_registry.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "source_acquisition_status_warn_after_10080_minutes",
+    "active_suppliers_must_have_source_state",
+    "missing_or_waiting_sources_are_classified_not_repaired_by_mot"
+  ],
+  "needs_user_signals": [
+    "manual_price_file_needed",
+    "supplier_source_config_needed",
+    "remote_source_auth_required"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "check_remote_source",
+    "download_price_file",
+    "write_supplier_inbox_file",
+    "delete_local_price_file",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "align_local_db",
+    "run_f061"
+  ],
+  "manager_notes": "Manager proof registration only. The manager may read existing source acquisition status, but must not run source checks, call remote supplier links, write files, run F061, or change queue/pricing state in this phase."
+}

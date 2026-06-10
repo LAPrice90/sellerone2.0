@@ -28,9 +28,9 @@ def _normalize_text(value: object) -> str:
 def finalize_o_contract_df(df: pd.DataFrame, contract_name: str) -> pd.DataFrame:
     ordered = o_contract_columns(contract_name)
     out = df.copy()
-    for column in ordered:
-        if column not in out.columns:
-            out[column] = ""
+    missing_columns = [column for column in ordered if column not in out.columns]
+    if missing_columns:
+        out = pd.concat([out, pd.DataFrame("", index=out.index, columns=missing_columns)], axis=1)
     extra_columns = [column for column in out.columns if column not in ordered]
     out = out[ordered + extra_columns]
     for column in out.columns:

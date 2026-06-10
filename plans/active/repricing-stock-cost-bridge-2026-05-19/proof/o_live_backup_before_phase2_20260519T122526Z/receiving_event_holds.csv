@@ -1,0 +1,3 @@
+hold_utc,event_utc,event_id,po_id,po_line_id,seller_sku,received_qty,hold_reason,hold_note,warehouse_ref,event_source,actor,note
+2026-04-04T13:58:53Z,2026-04-03T15:15:09Z,phase4-rx-close,PO-DRAFT-20260403-001,PO-DRAFT-20260403-001-L001,XE-YPAI-HX9F,4,duplicate_event_id,event_id already exists in live receiving log or current apply batch,WH-PHASE4,phase4_test,phase4_test,close remaining
+2026-04-04T13:58:53Z,2026-04-03T15:15:14Z,phase4-rx-over2,PO-DRAFT-20260403-001,PO-DRAFT-20260403-001-L001,XE-YPAI-HX9F,1,missing_po_line,po_line_id not found in purchase_order_lines_live,WH-PHASE4,phase4_test,phase4_test,intentional over after close

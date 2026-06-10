@@ -26,9 +26,13 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.h_strategy_outcome_log_patch = patch.object(phase1_storage, "H_STRATEGY_OUTCOME_LOG_PATH", self.out_dir / "h_strategy_outcome_log.csv")
         self.h_strategy_outcome_daily_patch = patch.object(phase1_storage, "H_STRATEGY_OUTCOME_DAILY_PATH", self.out_dir / "h_strategy_outcome_daily.csv")
         self.h_strategy_control_memory_patch = patch.object(phase1_storage, "H_STRATEGY_CONTROL_MEMORY_PATH", self.out_dir / "h_strategy_control_memory.csv")
+        self.h_defensive_listing_action_patch = patch.object(phase1_storage, "H_DEFENSIVE_LISTING_ACTION_LOG_PATH", self.out_dir / "h_defensive_listing_action_log.csv")
+        self.h_defensive_listing_memory_patch = patch.object(phase1_storage, "H_DEFENSIVE_LISTING_CAMPAIGN_MEMORY_PATH", self.out_dir / "h_defensive_listing_campaign_memory.csv")
+        self.h_defensive_listing_daily_patch = patch.object(phase1_storage, "H_DEFENSIVE_LISTING_DAILY_PATH", self.out_dir / "h_defensive_listing_daily.csv")
         self.phase_write_audit_patch = patch.object(phase1_main_loop, "PHASE_WRITE_AUDIT_PATH", self.out_dir / "phase_write_audit.csv")
         self.floor_trace_patch = patch.object(phase1_main_loop, "H_FLOOR_TRACE_PATH", self.out_dir / "h_floor_truth_trace.csv")
         self.temp_trial_rules_patch = patch.object(phase1_main_loop, "H_TEMP_TRIAL_RULES_PATH", self.config_dir / "h_temp_trial_rules.csv")
+        self.defensive_listing_rules_patch = patch.object(phase1_main_loop, "H_DEFENSIVE_LISTING_RULES_PATH", self.config_dir / "h_defensive_listing_protection.csv")
         self.data_patch.start()
         self.lock_patch.start()
         self.suppression_cases_patch.start()
@@ -38,14 +42,22 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.h_strategy_outcome_log_patch.start()
         self.h_strategy_outcome_daily_patch.start()
         self.h_strategy_control_memory_patch.start()
+        self.h_defensive_listing_action_patch.start()
+        self.h_defensive_listing_memory_patch.start()
+        self.h_defensive_listing_daily_patch.start()
         self.phase_write_audit_patch.start()
         self.floor_trace_patch.start()
         self.temp_trial_rules_patch.start()
+        self.defensive_listing_rules_patch.start()
 
     def tearDown(self) -> None:
+        self.defensive_listing_rules_patch.stop()
         self.temp_trial_rules_patch.stop()
         self.floor_trace_patch.stop()
         self.phase_write_audit_patch.stop()
+        self.h_defensive_listing_daily_patch.stop()
+        self.h_defensive_listing_memory_patch.stop()
+        self.h_defensive_listing_action_patch.stop()
         self.h_strategy_control_memory_patch.stop()
         self.h_strategy_outcome_daily_patch.stop()
         self.h_strategy_outcome_log_patch.stop()
@@ -174,6 +186,121 @@ class Phase1MainLoopTests(unittest.TestCase):
                 },
             ],
         }
+
+    def _b06_market_payload(self) -> dict:
+        return {
+            "offers": [
+                {
+                    "SellerId": "OUR_SELLER",
+                    "ListingPrice": {"Amount": 6.98},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                    "IsFeaturedOfferWinner": False,
+                    "IsFulfilledByAmazon": True,
+                },
+                {
+                    "SellerId": "RIVAL_A",
+                    "ListingPrice": {"Amount": 6.97},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                    "IsFeaturedOfferWinner": True,
+                    "IsFulfilledByAmazon": True,
+                },
+            ]
+        }
+
+    def _b06_market_payload_no_rival(self) -> dict:
+        return {
+            "offers": [
+                {
+                    "SellerId": "OUR_SELLER",
+                    "ListingPrice": {"Amount": 6.98},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                    "IsFeaturedOfferWinner": True,
+                    "IsFulfilledByAmazon": True,
+                },
+            ]
+        }
+
+    def _b06_market_payload_equal_rival(self) -> dict:
+        return {
+            "offers": [
+                {
+                    "SellerId": "OUR_SELLER",
+                    "ListingPrice": {"Amount": 6.98},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                    "IsFeaturedOfferWinner": False,
+                    "IsFulfilledByAmazon": True,
+                },
+                {
+                    "SellerId": "RIVAL_A",
+                    "ListingPrice": {"Amount": 6.98},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                    "IsFeaturedOfferWinner": True,
+                    "IsFulfilledByAmazon": True,
+                },
+            ]
+        }
+
+    def _b06_market_payload_rival_one_p_above_us(self) -> dict:
+        return {
+            "offers": [
+                {
+                    "SellerId": "OUR_SELLER",
+                    "ListingPrice": {"Amount": 6.97},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 2},
+                    "IsFeaturedOfferWinner": True,
+                    "IsFulfilledByAmazon": True,
+                },
+                {
+                    "SellerId": "RIVAL_A",
+                    "ListingPrice": {"Amount": 6.98},
+                    "Shipping": {"Amount": 0.00},
+                    "ShippingTime": {"minimumDays": 1, "maximumDays": 1},
+                    "IsFeaturedOfferWinner": False,
+                    "IsFulfilledByAmazon": True,
+                },
+            ]
+        }
+
+    def _write_defensive_listing_config(self, *, live_write_enabled: str = "0") -> None:
+        path = self.config_dir / "h_defensive_listing_protection.csv"
+        path.write_text(
+            "sku,asin,enabled,mode,live_write_enabled,pressure_days,undercut_gbp,after_pressure_action,reset_after_absent_hours,min_margin_guard,notes\n"
+            f"6V-EEC1-2S9Z,B06WW79DX5,1,pressure_then_match,{live_write_enabled},30,0.01,match,24,0.00,test\n",
+            encoding="utf-8",
+        )
+
+    def _write_temp_trial_config_for_b06(self) -> None:
+        path = self.config_dir / "h_temp_trial_rules.csv"
+        path.write_text(
+            "sku,enabled,undercut_gbp,trial_name,notes\n"
+            "6V-EEC1-2S9Z,1,0.00,temp trial,test\n",
+            encoding="utf-8",
+        )
+
+    def _seed_b06_daily_intel(self) -> None:
+        phase1_main_loop.run_a_cycle(
+            sku="6V-EEC1-2S9Z",
+            now_utc="2026-06-04T09:55:00Z",
+            compliance_anchor_gbp="20.00",
+            policy_buffer_pct="0.03",
+            manual_cap_gbp="10.64",
+            foep_price_gbp="10.64",
+            foep_status="OK",
+            foep_last_refresh_utc="2026-06-04T09:55:00Z",
+            cpt_gbp="10.64",
+            cpt_last_refresh_utc="2026-06-04T09:55:00Z",
+            last_known_safe_gbp="",
+            foep_stale_hours=48,
+            foep_sanity_min_mult="0.5",
+            foep_sanity_max_mult="2.0",
+            market_reference_price_gbp="10.64",
+        )
 
     def test_a_cycle_persists_daily_intel_and_non_null_source(self) -> None:
         result = phase1_main_loop.run_a_cycle(
@@ -1283,6 +1410,246 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.assertEqual(daily_rows[0]["provisional_sample_flag"], "1")
         self.assertNotEqual(daily_rows[0]["sample_min_rows"], "")
 
+    def test_h_cycle_defensive_listing_preview_overrides_temp_trial_and_writes_proof(self) -> None:
+        self._write_defensive_listing_config(live_write_enabled="0")
+        self._write_temp_trial_config_for_b06()
+        self._seed_b06_daily_intel()
+
+        calls = {"count": 0}
+
+        def submitter(_submitted_price: str) -> dict:
+            calls["count"] += 1
+            return {"ok": "1", "http_status": "202", "submission_id": "SHOULD-NOT-RUN", "response_text": ""}
+
+        result = phase1_main_loop.run_h_cycle(
+            sku="6V-EEC1-2S9Z",
+            asin="B06WW79DX5",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=True,
+            current_price_gbp="6.98",
+            hard_floor_gbp="5.90",
+            manual_cap_gbp="10.64",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._b06_market_payload(),
+            listings_observed_price_gbp="6.98",
+            write_submitter=submitter,
+            seller_detail_status="DETAIL_OK",
+            seller_detail_resolution_status="RECOVERED",
+            seller_detail_snapshot_ts_utc="2026-06-04T10:00:00Z",
+            seller_detail_offer_row_count="2",
+            now_utc="2026-06-04T10:00:00Z",
+        )
+
+        self.assertEqual(calls["count"], 0)
+        self.assertEqual(result.state, "DEFENSIVE_LISTING_BALANCED_DEFEND")
+        self.assertEqual(result.write_status, "READ_ONLY_NO_WRITE")
+        self.assertIn("DEFENSIVE_LISTING_LIVE_WRITES_DISABLED", result.reason_codes)
+        self.assertIn("DEFENSIVE_LISTING_SKIPS_TEMP_TRIAL", result.reason_codes)
+        self.assertNotIn("TEMP_TRIAL_ACTIVE", result.reason_codes)
+
+        action_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        self.assertEqual(len(action_rows), 1)
+        self.assertEqual(action_rows[0]["sku"], "6V-EEC1-2S9Z")
+        self.assertEqual(action_rows[0]["target_price_gbp"], "6.96")
+        self.assertEqual(action_rows[0]["live_write_enabled"], "0")
+        self.assertEqual(action_rows[0]["write_status"], "READ_ONLY_NO_WRITE")
+
+        daily_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_DAILY_PATH)
+        self.assertEqual(len(daily_rows), 1)
+        self.assertEqual(daily_rows[0]["blocked_live_rows"], "1")
+        self.assertEqual(daily_rows[0]["applied_rows"], "0")
+
+    def test_h_cycle_defensive_listing_live_guard_allows_only_enabled_b06_fake_writer(self) -> None:
+        self._write_defensive_listing_config(live_write_enabled="1")
+        self._seed_b06_daily_intel()
+        calls: list[str] = []
+
+        def submitter(submitted_price: str) -> dict:
+            calls.append(submitted_price)
+            return {"ok": "1", "http_status": "202", "submission_id": "SUB-B06", "response_text": ""}
+
+        result = phase1_main_loop.run_h_cycle(
+            sku="6V-EEC1-2S9Z",
+            asin="B06WW79DX5",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=True,
+            current_price_gbp="6.98",
+            hard_floor_gbp="5.90",
+            manual_cap_gbp="10.64",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._b06_market_payload(),
+            listings_observed_price_gbp="6.96",
+            write_submitter=submitter,
+            seller_detail_status="DETAIL_OK",
+            seller_detail_resolution_status="RECOVERED",
+            seller_detail_snapshot_ts_utc="2026-06-04T10:00:00Z",
+            seller_detail_offer_row_count="2",
+            now_utc="2026-06-04T10:00:00Z",
+        )
+
+        self.assertEqual(calls, ["6.96"])
+        self.assertEqual(result.state, "DEFENSIVE_LISTING_BALANCED_DEFEND")
+        self.assertEqual(result.write_status, "APPLIED")
+        action_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        self.assertEqual(action_rows[0]["live_write_enabled"], "1")
+        self.assertEqual(action_rows[0]["write_status"], "APPLIED")
+
+    def test_h_cycle_defensive_listing_equal_rival_stays_under_single_strategy(self) -> None:
+        self._write_defensive_listing_config(live_write_enabled="1")
+        self._seed_b06_daily_intel()
+        calls: list[str] = []
+
+        def submitter(submitted_price: str) -> dict:
+            calls.append(submitted_price)
+            return {"ok": "1", "http_status": "202", "submission_id": "SUB-B06", "response_text": ""}
+
+        result = phase1_main_loop.run_h_cycle(
+            sku="6V-EEC1-2S9Z",
+            asin="B06WW79DX5",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=True,
+            current_price_gbp="6.98",
+            hard_floor_gbp="5.90",
+            manual_cap_gbp="10.64",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._b06_market_payload_equal_rival(),
+            listings_observed_price_gbp="6.98",
+            write_submitter=submitter,
+            seller_detail_status="DETAIL_OK",
+            seller_detail_resolution_status="RECOVERED",
+            seller_detail_snapshot_ts_utc="2026-06-04T10:00:00Z",
+            seller_detail_offer_row_count="2",
+            now_utc="2026-06-04T10:00:00Z",
+        )
+
+        self.assertEqual(calls, ["6.97"])
+        self.assertEqual(result.state, "DEFENSIVE_LISTING_BALANCED_DEFEND")
+        self.assertNotIn("DEFENSIVE_LISTING_NORMAL_H_CONTROL", result.reason_codes)
+        action_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        self.assertEqual(action_rows[0]["target_price_gbp"], "6.97")
+        self.assertEqual(action_rows[0]["write_status"], "APPLIED")
+        self.assertEqual(action_rows[0]["attempted_write"], "1")
+        self.assertEqual(action_rows[0]["wrote"], "1")
+
+    def test_h_cycle_defensive_listing_hold_prevents_normal_h_raise(self) -> None:
+        self._write_defensive_listing_config(live_write_enabled="1")
+        self._seed_b06_daily_intel()
+        calls: list[str] = []
+
+        def submitter(submitted_price: str) -> dict:
+            calls.append(submitted_price)
+            return {"ok": "1", "http_status": "202", "submission_id": "SUB-B06", "response_text": ""}
+
+        result = phase1_main_loop.run_h_cycle(
+            sku="6V-EEC1-2S9Z",
+            asin="B06WW79DX5",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=True,
+            current_price_gbp="6.97",
+            hard_floor_gbp="5.90",
+            manual_cap_gbp="10.64",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._b06_market_payload_rival_one_p_above_us(),
+            listings_observed_price_gbp="6.97",
+            write_submitter=submitter,
+            seller_detail_status="DETAIL_OK",
+            seller_detail_resolution_status="RECOVERED",
+            seller_detail_snapshot_ts_utc="2026-06-04T10:00:00Z",
+            seller_detail_offer_row_count="2",
+            now_utc="2026-06-04T10:00:00Z",
+        )
+
+        self.assertEqual(calls, [])
+        self.assertEqual(result.state, "DEFENSIVE_LISTING_HOLD")
+        self.assertNotIn("DEFENSIVE_LISTING_NORMAL_H_CONTROL", result.reason_codes)
+        self.assertIn("DEFENSIVE_LISTING_SINGLE_STRATEGY_OWNS_RIVAL_PRESENT", result.reason_codes)
+        action_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        self.assertEqual(action_rows[0]["phase"], "pressure_hold")
+        self.assertEqual(action_rows[0]["target_price_gbp"], "6.97")
+        self.assertEqual(action_rows[0]["write_status"], "NO_WRITE_REQUIRED")
+        self.assertEqual(action_rows[0]["attempted_write"], "0")
+        self.assertEqual(action_rows[0]["wrote"], "0")
+
+    def test_h_cycle_defensive_listing_no_rival_leaves_normal_h_in_control(self) -> None:
+        self._write_defensive_listing_config(live_write_enabled="1")
+        self._seed_b06_daily_intel()
+
+        result = phase1_main_loop.run_h_cycle(
+            sku="6V-EEC1-2S9Z",
+            asin="B06WW79DX5",
+            marketplace_id="A1F83G8C2ARO7P",
+            our_seller_id="OUR_SELLER",
+            pricing_writer_mode="CODEX_H",
+            enabled_live_writes=False,
+            current_price_gbp="6.98",
+            hard_floor_gbp="5.90",
+            manual_cap_gbp="10.64",
+            max_step_down_gbp="0.20",
+            max_step_up_gbp="0.20",
+            max_daily_drop_gbp="0.60",
+            daily_drop_used_gbp="0.00",
+            delta_tolerance_gbp="0.02",
+            stable_buffer_gbp="0.02",
+            min_clean_tests_for_confidence=5,
+            price_apply_tolerance_gbp="0.01",
+            policy_buffer_pct="0.03",
+            market_payload=self._b06_market_payload_no_rival(),
+            listings_observed_price_gbp="6.98",
+            seller_detail_status="DETAIL_OK",
+            seller_detail_resolution_status="RECOVERED",
+            seller_detail_snapshot_ts_utc="2026-06-04T10:00:00Z",
+            seller_detail_offer_row_count="1",
+            now_utc="2026-06-04T10:00:00Z",
+        )
+
+        self.assertFalse(str(result.state).startswith("DEFENSIVE_LISTING"))
+        self.assertIn("DEFENSIVE_LISTING_NORMAL_H_CONTROL", result.reason_codes)
+        action_rows = phase1_storage.read_table(phase1_storage.H_DEFENSIVE_LISTING_ACTION_LOG_PATH)
+        self.assertEqual(len(action_rows), 1)
+        self.assertEqual(action_rows[0]["write_status"], "DEFENSIVE_NOT_TRIGGERED_NORMAL_H_CONTROL")
+        self.assertEqual(action_rows[0]["attempted_write"], "0")
+        self.assertEqual(action_rows[0]["wrote"], "0")
+
     def test_emit_h_ceiling_event_safe_clamp_is_bucketed_non_actionable(self) -> None:
         final_ceiling = phase1_main_loop.phase1_ceilings.FinalCeilingResult(
             compliance_ceiling_landed_gbp="6.00",
@@ -1346,6 +1713,32 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.assertEqual(rows[0]["ceiling_conflict_flag"], "1")
         self.assertIn("CEILING_CONFLICT_BUCKET_ACTIONABLE", rows[0]["reason_codes_json"])
         self.assertIn("CEILING_INPUT_BUCKET_MISSING_ACTIONABLE", rows[0]["reason_codes_json"])
+
+    def test_emit_h_ceiling_event_skips_rows_without_binding_ceiling(self) -> None:
+        final_ceiling = phase1_main_loop.phase1_ceilings.FinalCeilingResult(
+            compliance_ceiling_landed_gbp="",
+            eligibility_ceiling_landed_gbp="",
+            suppression_ceiling_landed_temp="",
+            demand_ceiling_landed_gbp="",
+            final_ceiling_landed_gbp="",
+            binding_ceiling_type="NONE",
+            reason_codes=["FINAL_CEILING_UNAVAILABLE"],
+        )
+        phase1_main_loop._emit_h_ceiling_event(
+            event_ts_utc="2026-02-13T15:18:00Z",
+            sku="SKU3_NO_BINDING_CEILING",
+            final_ceiling=final_ceiling,
+            target_price_gbp="8.00",
+            hard_floor_gbp="8.00",
+            reason_codes=["FINAL_CEILING_UNAVAILABLE", "CEILING_RULE_INPUTS_MISSING"],
+        )
+
+        rows = [
+            r
+            for r in phase1_storage.read_table(phase1_storage.H_CEILING_EVENTS_PATH)
+            if r.get("sku") == "SKU3_NO_BINDING_CEILING"
+        ]
+        self.assertEqual(rows, [])
 
     def test_h_cycle_multi_seller_regain_logs_ladder_cap_tactic(self) -> None:
         phase1_main_loop.run_a_cycle(
@@ -1424,6 +1817,98 @@ class Phase1MainLoopTests(unittest.TestCase):
             ),
             20,
         )
+
+    def test_strategy_daily_rollup_rebuilds_known_53_row_group_from_source_log(self) -> None:
+        asof_date = "2026-05-13"
+        scenario_type = "multi_seller_ladder_cap"
+        chosen_tactic = "MULTI_SELLER_LADDER_CAP"
+        states = ["success"] * 11 + ["failed"] * 10 + ["expired"] * 32
+        rows = []
+        for idx, state in enumerate(states):
+            writer_outcome = "APPLIED" if idx < 34 else "NO_WRITE_REQUIRED"
+            event_ts = f"{asof_date}T{idx // 3:02d}:{(idx * 7) % 60:02d}:00Z"
+            rows.append(
+                {
+                    "event_ts_utc": event_ts,
+                    "run_id": "RUN_KNOWN_53",
+                    "sku": f"SKU_KNOWN_{idx:02d}",
+                    "asin": f"ASIN_KNOWN_{idx:02d}",
+                    "scenario_type": scenario_type,
+                    "chosen_tactic": chosen_tactic,
+                    "buy_box_state_before": "LOST_TO_COMPETITOR",
+                    "buy_box_state_after": "NORMAL" if state == "success" else "OBSERVATION_TIMEOUT",
+                    "seller_count": "4",
+                    "lowest_price_1_gbp": "10.00",
+                    "lowest_price_2_gbp": "10.10",
+                    "lowest_price_3_gbp": "10.20",
+                    "our_price_before_gbp": "10.40",
+                    "target_price_gbp": "10.00",
+                    "price_written_gbp": "10.00" if writer_outcome == "APPLIED" else "",
+                    "hold_until_utc": "",
+                    "response_window_minutes": "35",
+                    "retry_budget_remaining": "2",
+                    "stop_rule_code": "",
+                    "writer_outcome": writer_outcome,
+                    "tactic_success_state": state,
+                    "reason_codes_json": "[]",
+                    "tactic_case_id": f"SKU_KNOWN_{idx:02d}-{event_ts.replace(':', '').replace('-', '')}-{chosen_tactic}",
+                }
+            )
+        phase1_storage.append_h_strategy_outcome_log(rows)
+        phase1_storage.upsert_h_strategy_outcome_daily(
+            [
+                {
+                    "asof_date": asof_date,
+                    "scenario_type": scenario_type,
+                    "chosen_tactic": chosen_tactic,
+                    "decision_rows": "52",
+                    "applied_rows": "33",
+                    "no_write_rows": "19",
+                    "resolved_rows": "53",
+                    "pending_rows": "0",
+                    "success_rows": "11",
+                    "failed_rows": "10",
+                    "expired_rows": "32",
+                    "aborted_rows": "0",
+                    "success_rate_pct": "52.38",
+                    "failed_rate_pct": "47.62",
+                    "sample_min_rows": "150",
+                    "provisional_sample_flag": "1",
+                    "avg_seller_count": "8.93",
+                    "avg_price_gap_to_lowest_gbp": "-0.01",
+                    "below_break_even_rows": "0",
+                    "at_floor_rows": "9",
+                    "notes": "",
+                }
+            ]
+        )
+
+        rebuilt = phase1_main_loop._rebuild_h_strategy_daily_rollup_from_source(
+            asof_date=asof_date,
+            scenario_type=scenario_type,
+            chosen_tactic=chosen_tactic,
+        )
+
+        self.assertIsNotNone(rebuilt)
+        daily_row = phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_DAILY_PATH)[0]
+        self.assertEqual(daily_row["decision_rows"], "53")
+        self.assertEqual(daily_row["applied_rows"], "34")
+        self.assertEqual(daily_row["no_write_rows"], "19")
+        self.assertEqual(daily_row["resolved_rows"], "53")
+        self.assertEqual(daily_row["pending_rows"], "0")
+        self.assertEqual(daily_row["success_rows"], "11")
+        self.assertEqual(daily_row["failed_rows"], "10")
+        self.assertEqual(daily_row["expired_rows"], "32")
+        self.assertEqual(daily_row["aborted_rows"], "0")
+        decision_rows = int(daily_row["decision_rows"])
+        terminal_rows = (
+            int(daily_row["success_rows"])
+            + int(daily_row["failed_rows"])
+            + int(daily_row["expired_rows"])
+            + int(daily_row["aborted_rows"])
+        )
+        self.assertEqual(int(daily_row["resolved_rows"]) + int(daily_row["pending_rows"]), decision_rows)
+        self.assertLessEqual(terminal_rows, decision_rows)
 
     def test_close_pending_strategy_outcome_waits_for_response_window(self) -> None:
         phase1_storage.append_h_strategy_outcome_log(
@@ -1598,6 +2083,131 @@ class Phase1MainLoopTests(unittest.TestCase):
         self.assertIn("OUTCOME_WINDOW_TIMEOUT", rows["SKU_TICK_OLD-CASE-001"]["reason_codes_json"])
         self.assertEqual(rows["SKU_TICK_NEW-CASE-001"]["tactic_success_state"], "pending")
         self.assertEqual(rows["SKU_TICK_NEW-CASE-001"]["buy_box_state_after"], "")
+
+    def test_close_pending_strategy_outcomes_tick_batches_daily_rollup_rebuilds(self) -> None:
+        phase1_storage.append_h_strategy_outcome_log(
+            [
+                {
+                    "event_ts_utc": "2026-02-13T15:00:00Z",
+                    "run_id": "RUN_BATCH",
+                    "sku": "SKU_BATCH_A",
+                    "asin": "ASIN_BATCH_A",
+                    "scenario_type": "multi_seller_ladder_cap",
+                    "chosen_tactic": "REGAIN_LADDER_CAP",
+                    "buy_box_state_before": "LOST_TO_COMPETITOR",
+                    "buy_box_state_after": "",
+                    "seller_count": "3",
+                    "lowest_price_1_gbp": "10.00",
+                    "lowest_price_2_gbp": "10.10",
+                    "lowest_price_3_gbp": "10.20",
+                    "our_price_before_gbp": "10.40",
+                    "target_price_gbp": "10.00",
+                    "price_written_gbp": "",
+                    "hold_until_utc": "NONE",
+                    "response_window_minutes": "5",
+                    "retry_budget_remaining": "2",
+                    "stop_rule_code": "",
+                    "writer_outcome": "NO_WRITE_REQUIRED",
+                    "tactic_success_state": "pending",
+                    "reason_codes_json": "[]",
+                    "tactic_case_id": "SKU_BATCH_A-CASE-001",
+                },
+                {
+                    "event_ts_utc": "2026-02-13T15:01:00Z",
+                    "run_id": "RUN_BATCH",
+                    "sku": "SKU_BATCH_B",
+                    "asin": "ASIN_BATCH_B",
+                    "scenario_type": "multi_seller_ladder_cap",
+                    "chosen_tactic": "REGAIN_LADDER_CAP",
+                    "buy_box_state_before": "LOST_TO_COMPETITOR",
+                    "buy_box_state_after": "",
+                    "seller_count": "3",
+                    "lowest_price_1_gbp": "10.00",
+                    "lowest_price_2_gbp": "10.10",
+                    "lowest_price_3_gbp": "10.20",
+                    "our_price_before_gbp": "10.40",
+                    "target_price_gbp": "10.00",
+                    "price_written_gbp": "",
+                    "hold_until_utc": "NONE",
+                    "response_window_minutes": "5",
+                    "retry_budget_remaining": "2",
+                    "stop_rule_code": "",
+                    "writer_outcome": "NO_WRITE_REQUIRED",
+                    "tactic_success_state": "pending",
+                    "reason_codes_json": "[]",
+                    "tactic_case_id": "SKU_BATCH_B-CASE-001",
+                },
+            ]
+        )
+
+        with patch.object(
+            phase1_main_loop,
+            "_rebuild_h_strategy_daily_rollup_from_source",
+            return_value={"asof_date": "2026-02-13"},
+        ) as rebuild:
+            phase1_main_loop.close_pending_strategy_outcomes_tick(
+                observation_ts_utc="2026-02-13T15:20:00Z",
+            )
+
+        rebuild.assert_called_once_with(
+            asof_date="2026-02-13",
+            scenario_type="multi_seller_ladder_cap",
+            chosen_tactic="REGAIN_LADDER_CAP",
+        )
+        rows = {
+            r["tactic_case_id"]: r
+            for r in phase1_storage.read_table(phase1_storage.H_STRATEGY_OUTCOME_LOG_PATH)
+            if r.get("tactic_case_id") in {"SKU_BATCH_A-CASE-001", "SKU_BATCH_B-CASE-001"}
+        }
+        self.assertEqual(rows["SKU_BATCH_A-CASE-001"]["tactic_success_state"], "expired")
+        self.assertEqual(rows["SKU_BATCH_B-CASE-001"]["tactic_success_state"], "expired")
+
+    def test_close_pending_strategy_outcomes_tick_writes_watchdog_progress(self) -> None:
+        progress_path = self.out_dir / "phase1_progress.log"
+        phase1_storage.append_h_strategy_outcome_log(
+            [
+                {
+                    "event_ts_utc": "2026-02-13T15:00:00Z",
+                    "run_id": "RUN_HEARTBEAT",
+                    "sku": "SKU_HEARTBEAT",
+                    "asin": "ASIN_HEARTBEAT",
+                    "scenario_type": "multi_seller_ladder_cap",
+                    "chosen_tactic": "REGAIN_LADDER_CAP",
+                    "buy_box_state_before": "LOST_TO_COMPETITOR",
+                    "buy_box_state_after": "",
+                    "seller_count": "3",
+                    "lowest_price_1_gbp": "10.00",
+                    "lowest_price_2_gbp": "10.10",
+                    "lowest_price_3_gbp": "10.20",
+                    "our_price_before_gbp": "10.40",
+                    "target_price_gbp": "10.00",
+                    "price_written_gbp": "",
+                    "hold_until_utc": "NONE",
+                    "response_window_minutes": "5",
+                    "retry_budget_remaining": "2",
+                    "stop_rule_code": "",
+                    "writer_outcome": "NO_WRITE_REQUIRED",
+                    "tactic_success_state": "pending",
+                    "reason_codes_json": "[]",
+                    "tactic_case_id": "SKU_HEARTBEAT-CASE-001",
+                }
+            ]
+        )
+
+        with patch.dict(
+            phase1_main_loop.os.environ,
+            {"H_PHASE1_PROGRESS_PATH": str(progress_path), "H_RUN_ID": "RUN_HEARTBEAT"},
+            clear=False,
+        ):
+            phase1_main_loop.close_pending_strategy_outcomes_tick(
+                observation_ts_utc="2026-02-13T15:20:00Z",
+            )
+
+        progress_text = progress_path.read_text(encoding="utf-8")
+        self.assertIn("checkpoint=close_pending_strategy_outcomes_upsert_start", progress_text)
+        self.assertIn("checkpoint=close_pending_strategy_outcomes_upsert_done", progress_text)
+        self.assertIn("checkpoint=close_pending_strategy_outcomes_done", progress_text)
+        self.assertIn("run_id=RUN_HEARTBEAT", progress_text)
 
     def test_close_pending_strategy_outcomes_tick_marks_non_action_hold_as_aborted(self) -> None:
         phase1_storage.append_h_strategy_outcome_log(

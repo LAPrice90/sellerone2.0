@@ -1,0 +1,61 @@
+{
+  "id": "run_F_supplier_test_mode_scan_once",
+  "display_name": "Run F Supplier Test Mode Scan Once",
+  "flow": "F",
+  "purpose": "Classify the generic supplier test-mode scan launcher so the manager can see it exists without running F061 or changing test queues.",
+  "owner_entrypoint": "run_F_supplier_test_mode_scan_once.bat",
+  "worker_entrypoint": "run_F_supplier_test_mode_scan_once.bat",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "test_mode_batch_rows",
+      "path": "out/systems/F/price_list_manager/test_mode/batch_rows.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "test_mode_launcher_is_not_manager_dispatch",
+    "f061_test_scan_requires_separate_approved_proof_window"
+  ],
+  "needs_user_signals": [
+    "test_mode_scan_requested",
+    "visible_login_or_browser_required"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "run_test_mode_scan",
+    "reset_supplier_test_mode",
+    "start_browser",
+    "call_amazon_api",
+    "align_local_db"
+  ],
+  "manager_notes": "Launcher classification only. MOT must not run this batch file because it calls the F061 test-mode launcher."
+}

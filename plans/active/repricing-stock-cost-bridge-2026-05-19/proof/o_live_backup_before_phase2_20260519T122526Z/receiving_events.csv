@@ -1,0 +1,4 @@
+event_utc,event_id,po_id,po_line_id,seller_sku,asin,received_qty,warehouse_ref,event_source,note,actor
+2026-04-03T15:14:31Z,phase4-rx-full,PO-DRAFT-20260403-001,PO-DRAFT-20260403-001-L001,XE-YPAI-HX9F,B086ZD7MG6,10,WH-PHASE4,phase4_test,full receipt close,phase4_test
+2026-04-03T15:14:31Z,phase4-rx-over,PO-DRAFT-20260403-001,PO-DRAFT-20260403-001-L001,XE-YPAI-HX9F,B086ZD7MG6,1,WH-PHASE4,phase4_test,intentional over receipt,phase4_test
+2026-04-03T15:15:09Z,phase4-rx-close,PO-DRAFT-20260403-001,PO-DRAFT-20260403-001-L001,XE-YPAI-HX9F,B086ZD7MG6,4,WH-PHASE4,phase4_test,close remaining,phase4_test

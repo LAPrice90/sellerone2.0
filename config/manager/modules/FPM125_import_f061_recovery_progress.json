@@ -1,0 +1,66 @@
+{
+  "id": "FPM125_import_f061_recovery_progress",
+  "display_name": "FPM125 F061 Recovery Progress Import",
+  "flow": "F",
+  "purpose": "Register the recovery progress importer so the manager can inspect reconciliation evidence for recovered F061 rows without importing or merging recovery data.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM125_import_f061_recovery_progress.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM125_import_f061_recovery_progress.py",
+  "health_sources": [
+    {
+      "name": "test_mode_health",
+      "path": "out/systems/F/price_list_manager/test_mode/health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "f061_recovery_progress",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_recovery_progress.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "legacy_active_run",
+      "path": "out/systems/F/inbox/suppliers/stocklist_supplier/active_run.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "f061_recovery_progress",
+      "path": "out/systems/F/price_list_manager/test_mode/f061_recovery_progress.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "recovery_progress_is_reconciliation_evidence",
+    "pending_unmatched_rows_must_be_visible"
+  ],
+  "needs_user_signals": [
+    "recovery_unmatched_rows",
+    "manual_review_exception_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "import_recovery_progress",
+    "merge_recovered_rows",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager registration only. MOT may read recovery progress proof but must not import recovery data, merge recovered rows, run F061, or approve parked rows."
+}

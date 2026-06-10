@@ -1,0 +1,60 @@
+{
+  "id": "E_cycle",
+  "display_name": "E Analytics",
+  "flow": "E",
+  "purpose": "Register the E analytics flow so the manager can classify freshness, proof, and expectation coverage without enabling publishing.",
+  "owner_entrypoint": "scripts/cycles/run_E_cycle.py",
+  "worker_entrypoint": "scripts/cycles/run_E_cycle.py",
+  "health_sources": [
+    {
+      "name": "checklist_E",
+      "path": "out/cycle_alerts/checklist_E.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    },
+    {
+      "name": "expectations_E",
+      "path": "project_control/EXPECTATIONS/E_cycle_expectations.md",
+      "required": true,
+      "max_age_minutes": 100000
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "E_run_log",
+      "path": "out/systems/E/live/e_run_log.jsonl",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "outputs": [
+    {
+      "name": "E_manager_state",
+      "path": "out/systems/M/flow_maintenance_state.csv",
+      "required": false,
+      "max_age_minutes": 1440
+    }
+  ],
+  "freshness_rules": [
+    "E_checklist_warn_after_1440_minutes",
+    "E_proof_must_stay_E_scoped"
+  ],
+  "needs_user_signals": [
+    "business_decision_required",
+    "publish_cutover_required"
+  ],
+  "safe_actions": [
+    "read_status",
+    "create_manager_task"
+  ],
+  "forbidden_actions": [
+    "run_worker_cycle",
+    "enable_publish",
+    "write_legacy_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "align_local_db",
+    "delete_outputs"
+  ],
+  "manager_notes": "Manager registration only. E proof should be scoped to E outputs and run logs."
+}

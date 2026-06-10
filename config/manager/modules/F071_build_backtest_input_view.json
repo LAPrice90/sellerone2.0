@@ -1,0 +1,67 @@
+{
+  "id": "F071_build_backtest_input_view",
+  "display_name": "F071 Backtest Input View",
+  "flow": "F",
+  "purpose": "Classify the backtest input-view builder so the manager can inspect historical input proof without rebuilding backtest rows or changing prices.",
+  "owner_entrypoint": "scripts/flows/F/F071_build_backtest_input_view.py",
+  "worker_entrypoint": "scripts/flows/F/F071_build_backtest_input_view.py",
+  "health_sources": [
+    {
+      "name": "feeder_backtest_health",
+      "path": "out/systems/F/live/feeder_backtest_health.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "feeder_backtest_policy_live",
+      "path": "out/systems/F/live/feeder_backtest_policy_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    },
+    {
+      "name": "feeder_legacy_scrape_evidence_live",
+      "path": "out/systems/F/live/feeder_legacy_scrape_evidence_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "feeder_backtest_input_view_live",
+      "path": "out/systems/F/live/feeder_backtest_input_view_live.csv",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "backtest_input_view_warn_after_10080_minutes",
+    "backtest_view_is_not_price_change_permission"
+  ],
+  "needs_user_signals": [
+    "manual_backtest_mapping_review",
+    "price_history_gap_visible"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "build_backtest_input_view",
+    "align_local_db",
+    "change_product_db_facts"
+  ],
+  "manager_notes": "Bridge classification only. MOT may inspect backtest input proof but must not rebuild rows, change pricing, or align product facts."
+}

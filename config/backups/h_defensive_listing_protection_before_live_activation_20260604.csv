@@ -1,0 +1,2 @@
+sku,asin,enabled,mode,live_write_enabled,campaign_days,undercut_gbp,match_after_days,max_writes_per_day,cooldown_days,reset_after_absent_hours,notes
+6V-EEC1-2S9Z,B06WW79DX5,1,balanced_defend,0,30,0.01,30,2,7,24,first protected defensive listing proof - live writes disabled until approved

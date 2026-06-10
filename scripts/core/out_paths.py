@@ -6,6 +6,8 @@ from typing import Dict, Iterable, List
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 OUT_ROOT = Path("out")
 SYSTEMS_ROOT = OUT_ROOT / "systems"
 
@@ -64,10 +66,10 @@ def write_csv_with_compat(
 ) -> CompatPath:
     resolved = resolve_compat_path(path_or_rel, default_system=default_system)
     resolved.live_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(resolved.live_path, index=index)
+    safe_to_csv(df, resolved.live_path, index=index)
     if mirror_legacy:
         resolved.legacy_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(resolved.legacy_path, index=index)
+        safe_to_csv(df, resolved.legacy_path, index=index)
     return resolved
 
 

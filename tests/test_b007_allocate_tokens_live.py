@@ -76,6 +76,55 @@ def test_reconcile_token_ledger_preserves_existing_allocation_fields():
     assert row["allocated_date"] == "2026-04-02T10:00:00Z"
 
 
+def test_reconcile_token_ledger_does_not_reallocate_return_lifecycle_tokens():
+    token_df = pd.DataFrame(
+        [
+            {
+                "token_id": "tok-returned",
+                "seller_sku": "SKU-1",
+                "status": "returned_complete",
+                "allocated_order_id": "ORDER-OLD",
+                "allocated_date": "2026-04-02T10:00:00Z",
+                "last_return_order_id": "ORDER-OLD",
+            },
+            {
+                "token_id": "tok-research",
+                "seller_sku": "SKU-1",
+                "status": "research_pending",
+                "allocated_order_id": "ORDER-OLD",
+                "allocated_date": "2026-04-02T10:00:00Z",
+                "last_return_order_id": "ORDER-OLD",
+            },
+            {
+                "token_id": "tok-available-return",
+                "seller_sku": "SKU-1",
+                "status": "available",
+                "allocated_order_id": "",
+                "allocated_date": "",
+                "last_return_order_id": "ORDER-OLD",
+            },
+        ]
+    )
+    alloc_df = pd.DataFrame(
+        [
+            {"token_id": "tok-returned", "order_id": "ORDER-OLD", "order_date": "2026-04-03T12:00:00Z"},
+            {"token_id": "tok-research", "order_id": "ORDER-OLD", "order_date": "2026-04-03T12:00:00Z"},
+            {"token_id": "tok-available-return", "order_id": "ORDER-NEW", "order_date": "2026-04-04T12:00:00Z"},
+        ]
+    )
+
+    reconciled, count = b007._reconcile_token_ledger_with_allocations(token_df, alloc_df)
+
+    assert count == 1
+    returned = reconciled.loc[reconciled["token_id"] == "tok-returned"].iloc[0]
+    research = reconciled.loc[reconciled["token_id"] == "tok-research"].iloc[0]
+    reusable = reconciled.loc[reconciled["token_id"] == "tok-available-return"].iloc[0]
+    assert returned["status"] == "returned_complete"
+    assert research["status"] == "research_pending"
+    assert reusable["status"] == "allocated"
+    assert reusable["allocated_order_id"] == "ORDER-NEW"
+
+
 def test_build_shortage_by_sku_includes_zero_available_skus():
     order_df = pd.DataFrame(
         [

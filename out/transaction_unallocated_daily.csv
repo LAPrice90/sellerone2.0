@@ -1,13 +1,5 @@
 date,transaction_type,breakdown_type,currency,rows,amount_total
-2026-02-17,Refund,Refunded Expenses,GBP,1,1.47
-2026-02-17,Refund,Refunded Sales,GBP,1,-11.48
-2026-02-17,ServiceFee,Expenses,GBP,1,-5.33
-2026-02-17,ServiceFee,Sales,GBP,1,0.0
-2026-02-17,Shipment,Expenses,AED,1,-105.74
-2026-02-17,Shipment,Expenses,GBP,80,-291.13
-2026-02-17,Shipment,Sales,AED,1,347.2
-2026-02-17,Shipment,Sales,GBP,80,711.13
-2026-02-18,Refund,Refunded Expenses,GBP,1,0.77
-2026-02-18,Refund,Refunded Sales,GBP,1,-6.09
-2026-02-18,Shipment,Expenses,GBP,10,-15.75
-2026-02-18,Shipment,Sales,GBP,10,92.86
+2026-06-09,Shipment,Expenses,GBP,36,-156.06
+2026-06-09,Shipment,Sales,GBP,36,391.86
+2026-06-10,Shipment,Expenses,GBP,11,-43.94
+2026-06-10,Shipment,Sales,GBP,11,117.86

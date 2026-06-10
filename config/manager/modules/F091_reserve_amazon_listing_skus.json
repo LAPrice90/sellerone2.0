@@ -1,0 +1,70 @@
+{
+  "id": "F091_reserve_amazon_listing_skus",
+  "display_name": "F091 Amazon Listing SKU Reservations",
+  "flow": "F",
+  "purpose": "Register Amazon listing SKU reservation proof so the manager can inspect reserved and held draft rows without reserving new SKUs.",
+  "owner_entrypoint": "scripts/flows/F/F091_reserve_amazon_listing_skus.py",
+  "worker_entrypoint": "scripts/flows/F/F091_reserve_amazon_listing_skus.py",
+  "health_sources": [
+    {
+      "name": "amazon_listing_health",
+      "path": "out/systems/F/health/amazon_listing_health.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "amazon_listing_intake_live",
+      "path": "out/systems/F/live/amazon_listing_intake_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    },
+    {
+      "name": "amazon_listing_holds_live",
+      "path": "out/systems/F/live/amazon_listing_holds_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "outputs": [
+    {
+      "name": "amazon_listing_sku_reservations_live",
+      "path": "out/systems/F/live/amazon_listing_sku_reservations_live.csv",
+      "required": false,
+      "max_age_minutes": 43200
+    }
+  ],
+  "freshness_rules": [
+    "sku_reservation_proof_warn_after_43200_minutes",
+    "reservation_rows_are_read_only_manager_evidence"
+  ],
+  "needs_user_signals": [
+    "sku_reservation_requested",
+    "listing_hold_rows_visible",
+    "product_fact_alignment_requested"
+  ],
+  "safe_actions": [
+    "read_status",
+    "read_report",
+    "read_snapshot"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "reserve_sku",
+    "publish_listing",
+    "call_amazon_api",
+    "change_product_db_facts",
+    "align_local_db"
+  ],
+  "manager_notes": "Manager label only. MOT may read reservation proof but must not reserve SKUs, publish listings, call Amazon APIs, or change product facts."
+}

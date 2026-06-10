@@ -6,6 +6,7 @@ import pandas as pd
 
 from scripts.h.h_floor_truth import (
     REASON_REFERRAL_BAND_MISSING_100,
+    build_h_floor_trace_row,
     compute_h_floor_for_sku,
     load_h_floor_context,
     resolve_h_floor_inputs,
@@ -174,6 +175,76 @@ class HFloorTruthTests(unittest.TestCase):
 
         self.assertAlmostEqual(inputs.cogs_exvat_gbp, 5.00, places=2)
         self.assertEqual(inputs.source_cogs, "token_ledger_live_next_available")
+        self.assertEqual(inputs.cogs_source_proof_state, "clean")
+
+    def test_fallback_token_source_is_visible_without_changing_floor_math(self) -> None:
+        td, ctx = self._context(
+            product_rows=[
+                {
+                    "seller_sku": "FALLBACK-SKU",
+                    "last_vat_rate_pct": "20",
+                    "last_fba_fee_ex_vat_100": "3.05",
+                    "last_commission_pct_100": "8",
+                }
+            ],
+            token_rows=[
+                {
+                    "token_id": "ADJ-FALLBACK-1",
+                    "seller_sku": "FALLBACK-SKU",
+                    "cost_per_unit": "4.51",
+                    "status": "available",
+                    "sort_rank": "1",
+                    "source": "stock_adjustment_fallback",
+                    "notes": "adjustment_fallback_create:FBA1",
+                }
+            ],
+            token_cogs_rows=[],
+        )
+        try:
+            inputs, result = compute_h_floor_for_sku("FALLBACK-SKU", 12.00, context=ctx)
+            trace = build_h_floor_trace_row(inputs=inputs, result=result, source_script="test")
+        finally:
+            td.cleanup()
+
+        self.assertAlmostEqual(inputs.cogs_exvat_gbp, 4.51, places=2)
+        self.assertEqual(inputs.cogs_source_token_id, "ADJ-FALLBACK-1")
+        self.assertEqual(inputs.cogs_token_source, "stock_adjustment_fallback")
+        self.assertEqual(inputs.cogs_source_proof_state, "unproved")
+        self.assertEqual(trace["cogs_source_proof_state"], "unproved")
+        self.assertGreater(result.floor_total_gbp, 0)
+
+    def test_receipt_proved_fallback_token_source_is_visible(self) -> None:
+        td, ctx = self._context(
+            product_rows=[
+                {
+                    "seller_sku": "PROVED-FALLBACK-SKU",
+                    "last_vat_rate_pct": "20",
+                    "last_fba_fee_ex_vat_100": "3.05",
+                    "last_commission_pct_100": "8",
+                }
+            ],
+            token_rows=[
+                {
+                    "token_id": "ADJ-FALLBACK-2",
+                    "seller_sku": "PROVED-FALLBACK-SKU",
+                    "cost_per_unit": "4.44",
+                    "status": "available",
+                    "sort_rank": "1",
+                    "source": "stock_adjustment_fallback",
+                    "source_batch_id": "SR-20260209-001",
+                    "source_order_key": "PO-1",
+                    "notes": "adjustment_fallback_create:FBA2;cost_source=receipt_proved",
+                }
+            ],
+            token_cogs_rows=[],
+        )
+        try:
+            inputs, _ = compute_h_floor_for_sku("PROVED-FALLBACK-SKU", 12.00, context=ctx)
+        finally:
+            td.cleanup()
+
+        self.assertEqual(inputs.cogs_source_proof_state, "receipt_proved")
+        self.assertEqual(inputs.cogs_source_batch_id, "SR-20260209-001")
 
     def test_token_cogs_median_fallback_when_live_missing(self) -> None:
         td, ctx = self._context(
@@ -199,6 +270,7 @@ class HFloorTruthTests(unittest.TestCase):
 
         self.assertAlmostEqual(inputs.cogs_exvat_gbp, 6.00, places=2)
         self.assertEqual(inputs.source_cogs, "token_cogs_ledger_median")
+        self.assertEqual(inputs.cogs_source_proof_state, "unproved")
 
 
 if __name__ == "__main__":

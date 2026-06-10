@@ -29,6 +29,17 @@ def _shipment_key(df: pd.DataFrame) -> pd.Series:
     return key
 
 
+def _delivery_shipment_ids(delivery: pd.DataFrame) -> set[str]:
+    if delivery.empty:
+        return set()
+    ids: set[str] = set()
+    for col in ("inbound_shipment_id", "shipment_id"):
+        if col not in delivery.columns:
+            continue
+        ids.update(value for value in delivery[col].astype(str).str.strip().tolist() if value)
+    return ids
+
+
 def main() -> None:
     events = _read_csv(IN_EVENTS)
     delivery = _read_csv(IN_DELIVERY)
@@ -40,9 +51,7 @@ def main() -> None:
         print({"status": "success", "rows_allocated": 0, "rows_unallocated": 0})
         return
 
-    delivery_shipments = set()
-    if not delivery.empty and "shipment_id" in delivery.columns:
-        delivery_shipments = set(delivery["shipment_id"].astype(str).str.strip().tolist())
+    delivery_shipments = _delivery_shipment_ids(delivery)
 
     events = events.copy()
     events["shipment_key"] = _shipment_key(events)

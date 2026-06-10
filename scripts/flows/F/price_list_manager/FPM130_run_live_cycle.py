@@ -27,21 +27,30 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from scripts.flows.F._contract_io import read_f_contract_df, write_f_contract_df
 from scripts.flows.F._scanner_state import (
+    AUTH_STATE_BBP_AUTHENTICATED,
     AUTH_STATE_BBP_LOGIN_REQUIRED,
     AUTH_STATE_DASHBOARD_LOGIN_REQUIRED,
     AUTH_STATE_LOGGED_IN,
     AUTH_STATE_LOGIN_REQUIRED,
+    AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED,
     AUTH_STATES_REQUIRING_VISIBLE,
     BROWSER_STATE_HIDDEN,
     BROWSER_STATE_VISIBLE,
     RESCAN_RETRY_BLOCK_REASON,
     RESCAN_RETRY_REASON,
+    active_row_is_rescan_retry,
     active_row_queue_priority,
     active_row_requires_visible_browser,
     auth_state_for_browser_visibility,
     auth_state_from_log_text,
     browser_state_for_auth_state,
     browser_visibility_value,
+)
+from scripts.flows.F.login_controller import (
+    LoginControllerRequestPaths,
+    login_controller_request_active,
+    read_login_controller_request,
+    write_login_controller_request,
 )
 from scripts.flows.F.price_list_manager.FPM010_check_acquisition_sources import check_acquisition_sources
 from scripts.flows.F.price_list_manager.FPM011_import_ready_sources import import_ready_sources
@@ -77,6 +86,8 @@ from scripts.flows.F.price_list_manager.FPM180_build_production_line_run import 
 )
 from scripts.flows.F.price_list_manager._io import normalize_text, read_csv, write_csv
 from scripts.flows.F.price_list_manager._paths import get_manager_paths
+
+AUTH_STATE_BBP_IFRAME_PLUGIN_BLOCKED = "BBP_IFRAME_PLUGIN_BLOCKED"
 from scripts.flows.F.price_list_manager._schemas import (
     BATCH_ROW_COLUMNS,
     F061_HANDOFF_PREVIEW_COLUMNS,
@@ -92,7 +103,12 @@ LOGIN_MODE_REQUEST_NAME = "f061_login_mode.requested"
 LOGIN_MODE_DEFAULT_HOLD_SECONDS = 900
 DEFAULT_F061_BBP_USER_DATA_DIR = r"C:\Users\Luke\AppData\Local\Chrome_UC136"
 DEFAULT_F061_BBP_PROFILE_DIR = "Profile 2"
-LOGIN_MODE_INACTIVE_STATUSES = {"canceled", "cancelled", "completed", "consumed", "drained", "still_required"}
+LOGIN_MODE_INACTIVE_STATUSES = {"canceled", "cancelled", "completed", "consumed", "drained"}
+SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_NAME = "seller_central_login_recovery_proof.csv"
+SELLER_CENTRAL_LOGIN_ATTEMPT_MODE_ENV = "SELLER_CENTRAL_LOGIN_ATTEMPT_MODE"
+SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH_ENV = "SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH"
+SELLER_CENTRAL_SECOND_CHECK_STATUS = "second_check_after_login"
+SELLER_CENTRAL_SECOND_CHECK_REASON = "seller_central_second_check_after_login"
 AUTO_VISIBLE_AUTH_ATTENTION_ENV = "FPM_F061_AUTO_VISIBLE_AUTH_ATTENTION"
 F061_CHILD_STALL_SECONDS_ENV = "FPM_F061_CHILD_STALL_SECONDS"
 STORAGE_DRIFT_AUTO_RECONCILE_ENV = "FPM_STORAGE_DRIFT_AUTO_RECONCILE"
@@ -112,6 +128,7 @@ F061_STAGE_MODE_LEGACY_FULL = "legacy_full"
 F061_STAGE_MODE_API_ONLY = "api_only"
 F061_STAGE_MODE_BROWSER_ONLY = "browser_only"
 AI_RESCAN_QUEUE_NAME = "ai_rescan_queue.csv"
+OPERATOR_RESCAN_QUEUE_NAME = "operator_rescan_events.csv"
 AI_RESCAN_PROMOTION_AUDIT_NAME = "ai_rescan_promotion_audit.csv"
 AI_RESCAN_PROMOTION_STATUS_NAME = "ai_rescan_promotion_status.csv"
 AI_RESCAN_PROMOTION_AUDIT_COLUMNS = [
@@ -354,6 +371,8 @@ def _active_f061_state(root: Path) -> dict[str, object]:
     runnable_statuses = {"login_backtrack_pending", "login_backtrack_running", "pending"}
     pending = active[scan_status.isin(runnable_statuses)].copy()
     if not pending.empty:
+        pending = pending[~pending.apply(lambda row: active_row_is_rescan_retry(row.to_dict()), axis=1)].copy()
+    if not pending.empty:
         pending["_queue_priority"] = pending.apply(lambda row: str(active_row_queue_priority(row.to_dict())), axis=1)
         pending = pending.sort_values(
             by=["_queue_priority", "last_attempt_utc", "supplier_sku", "row_key"],
@@ -393,7 +412,13 @@ def _active_pending_rows_for_supplier_run(root: Path, *, supplier_id: str, run_i
         & (active["run_id"].map(normalize_text) == run_key)
         & statuses.isin({"login_backtrack_pending", "login_backtrack_running", "pending"})
     )
-    return int(mask.sum())
+    if not mask.any():
+        return 0
+    work = active[mask].copy()
+    if work.empty:
+        return 0
+    work = work[~work.apply(lambda row: active_row_is_rescan_retry(row.to_dict()), axis=1)].copy()
+    return int(len(work.index))
 
 
 def _active_rescan_pending_rows_for_supplier_run(root: Path, *, supplier_id: str, run_id: str) -> int:
@@ -448,6 +473,91 @@ def _read_first_manifest_row(handoff_dir: Path) -> dict[str, str]:
     if manifest.empty:
         return {}
     return {str(key): normalize_text(value) for key, value in manifest.iloc[0].to_dict().items()}
+
+
+def _latest_operator_rescan_event_queues(root: Path, handoffs_root: Path) -> list[tuple[Path, pd.DataFrame]]:
+    events = read_f_contract_df(root, "feeder_review_events")
+    if events.empty:
+        return []
+    work = events.copy()
+    for column in [
+        "event_utc",
+        "event_id",
+        "active_supplier_id",
+        "active_run_id",
+        "review_pack_type",
+        "review_batch_id",
+        "candidate_id",
+        "supplier_sku",
+        "asin_raw",
+        "asin_padded",
+        "review_decision",
+        "title",
+        "f032_decision_id",
+        "f032_action",
+        "f032_decision_bucket",
+        "f032_fail_category",
+        "f032_confidence",
+        "f032_reason",
+        "codex_ai_action",
+        "codex_ai_decision_bucket",
+        "codex_ai_reason",
+        "codex_ai_evidence",
+    ]:
+        if column not in work.columns:
+            work[column] = ""
+        work[column] = work[column].map(normalize_text)
+    identity_columns = ["active_supplier_id", "active_run_id", "review_pack_type", "candidate_id"]
+    work = work[
+        work["active_supplier_id"].ne("")
+        & work["active_run_id"].ne("")
+        & work["candidate_id"].ne("")
+        & work["supplier_sku"].ne("")
+    ].copy()
+    if work.empty:
+        return []
+    work["_event_sort"] = pd.to_datetime(work["event_utc"], errors="coerce", utc=True, format="mixed")
+    work = work.sort_values(by=["_event_sort", "event_id"], ascending=[False, False], kind="stable")
+    latest = work.drop_duplicates(subset=identity_columns, keep="first").copy()
+    latest = latest[latest["review_decision"].map(lambda value: normalize_text(value).lower()) == "rescan"].copy()
+    if latest.empty:
+        return []
+
+    queues: list[tuple[Path, pd.DataFrame]] = []
+    for (supplier_id, run_id), group in latest.groupby(["active_supplier_id", "active_run_id"], sort=True):
+        supplier_key = normalize_text(supplier_id).lower()
+        clean_run_id = normalize_text(run_id)
+        if not supplier_key or not clean_run_id:
+            continue
+        handoff_dir = handoffs_root / supplier_key / clean_run_id
+        rows: list[dict[str, str]] = []
+        for _, event in group.iterrows():
+            asin = normalize_text(event.get("asin_padded", "")) or normalize_text(event.get("asin_raw", ""))
+            rows.append(
+                {
+                    "active_supplier_id": supplier_key,
+                    "active_run_id": clean_run_id,
+                    "review_batch_id": normalize_text(event.get("review_batch_id", "")),
+                    "candidate_id": normalize_text(event.get("candidate_id", "")),
+                    "supplier_sku": normalize_text(event.get("supplier_sku", "")),
+                    "asin": asin,
+                    "supplier_title": normalize_text(event.get("title", "")),
+                    "codex_ai_action": "rescan_needed",
+                    "codex_ai_rescan_needed": "1",
+                    "f032_decision_id": normalize_text(event.get("f032_decision_id", "")),
+                    "f032_action": normalize_text(event.get("f032_action", "")),
+                    "f032_decision_bucket": normalize_text(event.get("f032_decision_bucket", "")),
+                    "f032_fail_category": normalize_text(event.get("f032_fail_category", "")),
+                    "f032_confidence": normalize_text(event.get("f032_confidence", "")),
+                    "f032_reason": normalize_text(event.get("f032_reason", "")),
+                    "operator_event_id": normalize_text(event.get("event_id", "")),
+                    "operator_event_utc": normalize_text(event.get("event_utc", "")),
+                    "operator_decision_source": "feeder_review_events",
+                }
+            )
+        if rows:
+            queues.append((handoff_dir / OPERATOR_RESCAN_QUEUE_NAME, pd.DataFrame(rows)))
+    return queues
 
 
 def _supplier_converter_id(root: Path, supplier_id: str) -> str:
@@ -635,6 +745,15 @@ def _promote_ai_rescan_queue_rows(
         return {"status": "none", "promoted_rows": 0, "blocked_rows": 0, "skipped_rows": 0}
 
     queue_paths = sorted(path for path in handoffs_root.glob(f"*/*/{AI_RESCAN_QUEUE_NAME}") if path.is_file())
+    queue_sources: list[tuple[Path, pd.DataFrame]] = []
+    for queue_path in queue_paths:
+        try:
+            queue = pd.read_csv(queue_path, dtype=str).fillna("")
+        except Exception:
+            continue
+        queue_sources.append((queue_path, queue))
+    operator_queue_sources = _latest_operator_rescan_event_queues(root, handoffs_root)
+    queue_sources.extend(operator_queue_sources)
     batch_lookup = _batch_row_lookup_for_ai_rescans(root)
     active = read_f_contract_df(root, "supplier_price_list_active_run")
     run_state = read_f_contract_df(root, "supplier_price_list_run_state")
@@ -648,13 +767,9 @@ def _promote_ai_rescan_queue_rows(
     blocked_rows = 0
     source_lookup_cache: dict[tuple[str, str], dict[str, dict[str, str]]] = {}
 
-    for queue_path in queue_paths:
+    for queue_path, queue in queue_sources:
         handoff_dir = queue_path.parent
         manifest = _read_first_manifest_row(handoff_dir)
-        try:
-            queue = pd.read_csv(queue_path, dtype=str).fillna("")
-        except Exception:
-            continue
         if queue.empty:
             continue
         queue_rows_total += int(len(queue.index))
@@ -678,6 +793,7 @@ def _promote_ai_rescan_queue_rows(
             active_row_key = _ai_rescan_candidate_base(ai_candidate_id)
             supplier_sku = normalize_text(queue_row.get("supplier_sku", ""))
             asin = normalize_text(queue_row.get("asin", ""))
+            queue_source_name = queue_path.name
             promotion_id = _ai_rescan_promotion_id(
                 supplier_id=supplier_id,
                 run_id=run_id,
@@ -706,7 +822,7 @@ def _promote_ai_rescan_queue_rows(
                         "currency": "",
                         "vat_rate": "",
                         "scan_reason": RESCAN_RETRY_REASON,
-                        "source": "",
+                        "source": queue_source_name,
                         "handoff_dir": str(handoff_dir),
                         "notes": "missing supplier_id/run_id/candidate_id/supplier_sku",
                     }
@@ -852,9 +968,10 @@ def _promote_ai_rescan_queue_rows(
                     "scan_reason": RESCAN_RETRY_REASON,
                     "source": source_name,
                     "handoff_dir": str(handoff_dir),
-                    "notes": f"source_queue={queue_path.name}",
+                    "notes": f"source_queue={queue_source_name}",
                 }
             )
+            already_promoted.add(promotion_id)
 
         if audit_new:
             audit_rows_by_path[audit_path] = audit_new
@@ -944,12 +1061,16 @@ def _promote_ai_rescan_queue_rows(
         )
     )
     status = "promoted" if promoted_count else ("blocked" if blocked_rows else "none")
-    notes = f"source={AI_RESCAN_QUEUE_NAME};promoted={promoted_count};blocked={blocked_rows};skipped={skipped_rows}"
+    queue_file_count = len(queue_paths) + len(operator_queue_sources)
+    notes = (
+        f"source={AI_RESCAN_QUEUE_NAME}+{OPERATOR_RESCAN_QUEUE_NAME};"
+        f"promoted={promoted_count};blocked={blocked_rows};skipped={skipped_rows}"
+    )
     _record_ai_rescan_promotion_health(
         live_dir=live_dir,
         observed_utc=observed_utc,
         status=status,
-        queue_files=len(queue_paths),
+        queue_files=queue_file_count,
         queue_rows=queue_rows_total,
         promoted_rows=promoted_count,
         blocked_rows=blocked_rows,
@@ -1923,24 +2044,255 @@ def _login_mode_request_path(live_dir: Path) -> Path:
     return live_dir / LOGIN_MODE_REQUEST_NAME
 
 
+def _login_controller_request_paths(live_dir: Path) -> LoginControllerRequestPaths:
+    return LoginControllerRequestPaths(live_dir=live_dir, request_path=_login_mode_request_path(live_dir))
+
+
 def _read_login_mode_request(live_dir: Path) -> dict[str, str]:
-    path = _login_mode_request_path(live_dir)
-    if not path.exists():
-        return {}
-    try:
-        request = _parse_key_value_control_text(path.read_text(encoding="utf-8", errors="replace"))
-    except Exception:
-        request = {}
-    request["request_path"] = str(path)
-    request["request_exists"] = "1"
-    return request
+    return read_login_controller_request(_login_controller_request_paths(live_dir))
 
 
 def _login_mode_request_active(request: dict[str, str]) -> bool:
+    return login_controller_request_active(request)
+
+
+def _flagish(value: object) -> bool:
+    return normalize_text(value).lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _dashboard_value_from_text(text: object) -> str:
+    match = re.search(r"(?:dashboard_value|dashboard_yes_no)=([^;\s]+)", normalize_text(text), flags=re.I)
+    if not match:
+        return ""
+    value = normalize_text(match.group(1)).upper()
+    return value if value in {"YES", "NO", "LIKELY"} else ""
+
+
+def _latest_seller_central_login_proof(live_dir: Path) -> dict[str, str]:
+    path = live_dir / SELLER_CENTRAL_LOGIN_RECOVERY_PROOF_NAME
+    if not path.exists():
+        return {}
+    try:
+        frame = pd.read_csv(path, dtype=str).fillna("")
+    except Exception:
+        return {}
+    if frame.empty:
+        return {}
+    return {str(key): normalize_text(value) for key, value in frame.iloc[-1].to_dict().items()}
+
+
+def _seller_central_dashboard_proved(live_dir: Path) -> bool:
+    controller_state_path = live_dir / "f_login_controller_state.json"
+    if controller_state_path.exists():
+        try:
+            payload = json.loads(controller_state_path.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        if bool(payload.get("dashboard_proved")):
+            return True
+
+    proof = _latest_seller_central_login_proof(live_dir)
+    if not proof:
+        return False
+    if normalize_text(proof.get("proof_status", "")).lower() == "dashboard_yes_no_proved":
+        return True
+    if normalize_text(proof.get("status", "")).lower() != "succeeded":
+        return False
+    if not _flagish(proof.get("succeeded_flag", "")):
+        return False
+    reason = normalize_text(proof.get("reason", "")).lower()
+    dashboard_value = normalize_text(proof.get("dashboard_yes_no", "")).upper() or _dashboard_value_from_text(
+        proof.get("notes", "")
+    )
+    return reason in {
+        "eligibility_signal_visible",
+        "manual_eligibility_signal_visible",
+        "bbp_dashboard_signal_visible_after_manual_login",
+        "bbp_dashboard_signal_visible_after_seller_central_return",
+    } and dashboard_value in {"YES", "NO", "LIKELY"}
+
+
+def _seller_central_login_show_marker_path(live_dir: Path) -> Path:
+    return live_dir / "f061_seller_central_window_shown.marker"
+
+
+def _mark_seller_central_login_window_shown(live_dir: Path) -> None:
+    _seller_central_login_show_marker_path(live_dir).write_text(
+        _utc_now_iso() + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
+def _clear_seller_central_login_window_shown(live_dir: Path) -> None:
+    try:
+        _seller_central_login_show_marker_path(live_dir).unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def _seller_central_login_window_already_shown(live_dir: Path) -> bool:
+    return _seller_central_login_show_marker_path(live_dir).exists()
+
+
+def _visible_login_pc_usability_pause_active(live_dir: Path) -> bool:
+    request = _read_login_mode_request(live_dir)
+    request_status = normalize_text(request.get("status", "")).lower()
+    request_text = " ".join(
+        [
+            normalize_text(request.get("reason", "")),
+            normalize_text(request.get("last_status_note", "")),
+        ]
+    ).lower()
+    visibility_reason = normalize_text(_browser_visibility_parts(live_dir).get("reason", "")).lower()
+    pause_tokens = {
+        "user_pc_unusable_visibility_loop_paused",
+        "visible_window_loop_paused_for_pc_usability",
+    }
+    if request_status in LOGIN_MODE_INACTIVE_STATUSES and any(token in request_text for token in pause_tokens):
+        return True
+    return any(token in visibility_reason for token in pause_tokens)
+
+
+def _seller_central_eligibility_login_pending(live_dir: Path) -> bool:
+    proof = _latest_seller_central_login_proof(live_dir)
+    if not proof:
+        return False
+    status = normalize_text(proof.get("status", "")).lower()
+    reason = normalize_text(proof.get("reason", "")).lower()
+    if status == "succeeded":
+        return False
+    signin_detected = _flagish(proof.get("seller_central_signin_detected", ""))
+    otp_detected = _flagish(proof.get("seller_central_otp_detected", ""))
+    if signin_detected or otp_detected:
+        return True
+    return status in {"waiting_for_code", "expired", "failed"} or reason in {
+        "amazon_forced_passkey",
+        "manual_challenge_required",
+        "email_continue_not_advanced",
+        "otp_page_detected",
+        "otp_page_not_detected",
+        "password_not_entered",
+        "password_rejected",
+        "signin_or_passkey_page_after_code_wait",
+        "signin_or_passkey_page_after_credentials",
+        "signin_selectors_missing",
+        "submit_not_accepted",
+        "otp_selectors_missing",
+        "eligibility_signal_not_visible_after_code",
+        "bbp_dashboard_not_refreshed_after_seller_central",
+    }
+
+
+def _seller_central_auto_login_can_continue(live_dir: Path) -> bool:
+    proof = _latest_seller_central_login_proof(live_dir)
+    if not proof:
+        return False
+    status = normalize_text(proof.get("status", "")).lower()
+    reason = normalize_text(proof.get("reason", "")).lower()
+    if reason in {
+        "amazon_forced_passkey",
+        "manual_challenge_required",
+        "missing_secret_file",
+        "missing_credentials",
+        "auto_login_disabled",
+        "password_rejected",
+    }:
+        return False
+    if not _flagish(proof.get("auto_login_enabled", "")):
+        return False
+    if not _flagish(proof.get("secret_file_exists", "")):
+        return False
+    if not _flagish(proof.get("credentials_present", "")):
+        return False
+    signin_detected = _flagish(proof.get("seller_central_signin_detected", ""))
+    otp_detected = _flagish(proof.get("seller_central_otp_detected", ""))
+    return (
+        signin_detected
+        or otp_detected
+        or status in {"attempted", "waiting_for_code", "expired", "failed", "blocked"}
+        or reason in {
+            "credentials_submitted",
+            "email_continue_not_advanced",
+            "otp_page_detected",
+            "otp_page_not_detected",
+            "password_not_entered",
+            "signin_or_passkey_page_after_code_wait",
+            "signin_or_passkey_page_after_credentials",
+            "signin_selectors_missing",
+            "submit_not_accepted",
+            "otp_selectors_missing",
+            "eligibility_signal_not_visible_after_code",
+            "bbp_dashboard_not_refreshed_after_seller_central",
+        }
+    )
+
+
+def _seller_central_email_continue_hidden_retry_exhausted(live_dir: Path) -> bool:
+    proof = _latest_seller_central_login_proof(live_dir)
+    if not proof:
+        return False
+    reason = normalize_text(proof.get("reason", "")).lower()
+    if reason != "email_continue_not_advanced":
+        return False
+    if not _flagish(proof.get("seller_central_signin_detected", "")):
+        return False
+    if _flagish(proof.get("seller_central_otp_detected", "")):
+        return False
+    notes = normalize_text(proof.get("notes", "")).lower()
+    required_notes = {
+        "email_finalize=1",
+        "click=1",
+        "js_click=1",
+        "js_enter=1",
+        "form_submit=1",
+        "email_value=present",
+    }
+    return all(token in notes for token in required_notes)
+
+
+def _seller_central_eligibility_login_requires_visible(live_dir: Path) -> bool:
+    if _visible_login_pc_usability_pause_active(live_dir):
+        return False
+    if _seller_central_email_continue_hidden_retry_exhausted(live_dir):
+        return True
+    if _seller_central_login_window_already_shown(live_dir):
+        return False
+    if _seller_central_auto_login_can_continue(live_dir):
+        return False
+    return _seller_central_eligibility_login_pending(live_dir)
+
+
+def _login_mode_request_is_manual_fallback(request: dict[str, str]) -> bool:
+    reason = normalize_text(request.get("reason", "")).lower()
+    note = normalize_text(request.get("last_status_note", "")).lower()
+    text = f"{reason} {note}"
+    return any(
+        token in text
+        for token in {
+            "manual_challenge_required",
+            "manual_fallback",
+            "missing_secret_file",
+            "missing_credentials",
+            "auto_login_disabled",
+        }
+    )
+
+
+def _login_mode_request_active_for_child(*, live_dir: Path, request: dict[str, str]) -> bool:
+    if _login_mode_request_active(request):
+        if (
+            _seller_central_auto_login_can_continue(live_dir)
+            and not _seller_central_eligibility_login_requires_visible(live_dir)
+            and not _login_mode_request_is_manual_fallback(request)
+        ):
+            return False
+        return True
     if normalize_text(request.get("request_exists", "")) != "1":
         return False
-    status = normalize_text(request.get("status", "requested")).lower()
-    return status not in LOGIN_MODE_INACTIVE_STATUSES
+    return _seller_central_eligibility_login_requires_visible(live_dir)
 
 
 def _login_mode_hold_seconds(request: dict[str, str]) -> int:
@@ -1969,6 +2321,96 @@ def _active_login_backtrack_rows(active: pd.DataFrame) -> pd.DataFrame:
     return work[mask].copy()
 
 
+def _scanner_summary_allows_logged_out_continuation(scanner_summary: dict[str, object]) -> bool:
+    login_mode_active = normalize_text(scanner_summary.get("login_mode_active", "")).lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    runtime_status = normalize_text(scanner_summary.get("login_mode_runtime_status", "")).lower()
+    return login_mode_active and runtime_status == "still_required"
+
+
+def _hold_supplier_for_seller_central_second_check(
+    *,
+    root: Path,
+    live_dir: Path,
+    observed_utc: str,
+    cycle_run_id: str,
+    supplier_id: str,
+    f061_run_id: str,
+    scanner_summary: dict[str, object],
+) -> dict[str, object]:
+    active = read_f_contract_df(root, "supplier_price_list_active_run")
+    if active.empty:
+        return {"status": "skipped", "held_rows": 0, "reason": "active_run_empty"}
+    supplier_key = normalize_text(supplier_id).lower()
+    run_key = normalize_text(f061_run_id)
+    if not supplier_key or not run_key:
+        return {"status": "skipped", "held_rows": 0, "reason": "missing_supplier_or_run"}
+    supplier_run_mask = (
+        (active["supplier_id"].map(lambda value: normalize_text(value).lower()) == supplier_key)
+        & (active["run_id"].map(normalize_text) == run_key)
+    )
+    if not supplier_run_mask.any():
+        return {"status": "skipped", "held_rows": 0, "reason": "supplier_run_not_active"}
+    login_rows = _active_login_backtrack_rows(active[supplier_run_mask].copy())
+    if login_rows.empty:
+        return {"status": "skipped", "held_rows": 0, "reason": "no_login_backtrack_rows"}
+
+    held_indexes = login_rows.index
+    held_rows = int(len(held_indexes))
+    active.loc[held_indexes, "scan_status"] = SELLER_CENTRAL_SECOND_CHECK_STATUS
+    active.loc[held_indexes, "scan_reason"] = SELLER_CENTRAL_SECOND_CHECK_REASON
+    active.loc[held_indexes, "completion_block_reason"] = "seller_central_eligibility_login_required"
+    active.loc[held_indexes, "last_attempt_utc"] = observed_utc
+    write_f_contract_df(root, "supplier_price_list_active_run", active)
+
+    run_state = read_f_contract_df(root, "supplier_price_list_run_state")
+    if not run_state.empty:
+        state_mask = (
+            (run_state["supplier_id"].map(lambda value: normalize_text(value).lower()) == supplier_key)
+            & (run_state["run_id"].map(normalize_text) == run_key)
+        )
+        if state_mask.any():
+            run_state.loc[state_mask, "run_status"] = "held_for_login"
+            run_state.loc[state_mask, "pending_rows"] = "0"
+            run_state.loc[state_mask, "held_rows"] = str(held_rows)
+            run_state.loc[state_mask, "next_row_index"] = "0"
+            run_state.loc[state_mask, "updated_at_utc"] = observed_utc
+            write_f_contract_df(root, "supplier_price_list_run_state", run_state)
+
+    next_active = _active_f061_state(root)
+    next_supplier_id = normalize_text(next_active.get("supplier_id", ""))
+    next_run_id = normalize_text(next_active.get("run_id", ""))
+    next_pending = int(next_active.get("pending_rows", 0) or 0)
+    runtime_status = normalize_text(scanner_summary.get("login_mode_runtime_status", ""))
+    notes = (
+        f"held_for_seller_central_second_check;return_supplier_id={supplier_id};"
+        f"return_run_id={f061_run_id};next_supplier_id={next_supplier_id};"
+        f"next_run_id={next_run_id};runtime_status={runtime_status}"
+    )
+    _append_event(
+        live_dir=live_dir,
+        event_utc=observed_utc,
+        cycle_run_id=cycle_run_id,
+        event_type="seller_central_second_check_hold",
+        supplier_id=supplier_id,
+        f061_run_id=f061_run_id,
+        status="held_for_login",
+        rows=held_rows,
+        notes=notes,
+    )
+    return {
+        "status": "held_for_login",
+        "held_rows": held_rows,
+        "next_supplier_id": next_supplier_id,
+        "next_run_id": next_run_id,
+        "next_pending_rows": next_pending,
+        "notes": notes,
+    }
+
+
 def _ensure_login_mode_request_for_active_backtrack(
     *,
     live_dir: Path,
@@ -1984,45 +2426,41 @@ def _ensure_login_mode_request_for_active_backtrack(
     if pending_backtrack.empty:
         return request
 
-    path = _login_mode_request_path(live_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    request["request_path"] = str(path)
-    request["request_exists"] = "1"
-    request.setdefault("requested_utc", observed_utc)
-    request.setdefault("requested_by", "fpm130")
-    request.setdefault("mode", "login_recovery")
-    request.setdefault("hold_seconds", str(LOGIN_MODE_DEFAULT_HOLD_SECONDS))
-    request.setdefault("reason", "active_login_backtrack_recovery")
-    request["status"] = "authenticated_backlog_remaining"
-    request["last_observed_utc"] = observed_utc
-    request["last_status_note"] = f"reactivated_for_active_login_backtrack_rows={len(pending_backtrack.index)}"
-    ordered_keys = [
-        "requested_utc",
-        "requested_by",
-        "mode",
-        "supplier_id",
-        "run_id",
-        "status",
-        "hold_seconds",
-        "reason",
-        "last_observed_utc",
-        "last_status_note",
-    ]
-    lines = [f"{key}={normalize_text(request.get(key, ''))}" for key in ordered_keys if normalize_text(request.get(key, ""))]
-    path.write_text("\n".join(lines) + "\n", encoding="ascii", newline="\n")
+    write_login_controller_request(
+        requested_by=normalize_text(request.get("requested_by", "")) or "fpm130",
+        supplier_id=normalize_text(request.get("supplier_id", "")),
+        run_id=normalize_text(request.get("run_id", "")),
+        status="authenticated_backlog_remaining",
+        hold_seconds=_login_mode_hold_seconds(request),
+        reason=normalize_text(request.get("reason", "")) or "active_login_backtrack_recovery",
+        observed_utc=observed_utc,
+        last_status_note=f"reactivated_for_active_login_backtrack_rows={len(pending_backtrack.index)}",
+        paths=_login_controller_request_paths(live_dir),
+        existing=request,
+    )
     return _read_login_mode_request(live_dir)
 
 
-def _apply_login_mode_env(env: dict[str, str], request: dict[str, str]) -> None:
-    if not _login_mode_request_active(request):
+def _apply_login_mode_env(
+    env: dict[str, str],
+    request: dict[str, str],
+    *,
+    force_active: bool = False,
+) -> None:
+    if not force_active and not _login_mode_request_active(request):
         for key in [
             "F061_LOGIN_MODE",
             "F061_LOGIN_HOLD_SECONDS",
             "F061_LOGIN_MODE_REQUEST_PATH",
             "F061_MANUAL_BBP_LOGIN_WAIT_SECONDS",
+            SELLER_CENTRAL_LOGIN_ATTEMPT_MODE_ENV,
+            SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH_ENV,
         ]:
             env.pop(key, None)
-        if normalize_text(request.get("request_exists", "")) == "1":
+        if (
+            normalize_text(request.get("request_exists", "")) == "1"
+            and normalize_text(env.get("F061_BACKGROUND_BROWSER_MODE", "")).lower() != "visible"
+        ):
             env["F061_BACKGROUND_BROWSER_MODE"] = "minimized"
             env["F061_SHOW_WINDOWS"] = "0"
             env["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] = "1"
@@ -2035,6 +2473,10 @@ def _apply_login_mode_env(env: dict[str, str], request: dict[str, str]) -> None:
     env["F061_LOGIN_HOLD_SECONDS"] = str(hold_seconds)
     env["F061_LOGIN_MODE_REQUEST_PATH"] = normalize_text(request.get("request_path", ""))
     env["F061_MANUAL_BBP_LOGIN_WAIT_SECONDS"] = str(hold_seconds)
+    env[SELLER_CENTRAL_LOGIN_ATTEMPT_MODE_ENV] = "1"
+    request_path = normalize_text(request.get("request_path", ""))
+    if request_path:
+        env[SELLER_CENTRAL_LOGIN_ATTEMPT_CONTROL_PATH_ENV] = request_path
 
 
 def _apply_authenticated_login_mode_browser_policy(
@@ -2043,7 +2485,9 @@ def _apply_authenticated_login_mode_browser_policy(
     live_dir: Path,
     request: dict[str, str],
 ) -> None:
-    if not _login_mode_request_active(request):
+    if not _login_mode_request_active_for_child(live_dir=live_dir, request=request):
+        return
+    if _seller_central_eligibility_login_requires_visible(live_dir):
         return
     if _saved_auth_state(live_dir) != AUTH_STATE_LOGGED_IN:
         return
@@ -2053,6 +2497,8 @@ def _apply_authenticated_login_mode_browser_policy(
 
 
 def _login_mode_child_browser_mode_note(live_dir: Path) -> str:
+    if _seller_central_eligibility_login_requires_visible(live_dir):
+        return "visible_seller_central_required"
     if _saved_auth_state(live_dir) == AUTH_STATE_LOGGED_IN:
         return "minimized_authenticated"
     return "visible_from_start"
@@ -2349,9 +2795,20 @@ def _saved_auth_state(live_dir: Path) -> str:
     auth_state = normalize_text(parts.get("auth_state", "")).upper()
     if reason in {"child_started_minimized", "child_started_hidden"}:
         return ""
-    if auth_state in {AUTH_STATE_LOGGED_IN, AUTH_STATE_LOGIN_REQUIRED, *AUTH_STATES_REQUIRING_VISIBLE}:
+    if auth_state == AUTH_STATE_LOGGED_IN:
+        return AUTH_STATE_LOGGED_IN if _seller_central_dashboard_proved(live_dir) else AUTH_STATE_BBP_AUTHENTICATED
+    if auth_state in {
+        AUTH_STATE_BBP_AUTHENTICATED,
+        AUTH_STATE_LOGIN_REQUIRED,
+        *AUTH_STATES_REQUIRING_VISIBLE,
+    }:
         return auth_state
-    return auth_state_for_browser_visibility(_browser_visibility_state(live_dir))
+    if auth_state == AUTH_STATE_BBP_IFRAME_PLUGIN_BLOCKED:
+        return auth_state
+    fallback = auth_state_for_browser_visibility(_browser_visibility_state(live_dir))
+    if fallback == AUTH_STATE_BBP_AUTHENTICATED and _seller_central_dashboard_proved(live_dir):
+        return AUTH_STATE_LOGGED_IN
+    return fallback
 
 
 def _scanner_browser_blocked_rows(scanner_summary: dict[str, object]) -> int:
@@ -2374,6 +2831,7 @@ def _record_auth_attention_after_chunk(
     cycle_run_id: str,
     scanner_summary: dict[str, object],
 ) -> str:
+    seller_central_login_pending = _seller_central_eligibility_login_requires_visible(live_dir)
     blocked_rows = _scanner_browser_blocked_rows(scanner_summary)
     processed_rows = _price_list_int(scanner_summary.get("processed_rows", "0"))
     login_mode_active = normalize_text(scanner_summary.get("login_mode_active", "")).lower() in {
@@ -2383,7 +2841,95 @@ def _record_auth_attention_after_chunk(
         "on",
     }
     login_mode_runtime_status = normalize_text(scanner_summary.get("login_mode_runtime_status", "")).lower()
+    if login_mode_active and login_mode_runtime_status == "bbp_iframe_plugin_blocked":
+        _write_browser_visibility_state(live_dir, state="hidden", reason="bbp_iframe_plugin_blocked")
+        _append_event(
+            live_dir=live_dir,
+            event_utc=event_utc,
+            cycle_run_id=cycle_run_id,
+            event_type="f061_auth_attention",
+            status="bbp_iframe_plugin_blocked",
+            rows=blocked_rows,
+            notes=(
+                "bbp_iframe_plugin_blocked;"
+                f"bbp_iframe_plugin_blocked_rows={_price_list_int(scanner_summary.get('bbp_iframe_plugin_blocked_rows', '0'))};"
+                "next_child_browser_mode=minimized"
+            ),
+        )
+        return "bbp_iframe_plugin_blocked"
     if login_mode_active and login_mode_runtime_status in {"authenticated_backlog_remaining", "backlog_drained"}:
+        if _visible_login_pc_usability_pause_active(live_dir):
+            _clear_seller_central_login_window_shown(live_dir)
+            proof_ready = _seller_central_dashboard_proved(live_dir)
+            pause_reason = "login_mode_authenticated" if proof_ready else "seller_central_dashboard_proof_paused_unproved"
+            pause_status = "cleared" if proof_ready else "deferred_login_mode"
+            pause_notes = (
+                f"{pause_reason};runtime_status={login_mode_runtime_status};"
+                "visible_loop_paused_for_pc_usability;next_child_browser_mode=minimized"
+            )
+            _write_browser_visibility_state(live_dir, state="hidden", reason=pause_reason)
+            _append_event(
+                live_dir=live_dir,
+                event_utc=event_utc,
+                cycle_run_id=cycle_run_id,
+                event_type="f061_auth_attention",
+                status=pause_status,
+                rows=0,
+                notes=pause_notes,
+            )
+            return pause_status
+        if _seller_central_eligibility_login_pending(live_dir):
+            if seller_central_login_pending:
+                _write_browser_visibility_state(
+                    live_dir,
+                    state="visible",
+                    reason="seller_central_eligibility_login_still_required",
+                )
+                _mark_seller_central_login_window_shown(live_dir)
+                next_mode = "visible"
+                note_reason = "seller_central_eligibility_login_still_required"
+            else:
+                _write_browser_visibility_state(
+                    live_dir,
+                    state="hidden",
+                    reason="seller_central_eligibility_login_waiting_parked",
+                )
+                next_mode = "minimized"
+                note_reason = "seller_central_eligibility_login_waiting_parked"
+            _append_event(
+                live_dir=live_dir,
+                event_utc=event_utc,
+                cycle_run_id=cycle_run_id,
+                event_type="f061_auth_attention",
+                status="deferred_login_mode",
+                rows=blocked_rows,
+                notes=(
+                    f"{note_reason};"
+                    f"runtime_status={login_mode_runtime_status};next_child_browser_mode={next_mode}"
+                ),
+            )
+            return "deferred_login_mode"
+        if not _seller_central_dashboard_proved(live_dir):
+            _clear_seller_central_login_window_shown(live_dir)
+            _write_browser_visibility_state(
+                live_dir,
+                state="hidden",
+                reason="bbp_authenticated_seller_central_unproved",
+            )
+            _append_event(
+                live_dir=live_dir,
+                event_utc=event_utc,
+                cycle_run_id=cycle_run_id,
+                event_type="f061_auth_attention",
+                status="deferred_login_mode",
+                rows=blocked_rows,
+                notes=(
+                    f"bbp_authenticated_seller_central_unproved;runtime_status={login_mode_runtime_status};"
+                    "seller_central_dashboard_proof_missing;next_child_browser_mode=minimized"
+                ),
+            )
+            return "deferred_login_mode"
+        _clear_seller_central_login_window_shown(live_dir)
         _write_browser_visibility_state(live_dir, state="hidden", reason="login_mode_authenticated")
         _append_event(
             live_dir=live_dir,
@@ -2398,10 +2944,14 @@ def _record_auth_attention_after_chunk(
     if blocked_rows > 0:
         visibility_parts = _browser_visibility_parts(live_dir)
         visibility_reason = normalize_text(visibility_parts.get("reason", "")).lower()
-        if _saved_auth_state(live_dir) == AUTH_STATE_LOGGED_IN and visibility_reason in {
+        if (
+            not seller_central_login_pending
+            and _saved_auth_state(live_dir) == AUTH_STATE_LOGGED_IN
+            and visibility_reason in {
             "auth_confirmed",
             "login_mode_authenticated",
-        }:
+            }
+        ):
             _write_browser_visibility_state(live_dir, state="hidden", reason="auth_attention_recovered")
             _append_event(
                 live_dir=live_dir,
@@ -2414,8 +2964,28 @@ def _record_auth_attention_after_chunk(
             )
             return "cleared"
         if login_mode_active or not _auto_visible_auth_attention_enabled():
-            _write_browser_visibility_state(live_dir, state="hidden", reason="auth_attention_deferred_login_mode")
-            note_reason = "login_mode_still_required" if login_mode_active else "login_mode_button_required"
+            if login_mode_active and _seller_central_eligibility_login_pending(live_dir):
+                if seller_central_login_pending:
+                    _write_browser_visibility_state(
+                        live_dir,
+                        state="visible",
+                        reason="seller_central_eligibility_login_still_required",
+                    )
+                    _mark_seller_central_login_window_shown(live_dir)
+                    note_reason = "seller_central_eligibility_login_still_required"
+                    next_mode = "visible"
+                else:
+                    _write_browser_visibility_state(
+                        live_dir,
+                        state="hidden",
+                        reason="seller_central_eligibility_login_waiting_parked",
+                    )
+                    note_reason = "seller_central_eligibility_login_waiting_parked"
+                    next_mode = "minimized"
+            else:
+                _write_browser_visibility_state(live_dir, state="hidden", reason="auth_attention_deferred_login_mode")
+                note_reason = "login_mode_still_required" if login_mode_active else "login_mode_button_required"
+                next_mode = "minimized"
             _append_event(
                 live_dir=live_dir,
                 event_utc=event_utc,
@@ -2423,7 +2993,7 @@ def _record_auth_attention_after_chunk(
                 event_type="f061_auth_attention",
                 status="deferred_login_mode",
                 rows=blocked_rows,
-                notes=f"browser_block_signal_seen;{note_reason};next_child_browser_mode=minimized",
+                notes=f"browser_block_signal_seen;{note_reason};next_child_browser_mode={next_mode}",
             )
             return "deferred_login_mode"
         _write_browser_visibility_state(live_dir, state="visible", reason="auth_attention_required")
@@ -2468,9 +3038,25 @@ def _scanner_browser_mode_for_next_child(root: Path | None = None) -> str:
     auto_visible = _auto_visible_auth_attention_enabled()
     if root is not None:
         live_dir = get_manager_paths(root=root).system_dir / "live"
-        if _login_mode_request_active(_read_login_mode_request(live_dir)):
-            if _saved_auth_state(live_dir) in AUTH_STATES_REQUIRING_VISIBLE:
+        if _visible_login_pc_usability_pause_active(live_dir):
+            return "minimized"
+        if (
+            _seller_central_eligibility_login_pending(live_dir)
+            and not _seller_central_eligibility_login_requires_visible(live_dir)
+        ):
+            return "minimized"
+        login_request = _read_login_mode_request(live_dir)
+        if _login_mode_request_active_for_child(live_dir=live_dir, request=login_request):
+            if (
+                _saved_auth_state(live_dir) in AUTH_STATES_REQUIRING_VISIBLE
+                or _seller_central_eligibility_login_requires_visible(live_dir)
+            ):
                 return "visible"
+            return "minimized"
+        if (
+            _seller_central_auto_login_can_continue(live_dir)
+            and not _seller_central_eligibility_login_requires_visible(live_dir)
+        ):
             return "minimized"
     raw = normalize_text(os.environ.get("F061_BACKGROUND_BROWSER_MODE", "")).lower()
     if raw in {"visible", "minimized"}:
@@ -2498,9 +3084,15 @@ def _scanner_browser_mode_for_next_child(root: Path | None = None) -> str:
 
 def _build_scanner_child_env(root: Path | None = None) -> dict[str, str]:
     env = os.environ.copy()
+    env["F061_BBP_USER_DATA_DIR"] = normalize_text(env.get("F061_BBP_USER_DATA_DIR", "")) or DEFAULT_F061_BBP_USER_DATA_DIR
+    env["F061_BBP_PROFILE_DIR"] = normalize_text(env.get("F061_BBP_PROFILE_DIR", "")) or DEFAULT_F061_BBP_PROFILE_DIR
     login_request: dict[str, str] = {}
+    force_login_mode_active = False
+    live_dir: Path | None = None
     if root is not None:
-        login_request = _read_login_mode_request(get_manager_paths(root=root).system_dir / "live")
+        live_dir = get_manager_paths(root=root).system_dir / "live"
+        login_request = _read_login_mode_request(live_dir)
+        force_login_mode_active = _login_mode_request_active_for_child(live_dir=live_dir, request=login_request)
     mode = _scanner_browser_mode_for_next_child(root)
     env["F061_BACKGROUND_BROWSER_MODE"] = mode
     if mode == "visible":
@@ -2509,11 +3101,15 @@ def _build_scanner_child_env(root: Path | None = None) -> dict[str, str]:
     else:
         env["F061_SHOW_WINDOWS"] = "0"
         env["FPM_LIVE_HIDE_SCRAPER_WINDOWS"] = "1"
-    _apply_login_mode_env(env, login_request)
-    if root is not None:
+    env_login_request = dict(login_request)
+    if live_dir is not None and _login_mode_request_active(login_request) and not force_login_mode_active:
+        env_login_request["status"] = "canceled"
+        env_login_request["last_status_note"] = "scanner_owned_auto_login_available"
+    _apply_login_mode_env(env, env_login_request, force_active=force_login_mode_active)
+    if live_dir is not None:
         _apply_authenticated_login_mode_browser_policy(
             env=env,
-            live_dir=get_manager_paths(root=root).system_dir / "live",
+            live_dir=live_dir,
             request=login_request,
         )
     return env
@@ -2631,8 +3227,13 @@ def _show_scraper_windows_once(
             return False
         target_filter = rf'''
         $_.Name -eq "chrome.exe" -and
-        $_.CommandLine -match "{user_data_pattern}" -and
-        $_.CommandLine -match "--profile-directory={profile_pattern}(\s|`"|$)"
+        (
+          (
+            $_.CommandLine -match "{user_data_pattern}" -and
+            $_.CommandLine -match "--profile-directory={profile_pattern}(\s|`"|$)"
+          ) -or
+          $_.CommandLine -match "Chrome_91_F061"
+        )
 '''
     else:
         target_filter = r'''
@@ -2686,11 +3287,17 @@ public static class WinApiShowOnce {
   public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 }
 "@
-$targets = Get-CimInstance Win32_Process |
+$matchedProcesses = Get-CimInstance Win32_Process |
   Where-Object {
 __TARGET_FILTER__
-  } |
-  Select-Object -ExpandProperty ProcessId
+  }
+$targets = @(
+  $matchedProcesses | ForEach-Object {
+    [int]$_.ProcessId
+    if ($_.ParentProcessId) { [int]$_.ParentProcessId }
+  }
+) | Sort-Object -Unique
+$script:shown = 0
 $callback = [WinApiShowOnce+EnumWindowsProc]{
   param($hWnd, $lParam)
   [uint32]$outPid = 0
@@ -2727,30 +3334,41 @@ $callback = [WinApiShowOnce+EnumWindowsProc]{
       [WinApiShowOnce]::BringWindowToTop($hWnd) | Out-Null
       [WinApiShowOnce]::SetForegroundWindow($hWnd) | Out-Null
       [WinApiShowOnce]::SetWindowPos($hWnd, [IntPtr](-2), 20, 20, 1600, 950, 0x0040 -bor 0x0020) | Out-Null
+      $script:shown += 1
     } catch {
     }
   }
   return $true
 }
 [WinApiShowOnce]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
+Write-Output $script:shown
 '''.replace("__TARGET_FILTER__", target_filter)
+    winapi_surfaced = False
     try:
-        subprocess.run(
+        completed = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps_command],
             cwd=str(root),
-            stdout=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            text=True,
             timeout=15,
             check=False,
         )
+        lines = [line.strip() for line in normalize_text(getattr(completed, "stdout", "")).splitlines() if line.strip()]
+        if lines:
+            try:
+                winapi_surfaced = int(float(lines[-1])) > 0
+            except ValueError:
+                winapi_surfaced = False
     except Exception:
         pass
-    return _show_scraper_windows_via_devtools(
+    devtools_surfaced = _show_scraper_windows_via_devtools(
         root,
         login_mode=login_mode,
         user_data_dir=user_data_dir,
         profile_dir=profile_dir,
     )
+    return bool(winapi_surfaced or devtools_surfaced)
 
 
 def _remote_debugging_ports_from_command_lines(command_lines: list[str]) -> list[int]:
@@ -2812,7 +3430,8 @@ def _target_chrome_command_lines_for_devtools(*, login_mode: bool, user_data_dir
         return [
             command
             for command in commands
-            if user_data_lower in command.lower() and profile_token in command.lower()
+            if (user_data_lower in command.lower() and profile_token in command.lower())
+            or "chrome_91_f061" in command.lower()
         ]
     return [
         command
@@ -2923,6 +3542,19 @@ def _scanner_child_startupinfo(browser_mode: str) -> subprocess.STARTUPINFO | No
 
 
 def _auth_visibility_signal_from_text(text: str) -> tuple[str, str]:
+    lowered = normalize_text(text).lower()
+    if any(
+        token in lowered
+        for token in (
+            "f061_bbp_profile_health ok=false",
+            "buybotpro_extension_missing",
+            "bbp_profile_extension_missing",
+            "bbp iframe preflight failed",
+            "bbp iframe missing, but no real login option was detected",
+            "no bbp iframe",
+        )
+    ):
+        return "hidden", "bbp_iframe_plugin_blocked"
     auth_state = auth_state_from_log_text(text)
     browser_state = browser_state_for_auth_state(auth_state)
     signal = browser_visibility_value(browser_state)
@@ -2932,7 +3564,7 @@ def _auth_visibility_signal_from_text(text: str) -> tuple[str, str]:
         return signal, "amazon_dashboard_login_required"
     if auth_state == AUTH_STATE_LOGIN_REQUIRED:
         return signal, "auth_required"
-    if auth_state == AUTH_STATE_LOGGED_IN:
+    if auth_state in {AUTH_STATE_LOGGED_IN, AUTH_STATE_BBP_AUTHENTICATED}:
         return signal, "auth_confirmed"
     return "", ""
 
@@ -2946,23 +3578,32 @@ def _read_log_since(path: Path, start_offset: int) -> str:
         return ""
 
 
-def _auth_state_for_visibility_reason(state: str, reason: str) -> str:
+def _auth_state_for_visibility_reason(live_dir: Path, state: str, reason: str) -> str:
     reason_l = normalize_text(reason).lower()
     if reason_l in {"child_started_minimized", "child_started_hidden"}:
         return ""
+    if "bbp_iframe_plugin_blocked" in reason_l:
+        return AUTH_STATE_BBP_IFRAME_PLUGIN_BLOCKED
+    if "seller_central_eligibility_login" in reason_l:
+        return AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED
+    if "seller_central_login_window_missing" in reason_l:
+        return AUTH_STATE_SELLER_CENTRAL_ELIGIBILITY_LOGIN_REQUIRED
     if "amazon_dashboard_login_required" in reason_l or "dashboard_login_required" in reason_l:
         return AUTH_STATE_DASHBOARD_LOGIN_REQUIRED
     if "bbp_login_required" in reason_l:
         return AUTH_STATE_BBP_LOGIN_REQUIRED
     if reason_l in {"auth_confirmed", "login_mode_authenticated", "auth_attention_recovered", "auth_attention_cleared"}:
+        return AUTH_STATE_LOGGED_IN if _seller_central_dashboard_proved(live_dir) else AUTH_STATE_BBP_AUTHENTICATED
+    fallback = auth_state_for_browser_visibility(state)
+    if fallback == AUTH_STATE_BBP_AUTHENTICATED and _seller_central_dashboard_proved(live_dir):
         return AUTH_STATE_LOGGED_IN
-    return auth_state_for_browser_visibility(state)
+    return fallback
 
 
 def _write_browser_visibility_state(live_dir: Path, *, state: str, reason: str) -> None:
     path = live_dir / "f061_browser_visibility_state.txt"
     browser_state = BROWSER_STATE_HIDDEN if state == "hidden" else BROWSER_STATE_VISIBLE if state == "visible" else ""
-    auth_state = _auth_state_for_visibility_reason(state, reason)
+    auth_state = _auth_state_for_visibility_reason(live_dir, state, reason)
     path.write_text(
         f"state={state}|browser_state={browser_state}|auth_state={auth_state}|reason={reason}|updated_utc={_utc_now_iso()}\n",
         encoding="utf-8",
@@ -3005,24 +3646,37 @@ def _apply_browser_visibility_signal(
     state: str,
     reason: str,
     cycle_run_id: str = "f061_child",
-) -> None:
+) -> str:
     if state == "hidden":
         _ensure_scraper_window_hider(root, force=True)
+        applied_state = "hidden"
+        applied_reason = reason
     elif state == "visible":
         _stop_scraper_window_hider(root)
-        _show_scraper_windows_once(root)
+        surfaced = _show_scraper_windows_once(root)
+        if surfaced is False:
+            applied_state = "missing"
+            applied_reason = (
+                "seller_central_login_window_missing"
+                if "seller_central_eligibility_login" in normalize_text(reason).lower()
+                else f"{reason}_window_missing"
+            )
+        else:
+            applied_state = "visible"
+            applied_reason = reason
     else:
-        return
-    _write_browser_visibility_state(live_dir, state=state, reason=reason)
+        return normalize_text(state)
+    _write_browser_visibility_state(live_dir, state=applied_state, reason=applied_reason)
     _append_event(
         live_dir=live_dir,
         event_utc=_utc_now_iso(),
         cycle_run_id=cycle_run_id,
         event_type="f061_browser_visibility",
-        status=state,
+        status=applied_state,
         rows=0,
-        notes=reason,
+        notes=applied_reason,
     )
+    return applied_state
 
 
 def _update_child_auth_visibility_from_logs(
@@ -3046,24 +3700,40 @@ def _update_child_auth_visibility_from_logs(
     signal, reason = _auth_visibility_signal_from_text(text)
     if not signal:
         return current_state
+    if signal == "hidden" and reason == "auth_confirmed" and _seller_central_eligibility_login_pending(live_dir):
+        seller_central_reason = "seller_central_eligibility_login_still_required"
+        if _seller_central_eligibility_login_requires_visible(live_dir):
+            state = _apply_browser_visibility_signal(root=root, live_dir=live_dir, state="visible", reason=seller_central_reason)
+            if state == "visible":
+                _mark_seller_central_login_window_shown(live_dir)
+            return state
+        return _apply_browser_visibility_signal(
+            root=root,
+            live_dir=live_dir,
+            state="hidden",
+            reason="seller_central_eligibility_login_waiting_parked",
+        )
     if login_mode and signal == "visible":
-        already_shown = _login_mode_window_already_shown(live_dir)
-        if not already_shown:
-            surfaced = _show_scraper_windows_once(root, login_mode=True)
-            if surfaced:
-                _mark_login_mode_window_shown(live_dir)
-        if current_state != "visible" or not already_shown:
-            _write_browser_visibility_state(live_dir, state="visible", reason=f"{reason}_scanner_owned")
-            _append_event(
-                live_dir=live_dir,
-                event_utc=_utc_now_iso(),
-                cycle_run_id="f061_child",
-                event_type="f061_browser_visibility",
-                status="visible",
-                rows=0,
-                notes=f"{reason}_scanner_owned",
-            )
-        return "visible"
+        saved_reason = normalize_text(_browser_visibility_parts(live_dir).get("reason", "")).lower()
+        scanner_owned_reason = f"{reason}_scanner_owned"
+        if _login_mode_window_already_shown(live_dir) and saved_reason == scanner_owned_reason:
+            return current_state
+        surfaced = _show_scraper_windows_once(root, login_mode=True)
+        if surfaced:
+            _mark_login_mode_window_shown(live_dir)
+        visible_state = "visible" if surfaced is not False else "missing"
+        visible_reason = f"{reason}_scanner_owned" if visible_state == "visible" else f"{reason}_scanner_owned_window_missing"
+        _write_browser_visibility_state(live_dir, state=visible_state, reason=visible_reason)
+        _append_event(
+            live_dir=live_dir,
+            event_utc=_utc_now_iso(),
+            cycle_run_id="f061_child",
+            event_type="f061_browser_visibility",
+            status=visible_state,
+            rows=0,
+            notes=visible_reason,
+        )
+        return visible_state
     if signal == current_state:
         if signal == "hidden" and reason == "auth_confirmed":
             visibility_reason = normalize_text(_browser_visibility_parts(live_dir).get("reason", "")).lower()
@@ -3089,8 +3759,7 @@ def _update_child_auth_visibility_from_logs(
             allow_visible_auth_required = _auto_visible_auth_attention_enabled()
         if not allow_visible_auth_required:
             return current_state
-    _apply_browser_visibility_signal(root=root, live_dir=live_dir, state=signal, reason=reason)
-    return signal
+    return _apply_browser_visibility_signal(root=root, live_dir=live_dir, state=signal, reason=reason)
 
 
 def _scanner_child_timeout_seconds(chunk_rows: int) -> float:
@@ -3127,8 +3796,14 @@ def _manager_mode_for_child(
     auth = normalize_text(auth_state).upper()
     mode = normalize_text(browser_mode).lower()
     visibility = normalize_text(browser_visibility_state).lower()
+    if auth == AUTH_STATE_BBP_IFRAME_PLUGIN_BLOCKED:
+        return "BBP Plugin Blocked"
+    if auth in AUTH_STATES_REQUIRING_VISIBLE and visibility == "missing":
+        return "Login Window Missing"
     if login_mode_child and auth in AUTH_STATES_REQUIRING_VISIBLE and (mode == "visible" or visibility == "visible"):
         return "Login Window Open"
+    if auth == AUTH_STATE_BBP_AUTHENTICATED:
+        return "Seller Central Proof Required" if login_mode_child else "Scanning Held For Seller Central"
     if login_mode_child and auth == AUTH_STATE_LOGGED_IN:
         return "Catching Up"
     if auth == AUTH_STATE_LOGGED_IN and mode == "minimized":
@@ -3289,7 +3964,7 @@ def _run_scanner_subprocess(
             stderr=stderr_fh,
         )
         login_mode_child = normalize_text(child_env.get("F061_LOGIN_MODE", "")) == "1"
-        if login_mode_child:
+        if login_mode_child and not _seller_central_eligibility_login_pending(live_dir):
             _clear_login_mode_window_shown(live_dir)
         if browser_mode == "visible" and login_mode_child:
             time.sleep(2.0)
@@ -3781,6 +4456,51 @@ def run_live_cycle_once(
             run_id=f061_run_id,
         )
         processed = _price_list_int(scanner_summary.get("processed_rows", "0"))
+        if (
+            after_supplier_pending > 0
+            and not _seller_central_dashboard_proved(live_dir)
+            and _scanner_summary_allows_logged_out_continuation(scanner_summary)
+        ):
+            hold_summary = _hold_supplier_for_seller_central_second_check(
+                root=root_path,
+                live_dir=live_dir,
+                observed_utc=observed,
+                cycle_run_id=run_id,
+                supplier_id=supplier_id,
+                f061_run_id=f061_run_id,
+                scanner_summary=scanner_summary,
+            )
+            if normalize_text(hold_summary.get("status", "")) == "held_for_login":
+                after = _active_f061_state(root_path)
+                after_pending = int(after.get("pending_rows", 0) or 0)
+                next_supplier_id = normalize_text(hold_summary.get("next_supplier_id", ""))
+                next_run_id = normalize_text(hold_summary.get("next_run_id", ""))
+                _write_status(
+                    live_dir=live_dir,
+                    observed_utc=observed,
+                    run_id=run_id,
+                    state="running" if next_supplier_id else "idle",
+                    active_supplier_id=next_supplier_id,
+                    active_f061_run_id=next_run_id,
+                    pending_rows=after_pending,
+                    last_action="logged_out_continuation_hold",
+                    last_action_status="held_for_login",
+                    chunk_rows=chunk,
+                    notes=normalize_text(hold_summary.get("notes", "")),
+                )
+                return {
+                    "status": "held_for_login",
+                    "action": "logged_out_continuation_hold",
+                    "supplier_id": supplier_id,
+                    "pending_before": pending_rows,
+                    "pending_after": after_pending,
+                    "supplier_pending_after": 0,
+                    "processed_rows": processed,
+                    "auth_attention_status": auth_attention_status,
+                    "held_rows": int(hold_summary.get("held_rows", 0) or 0),
+                    "next_supplier_id": next_supplier_id,
+                    "next_run_id": next_run_id,
+                }
         if _scanner_summary_requires_login_wait(live_dir, scanner_summary):
             login_wait_notes = (
                 f"{_saved_auth_state(live_dir).lower()}_waiting_for_operator;"
@@ -4157,6 +4877,50 @@ def run_live_cycle_once(
         run_id=f061_run_after_apply,
     )
     processed = _price_list_int(scanner_summary.get("processed_rows", "0"))
+    if (
+        after_supplier_pending > 0
+        and not _seller_central_dashboard_proved(live_dir)
+        and _scanner_summary_allows_logged_out_continuation(scanner_summary)
+    ):
+        hold_summary = _hold_supplier_for_seller_central_second_check(
+            root=root_path,
+            live_dir=live_dir,
+            observed_utc=observed,
+            cycle_run_id=run_id,
+            supplier_id=supplier_after_apply,
+            f061_run_id=f061_run_after_apply,
+            scanner_summary=scanner_summary,
+        )
+        if normalize_text(hold_summary.get("status", "")) == "held_for_login":
+            after = _active_f061_state(root_path)
+            after_pending = int(after.get("pending_rows", 0) or 0)
+            next_supplier_id = normalize_text(hold_summary.get("next_supplier_id", ""))
+            next_run_id = normalize_text(hold_summary.get("next_run_id", ""))
+            _write_status(
+                live_dir=live_dir,
+                observed_utc=observed,
+                run_id=run_id,
+                state="running" if next_supplier_id else "idle",
+                active_supplier_id=next_supplier_id,
+                active_f061_run_id=next_run_id,
+                pending_rows=after_pending,
+                last_action="logged_out_continuation_hold",
+                last_action_status="held_for_login",
+                chunk_rows=chunk,
+                notes=normalize_text(hold_summary.get("notes", "")),
+            )
+            return {
+                "status": "held_for_login",
+                "action": "logged_out_continuation_hold",
+                "supplier_id": supplier_after_apply,
+                "pending_after": after_pending,
+                "supplier_pending_after": 0,
+                "processed_rows": processed,
+                "auth_attention_status": auth_attention_status,
+                "held_rows": int(hold_summary.get("held_rows", 0) or 0),
+                "next_supplier_id": next_supplier_id,
+                "next_run_id": next_run_id,
+            }
     if _scanner_summary_requires_login_wait(live_dir, scanner_summary):
         login_wait_notes = (
             f"{_saved_auth_state(live_dir).lower()}_waiting_for_operator;"

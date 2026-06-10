@@ -45,6 +45,7 @@ def test_append_adjustment_fallback_tokens_creates_tokens_from_latest_cost_basis
     assert set(new_rows["status"].astype(str)) == {"available"}
     assert set(new_rows["cost_per_unit"].astype(str)) == {"2.50"}
     assert set(new_rows["source_batch_id"].astype(str)) == {"EVT-1"}
+    assert new_rows["notes"].str.contains("cost_source=source_token_proved").all()
 
 
 def test_append_adjustment_fallback_tokens_requires_cost_basis() -> None:
@@ -72,6 +73,87 @@ def test_append_adjustment_fallback_tokens_requires_cost_basis() -> None:
 
     assert created == 0
     assert len(updated.index) == 1
+
+
+def test_append_adjustment_fallback_tokens_rejects_weak_latest_cost_without_source_proof() -> None:
+    ledger = pd.DataFrame(
+        [
+            {
+                "token_id": "tok-1",
+                "seller_sku": "SKU-1",
+                "cost_per_unit": "2.50",
+                "currency": "GBP",
+                "status": "allocated",
+                "received_date": "2026-01-10",
+                "notes": "",
+                "source": "",
+                "source_batch_id": "",
+                "source_order_key": "",
+                "created_at": "2026-01-10T00:00:00Z",
+            }
+        ]
+    )
+
+    updated, created = b009._append_adjustment_fallback_tokens(
+        ledger,
+        sku="SKU-1",
+        qty=1,
+        event_id="EVT-WEAK",
+        disposition="SELLABLE",
+        now_iso="2026-04-22T15:00:00Z",
+        event_date="2026-04-20T10:00:00+0000",
+    )
+
+    assert created == 0
+    assert len(updated.index) == 1
+
+
+def test_append_adjustment_fallback_tokens_allows_receipt_cost_proof() -> None:
+    ledger = pd.DataFrame(
+        [
+            {
+                "token_id": "tok-1",
+                "seller_sku": "SKU-1",
+                "cost_per_unit": "2.50",
+                "currency": "GBP",
+                "status": "allocated",
+                "received_date": "2026-01-10",
+                "notes": "",
+                "source": "",
+                "source_batch_id": "",
+                "source_order_key": "",
+                "created_at": "2026-01-10T00:00:00Z",
+            }
+        ]
+    )
+    receipts = pd.DataFrame(
+        [
+            {
+                "seller_sku": "SKU-1",
+                "cost_per_unit": "2.50",
+                "status": "APPLIED",
+                "batch_id": "SR-1",
+                "order_key": "PO-1",
+            }
+        ]
+    )
+
+    updated, created = b009._append_adjustment_fallback_tokens(
+        ledger,
+        sku="SKU-1",
+        qty=1,
+        event_id="EVT-RECEIPT",
+        disposition="SELLABLE",
+        now_iso="2026-04-22T15:00:00Z",
+        event_date="2026-04-20T10:00:00+0000",
+        receipts=receipts,
+    )
+
+    assert created == 1
+    new_row = updated.loc[updated["source"].eq("stock_adjustment_fallback")].iloc[0]
+    assert new_row["cost_per_unit"] == "2.50"
+    assert "cost_source=receipt_proved" in new_row["notes"]
+    assert "receipt_batch_id=SR-1" in new_row["notes"]
 
 
 def test_stock_adjustment_events_sql_primary_writes_combined_log(monkeypatch, tmp_path: Path) -> None:

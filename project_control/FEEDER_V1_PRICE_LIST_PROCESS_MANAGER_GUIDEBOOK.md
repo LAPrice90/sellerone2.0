@@ -224,6 +224,12 @@ ABGee setup note:
 - pack rule: ABGee unit codes such as `PK12` mean the source cost is a pack cost for 12 individual units. The converter stores the original pack cost and divides it into the scanner `unit_cost`.
 - status as of 2026-05-22: Gmail download and import succeeded for the latest available stock feed. The file converted to `8745` source rows, `5770` converter-valid rows, `2975` held rows, and `5307` scanner-eligible rows after memory checks.
 
+Email manager proof rule:
+- `FPM016_fetch_gmail_email_sources.py` is the first registered email-price-list manager proof step.
+- MOT proof is read-only: it reads the local OAuth file presence, FPM016 source-acquisition proof, and FPM011 import row counts.
+- MOT must not call the Gmail downloader, download attachments, delete Gmail, delete local price files, run F061, edit queues, change prices, write Sheets, or align local DB data.
+- A Gmail supplier is manager-proven only when the expected label, attachment evidence, source row count, valid row count, and imported source file proof are current enough.
+
 ### API Pull
 Use for suppliers with API access.
 

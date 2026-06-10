@@ -1,0 +1,23 @@
+{
+  "policy_id": "B_SELLERBOARD_EMAIL_LOCAL_INTAKE_CLEANUP",
+  "approved_by": "Luke",
+  "approved_in_chat_utc": "2026-05-27",
+  "scope": "local Sellerboard manager intake folder only",
+  "intake_folder": "out/systems/M/sellerboard_bridge/inbox",
+  "keep_latest_orderlist_files": 2,
+  "delete_allowed": true,
+  "allowed_deletion": [
+    "Older local Sellerboard OrderList CSV copies beyond the latest 2 retained files"
+  ],
+  "forbidden_deletion": [
+    "Gmail messages",
+    "Gmail attachments in the mailbox",
+    "latest 2 local Sellerboard OrderList CSV files",
+    "business outputs",
+    "order outputs",
+    "MOT proof outputs",
+    "files outside the Sellerboard intake folder",
+    "non-OrderList files unless Luke separately approves"
+  ],
+  "notes": "Luke approved Codex's suggested cleanup rule with: whatever you suggest. This policy does not approve Gmail deletion or broad output cleanup."
+}

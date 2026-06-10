@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from scripts.core.safe_file_writes import safe_to_csv
+
 
 def _load_source() -> Path:
     cand = [
@@ -63,7 +65,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ledger_path = out_dir / "fee_vat_ledger.csv"
-    fees.to_csv(ledger_path, index=False)
+    safe_to_csv(fees, ledger_path, index=False)
 
     # Daily summary
     fees["posted_date_day"] = fees["posted_date"].astype(str).str[:10]
@@ -74,7 +76,7 @@ def main() -> None:
         .rename(columns={"posted_date_day": "date"})
     )
     daily_path = out_dir / "fee_vat_summary_daily.csv"
-    daily.to_csv(daily_path, index=False)
+    safe_to_csv(daily, daily_path, index=False)
 
     # Type summary
     type_summary = (
@@ -83,7 +85,7 @@ def main() -> None:
         .reset_index()
     )
     type_path = out_dir / "fee_vat_summary_type.csv"
-    type_summary.to_csv(type_path, index=False)
+    safe_to_csv(type_summary, type_path, index=False)
 
     print(json.dumps({
         "status": "success",

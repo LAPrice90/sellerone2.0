@@ -1,0 +1,56 @@
+{
+  "id": "FPM158_ai_precheck_common",
+  "display_name": "FPM158 AI Precheck Common Helpers",
+  "flow": "F",
+  "purpose": "Classify shared AI precheck helper code so the manager knows it is support code, not a runnable manager action.",
+  "owner_entrypoint": "scripts/flows/F/price_list_manager/FPM158_ai_precheck_common.py",
+  "worker_entrypoint": "scripts/flows/F/price_list_manager/FPM158_ai_precheck_common.py",
+  "health_sources": [
+    {
+      "name": "ai_precheck_health",
+      "path": "out/systems/F/price_list_manager/ai_prechecks",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "status_sources": [
+    {
+      "name": "ai_precheck_status",
+      "path": "out/systems/F/price_list_manager/ai_prechecks",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ai_precheck_helpers",
+      "path": "out/systems/F/price_list_manager/ai_prechecks",
+      "required": false,
+      "max_age_minutes": 10080
+    }
+  ],
+  "freshness_rules": [
+    "common_helper_is_not_runnable_manager_proof"
+  ],
+  "needs_user_signals": [
+    "ai_precheck_helper_change_requested"
+  ],
+  "safe_actions": [
+    "read_status"
+  ],
+  "forbidden_actions": [
+    "edit_worker_logic",
+    "run_worker_cycle",
+    "write_google_sheets",
+    "change_queue_state",
+    "change_pricing",
+    "delete_outputs",
+    "restart_worker",
+    "approve_f061_handoff",
+    "write_live_scanner_inbox",
+    "run_f061",
+    "apply_ai_gate",
+    "align_local_db"
+  ],
+  "manager_notes": "Support-code classification. MOT may know this helper exists but must not treat it as a runnable proof action."
+}
