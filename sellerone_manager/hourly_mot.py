@@ -1646,14 +1646,23 @@ def _h_token_floor_source_rows(*, base: Path, observed_utc: str) -> list[dict[st
     else:
         active_skus = _h_floor_source_active_skus(snapshot_rows, trace_rows)
         latest_trace_by_sku = _h_latest_trace_rows_by_sku(trace_rows)
+        snapshot_by_sku = {
+            str(row.get("sku", "") or "").strip().upper(): row
+            for row in (snapshot_rows or [])
+            if str(row.get("sku", "") or "").strip()
+        }
         clean_rows = 0
         risky_rows: list[dict[str, str]] = []
         unknown_rows: list[dict[str, str]] = []
+        active_conflict_no_clean_floor_rows: list[dict[str, str]] = []
         fallback_rows = 0
         batch_link_needed_rows = 0
 
         for sku in active_skus:
             trace_row = latest_trace_by_sku.get(sku, {})
+            snapshot_row = snapshot_by_sku.get(sku, {})
+            if _h_trace_has_token_selection_conflict(trace_row) and _h_missing_clean_floor(snapshot_row, trace_row):
+                active_conflict_no_clean_floor_rows.append({"sku": sku, **trace_row})
             proof = _h_floor_source_proof(
                 trace_row,
                 selected_tokens.get(sku, {}),
@@ -1680,6 +1689,23 @@ def _h_token_floor_source_rows(*, base: Path, observed_utc: str) -> list[dict[st
             status = "fail"
             value = "floor_source_rows=0"
             root_cause = "H has no floor source rows for the manager to inspect."
+        elif active_conflict_no_clean_floor_rows:
+            status = "fail"
+            sample = ",".join(row["sku"] for row in active_conflict_no_clean_floor_rows[:5])
+            value = (
+                f"floor_source_rows={len(active_skus)};"
+                f"clean_rows={clean_rows};"
+                f"fallback_rows={fallback_rows};"
+                f"batch_link_proof_needed_rows={batch_link_needed_rows};"
+                f"risky_or_unknown_rows={len(risky_rows)};"
+                f"unknown_source_rows={len(unknown_rows)};"
+                f"token_selection_conflict_no_clean_floor_rows={len(active_conflict_no_clean_floor_rows)};"
+                f"sample_skus={sample}"
+            )
+            root_cause = (
+                "H has a token-selection conflict and no clean floor for at least one SKU. "
+                "This is an active pricing risk, not parked fallback-cost cleanup."
+            )
         elif risky_rows:
             status = "warn"
             sample = ",".join(row["sku"] for row in risky_rows[:5])
@@ -1724,7 +1750,7 @@ def _h_token_floor_source_rows(*, base: Path, observed_utc: str) -> list[dict[st
             summary="H should separate a calculated floor from a cleanly proved floor-cost source.",
             root_cause_guess=root_cause,
             manager_action=(
-                "If warn, keep the H floor source visible and package the token-source fix separately. "
+                "If fail or warn, keep the H floor source visible and package the token-source fix separately. "
                 "Do not change H prices, token rows, Sheets, or local DB facts from this guard."
             ),
             safe_repair_boundary=H_PROOF_ONLY_BOUNDARY,
@@ -1765,6 +1791,36 @@ def _h_latest_trace_rows_by_sku(trace_rows: list[dict[str, str]]) -> dict[str, d
         if current is None or (parsed, index) >= (current[0], current[1]):
             by_sku[sku] = (parsed, index, row)
     return {sku: item[2] for sku, item in by_sku.items()}
+
+
+def _h_trace_has_token_selection_conflict(trace_row: dict[str, str]) -> bool:
+    if str(trace_row.get("token_selection_conflict", "") or "").strip().lower() in {"1", "true", "yes"}:
+        return True
+    reason_text = ",".join(
+        [
+            str(trace_row.get("token_selection_conflict_reason", "") or ""),
+            str(trace_row.get("reason_codes_csv", "") or ""),
+        ]
+    ).lower()
+    return "token_selection_conflict" in reason_text
+
+
+def _h_missing_clean_floor(snapshot_row: dict[str, str], trace_row: dict[str, str]) -> bool:
+    snapshot_floor = str(
+        snapshot_row.get("execution_hard_floor_gbp", "")
+        or snapshot_row.get("trace_floor_total_gbp", "")
+    ).strip()
+    trace_floor = str(trace_row.get("floor_total_gbp", "") or "").strip()
+    if not snapshot_floor and not trace_floor:
+        return True
+    status_text = " ".join(
+        [
+            str(snapshot_row.get("execution_write_status", "") or ""),
+            str(snapshot_row.get("reason_codes_csv", "") or ""),
+            str(trace_row.get("reason_codes_csv", "") or ""),
+        ]
+    ).upper()
+    return "FLOOR_INPUT_MISSING_HOLD" in status_text or "H_FLOOR_INPUT_BLOCKED_NO_WRITE" in status_text
 
 
 def _h_floor_source_proof(
@@ -2823,6 +2879,7 @@ def _f_live_owner_rows(*, base: Path, observed_utc: str, now: datetime) -> list[
     supervisor_stale_seconds = _optional_float(supervisor.get("stale_seconds", "")) or 900.0
     scanner_stall = _f_recent_scanner_stall(base, live) if live_path.exists() and live_rows else {"state": "not_checked"}
     luke_action_required = "0"
+    heartbeat_progress_states = {"known_wait", "scanner_alive_inside_batch"}
 
     if not live_path.exists() or not live_rows:
         status = "fail"
@@ -2872,6 +2929,18 @@ def _f_live_owner_rows(*, base: Path, observed_utc: str, now: datetime) -> list[
     elif (
         supervisor_path.exists()
         and state == "running"
+        and (
+            supervisor_state in {"alive_inside_batch", "waiting_known_action"}
+            or supervisor_progress_state in heartbeat_progress_states
+        )
+    ):
+        status = "ok"
+        value = f"{state}/{supervisor_progress_state or supervisor_state}"
+        root_cause = ""
+        manager_action = "No action; F has fresh in-batch scanner heartbeat proof."
+    elif (
+        supervisor_path.exists()
+        and state == "running"
         and supervisor_state in {"ok", "idle", "running", "completed"}
         and scanner_progress_age is not None
         and scanner_progress_age > supervisor_stale_seconds
@@ -2880,7 +2949,14 @@ def _f_live_owner_rows(*, base: Path, observed_utc: str, now: datetime) -> list[
         value = f"{state}/no_recent_scanner_progress"
         root_cause = "The F process proof is fresh, but the last scanner chunk is stale."
         manager_action = "Treat the UI heartbeat as process-only proof; inspect scanner progress before trusting catch-up wording."
-    elif supervisor_path.exists() and supervisor_state not in {"ok", "idle", "running", "completed"}:
+    elif supervisor_path.exists() and supervisor_state not in {
+        "ok",
+        "idle",
+        "running",
+        "completed",
+        "alive_inside_batch",
+        "waiting_known_action",
+    }:
         status = "fail"
         value = f"{state}/{supervisor_state or 'blank'}"
         root_cause = "Live owner status and supervisor state disagree."

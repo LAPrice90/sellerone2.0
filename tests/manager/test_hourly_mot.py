@@ -4350,6 +4350,23 @@ def test_f_live_owner_warns_when_supervisor_process_is_alive_without_row_progres
     assert "scanner_progress_age_seconds=1900.0" in rows["f_live_owner_status"]["actual_proof"]
 
 
+def test_f_live_owner_accepts_fresh_in_batch_heartbeat_without_row_progress(tmp_path: Path) -> None:
+    _write_f_outputs(
+        tmp_path,
+        supervisor_state="alive_inside_batch",
+        supervisor_progress_state="scanner_alive_inside_batch",
+        supervisor_scanner_progress_age_seconds="1900",
+    )
+
+    result = build_f_hourly_mot(root=tmp_path, observed_utc=OBSERVED)
+    rows = {row["check"]: row for row in result["rows"]}
+
+    assert rows["f_live_owner_status"]["status"] == "ok"
+    assert rows["f_live_owner_status"]["value"] == "running/scanner_alive_inside_batch"
+    assert "progress_state=scanner_alive_inside_batch" in rows["f_live_owner_status"]["actual_proof"]
+    assert "scanner_progress_age_seconds=1900.0" in rows["f_live_owner_status"]["actual_proof"]
+
+
 def test_f_live_owner_warns_when_old_supervisor_ok_masks_stale_scanner_events(tmp_path: Path) -> None:
     _write_f_outputs(
         tmp_path,

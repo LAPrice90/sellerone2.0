@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="60">
+  <title>SellerOne Simple Task List</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --paper: #ffffff;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #e8eaed;
+      --red: #ea4335;
+      --yellow: #fbbc04;
+      --blue: #4285f4;
+      --green: #34a853;
+      --grey: #9aa0a6;
+      --soft-blue: #e8f0fe;
+      --soft-green: #e6f4ea;
+      --soft-yellow: #fef7e0;
+      --soft-red: #fce8e6;
+      --soft-grey: #f8fafd;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Google Sans", Roboto, Arial, Helvetica, sans-serif;
+      line-height: 1.35;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 28px 16px 42px;
+    }
+
+    header {
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 4px solid var(--blue);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .list {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 22px;
+      box-shadow: 0 2px 8px rgba(60, 64, 67, 0.12);
+    }
+
+    .section-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 20px 0 10px;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .section-title::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--blue);
+    }
+
+    .section-title.decision::before { background: var(--red); }
+    .section-title.working::before { background: var(--blue); }
+    .section-title.waiting-proof::before { background: var(--yellow); }
+    .section-title.ready-later::before { background: var(--green); }
+
+    .section-title.decision { color: var(--red); }
+    .section-title.working { color: var(--blue); }
+    .section-title.waiting-proof { color: #b06000; }
+    .section-title.ready-later { color: var(--green); }
+
+    .list.decision { border-top: 5px solid var(--red); }
+    .list.working { border-top: 5px solid var(--blue); }
+    .list.waiting-proof { border-top: 5px solid var(--yellow); }
+    .list.ready-later { border-top: 5px solid var(--green); }
+
+    .list.decision .item { background: linear-gradient(90deg, var(--soft-red), #ffffff 32%); }
+    .list.working .item { background: linear-gradient(90deg, var(--soft-blue), #ffffff 32%); }
+    .list.waiting-proof .item { background: linear-gradient(90deg, var(--soft-yellow), #ffffff 32%); }
+    .list.ready-later .item { background: linear-gradient(90deg, var(--soft-green), #ffffff 32%); }
+
+    .item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .item:last-child { border-bottom: 0; }
+
+    h2 {
+      margin: 0 0 5px;
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    .title-row h2 {
+      margin: 0;
+    }
+
+    .copy-title {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #ffffff;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .copy-title:hover,
+    .copy-title:focus {
+      color: var(--ink);
+      border-color: var(--blue);
+      outline: none;
+    }
+
+    .copy-title.copied {
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .why {
+      color: var(--muted);
+      margin-bottom: 9px;
+    }
+
+    .next {
+      color: var(--ink);
+    }
+
+    .label {
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      align-self: start;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+    }
+
+    .critical { background: var(--red); color: #ffffff; }
+    .active { background: var(--blue); color: #ffffff; }
+    .waiting { background: var(--yellow); color: #202124; }
+    .pilot { background: var(--green); color: #ffffff; }
+    .parked { background: var(--grey); color: #ffffff; }
+
+    .footer {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      .item {
+        grid-template-columns: 1fr;
+      }
+
+      .badge {
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SellerOne Task List</h1>
+      <p class="sub">The short version. Ask the Rep chat for details when needed.</p>
+    </header>
+
+    <h2 class="section-title working">Being Worked</h2>
+    <section class="list working">
+      <article class="item">
+        <div>
+          <h2>System Trust Reset</h2>
+          <p class="why">The manager system missed an obvious pricing-risk escalation. Until fixed, the board is a checklist, not a trusted autopilot.</p>
+          <p class="next"><span class="label">Next:</span> Reset brief complete: treat the manager pilot as a failed first version. Start future management communication from the reset pack and keep money-risk checks above feature work.</p>
+        </div>
+        <span class="badge critical">Trust reset</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Token Pricing Issue</h2>
+          <p class="why">Pricing/floor audit found 4 red SKUs: A2-T2AC-TW3L, CN-NR50-TSFE, LV-425G-BY4X, and 6V-EEC1-2S9Z.</p>
+          <p class="next"><span class="label">Next:</span> A2 code/test repair passed. Wait for approved H proof refresh, then close all 4 red SKUs as complete, next packet, blocked, or escalation needed.</p>
+        </div>
+        <span class="badge waiting">Awaiting H proof</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Shift Manager</h2>
+          <p class="why">Keep workers moving without filling this chat with technical noise.</p>
+          <p class="next"><span class="label">Next:</span> Proof-closure rule is now applied. Foreman heartbeat is tightened to 5 minutes and broad side dispatch is held while stale results are closed.</p>
+        </div>
+        <span class="badge active">Closure fix applied</span>
+      </article>
+    </section>
+
+    <h2 class="section-title waiting-proof">Waiting Proof Or Follow-Up</h2>
+    <section class="list waiting-proof">
+      <article class="item">
+        <div>
+          <h2>New Product Review</h2>
+          <p class="why">AI decision step is rebuilt; TD Synnex now waits for final handoff safety before Luke can review it.</p>
+          <p class="next"><span class="label">Next:</span> Wait for TD Synnex final handoff build conditions, then check whether its 9 decided rows become operator-ready.</p>
+        </div>
+        <span class="badge waiting">Awaiting handoff</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Bliss SKU Refresh</h2>
+          <p class="why">Bliss changed supplier SKUs, and Luke has now supplied the fresh Product Database export.</p>
+          <p class="next"><span class="label">Next:</span> Fresh preview complete: 24 safe update candidates, 8 already updated/no change, 19 dropped/discontinued, and 23 active manual review rows. Google writeback still needs approval.</p>
+        </div>
+        <span class="badge waiting">Review needed</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>H Token Selection Follow-Up</h2>
+          <p class="why">The morning token check passed, but two SKUs still need H to prove it selects the fresh stock token.</p>
+          <p class="next"><span class="label">Next:</span> Result complete: both watched SKUs are still blocked because H selects older fallback tokens instead of fresh receipt tokens.</p>
+        </div>
+        <span class="badge waiting">Blocked</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Morning MOT Watch</h2>
+          <p class="why">Make sure morning health checks are read and turned into board actions, not just left in files.</p>
+          <p class="next"><span class="label">Next:</span> Result complete: morning MOT tasks ran, but MOT verdict is decision-needed with 16 fails, 19 warnings, and 1 Luke decision.</p>
+        </div>
+        <span class="badge waiting">Decision needed</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Foreman Proof Closure Rule</h2>
+          <p class="why">Stop worker results finishing with a hidden next step that nobody chases.</p>
+          <p class="next"><span class="label">Next:</span> Rule file exists and this heartbeat closed the finished O worker result before dispatching side work.</p>
+        </div>
+        <span class="badge pilot">Rule proved</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Runtime Watch And MOT</h2>
+          <p class="why">Make sure dead scanners, stale cycles, and MOT follow-ups are seen by the manager without Luke asking.</p>
+          <p class="next"><span class="label">Next:</span> Result complete: sensors exist, but board/Foreman still need a clearer scanner alive/stuck/blocked watch. Risk is medium.</p>
+        </div>
+        <span class="badge waiting">Needs watch upgrade</span>
+      </article>
+    </section>
+
+    <h2 class="section-title ready-later">Ready Later</h2>
+    <section class="list ready-later">
+      <article class="item">
+        <div>
+          <h2>Maintenance Mode</h2>
+          <p class="why">H/B safe maintenance design is complete; implementation is a later protected build decision.</p>
+          <p class="next"><span class="label">Next:</span> Use the H/B design when we approve actual lane-scoped maintenance controls. No runtime change is approved from the design alone.</p>
+        </div>
+        <span class="badge pilot">Design ready</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Profit Dashboard</h2>
+          <p class="why">Create a Sellerboard-style profit dashboard using SellerOne data.</p>
+          <p class="next"><span class="label">Next:</span> Data-source mapping is done. Formula-definition packet needed before dashboard build.</p>
+        </div>
+        <span class="badge waiting">Needs packet</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Final Code Clean-Up Gate</h2>
+          <p class="why">Stop coding jobs being signed off if they work but leave messy, over-complicated code behind.</p>
+          <p class="next"><span class="label">Next:</span> Checklist and sign-off template are built. Use this as the final review step before coding tasks are signed off.</p>
+        </div>
+        <span class="badge pilot">Ready to use</span>
+      </article>
+
+      <article class="item">
+        <div>
+          <h2>Restocking Decisions</h2>
+          <p class="why">Keep buying decisions moving while the new system is still being tightened.</p>
+          <p class="next"><span class="label">Next:</span> O proof review and bounded fix/retest plan are complete but blocked. Clearing this needs an approved O proof refresh packet or an approved bridge proof-gate policy decision.</p>
+        </div>
+        <span class="badge waiting">Blocked</span>
+      </article>
+    </section>
+
+    <p class="footer">Last checked: 2026-06-12 12:04. This page refreshes every 60 seconds. Waiting Proof means a result is due. Ready Later means parked, not being chased today.</p>
+  </main>
+  <script>
+    (function () {
+      function copyText(value) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(value).catch(function () {
+            return fallbackCopy(value);
+          });
+        }
+
+        return fallbackCopy(value);
+      }
+
+      function fallbackCopy(value) {
+        return new Promise(function (resolve, reject) {
+          var textArea = document.createElement("textarea");
+          textArea.value = value;
+          textArea.setAttribute("readonly", "readonly");
+          textArea.style.position = "fixed";
+          textArea.style.left = "-9999px";
+          textArea.style.top = "0";
+          textArea.style.opacity = "0";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+
+          try {
+            if (document.execCommand("copy")) {
+              resolve();
+            } else {
+              reject(new Error("copy command failed"));
+            }
+          } catch (error) {
+            reject(error);
+          } finally {
+            document.body.removeChild(textArea);
+          }
+        });
+      }
+
+      var copyValues = {
+        "Token Pricing Issue": "A2-T2AC-TW3L-FLOOR-NOT-UPDATED-ACTIVE-RISK",
+        "System Trust Reset": "SYSTEM-TRUST-RESET-AND-BLINDSPOT-AUDIT",
+        "New Product Review": "NEW-PRODUCT-REVIEW-AI-DECISION-STEP-REBUILD",
+        "Restocking Decisions": "Restocking Decisions",
+        "H Token Selection Follow-Up": "H-TOKEN-SELECTION-FOLLOW-UP-20260612",
+        "Morning MOT Watch": "MORNING-MOT-WATCH-20260612",
+        "Foreman Proof Closure Rule": "FOREMAN-PROOF-CLOSURE-RULE-20260612",
+        "Bliss SKU Refresh": "BLISS-DISTRIBUTION-SKU-REFRESH-RERUN-WITH-FRESH-SOURCE",
+        "Profit Dashboard": "Profit Dashboard",
+        "Shift Manager": "SO21-FOREMAN-PRIORITY-HANDOFF-FIX",
+        "Final Code Clean-Up Gate": "SO21-FINAL-SIMPLIFICATION-SIGNOFF-GATE",
+        "Maintenance Mode": "H-B-SCOPED-MAINTENANCE-ROUTE-DESIGN",
+        "Runtime Watch And MOT": "RUNTIME-WATCH-AND-MOT-VISIBILITY"
+      };
+
+      Array.prototype.forEach.call(document.querySelectorAll(".item h2"), function (heading) {
+        if (heading.parentElement && heading.parentElement.classList.contains("title-row")) return;
+
+        var row = document.createElement("div");
+        row.className = "title-row";
+        heading.parentNode.insertBefore(row, heading);
+        row.appendChild(heading);
+
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "copy-title";
+        button.textContent = "C";
+        button.title = "Copy title";
+        button.setAttribute("aria-label", "Copy " + heading.textContent);
+        row.appendChild(button);
+
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          var value = copyValues[heading.textContent.trim()] || heading.textContent.trim();
+
+          copyText(value).then(function () {
+            button.classList.add("copied");
+            button.textContent = "OK";
+            setTimeout(function () {
+              button.classList.remove("copied");
+              button.textContent = "C";
+            }, 900);
+          }).catch(function () {
+            button.textContent = "!";
+            setTimeout(function () {
+              button.textContent = "C";
+            }, 900);
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

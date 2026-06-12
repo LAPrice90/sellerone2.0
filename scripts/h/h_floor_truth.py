@@ -29,6 +29,7 @@ REASON_FBA_BAND_MISSING_100 = "FBA_BAND_MISSING_100"
 REASON_COGS_TOKEN_MISSING = "COGS_TOKEN_MISSING"
 REASON_VAT_RATE_MISSING_FALLBACK_USED = "VAT_RATE_MISSING_FALLBACK_USED"
 REASON_CANDIDATE_PRICE_MISSING = "CANDIDATE_PRICE_MISSING"
+REASON_TOKEN_SELECTION_CONFLICT = "token_selection_conflict"
 
 BLOCKING_REASON_CODES = {
     REASON_REFERRAL_BAND_MISSING_10,
@@ -37,6 +38,7 @@ BLOCKING_REASON_CODES = {
     REASON_FBA_BAND_MISSING_100,
     REASON_COGS_TOKEN_MISSING,
     REASON_CANDIDATE_PRICE_MISSING,
+    REASON_TOKEN_SELECTION_CONFLICT,
 }
 
 
@@ -50,6 +52,11 @@ class HTokenCogsSource:
     source_order_key: str = ""
     notes: str = ""
     proof_state: str = "unknown"
+    token_selection_conflict: bool = False
+    token_selection_conflict_reason: str = ""
+    newer_receipt_token_id: str = ""
+    newer_receipt_cost_exvat_gbp: str = ""
+    newer_receipt_received_date: str = ""
 
 
 def _norm(value: object) -> str:
@@ -127,6 +134,79 @@ def _token_cost_proof_state(row: Mapping[str, object], source_cogs: str) -> str:
     return "unproved"
 
 
+def _find_newer_available_receipt_for_selected_token(
+    selected_row: Mapping[str, object],
+    sku_available: pd.DataFrame,
+) -> dict[str, str]:
+    receipt = _find_newer_available_receipt_row_for_selected_token(selected_row, sku_available)
+    if not receipt:
+        return {}
+    return {
+        "newer_receipt_token_id": receipt.get("token_id", ""),
+        "newer_receipt_cost_exvat_gbp": receipt.get("cost_per_unit", ""),
+        "newer_receipt_received_date": receipt.get("received_date", ""),
+    }
+
+
+def _find_newer_available_receipt_row_for_selected_token(
+    selected_row: Mapping[str, object],
+    sku_available: pd.DataFrame,
+) -> dict[str, str]:
+    selected_received_dt = selected_row.get("received_dt")
+    selected_sort_rank = _to_float(selected_row.get("sort_rank_num", ""))
+    if "source" not in sku_available.columns:
+        return {}
+    receipts = sku_available.loc[
+        sku_available["source"].astype(str).str.strip().str.lower().eq("stock_receipt")
+    ].copy()
+    if receipts.empty:
+        return {}
+
+    newer_by_date = pd.Series([False] * len(receipts), index=receipts.index)
+    if pd.notna(selected_received_dt) and "received_dt" in receipts.columns:
+        newer_by_date = receipts["received_dt"].gt(selected_received_dt)
+
+    newer_by_rank = pd.Series([False] * len(receipts), index=receipts.index)
+    if selected_sort_rank is not None and "sort_rank_num" in receipts.columns:
+        newer_by_rank = receipts["sort_rank_num"].gt(float(selected_sort_rank))
+
+    newer_receipts = receipts.loc[newer_by_date | newer_by_rank].copy()
+    if newer_receipts.empty:
+        return {}
+    newer_receipts = newer_receipts.sort_values(
+        ["sort_rank_num", "received_dt"],
+        ascending=[False, False],
+        kind="stable",
+    )
+    return {str(k): _norm(v) for k, v in newer_receipts.iloc[0].to_dict().items()}
+
+
+def _select_h_token_row_for_sku(
+    sku_available: pd.DataFrame,
+    *,
+    prefer_newer_receipt_over_unproved_fallback: bool,
+) -> tuple[dict[str, str], dict[str, str]]:
+    if sku_available.empty:
+        return {}, {}
+    ordered = sku_available.sort_values(["sort_rank_num", "received_dt"], kind="stable")
+    first_row = ordered.iloc[0]
+    first_dict = {str(k): _norm(v) for k, v in first_row.to_dict().items()}
+    first_proof_state = _token_cost_proof_state(first_dict, "token_ledger_live_next_available")
+    if (
+        prefer_newer_receipt_over_unproved_fallback
+        and first_proof_state == "unproved"
+        and _is_fallback_token_row(first_dict)
+    ):
+        newer_receipt = _find_newer_available_receipt_row_for_selected_token(first_row, ordered)
+        if newer_receipt:
+            return newer_receipt, {
+                "superseded_fallback_token_id": first_dict.get("token_id", ""),
+                "superseded_fallback_cost_exvat_gbp": first_dict.get("cost_per_unit", ""),
+                "superseded_fallback_received_date": first_dict.get("received_date", ""),
+            }
+    return first_dict, {}
+
+
 @dataclass
 class HFloorInputs:
     sku: str
@@ -150,6 +230,11 @@ class HFloorInputs:
     cogs_source_order_key: str = ""
     cogs_source_notes: str = ""
     cogs_source_proof_state: str = "unknown"
+    token_selection_conflict: bool = False
+    token_selection_conflict_reason: str = ""
+    newer_receipt_token_id: str = ""
+    newer_receipt_cost_exvat_gbp: str = ""
+    newer_receipt_received_date: str = ""
 
 
 @dataclass
@@ -209,26 +294,54 @@ def load_h_floor_context(
                     base["received_dt"] = pd.to_datetime(
                         base.get("received_date", ""),
                         errors="coerce",
+                        format="mixed",
                         utc=True,
                     )
                 else:
-                    base["received_dt"] = pd.NaT
+                    base["received_dt"] = pd.Series(pd.NaT, index=base.index, dtype="datetime64[ns, UTC]")
                 base["sort_rank_num"] = base["sort_rank_num"].fillna(10**12)
-                base["received_dt"] = base["received_dt"].fillna(pd.Timestamp("2262-04-11T00:00:00Z"))
-                base = base.sort_values(["sku_u", "sort_rank_num", "received_dt"], kind="stable")
-                first_rows = base.groupby("sku_u", as_index=False).head(1).copy()
+                fallback_received_dt = pd.Timestamp("2262-04-11T00:00:00Z")
+                base["received_dt"] = base["received_dt"].where(base["received_dt"].notna(), fallback_received_dt)
                 source = "token_ledger_live_next_available" if not available.empty else "token_ledger_live_first_cost"
-                for _, row in first_rows.iterrows():
-                    row_dict = {str(k): _norm(v) for k, v in row.to_dict().items()}
-                    token_cogs_by_sku[str(row["sku_u"]).strip().upper()] = HTokenCogsSource(
-                        cost_exvat_gbp=float(row["cost_num"]),
+                base = base.sort_values(["sku_u", "sort_rank_num", "received_dt"], kind="stable")
+                for sku_key, sku_rows in base.groupby("sku_u", sort=False):
+                    row_dict, superseded_fallback = _select_h_token_row_for_sku(
+                        sku_rows.copy(),
+                        prefer_newer_receipt_over_unproved_fallback=source == "token_ledger_live_next_available",
+                    )
+                    if not row_dict:
+                        continue
+                    proof_state = _token_cost_proof_state(row_dict, source)
+                    conflict_evidence: dict[str, str] = {}
+                    if (
+                        source == "token_ledger_live_next_available"
+                        and proof_state == "unproved"
+                        and _is_fallback_token_row(row_dict)
+                    ):
+                        # The selector above would have chosen the newer receipt when one exists.
+                        conflict_evidence = {}
+                    conflict_active = bool(conflict_evidence)
+                    notes = row_dict.get("notes", "")
+                    if superseded_fallback:
+                        extra_note = (
+                            "h_selection_superseded_unproved_fallback="
+                            f"{superseded_fallback.get('superseded_fallback_token_id', '')}"
+                        )
+                        notes = f"{notes};{extra_note}" if notes else extra_note
+                    token_cogs_by_sku[str(sku_key).strip().upper()] = HTokenCogsSource(
+                        cost_exvat_gbp=float(row_dict.get("cost_num") or row_dict.get("cost_per_unit")),
                         source_cogs=source,
                         token_id=row_dict.get("token_id", ""),
                         token_source=row_dict.get("source", ""),
                         source_batch_id=row_dict.get("source_batch_id", ""),
                         source_order_key=row_dict.get("source_order_key", ""),
-                        notes=row_dict.get("notes", ""),
-                        proof_state=_token_cost_proof_state(row_dict, source),
+                        notes=notes,
+                        proof_state=proof_state,
+                        token_selection_conflict=conflict_active,
+                        token_selection_conflict_reason=REASON_TOKEN_SELECTION_CONFLICT if conflict_active else "",
+                        newer_receipt_token_id=conflict_evidence.get("newer_receipt_token_id", ""),
+                        newer_receipt_cost_exvat_gbp=conflict_evidence.get("newer_receipt_cost_exvat_gbp", ""),
+                        newer_receipt_received_date=conflict_evidence.get("newer_receipt_received_date", ""),
                     )
         except Exception:
             token_cogs_by_sku = {}
@@ -368,6 +481,11 @@ def resolve_h_floor_inputs(
         cogs_source_order_key = ""
         cogs_source_notes = ""
         cogs_source_proof_state = "unknown"
+        token_selection_conflict = False
+        token_selection_conflict_reason = ""
+        newer_receipt_token_id = ""
+        newer_receipt_cost_exvat_gbp = ""
+        newer_receipt_received_date = ""
         reason_codes.append(REASON_COGS_TOKEN_MISSING)
     else:
         cogs_ex = float(cogs_info.cost_exvat_gbp)
@@ -378,6 +496,13 @@ def resolve_h_floor_inputs(
         cogs_source_order_key = cogs_info.source_order_key
         cogs_source_notes = cogs_info.notes
         cogs_source_proof_state = cogs_info.proof_state
+        token_selection_conflict = bool(cogs_info.token_selection_conflict)
+        token_selection_conflict_reason = cogs_info.token_selection_conflict_reason
+        newer_receipt_token_id = cogs_info.newer_receipt_token_id
+        newer_receipt_cost_exvat_gbp = cogs_info.newer_receipt_cost_exvat_gbp
+        newer_receipt_received_date = cogs_info.newer_receipt_received_date
+        if token_selection_conflict:
+            reason_codes.append(REASON_TOKEN_SELECTION_CONFLICT)
 
     fba_ex, source_fba = _resolve_fba_exvat(row, band_bucket, reason_codes)
     referral_pct, source_referral = _resolve_referral_pct(row, band_bucket, reason_codes)
@@ -416,6 +541,11 @@ def resolve_h_floor_inputs(
         cogs_source_order_key=cogs_source_order_key,
         cogs_source_notes=cogs_source_notes,
         cogs_source_proof_state=cogs_source_proof_state,
+        token_selection_conflict=token_selection_conflict,
+        token_selection_conflict_reason=token_selection_conflict_reason,
+        newer_receipt_token_id=newer_receipt_token_id,
+        newer_receipt_cost_exvat_gbp=newer_receipt_cost_exvat_gbp,
+        newer_receipt_received_date=newer_receipt_received_date,
     )
 
 
@@ -560,6 +690,11 @@ def build_h_floor_trace_row(
         "cogs_source_order_key": _norm(inputs.cogs_source_order_key),
         "cogs_source_notes": _norm(inputs.cogs_source_notes),
         "cogs_source_proof_state": _norm(inputs.cogs_source_proof_state),
+        "token_selection_conflict": "1" if inputs.token_selection_conflict else "0",
+        "token_selection_conflict_reason": _norm(inputs.token_selection_conflict_reason),
+        "newer_receipt_token_id": _norm(inputs.newer_receipt_token_id),
+        "newer_receipt_cost_exvat_gbp": _norm(inputs.newer_receipt_cost_exvat_gbp),
+        "newer_receipt_received_date": _norm(inputs.newer_receipt_received_date),
         "source_fba": _norm(inputs.source_fba),
         "source_referral": _norm(inputs.source_referral),
         "band_bucket": _norm(inputs.band_bucket),
@@ -596,6 +731,11 @@ def append_h_floor_trace_rows(rows: list[dict[str, str]], *, path: Path = TRACE_
         "cogs_source_order_key",
         "cogs_source_notes",
         "cogs_source_proof_state",
+        "token_selection_conflict",
+        "token_selection_conflict_reason",
+        "newer_receipt_token_id",
+        "newer_receipt_cost_exvat_gbp",
+        "newer_receipt_received_date",
         "source_fba",
         "source_referral",
         "band_bucket",

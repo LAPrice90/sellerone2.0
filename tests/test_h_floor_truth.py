@@ -5,9 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from scripts.h.h_floor_truth import (
+    REASON_TOKEN_SELECTION_CONFLICT,
     REASON_REFERRAL_BAND_MISSING_100,
     build_h_floor_trace_row,
     compute_h_floor_for_sku,
+    has_blocking_reason_codes,
     load_h_floor_context,
     resolve_h_floor_inputs,
 )
@@ -210,8 +212,113 @@ class HFloorTruthTests(unittest.TestCase):
         self.assertEqual(inputs.cogs_source_token_id, "ADJ-FALLBACK-1")
         self.assertEqual(inputs.cogs_token_source, "stock_adjustment_fallback")
         self.assertEqual(inputs.cogs_source_proof_state, "unproved")
+        self.assertFalse(inputs.token_selection_conflict)
         self.assertEqual(trace["cogs_source_proof_state"], "unproved")
+        self.assertEqual(trace["token_selection_conflict"], "0")
         self.assertGreater(result.floor_total_gbp, 0)
+
+    def test_a2_t2ac_tw3l_newer_receipt_supersedes_unproved_fallback(self) -> None:
+        td, ctx = self._context(
+            product_rows=[
+                {
+                    "seller_sku": "A2-T2AC-TW3L",
+                    "last_vat_rate_pct": "20",
+                    "last_fba_fee_ex_vat_100": "3.05",
+                    "last_commission_pct_100": "8",
+                }
+            ],
+            token_rows=[
+                {
+                    "token_id": "ADJ-A2-T2AC-TW3L-FBA15LKBY55D-0140",
+                    "seller_sku": "A2-T2AC-TW3L",
+                    "cost_per_unit": "4.51",
+                    "status": "available",
+                    "sort_rank": "1773792000.0",
+                    "received_date": "2026-03-18",
+                    "source": "stock_adjustment_fallback",
+                    "source_batch_id": "FBA15LKBY55D",
+                    "notes": "adjustment_fallback_create:FBA15LKBY55D",
+                },
+                {
+                    "token_id": "SR-20260605-ROW0092-0001",
+                    "seller_sku": "A2-T2AC-TW3L",
+                    "cost_per_unit": "4.89",
+                    "status": "available",
+                    "sort_rank": "1780617600.0",
+                    "received_date": "2026-06-05",
+                    "source": "stock_receipt",
+                    "source_batch_id": "SR-20260605-ROW0092",
+                    "source_order_key": "20495415-fc4d-478c-a65d-0de4ecaec689",
+                    "notes": "",
+                },
+            ],
+            token_cogs_rows=[],
+        )
+        try:
+            inputs, result = compute_h_floor_for_sku("A2-T2AC-TW3L", 12.00, context=ctx)
+            trace = build_h_floor_trace_row(inputs=inputs, result=result, source_script="test")
+        finally:
+            td.cleanup()
+
+        self.assertAlmostEqual(inputs.cogs_exvat_gbp, 4.89, places=2)
+        self.assertEqual(inputs.cogs_source_token_id, "SR-20260605-ROW0092-0001")
+        self.assertEqual(inputs.cogs_token_source, "stock_receipt")
+        self.assertEqual(inputs.cogs_source_proof_state, "clean")
+        self.assertIn("h_selection_superseded_unproved_fallback=ADJ-A2-T2AC-TW3L-FBA15LKBY55D-0140", inputs.cogs_source_notes)
+        self.assertFalse(inputs.token_selection_conflict)
+        self.assertEqual(inputs.newer_receipt_token_id, "")
+        self.assertNotIn(REASON_TOKEN_SELECTION_CONFLICT, inputs.reason_codes)
+        self.assertNotIn(REASON_TOKEN_SELECTION_CONFLICT, result.reason_codes)
+        self.assertFalse(has_blocking_reason_codes(inputs.reason_codes))
+        self.assertGreater(result.floor_total_gbp, 0)
+        self.assertEqual(trace["token_selection_conflict"], "0")
+        self.assertEqual(trace["cogs_source_token_id"], "SR-20260605-ROW0092-0001")
+        self.assertEqual(trace["newer_receipt_token_id"], "")
+
+    def test_generic_unproved_fallback_before_newer_receipt_is_blocking_conflict(self) -> None:
+        td, ctx = self._context(
+            product_rows=[
+                {
+                    "seller_sku": "GENERIC-FALLBACK-SKU",
+                    "last_vat_rate_pct": "20",
+                    "last_fba_fee_ex_vat_100": "3.05",
+                    "last_commission_pct_100": "8",
+                }
+            ],
+            token_rows=[
+                {
+                    "token_id": "ADJ-GENERIC-FBA-0001",
+                    "seller_sku": "GENERIC-FALLBACK-SKU",
+                    "cost_per_unit": "3.10",
+                    "status": "available",
+                    "sort_rank": "10",
+                    "received_date": "2026-01-01",
+                    "source": "stock_adjustment_fallback",
+                    "notes": "adjustment_fallback_create:FBA-GENERIC",
+                },
+                {
+                    "token_id": "SR-GENERIC-0001",
+                    "seller_sku": "GENERIC-FALLBACK-SKU",
+                    "cost_per_unit": "4.00",
+                    "status": "available",
+                    "sort_rank": "20",
+                    "received_date": "2026-02-01",
+                    "source": "stock_receipt",
+                    "notes": "",
+                },
+            ],
+            token_cogs_rows=[],
+        )
+        try:
+            inputs, result = compute_h_floor_for_sku("GENERIC-FALLBACK-SKU", 12.00, context=ctx)
+        finally:
+            td.cleanup()
+
+        self.assertEqual(inputs.cogs_source_token_id, "SR-GENERIC-0001")
+        self.assertFalse(inputs.token_selection_conflict)
+        self.assertEqual(inputs.newer_receipt_token_id, "")
+        self.assertNotIn(REASON_TOKEN_SELECTION_CONFLICT, result.reason_codes)
+        self.assertFalse(has_blocking_reason_codes(result.reason_codes))
 
     def test_receipt_proved_fallback_token_source_is_visible(self) -> None:
         td, ctx = self._context(

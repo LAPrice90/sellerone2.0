@@ -387,6 +387,92 @@ def test_h_token_floor_source_guard_warns_for_unproved_fallback_token(tmp_path: 
     assert rows["h_manager_readiness"]["status"] == "warn"
 
 
+def test_h_token_floor_source_guard_fails_for_token_conflict_with_missing_clean_floor(tmp_path: Path) -> None:
+    _write_clean_h_evidence(tmp_path)
+    _write_reliability_manifests(tmp_path, ["clean"] * 10)
+    _write_csv(
+        tmp_path / "out" / "phase1_runtime_floor_snapshot_latest.csv",
+        [
+            "sku",
+            "execution_write_status",
+            "current_cycle_decision",
+            "current_cycle_market_data_present",
+            "write_attempted_flag",
+            "execution_hard_floor_gbp",
+            "execution_final_ceiling_landed_gbp",
+            "true_binding_ceiling_gbp",
+            "trace_floor_total_gbp",
+            "trace_cogs_exvat_gbp",
+            "reason_codes_csv",
+        ],
+        [
+            {
+                "sku": "A2-T2AC-TW3L",
+                "execution_write_status": "FLOOR_INPUT_MISSING_HOLD",
+                "current_cycle_decision": "execute",
+                "current_cycle_market_data_present": "1",
+                "write_attempted_flag": "0",
+                "execution_hard_floor_gbp": "",
+                "execution_final_ceiling_landed_gbp": "14.00",
+                "true_binding_ceiling_gbp": "14.00",
+                "trace_floor_total_gbp": "",
+                "trace_cogs_exvat_gbp": "4.510",
+                "reason_codes_csv": "token_selection_conflict,H_FLOOR_INPUT_BLOCKED_NO_WRITE",
+            }
+        ],
+    )
+    _write_csv(
+        tmp_path / "out" / "h_floor_truth_trace.csv",
+        [
+            "asof_utc",
+            "source_script",
+            "sku",
+            "floor_total_gbp",
+            "candidate_price_gbp",
+            "source_cogs",
+            "cogs_source_token_id",
+            "cogs_token_source",
+            "cogs_source_proof_state",
+            "token_selection_conflict",
+            "token_selection_conflict_reason",
+            "newer_receipt_token_id",
+            "reason_codes_csv",
+        ],
+        [
+            {
+                "asof_utc": "2026-05-27T11:00:00Z",
+                "source_script": "H110",
+                "sku": "A2-T2AC-TW3L",
+                "floor_total_gbp": "",
+                "candidate_price_gbp": "12.00",
+                "source_cogs": "token_ledger_live_next_available",
+                "cogs_source_token_id": "ADJ-A2-T2AC-TW3L-FBA15LKBY55D-0140",
+                "cogs_token_source": "stock_adjustment_fallback",
+                "cogs_source_proof_state": "unproved",
+                "token_selection_conflict": "1",
+                "token_selection_conflict_reason": "token_selection_conflict",
+                "newer_receipt_token_id": "SR-20260605-ROW0092-0001",
+                "reason_codes_csv": "token_selection_conflict",
+            }
+        ],
+    )
+
+    result = build_h_hourly_mot(root=tmp_path, observed_utc=OBSERVED)
+    rows = _rows_by_check(result)
+    paths = write_hourly_mot_outputs(result, tmp_path / "out" / "systems" / "M")
+    with paths["mot_worklist_csv"].open(newline="", encoding="utf-8") as handle:
+        worklist_rows = list(csv.DictReader(handle))
+    item = next(row for row in worklist_rows if row["check"] == "h_token_floor_source_guard")
+
+    guard = rows["h_token_floor_source_guard"]
+    assert guard["status"] == "fail"
+    assert "token_selection_conflict_no_clean_floor_rows=1" in guard["value"]
+    assert "A2-T2AC-TW3L" in guard["value"]
+    assert "active pricing risk" in guard["root_cause_guess"]
+    assert item["status"] == "new"
+    assert item["job_ref"] == "H-TOKEN-FLOOR-SOURCE-GUARD"
+
+
 def test_h_token_floor_source_guard_accepts_receipt_proved_fallback_token(tmp_path: Path) -> None:
     _write_clean_h_evidence(tmp_path)
     _write_reliability_manifests(tmp_path, ["clean"] * 10)
